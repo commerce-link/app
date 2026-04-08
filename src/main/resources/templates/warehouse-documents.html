@@ -1,0 +1,112 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 th:text="#{warehouse.documents.title}"></h1>
+
+            <div class="box" th:if="${documentsDisabled}">
+                <div class="notification is-warning">
+                    <span th:text="#{warehouse.documents.disabled}"></span>
+                </div>
+            </div>
+
+            <div class="box" th:unless="${documentsDisabled}">
+                <form method="get" th:action="${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents'">
+                    <div class="columns">
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.type}"></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select name="type">
+                                            <option value="" th:text="#{general.all}"></option>
+                                            <option th:each="docType : ${documentTypes}"
+                                                    th:value="${docType.name()}"
+                                                    th:text="${docType.localizedName}"
+                                                    th:selected="${docType.name() == searchParams.type}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.warehouse.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="warehouseId" th:value="${searchParams.warehouseId}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="columns">
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.date.from}"></label>
+                                <div class="control">
+                                    <input class="input" type="date" name="dateFrom" th:value="${searchParams.dateFrom}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.date.to}"></label>
+                                <div class="control">
+                                    <input class="input" type="date" name="dateTo" th:value="${searchParams.dateTo}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-5">
+                    <table class="table is-fullwidth is-narrow">
+                        <thead>
+                        <tr>
+                            <th th:if="${isSuperAdmin}" th:text="#{general.store.id}"></th>
+                            <th th:text="#{warehouse.documents.warehouse.id}"></th>
+                            <th th:text="#{warehouse.documents.document.no}"></th>
+                            <th th:text="#{warehouse.documents.type}"></th>
+                            <th th:text="#{warehouse.documents.counterparty}"></th>
+                            <th th:text="#{warehouse.documents.created.at}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="doc : ${documents}"
+                            th:with="detailPath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard'">
+                            <td th:if="${isSuperAdmin}" th:text="${doc.storeId}"></td>
+                            <td th:text="${doc.warehouseId}"></td>
+                            <td>
+                                <a th:href="@{${detailPath + '/warehouse-documents/details'}(documentNo=${doc.documentNo})}">
+                                    <span th:text="${doc.documentNo}"></span>
+                                </a>
+                            </td>
+                            <td th:text="${doc.type.localizedName}"></td>
+                            <td th:text="${doc.counterparty?.companyName} ?: (${doc.counterparty?.name} != null ? ${doc.counterparty.name + (doc.counterparty.surname != null ? ' ' + doc.counterparty.surname : '')} : '')"></td>
+                            <td th:text="${#temporals.format(doc.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(documents)}">
+                            <td th:colspan="${isSuperAdmin} ? 6 : 5" class="has-text-centered" th:text="#{warehouse.documents.no.documents}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div th:replace="~{fragments/pagination :: pagination(${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents', ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div class="box"
+        th:fragment="box(title, items, status, isActionable)">
+        <h3 th:text="${title}"></h3>
+
+        <form method="post" th:id="'warehouseItemBatchForm_' + ${status.name()}" action="#">
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;"><span th:text="#{warehouse.select}"></span></th>
+                        <th style="width: 80px;" th:text="#{warehouse.item.id}">ID</th>
+                        <th th:text="#{warehouse.item.category}"></th>
+                        <th th:text="#{warehouse.item.ean}"></th>
+                        <th th:text="#{warehouse.item.manufacturer.code}"></th>
+                        <th th:text="#{warehouse.item.name}"></th>
+                        <th th:text="#{warehouse.item.quantity}"></th>
+                        <th th:text="#{warehouse.item.cost.net}"></th>
+                        <th th:text="#{warehouse.item.cost.gross}"></th>
+                        <th th:text="#{general.delivery.id}"></th>
+                        <th th:text="#{warehouse.item.serial.no}"></th>
+                        <th th:text="#{warehouse.item.status}"></th>
+                        <th th:text="#{warehouse.item.comment}"></th>
+                        <th th:text="#{warehouse.item.destroyed.at}" th:if="${status.name() == 'Destroyed'}"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${items}" th:data-item-id="${item.itemId}" th:data-item-name="${item.name}" th:data-item-qty="${item.qty}">
+                        <td style="width: 60px;">
+                            <input th:if="${isActionable}" type="checkbox" class="item-checkbox"
+                                   th:value="${item.itemId}" th:data-qty="${item.qty}" th:data-name="${item.name}"/>
+                            <span th:unless="${isActionable}">&nbsp;</span></td>
+                        <td>
+                            <a th:href="@{/dashboard/warehouse/items/{itemId}(itemId=${item.itemId})}"
+                               th:text="${#strings.substring(item.itemId, 0, 8)}"></a>
+                        </td>
+                        <td th:text="${item.category}"></td>
+                        <td th:text="${item.ean}"></td>
+                        <td th:text="${item.manufacturerCode}"></td>
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.qty}"></td>
+                        <td th:text="${item.unitCost.netValue}"></td>
+                        <td th:text="${item.unitCost.grossValue}"></td>
+                        <td>
+                            <a th:href="@{/dashboard/deliveries/details(deliveryId=${item.deliveryId})}" th:text="${item.shortenedDeliveryId}"></a>
+                        </td>
+                        <td th:text="${item.serialNo}"></td>
+                        <td th:text="${item.status.localizedName}"></td>
+                        <td th:text="${item.comment}"></td>
+                        <td th:text="${item.destroyedAt}" th:if="${status.name() == 'Destroyed'}"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="field is-grouped mb-3" th:if="${isActionable}">
+                <div class="control">
+                    <div class="select is-small">
+                        <select class="batch-action-select" name="action" required>
+
+                            <option value="markAsInAllocation"
+                                    th:text="#{warehouse.action.allocate}"
+                                    th:if="${status.name() == 'New'}">
+                            </option>
+
+                            <option value="markAsAvailable"
+                                    th:text="#{warehouse.action.mark.available}"
+                                    th:if="${status.name() == 'Reserved' || status.name() == 'InRMA'}">
+                            </option>
+
+                            <option value="markAsReserved"
+                                    th:text="#{warehouse.action.reserve}"
+                                    th:if="${status.name() == 'Delivered'}">
+                            </option>
+
+                            <option value="markAsInRMA"
+                                    th:text="#{warehouse.action.rma}"
+                                    th:if="${status.name() == 'Delivered' || status.name() == 'Reserved'}">
+                            </option>
+
+                            <option value="markAsDestroyed"
+                                    th:text="#{warehouse.action.destroy}"
+                                    th:if="${status.name() == 'Delivered' || status.name() == 'InRMA' || status.name() == 'InExternalService'}">
+                            </option>
+
+                            <option value="shipping"
+                                    th:text="#{warehouse.action.ship.to.distributor}"
+                                    th:if="${status.name() == 'InRMA'}">
+                            </option>
+
+                            <option value="markAsInExternalService"
+                                    th:text="#{warehouse.action.external.service}"
+                                    th:if="${status.name() == 'InRMA'}">
+                            </option>
+
+                            <option value="markAsReceivedFromExternalService"
+                                    th:text="#{warehouse.action.received.from.external.service}"
+                                    th:if="${status.name() == 'InExternalService'}">
+                            </option>
+
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <button class="button is-primary is-small" type="button" onclick="showQuantityModal(this)" th:text="#{general.save}"></button>
+                </div>
+            </div>
+        </form>
+
+        <div th:id="'quantityModal_' + ${status.name()}" class="modal">
+            <div class="modal-background" onclick="hideQuantityModal(this)"></div>
+            <div class="modal-card">
+                <header class="modal-card-head">
+                    <p class="modal-card-title" th:text="#{warehouse.modal.select.quantities}">Select Quantities</p>
+                    <button class="delete" aria-label="close" type="button" onclick="hideQuantityModal(this)"></button>
+                </header>
+                <section class="modal-card-body">
+                    <div class="destroy-fields" style="display: none;">
+                        <div class="field">
+                            <label class="label" th:text="#{warehouse.modal.reason}">Reason</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select class="destroy-reason-select" name="reason" required>
+                                        <option value="StockAdjustment" th:text="#{warehouse.reason.stock.adjustment}">Stock Adjustment</option>
+                                        <option value="Destruction" th:text="#{warehouse.reason.destruction}">Destruction</option>
+                                        <option value="InternalUse" th:text="#{warehouse.reason.internal.use}">Internal Use</option>
+                                        <option value="Theft" th:text="#{warehouse.reason.theft}">Theft</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{warehouse.modal.note}">Note</label>
+                            <div class="control">
+                                <textarea class="textarea destroy-note" name="note" rows="2" required></textarea>
+                            </div>
+                        </div>
+                        <hr/>
+                    </div>
+                    <table class="table is-fullwidth">
+                        <thead>
+                            <tr>
+                                <th th:text="#{warehouse.item.name}">Name</th>
+                                <th th:text="#{warehouse.modal.available}">Available</th>
+                                <th th:text="#{warehouse.modal.quantity.to.move}">Quantity to Move</th>
+                            </tr>
+                        </thead>
+                        <tbody class="quantity-modal-body">
+                        </tbody>
+                    </table>
+                </section>
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="button" onclick="submitWithQuantities(this)" th:text="#{general.confirm}">Confirm</button>
+                    <button class="button" type="button" onclick="hideQuantityModal(this)" th:text="#{general.cancel}">Cancel</button>
+                </footer>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+            const actionsRequiringQuantity = ['markAsAvailable', 'markAsReserved', 'markAsInRMA', 'markAsDestroyed'];
+
+            function showQuantityModal(button) {
+                const form = button.closest('form');
+                const select = form.querySelector('.batch-action-select');
+                const selectedAction = select?.value;
+                const checkboxes = form.querySelectorAll('.item-checkbox:checked');
+
+                if (checkboxes.length === 0) {
+                    alert(/*[[#{warehouse.validation.select.at.least.one}]]*/ 'Please select at least one item');
+                    return;
+                }
+
+                if (!actionsRequiringQuantity.includes(selectedAction)) {
+                    form.action = '/dashboard/warehouse/' + selectedAction;
+                    checkboxes.forEach(cb => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'selectedItemIds';
+                        input.value = cb.value;
+                        form.appendChild(input);
+                    });
+                    form.submit();
+                    return;
+                }
+
+                const modal = form.parentElement.querySelector('.modal');
+                const tbody = modal.querySelector('.quantity-modal-body');
+                tbody.innerHTML = '';
+
+                const destroyFields = modal.querySelector('.destroy-fields');
+                const destroyNote = modal.querySelector('.destroy-note');
+                if (selectedAction === 'markAsDestroyed') {
+                    destroyFields.style.display = 'block';
+                    destroyNote.required = true;
+                } else {
+                    destroyFields.style.display = 'none';
+                    destroyNote.required = false;
+                    destroyNote.value = '';
+                }
+
+                checkboxes.forEach(cb => {
+                    const row = document.createElement('tr');
+                    const maxQty = parseInt(cb.dataset.qty);
+                    row.innerHTML = `
+                        <td>${cb.dataset.name}</td>
+                        <td>${maxQty}</td>
+                        <td>
+                            <input type="number" class="input is-small qty-input"
+                                   data-item-id="${cb.value}"
+                                   min="1" max="${maxQty}" value="1" required
+                                   style="width: 80px;">
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                modal.classList.add('is-active');
+            }
+
+            function hideQuantityModal(element) {
+                const modal = element.closest('.modal');
+                modal.classList.remove('is-active');
+            }
+
+            function submitWithQuantities(button) {
+                const modal = button.closest('.modal');
+                const box = modal.closest('.box');
+                const form = box.querySelector('form');
+                const select = form.querySelector('.batch-action-select');
+                const selectedAction = select?.value;
+
+                form.querySelectorAll('input[name="selectedItemIds"], input[name="quantities"], input[name="reason"], input[name="note"]').forEach(el => el.remove());
+
+                const qtyInputs = modal.querySelectorAll('.qty-input');
+                let valid = true;
+
+                qtyInputs.forEach(input => {
+                    const qty = parseInt(input.value);
+                    const max = parseInt(input.max);
+                    if (qty < 1 || qty > max) {
+                        valid = false;
+                        input.classList.add('is-danger');
+                    } else {
+                        input.classList.remove('is-danger');
+                    }
+                });
+
+                if (!valid) {
+                    alert(/*[[#{warehouse.validation.invalid.quantity}]]*/ 'Please enter valid quantities');
+                    return;
+                }
+
+                if (selectedAction === 'markAsDestroyed') {
+                    const noteTextarea = modal.querySelector('.destroy-note');
+                    const reasonSelect = modal.querySelector('.destroy-reason-select');
+
+                    if (!noteTextarea.value.trim()) {
+                        alert(/*[[#{warehouse.validation.note.required}]]*/ 'Note is required');
+                        noteTextarea.classList.add('is-danger');
+                        return;
+                    }
+                    noteTextarea.classList.remove('is-danger');
+
+                    const reasonInput = document.createElement('input');
+                    reasonInput.type = 'hidden';
+                    reasonInput.name = 'reason';
+                    reasonInput.value = reasonSelect.value;
+                    form.appendChild(reasonInput);
+
+                    const noteInput = document.createElement('input');
+                    noteInput.type = 'hidden';
+                    noteInput.name = 'note';
+                    noteInput.value = noteTextarea.value;
+                    form.appendChild(noteInput);
+                }
+
+                qtyInputs.forEach(input => {
+                    const itemIdInput = document.createElement('input');
+                    itemIdInput.type = 'hidden';
+                    itemIdInput.name = 'selectedItemIds';
+                    itemIdInput.value = input.dataset.itemId;
+                    form.appendChild(itemIdInput);
+
+                    const qtyInput = document.createElement('input');
+                    qtyInput.type = 'hidden';
+                    qtyInput.name = 'quantities';
+                    qtyInput.value = input.value;
+                    form.appendChild(qtyInput);
+                });
+
+                form.action = '/dashboard/warehouse/' + selectedAction;
+                modal.classList.remove('is-active');
+                form.submit();
+            }
+        </script>
+    </div>
+</body>
+</html>

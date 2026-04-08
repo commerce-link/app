@@ -1,0 +1,173 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h2 class="title" th:text="#{catalog.edit.title}"></h2>
+            <form th:action="@{/dashboard/catalogs/{catalogId}(catalogId=${productCatalog.catalogId})}"
+                  th:object="${productCatalog}" method="post">
+                <div class="field">
+                    <label class="label" th:text="#{catalog.store.id}"></label>
+                    <div class="control">
+                        <input class="input" type="text" th:field="*{storeId}" th:placeholder="#{catalog.store.id}"
+                               readonly>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" th:text="#{catalog.catalog.id}"></label>
+                    <div class="control">
+                        <input class="input" type="text" th:field="*{catalogId}" th:placeholder="#{catalog.catalog.id}"
+                               readonly>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" th:text="#{catalog.name}"></label>
+                    <div class="control">
+                        <input class="input" type="text" th:field="*{name}" th:placeholder="#{catalog.name}">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" th:field="*{deletionProtection}">
+                        <span th:text="#{catalog.deletion.protection}"></span>
+                    </label>
+                </div>
+
+                <div class="field" th:if="${productCatalog.name != null}">
+                    <label class="label" th:text="#{catalog.category.definition}"></label>
+                    <div class="control">
+                        <table class="table is-fullwidth is-hoverable">
+                            <thead>
+                            <tr>
+                                <th th:text="#{catalog.category.name}"></th>
+                                <th th:text="#{product.category}"></th>
+                                <th th:text="#{catalog.category.type}"></th>
+                                <th th:text="#{catalog.category.required}"></th>
+                                <th th:text="#{catalog.category.sequence}"></th>
+                                <th th:text="#{catalog.category.max.qty}"></th>
+                                <th th:text="#{general.actions}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="category : *{categories}">
+                                <td><span th:text="${category.name}"></span></td>
+                                <td><span th:text="${category.category}"></span></td>
+                                <td><span th:text="${category.type}"></span></td>
+                                <td><span th:text="${category.requiredDuringOrder}"></span></td>
+                                <td><span th:text="${category.sequenceNumber}"></span></td>
+                                <td><span th:text="${category.maxQty}"></span></td>
+                                <td>
+                                    <div class="dropdown is-hoverable">
+                                        <div class="dropdown-trigger">
+                                            <button class="button is-small is-ghost" aria-haspopup="true"
+                                                    aria-controls="dropdown-menu">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <div class="dropdown-menu" role="menu">
+                                            <div class="dropdown-content">
+                                                <a class="dropdown-item"
+                                                   th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                   th:text="#{catalog.category.edit}"></a>
+
+                                                <div th:if="${category.type == T(pl.commercelink.products.CategoryDefinitionType).Managed}">
+                                                    <hr class="dropdown-divider">
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.add}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/recommendations(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.recommendations}"></a>
+                                                    <hr class="dropdown-divider">
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Enabled(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.enabled}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Disabled(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.disabled}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Queued(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.queued}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=MarketplaceEligible(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.marketplace.eligible}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=ExpectedStock(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.expected.stock}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=SuggestedRetailPrice(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.suggested.retail.price}"></a>
+                                                </div>
+
+                                                <div th:if="${category.type == T(pl.commercelink.products.CategoryDefinitionType).Dynamic}">
+                                                    <hr class="dropdown-divider">
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Enabled(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.enabled}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Disabled(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.disabled}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=Queued(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.queued}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=MarketplaceEligible(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.marketplace.eligible}"></a>
+                                                </div>
+
+                                                <hr class="dropdown-divider">
+                                                <div class="dropdown-item">
+                                                    <form th:action="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/delete(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                          method="post" class="delete-form">
+                                                        <button type="button"
+                                                                class="button is-small is-danger is-fullwidth"
+                                                                th:disabled="${category.deletionProtection}"
+                                                                onclick="confirmDelete(this)"
+                                                                th:text="#{general.delete}"></button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div class="field" th:if="${productCatalog.name != null}">
+                            <a class="button is-small is-success"
+                               th:href="@{/dashboard/catalogs/{catalogId}/category/new(catalogId=${productCatalog.catalogId})}"
+                               th:text="#{catalog.category.add}"></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-link is-small" type="submit" th:text="#{general.save}"></button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="control">
+                <form th:action="@{/dashboard/catalogs/{catalogId}/delete(catalogId=${productCatalog.catalogId})}"
+                      method="post" class="delete-form">
+                    <button type="button" class="button is-danger is-small " onclick="confirmDelete(this)"
+                            th:disabled="${productCatalog.deletionProtection}" th:text="#{general.delete}"></button>
+                </form>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+</body>
+</html>

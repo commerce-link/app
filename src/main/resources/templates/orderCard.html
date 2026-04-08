@@ -1,0 +1,120 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{order.card.title}"></h1>
+            <div class="box">
+                <div class="field">
+                    <label class="label"><strong th:text="#{order.order.id} + ':'"></strong></label>
+                    <div class="control">
+                        <a th:href="@{/dashboard/orders/{orderId}(orderId=${order.orderId})}" th:text="${order.orderId}"></a>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label"><strong th:text="#{orders.email} + ':'"></strong></label>
+                    <div class="control">
+                        <span th:text="${order.email}"></span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label"><strong th:text="#{order.ordered.at} + ':'"></strong></label>
+                    <div class="control">
+                        <span th:text="${order.orderedAt}"></span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" th:text="#{order.items}"></label>
+                    <div class="control">
+                        <table class="table is-fullwidth">
+                            <thead>
+                            <tr>
+                                <th th:text="#{order.item.category}"></th>
+                                <th th:text="#{order.item.name}"></th>
+                                <th th:text="#{general.quantity}"></th>
+                                <th th:text="#{general.manufacturer.code}"></th>
+                                <th th:text="#{general.delivery.id}"></th>
+                                <th th:text="#{order.item.comment}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item : ${orderItems}">
+                                <td th:text="${pcl.name(item.category)}"></td>
+                                <td th:text="${item.name}"></td>
+                                <td th:text="${item.qty}"></td>
+                                <td th:text="${item.manufacturerCode}"></td>
+                                <td th:text="${item.shortenedDeliveryId}"></td>
+                                <td th:text="${item.comment}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label"><strong th:text="#{order.comment} + ':'"></strong></label>
+                    <div class="control">
+                        <textarea class="textarea" th:field="*{order.comment}" readonly></textarea>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label"><strong th:text="#{order.documents} + ':'"></strong></label>
+                    <div class="control">
+                        <table class="table is-fullwidth">
+                            <thead>
+                            <tr>
+                                <th th:text="#{order.document.no}"></th>
+                                <th th:text="#{order.document.type}"></th>
+                                <th th:text="#{order.status}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="document : ${order.documents}">
+                                <td th:text="${document.number}"></td>
+                                <td th:text="${document.type.localizedName}"></td>
+                                <td th:text="#{document.status.issued}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+
+                <div class="field">
+                    <label class="label"><strong th:text="#{order.shipments} + ':'"></strong></label>
+                    <div class="control">
+                        <table class="table is-fullwidth">
+                            <thead>
+                            <tr>
+                                <th th:text="#{order.shipment.type}"></th>
+                                <th th:text="#{order.shipment.tracking}"></th>
+                                <th th:text="#{order.shipment.carrier}"></th>
+                                <th th:text="#{order.shipped.at}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="shipment : ${order.shipments}">
+                                <td th:text="${shipment.type.localizedName}"></td>
+                                <td th:text="${shipment.trackingNo}"></td>
+                                <td th:text="${shipment.carrier}"></td>
+                                <td th:text="${shipment.shippedAt}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

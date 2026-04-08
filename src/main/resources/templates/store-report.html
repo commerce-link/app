@@ -1,0 +1,47 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{store.reporting.configuration}"></h1>
+
+            <form th:action="@{/dashboard/store/report}" th:object="${form}" method="post">
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <div class="box">
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.reportingConfiguration.googleAdsEnabled}">
+                            <strong th:text="#{store.reporting.enable.google.ads}"></strong>
+                        </label>
+                    </div>
+
+                    <div class="field" th:if="*{store.reportingConfiguration.googleAdsEnabled}">
+                        <label class="label" th:text="#{store.reporting.google.ads.url}"></label>
+                        <div class="control">
+                            <input class="input"
+                                   type="text"
+                                   readonly
+                                   th:value="${apiDomain + '/Store/' + form.store.storeId + '/Reporting/Google/Conversions/' + form.store.reportingConfiguration.googleAdsToken}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

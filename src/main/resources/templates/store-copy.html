@@ -1,0 +1,52 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{store.copy.title}"></h1>
+
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <div class="notification is-info is-light">
+                <p th:text="#{store.copy.info}"></p>
+            </div>
+
+            <div class="notification is-warning is-light">
+                <p th:text="#{store.copy.warning}"></p>
+            </div>
+
+            <form th:action="@{'/dashboard/store/' + ${store.storeId} + '/copy'}" method="post">
+                <div class="field">
+                    <label class="label" th:text="#{store.copy.source}"></label>
+                    <div class="control">
+                        <input class="input" type="text" th:value="${store.name}" readonly disabled />
+                    </div>
+                    <p class="help" th:text="#{store.copy.source.help}"></p>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="newStoreName" th:text="#{store.copy.new.name}"></label>
+                    <div class="control">
+                        <input class="input" type="text" id="newStoreName" name="newStoreName"
+                               th:value="${suggestedName}" required />
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button type="submit" class="button is-success" th:text="#{store.copy.confirm}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{'/dashboard/store/' + ${store.storeId}}" class="button is-light"
+                           th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

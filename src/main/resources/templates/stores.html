@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{store.management}"></h1>
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{store.id}"></th>
+                    <th th:text="#{store.name}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="store : ${stores}">
+                    <td>
+                        <a th:href="@{'/dashboard/store/' + ${store.storeId}}" th:text="${store.storeId}"></a>
+                    </td>
+                    <td th:text="${store.name}"></td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="field is-grouped">
+                <div class="control">
+                    <a class="button is-primary" href="/dashboard/store/create" th:text="#{store.create}"></a>
+                </div>
+                <div class="control">
+                    <form action="/dashboard/stores/cleanup-products" method="post" style="display:inline">
+                        <button type="submit" class="button is-warning" th:text="#{store.cleanup.button}"></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>

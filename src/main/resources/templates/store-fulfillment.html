@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="#{store.fulfillment.settings}"></h1>
+
+            <form th:action="@{/dashboard/store/fulfillment}" th:object="${form}" method="post">
+
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <div class="box">
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.order.assembly.days}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.fulfillmentSettings.orderAssemblyDays}"
+                                   th:placeholder="#{store.order.assembly.days}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.order.realization.days}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.fulfillmentSettings.orderRealizationDays}"
+                                   th:placeholder="#{store.order.realization.days}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.fulfillmentSettings.automatedFulfilment}">
+                            <strong th:text="#{store.enable.automated.fulfillment}"></strong>
+                        </label>
+                        <p th:text="#{store.enable.automated.fulfillment.description}"></p>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.fulfillment.default.type}"></label>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{store.fulfillmentSettings.defaultFulfilmentType}">
+                                    <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.enabled.product.groups}"></label>
+                        <div th:each="type : ${productGroupTypes}" class="field">
+                            <label class="checkbox">
+                                <input type="checkbox"
+                                       th:value="${type}"
+                                       th:field="*{store.fulfillmentSettings.enabledProductGroups}" />
+                                <span th:text="${pgl.name(type)}"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.enabled.providers}"></label>
+                        <div th:each="type : ${supplierTypes}" class="field">
+                            <label class="checkbox">
+                                <input type="checkbox"
+                                       th:value="${type}"
+                                       th:field="*{store.fulfillmentSettings.enabledProviders}" />
+                                <span th:text="${type}"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

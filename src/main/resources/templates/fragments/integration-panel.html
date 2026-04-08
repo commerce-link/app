@@ -1,0 +1,107 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="panel(connectedIntegrations, providers, selectedProviderName, selectLabel, providerConfiguration, providerType, storeId)">
+
+    <div th:if="${!connectedIntegrations.isEmpty()}" class="box">
+        <table class="table is-fullwidth is-striped">
+            <thead>
+                <tr>
+                    <th th:text="#{store.integrations.provider.name}"></th>
+                    <th th:text="#{store.marketplaces.status}"></th>
+                    <th th:text="#{general.actions}"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="integration : ${connectedIntegrations}">
+                    <td th:text="${integration.name}"></td>
+                    <td>
+                        <span class="tag is-success" th:if="${integration.connected}" th:text="#{store.marketplaces.connected}"></span>
+                        <span class="tag is-danger" th:unless="${integration.connected}" th:text="#{store.marketplaces.disconnected}"></span>
+                    </td>
+                    <td>
+                        <form th:action="@{/dashboard/store/integrations/disconnect}" method="post">
+                            <input type="hidden" name="storeId" th:value="${storeId}"/>
+                            <input type="hidden" name="providerType" th:value="${providerType}"/>
+                            <input type="hidden" name="providerName" th:value="${integration.name}"/>
+                            <button type="button" class="button is-small is-danger is-outlined" onclick="confirmDelete(this)"
+                                    th:text="#{store.integrations.disconnect}"></button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <form th:action="@{/dashboard/store/integrations/credentials}" method="post">
+        <input type="hidden" name="storeId" th:value="${storeId}"/>
+        <input type="hidden" name="providerType" th:value="${providerType}"/>
+
+        <div class="box">
+            <div class="field">
+                <label class="label" th:text="${selectLabel}"></label>
+                <div class="control">
+                    <div class="select">
+                        <select name="providerName">
+                            <option value="" th:text="#{general.select}">--- wybierz ---</option>
+                            <option th:each="provider : ${providers}"
+                                    th:value="${provider.name()}"
+                                    th:text="${provider.displayName()}"
+                                    th:selected="${provider.name() == selectedProviderName}">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div th:each="provider : ${providers}"
+                 th:id="'provider-fields-' + ${provider.name()}"
+                 class="provider-fields"
+                 th:attr="data-active=${provider.name() == selectedProviderName}">
+                <div class="field" th:each="field : ${provider.configurationFields()}">
+                    <label class="label" th:text="${field.label()}"></label>
+                    <div class="control">
+                        <input class="input"
+                               th:type="${field.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                               th:name="'providerConfiguration[' + ${field.key()} + ']'"
+                               th:value="${providerConfiguration[field.key()]}"
+                               th:placeholder="${field.placeholder()}"
+                               th:disabled="${provider.name() != selectedProviderName}"
+                               th:required="${field.required()}">
+                    </div>
+                </div>
+            </div>
+
+            <script th:inline="javascript">
+                (function() {
+                    var select = document.querySelector('select[name="providerName"]');
+                    function switchProvider(providerName) {
+                        var container = select.closest('.box') || select.closest('form');
+                        container.querySelectorAll('.provider-fields').forEach(function(div) {
+                            var isActive = div.id === 'provider-fields-' + providerName;
+                            div.style.display = isActive ? '' : 'none';
+                            div.querySelectorAll('input').forEach(function(input) {
+                                input.disabled = !isActive;
+                            });
+                        });
+                    }
+                    switchProvider(select.value);
+                    select.addEventListener('change', function() {
+                        switchProvider(this.value);
+                    });
+                })();
+            </script>
+
+            <div class="field is-grouped mt-4">
+                <div class="control">
+                    <button class="button is-primary" type="button" onclick="confirmSave(this)" th:text="#{general.save}"></button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+</div>
+
+</body>
+</html>

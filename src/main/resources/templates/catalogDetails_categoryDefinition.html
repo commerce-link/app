@@ -1,0 +1,331 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+    <h1 class="title" th:text="#{catalog.category.edit}"></h1>
+    <form th:action="@{/dashboard/catalogs/{catalogId}/category(catalogId=${catalogId})}" th:object="${categoryDefinition}" method="post">
+        <input type="hidden" th:field="*{categoryId}" th:value="*{categoryId}">
+        <div class="field">
+            <label class="label" th:text="#{general.name}"></label>
+            <div class="control">
+                <input class="input" type="text" th:field="*{name}" th:placeholder="#{catalog.category.name.placeholder}">
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{catalog.category}"></label>
+            <div class="control">
+                <div class="select">
+                    <select th:field="*{category}" th:disabled="${edit}">
+                        <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
+                    </select>
+                </div>
+                <input type="hidden" th:field="*{category}">
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{catalog.category.type}"></label>
+            <div class="control">
+                <div class="select">
+                    <select th:field="*{type}">
+                        <option th:each="type : ${categoryDefinitionTypes}" th:value="${type}" th:text="${type}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" th:field="*{requiredDuringOrder}">
+                <span th:text="#{catalog.category.required.during.order}"></span>
+            </label>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" th:field="*{deletionProtection}">
+                <span th:text="#{catalog.category.deletion.protection}"></span>
+            </label>
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{catalog.category.sequence.number}"></label>
+            <div class="control">
+                <input class="input" type="number" th:field="*{sequenceNumber}" th:placeholder="#{catalog.category.sequence.number.placeholder}">
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{catalog.category.max.qty}"></label>
+            <div class="control">
+                <input class="input" type="number" th:field="*{maxQty}" th:placeholder="#{catalog.category.max.qty}">
+            </div>
+        </div>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.grouping.order}"></legend>
+            <table class="table is-fullwidth is-striped">
+                <tbody th:each="order, iterStat : ${categoryDefinition.groupingOrder}">
+                <tr>
+                    <td>
+                        <input class="input" type="text" th:field="*{groupingOrder[__${iterStat.index}__]}" th:placeholder="#{catalog.category.order.placeholder}">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.stock.thresholds}"></legend>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" th:text="#{catalog.category.critical.stock.threshold}"></label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{stockDefinition.criticalStockThreshold}" th:placeholder="#{catalog.category.critical.stock.threshold.placeholder}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" th:text="#{catalog.category.low.stock.threshold}"></label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{stockDefinition.lowStockThreshold}" th:placeholder="#{catalog.category.low.stock.threshold.placeholder}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" th:text="#{catalog.category.high.stock.threshold}"></label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{stockDefinition.highStockThreshold}" th:placeholder="#{catalog.category.high.stock.threshold.placeholder}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.availability.definition}"></legend>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" th:text="#{catalog.category.total.min.quantity}"></label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{availabilityDefinition.totalMinQty}" th:placeholder="#{catalog.category.total.min.quantity.placeholder}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label" th:text="#{catalog.category.min.providers}"></label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{availabilityDefinition.minNumberOfProviders}" th:placeholder="#{catalog.category.min.providers.placeholder}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.price.definitions}"></legend>
+
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{catalog.category.multiplier}"></th>
+                    <th th:text="#{catalog.category.min.profit}"></th>
+                    <th th:text="#{catalog.category.critical.stock.price.adjustment}"></th>
+                    <th th:text="#{catalog.category.low.stock.price.adjustment}"></th>
+                    <th th:text="#{catalog.category.medium.stock.price.adjustment}"></th>
+                    <th th:text="#{catalog.category.pricing.group}"></th>
+                    <th th:text="#{catalog.category.label.match}"></th>
+                    <th th:text="#{catalog.category.price.match}"></th>
+                </tr>
+                </thead>
+                <tbody th:each="priceDefinition, iterStat : ${categoryDefinition.priceDefinitions}">
+                <tr>
+                    <td>
+                        <input class="input" type="number" step="0.01" th:field="*{priceDefinitions[__${iterStat.index}__].multiplier}" th:placeholder="#{catalog.category.multiplier.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{priceDefinitions[__${iterStat.index}__].minProfit}" th:placeholder="#{catalog.category.min.profit.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{priceDefinitions[__${iterStat.index}__].criticalStockPriceAdjustment}" th:placeholder="#{catalog.category.critical.stock.price.adjustment.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{priceDefinitions[__${iterStat.index}__].lowStockPriceAdjustment}" th:placeholder="#{catalog.category.low.stock.price.adjustment.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{priceDefinitions[__${iterStat.index}__].mediumStockPriceAdjustment}" th:placeholder="#{catalog.category.medium.stock.price.adjustment.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{priceDefinitions[__${iterStat.index}__].pricingGroup}" th:placeholder="#{catalog.category.pricing.group.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{priceDefinitions[__${iterStat.index}__].labelMatch}" th:placeholder="#{catalog.category.label.match.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" step="0.01"  th:field="*{priceDefinitions[__${iterStat.index}__].priceMatch}" th:placeholder="#{catalog.category.price.match.placeholder}">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.marketplace.definitions}"></legend>
+
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{general.name}"></th>
+                    <th th:text="#{catalog.category.markup}"></th>
+                    <th th:text="#{catalog.category.min.total.quantity}"></th>
+                    <th th:text="#{catalog.category.min.qty.per.distributor}"></th>
+                    <th th:text="#{catalog.category.min.distributors}"></th>
+                    <th th:text="#{catalog.category.min.warehouse.qty}"></th>
+                    <th th:text="#{catalog.category.enabled}"></th>
+                    <th th:text="#{catalog.category.export.selected.products}"></th>
+                </tr>
+                </thead>
+                <tbody th:each="marketplaceDefinition, iterStat : ${categoryDefinition.marketplaceDefinitions}">
+                <tr>
+                    <td>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{marketplaceDefinitions[__${iterStat.index}__].name}">
+                                    <option value=""></option>
+                                    <option th:each="marketplaceType : ${marketplaceTypes}" th:value="${marketplaceType}" th:text="${marketplaceType}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <input class="input" type="number" step="0.01" th:field="*{marketplaceDefinitions[__${iterStat.index}__].markup}" th:placeholder="#{catalog.category.multiplier.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minTotalQty}" th:placeholder="#{catalog.category.min.total.quantity.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minQtyPerDistributor}" th:placeholder="#{catalog.category.min.qty.per.distributor.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minNumOfDistributors}" th:placeholder="#{catalog.category.min.distributors.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minWarehouseQty}" th:placeholder="#{catalog.category.min.warehouse.qty.placeholder}">
+                    </td>
+                    <td>
+                        <input type="checkbox" th:field="*{marketplaceDefinitions[__${iterStat.index}__].enabled}">
+                    </td>
+                    <td>
+                        <input type="checkbox" th:field="*{marketplaceDefinitions[__${iterStat.index}__].exportSelectedProducts}">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{catalog.category.inventory.definitions}"></legend>
+
+            <fieldset class="box">
+                <legend class="label" th:text="#{catalog.category.required.metadata.by.filter}"></legend>
+
+                <table class="table is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{general.type}"></th>
+                        <th th:text="#{general.name}"></th>
+                        <th th:text="#{general.description}"></th>
+                    </tr>
+                    </thead>
+                    <tbody th:each="filter : ${inventoryDefinitionFilters}">
+                    <tr th:each="field : ${filter.fieldsList}">
+                        <td th:text="${filter.type}"></td>
+                        <td th:text="${field.name}"></td>
+                        <td th:text="${field.description}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </fieldset>
+
+            <div th:each="inventoryDefinition, iterStat : ${categoryDefinition.inventoryDefinitions}">
+                <fieldset class="box">
+                    <legend class="label" th:text="#{catalog.category.inventory.definition}"></legend>
+                    <div class="field">
+                        <label class="label" th:text="#{general.type}"></label>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{inventoryDefinitions[__${iterStat.index}__].type}">
+                                    <option th:each="filter : ${inventoryFilterTypes}" th:value="${filter}" th:text="${filter}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{catalog.category.metadata}"></label>
+                        <table class="table is-fullwidth is-striped">
+                            <thead>
+                            <tr>
+                                <th th:text="#{general.key}"></th>
+                                <th th:text="#{general.value}"></th>
+                            </tr>
+                            </thead>
+                            <tbody th:each="metadata, metaStat : ${inventoryDefinition.metadata}">
+                            <tr>
+                                <td>
+                                    <input class="input" type="text" th:field="*{inventoryDefinitions[__${iterStat.index}__].metadata[__${metaStat.index}__].key}" th:placeholder="#{general.key.placeholder}">
+                                </td>
+                                <td>
+                                    <input class="input" type="text" th:field="*{inventoryDefinitions[__${iterStat.index}__].metadata[__${metaStat.index}__].value}" th:placeholder="#{general.value.placeholder}">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </fieldset>
+            </div>
+        </fieldset>
+
+        <div class="field is-grouped">
+            <div class="control">
+                <button class="button is-link" type="submit" th:text="#{general.save}"></button>
+            </div>
+            <div class="control">
+                <a class="button is-link is-light" th:href="@{/dashboard/catalogs/{catalogId}(catalogId=${catalogId})}" th:text="#{general.cancel}"></a>
+            </div>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>

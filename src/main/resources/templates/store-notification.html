@@ -1,0 +1,66 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="#{store.notification}"></h1>
+
+            <form th:action="@{/dashboard/store/notification/edit}" th:object="${form}" method="post">
+
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <!-- Client Notification Config Section -->
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{store.client.notification.config}"></h2>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.sender.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.clientNotificationsConfig.senderName}"
+                                   th:placeholder="#{store.sender.name}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.reply.to.email}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.clientNotificationsConfig.replyToEmail}"
+                                   th:placeholder="#{store.reply.to.email}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.enabled.templates}"></label>
+                        <div class="content">
+                            <ul>
+                                <li th:each="entry : *{store.clientNotificationsConfig.supportedTemplates}"
+                                    th:text="${entry.key}"></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

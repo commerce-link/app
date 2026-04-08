@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 th:text="#{rma.title}"></h1>
+
+            <div class="box">
+                <form method="get" action="/dashboard/rma">
+                    <div class="field">
+                        <label class="label" th:text="#{rma.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="rmaId" th:value="${searchParams.rmaId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.order.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="orderId" th:value="${searchParams.orderId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.email}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="email" th:value="${searchParams.email}">
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped">
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{rma.created.at.start}"></label>
+                            <input class="input" type="date" name="createdAtStart"
+                                   th:value="${searchParams.createdAtStart}">
+                        </div>
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{rma.created.at.end}"></label>
+                            <input class="input" type="date" name="createdAtEnd"
+                                   th:value="${searchParams.createdAtEnd}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-5">
+                    <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th th:text="#{rma.id}"></th>
+                            <th th:text="#{rma.order.id}"></th>
+                            <th th:text="#{rma.email}"></th>
+                            <th th:text="#{rma.status}"></th>
+                            <th th:text="#{rma.created.at}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="rmaEntry : ${rmaEntries}">
+                            <td>
+                                <a th:href="@{/dashboard/rma/{id}(id=${rmaEntry.rmaId})}">
+                                    <span th:text="${rmaEntry.rmaId}"></span>
+                                </a>
+                            </td>
+                            <td>
+                                <a th:href="@{/dashboard/orders/{id}(id=${rmaEntry.orderId})}">
+                                    <span th:text="${rmaEntry.orderId}"></span>
+                                </a>
+                            </td>
+                            <td th:text="${rmaEntry.email}"></td>
+                            <td th:text="${rmaEntry.status}"></td>
+                            <td th:text="${#temporals.format(rmaEntry.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div th:replace="~{fragments/pagination :: pagination(${'/dashboard/rma'}, ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
+                </div>
+            </div>
+
+            <div class="buttons">
+                <a href="/dashboard/rma/new" class="button is-link" th:text="#{create.new.rma}"></a>
+                <a href="/dashboard/item/history" class="button is-light">
+                    <span class="icon"><i class="fas fa-history"></i></span>
+                    <span th:text="#{item.history}"></span>
+                </a>
+            </div>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

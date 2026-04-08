@@ -1,0 +1,76 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+
+    <form th:action="@{/dashboard/orders/new/fulfilment}" th:object="${form}" enctype="multipart/form-data" method="post" class="box" onsubmit="copyBillingDetailsIfNeeded()">
+        <h2 class="title is-4" th:text="#{client.order.reference.title}"></h2>
+        <input type="hidden" th:field="*{orderReference}" />
+        <input type="hidden" th:field="*{orderReferenceType}" />
+
+        <div class="field">
+            <label class="label" th:text="#{order.payment.source}"></label>
+            <div class="control">
+                <div class="select">
+                    <select th:field="*{paymentSource}" required>
+                        <option th:each="psource : ${paymentSources}" th:value="${psource}"
+                                th:text="${psource}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="field" th:if="*{orderReferenceType == T(pl.commercelink.orders.imports.OrderReferenceType).Csv}">
+            <label class="label" th:text="#{client.csv.file}"></label>
+            <div class="control">
+                <input class="input" type="file" th:field="*{csvFile}" accept=".csv" required>
+            </div>
+        </div>
+        <div class="field" th:if="*{orderReferenceType == 'CSV'}">
+            <label class="label" for="affiliateId" th:text="#{client.affiliate.id}"></label>
+            <div class="control">
+                <input class="input" type="text" id="affiliateId" th:field="*{affiliateId}">
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="shipmentType" th:text="#{client.shipment.type}"></label>
+            <div class="control">
+                <div class="select">
+                    <select id="shipmentType" th:field="*{shipmentType}" onchange="toggleShippingDetails()">
+                        <option th:each="type : ${shipmentTypes}" th:value="${type}" th:text="${type.localizedName}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
+
+        <div class="field">
+            <div class="control" style="margin-top: 20px">
+                <button class="button is-primary" type="submit" th:text="#{general.submit}"></button>
+            </div>
+        </div>
+    </form>
+
+    <script>
+        function copyBillingDetailsIfNeeded() {
+            const shipmentType = document.getElementById('shipmentType').value;
+            if (shipmentType !== 'PersonalCollection' && !document.getElementById('differentShippingAddress').checked) {
+                document.getElementById('shippingName').value = document.getElementById('billingName').value;
+                document.getElementById('shippingSurname').value = document.getElementById('billingSurname').value;
+                document.getElementById('shippingCompanyName').value = document.getElementById('billingCompanyName').value;
+                document.getElementById('shippingStreetAndNumber').value = document.getElementById('billingStreetAndNumber').value;
+                document.getElementById('shippingPostalCode').value = document.getElementById('billingPostalCode').value;
+                document.getElementById('shippingCity').value = document.getElementById('billingCity').value;
+                document.getElementById('shippingEmail').value = document.getElementById('billingEmail').value;
+                document.getElementById('shippingPhone').value = document.getElementById('billingPhone').value;
+            }
+        }
+    </script>
+
+</div>
+
+</body>
+</html>

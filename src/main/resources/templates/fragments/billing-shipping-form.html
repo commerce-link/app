@@ -1,0 +1,257 @@
+<div th:fragment="billingShippingForm(form)">
+    <div class="field">
+        <div class="control">
+            <label class="checkbox">
+                <input type="checkbox" id="isCompany" onclick="toggleCompanyFields()">
+                <span th:text="#{client.company}"></span>
+            </label>
+        </div>
+    </div>
+
+    <section id="collectBillingDetails">
+        <div class="field">
+            <label class="label" for="billingName" th:text="#{order.address.name}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingName" th:field="*{billingDetails.name}" required />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingSurname" th:text="#{order.address.surname}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingSurname" th:field="*{billingDetails.surname}" required />
+            </div>
+        </div>
+        <div class="field" id="companyNameField" style="display: none;">
+            <label class="label" for="billingCompanyName" th:text="#{order.address.company}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingCompanyName" th:field="*{billingDetails.companyName}" />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingStreetAndNumber" th:text="#{order.address.street}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingStreetAndNumber" th:field="*{billingDetails.streetAndNumber}" required />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingPostalCode" th:text="#{order.address.postal}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingPostalCode"
+                       th:field="*{billingDetails.postalCode}"
+                       pattern="^\d{2}-\d{3}$"
+                       th:title="#{billing.postalCode.invalid}"
+                       required/>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingCity" th:text="#{order.address.city}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingCity" th:field="*{billingDetails.city}" required />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingCountry" th:text="#{order.address.country}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingCountry" th:field="*{billingDetails.country}" required />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingEmail" th:text="#{order.address.email}"></label>
+            <div class="control">
+                <input class="input" type="email" id="billingEmail"
+                       th:field="*{billingDetails.email}"
+                       th:title="#{billing.email.invalid}"
+                       required/>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="billingPhone" th:text="#{order.address.phone}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingPhone"
+                       th:field="*{billingDetails.phone}"
+                       pattern="[0-9+ ]{9,15}"
+                       th:title="#{billing.phone.invalid}"
+                       required/>
+            </div>
+        </div>
+        <div class="field" id="taxIdField" style="display: none;">
+            <label class="label" for="billingTaxId" th:text="#{order.address.tax.id}"></label>
+            <div class="control">
+                <input class="input" type="text" id="billingTaxId" th:field="*{billingDetails.taxId}" />
+            </div>
+        </div>
+    </section>
+
+    <section id="collectShippingDetails">
+        <h2 class="title is-4" th:text="#{order.shipping.details}"></h2>
+        <div class="field">
+            <div class="control">
+                <label class="checkbox">
+                    <input type="checkbox" id="differentShippingAddress" onclick="toggleShippingFields()">
+                    <span th:text="#{client.different.shipping}"></span>
+                </label>
+            </div>
+        </div>
+        <div id="shippingDetails" style="display: none;">
+            <div class="field">
+                <label class="label" for="shippingName" th:text="#{order.address.name}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingName" th:field="*{shippingDetails.name}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingSurname" th:text="#{order.address.surname}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingSurname" th:field="*{shippingDetails.surname}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingCompanyName" th:text="#{order.address.company}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingCompanyName" th:field="*{shippingDetails.companyName}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingStreetAndNumber" th:text="#{order.address.street}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingStreetAndNumber" th:field="*{shippingDetails.streetAndNumber}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingPostalCode" th:text="#{order.address.postal}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingPostalCode"
+                           th:field="*{shippingDetails.postalCode}"
+                           pattern="^\d{2}-\d{3}$"
+                           th:title="#{shipping.postalCode.invalid}"/>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingCity" th:text="#{order.address.city}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingCity" th:field="*{shippingDetails.city}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingCountry" th:text="#{order.address.country}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingCountry" th:field="*{shippingDetails.country}" value="PL" readonly />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingEmail" th:text="#{order.address.email}"></label>
+                <div class="control">
+                    <input class="input" type="email" id="shippingEmail"
+                           th:field="*{shippingDetails.email}"
+                           th:title="#{shipping.email.invalid}"/>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="shippingPhone" th:text="#{order.address.phone}"></label>
+                <div class="control">
+                    <input class="input" type="text" id="shippingPhone"
+                           th:field="*{shippingDetails.phone}"
+                           pattern="[0-9+ ]{9,15}"
+                           th:title="#{shipping.phone.invalid}"/>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        function toggleCompanyFields() {
+            const isCompany = document.getElementById('isCompany').checked;
+            const taxIdField = document.getElementById('taxIdField');
+            const billingTaxId = document.getElementById('billingTaxId');
+            const billingCompanyName = document.getElementById('billingCompanyName');
+            const companyNameField = document.getElementById('companyNameField');
+
+            if (isCompany) {
+                taxIdField.style.display = 'block';
+                companyNameField.style.display = 'block';
+                billingTaxId.required = true;
+                billingCompanyName.required = true;
+            } else {
+                taxIdField.style.display = 'none';
+                companyNameField.style.display = 'none';
+                billingTaxId.required = false;
+                billingCompanyName.required = false;
+            }
+        }
+
+        function toggleShippingFields() {
+            const differentShippingAddress = document.getElementById('differentShippingAddress').checked;
+            const shippingDetails = document.getElementById('shippingDetails');
+            const shippingInputs = shippingDetails.querySelectorAll('input');
+            const shippingName = document.getElementById('shippingName').value;
+
+            if (differentShippingAddress || shippingName) {
+                shippingDetails.style.display = 'block';
+                shippingInputs.forEach(input => {
+                    if (input.id !== 'shippingCompanyName') {
+                        input.required = true;
+                    }
+                });
+            } else {
+                shippingDetails.style.display = 'none';
+                shippingInputs.forEach(input => input.required = false);
+            }
+        }
+
+        function toggleShippingDetails() {
+            const shipmentType = document.getElementById('shipmentType')?.value;
+            const collectShippingDetailsSection = document.getElementById('collectShippingDetails');
+            const billingDetailsFields = [
+                'billingStreetAndNumber',
+                'billingPostalCode',
+                'billingCity',
+                'billingCountry'
+            ];
+            if (shipmentType === 'Courier') {
+                collectShippingDetailsSection.style.display = 'block';
+                billingDetailsFields.forEach(fieldId => {
+                    document.getElementById(fieldId).required = true;
+                });
+            } else {
+                collectShippingDetailsSection.style.display = 'none';
+                billingDetailsFields.forEach(fieldId => {
+                    document.getElementById(fieldId).required = false;
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleShippingDetails();
+            toggleShippingFields();
+
+            // Auto-toggle company checkbox
+            const billingTaxId = document.getElementById('billingTaxId');
+            const billingCompanyName = document.getElementById('billingCompanyName');
+            const isCompanyCheckbox = document.getElementById('isCompany');
+            if (billingTaxId?.value?.trim() || (billingCompanyName?.value?.trim())) {
+                isCompanyCheckbox.checked = true;
+            }
+            toggleCompanyFields();
+
+            // Auto-toggle shipping checkbox if any shipping field has value
+            const shippingFields = [
+                'shippingName',
+                'shippingSurname',
+                'shippingStreetAndNumber',
+                'shippingPostalCode',
+                'shippingCity',
+                'shippingEmail',
+                'shippingPhone'
+            ];
+            const shouldEnableShipping = shippingFields.some(id => {
+                const el = document.getElementById(id);
+                return el && el.value.trim() !== '';
+            });
+            const differentShippingCheckbox = document.getElementById('differentShippingAddress');
+            if (shouldEnableShipping) {
+                differentShippingCheckbox.checked = true;
+            }
+            toggleShippingFields();
+        });
+    </script>
+</div>

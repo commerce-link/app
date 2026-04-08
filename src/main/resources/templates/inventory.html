@@ -1,0 +1,164 @@
+    <!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title is-3" th:text="#{inventory.title}"></h1>
+
+            <div class="columns">
+                <div class="column is-half">
+                    <div class="box">
+                        <h2 class="subtitle is-5 has-text-weight-semibold mb-4" th:text="#{inventory.statistics}"></h2>
+                        <div class="content">
+                            <div class="level is-mobile mb-3">
+                                <div class="level-left">
+                                    <span class="has-text-weight-medium" th:text="#{inventory.size}"></span>
+                                </div>
+                                <div class="level-right">
+                                    <span class="tag is-info is-medium" th:text="${inventorySize}"></span>
+                                </div>
+                            </div>
+                            <div class="level is-mobile mb-3">
+                                <div class="level-left">
+                                    <span class="has-text-weight-medium" th:text="#{inventory.taxonomy.size}"></span>
+                                </div>
+                                <div class="level-right">
+                                    <span class="tag is-success is-medium" th:text="${taxonomySize}"></span>
+                                </div>
+                            </div>
+                            <div class="level is-mobile mb-3">
+                                <div class="level-left">
+                                    <span class="has-text-weight-medium" th:text="#{inventory.pim.index.size}"></span>
+                                </div>
+                                <div class="level-right">
+                                    <span class="tag is-success is-medium" th:text="${pimIndexSize}"></span>
+                                </div>
+                            </div>
+                            <div class="level is-mobile mb-3" th:if="${taxonomyFileName}">
+                                <div class="level-left">
+                                    <span class="has-text-weight-medium" th:text="#{inventory.taxonomy.file}"></span>
+                                </div>
+                                <div class="level-right">
+                                    <span class="tag is-light is-medium" th:text="${taxonomyFileName}"></span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-half">
+                    <div class="box">
+                        <h2 class="subtitle is-5 has-text-weight-semibold mb-4" th:text="#{inventory.matched.providers}"></h2>
+                        <div class="content">
+                            <div class="tags">
+                                <span th:each="entry : ${supplierUpdateEntries}"
+                                      class="tag is-medium mb-2"
+                                      th:classappend="${enabledSuppliers.contains(entry.key)} ? 'is-primary' : 'is-danger'">
+                                    <span th:text="${entry.key} + ' (' + ${entry.value} + ')'"></span>
+                                    <span th:if="${!enabledSuppliers.contains(entry.key)}" class="ml-2">&bull; </span>
+                                    <span th:if="${!enabledSuppliers.contains(entry.key)}" th:text="#{general.disabled}"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section pt-0">
+        <div class="container">
+            <div class="box">
+                <h2 class="title is-4" th:text="#{inventory.check.price}"></h2>
+                <form action="/dashboard/inventory/check-price" method="get">
+                    <div class="columns">
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{pim.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="pimId" th:placeholder="#{pim.id.placeholder}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{inventory.product.code}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="mfn" th:placeholder="#{inventory.product.code.placeholder}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{inventory.ean}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="ean" th:placeholder="#{inventory.ean.placeholder}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{inventory.check.price.button}"></button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="notification is-info is-light mt-5" th:if="${name}">
+                    <h3 class="subtitle is-5 has-text-weight-semibold mb-4" th:text="#{inventory.product.info}"></h3>
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{product.ean} + ':'"></span> <span th:text="${ean}"></span></p>
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{inventory.product.code} + ':'"></span> <span th:text="${mfn}"></span></p>
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{product.name} + ':'"></span> <span th:text="${name}"></span></p>
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{product.brand} + ':'"></span> <span th:text="${brand}"></span></p>
+                        </div>
+                        <div class="column is-half">
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{inventory.product.lowest.price} + ':'"></span> <span class="tag is-success" th:text="${lowestGrossPrice}"></span></p>
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{inventory.product.median.price} + ':'"></span> <span class="tag is-info" th:text="${medianGrossPrice}"></span></p>
+                            <p class="mb-2"><span class="has-text-weight-medium" th:text="#{inventory.product.availability} + ':'"></span> <span class="tag is-primary" th:text="${totalAvailableQty}"></span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container mt-5" th:if="${inventoryItems}">
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                        <tr>
+                            <th th:text="#{inventory.provider}"></th>
+                            <th th:text="#{inventory.provider.ean}"></th>
+                            <th th:text="#{inventory.provider.code}"></th>
+                            <th th:text="#{inventory.provider.price}"></th>
+                            <th th:text="#{inventory.provider.quantity}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${inventoryItems}"
+                            th:classappend="${!enabledSuppliers.contains(item.supplier)} ? 'has-text-danger'">
+                            <td>
+                                <span class="tag"
+                                      th:classappend="${enabledSuppliers.contains(item.supplier)} ? 'is-primary' : 'is-danger'"
+                                      th:text="${item.supplier}"></span>
+                            </td>
+                            <td th:text="${item.productEan}"></td>
+                            <td th:text="${item.productCode}"></td>
+                            <td><span class="has-text-weight-semibold" th:text="${item.grossPrice}"></span></td>
+                            <td><span class="tag is-info" th:text="${item.qty}"></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

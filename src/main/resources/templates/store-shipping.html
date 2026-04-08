@@ -1,0 +1,261 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title">Shipping Configuration</h1>
+
+            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.shipping.provider.label}, ${form.providerConfiguration}, 'shipping', ${form.store.storeId})}"></div>
+
+            <!-- Authorized Carriers Section -->
+            <div class="box mt-4">
+                <h2 class="subtitle" th:text="#{store.shipping.carriers.title}">Authorized Carriers</h2>
+
+                <div th:if="${not #lists.isEmpty(form.store.shippingConfiguration.authorizedCarriers)}" class="mb-4">
+                    <p class="has-text-weight-semibold mb-2" th:text="#{store.shipping.carriers.current}">Currently authorized:</p>
+                    <div class="tags">
+                        <span class="tag is-medium" th:each="carrier : ${form.store.shippingConfiguration.authorizedCarriers}"
+                              th:text="${carrier.displayName}"></span>
+                    </div>
+                </div>
+
+                <form th:action="@{/dashboard/store/shipping/carriers/fetch}" method="post">
+                    <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-info" type="button" onclick="confirmSave(this)"
+                                    th:text="#{store.shipping.carriers.fetch}">Fetch Available Carriers</button>
+                        </div>
+                    </div>
+                </form>
+
+                <form th:if="${availableCarriers != null}" th:action="@{/dashboard/store/shipping/carriers/save}" method="post">
+                    <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th style="width: 60px"></th>
+                            <th th:text="#{fulfilment.name}">Name</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="carrier, stat : ${availableCarriers}">
+                            <td style="text-align:center;">
+                                <input type="checkbox"
+                                       th:name="'carriers[' + ${stat.index} + '].selected'"
+                                       th:checked="${carrier.selected}"
+                                       value="true"/>
+                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].id'" th:value="${carrier.id}"/>
+                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].name'" th:value="${carrier.name}"/>
+                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].displayName'" th:value="${carrier.displayName}"/>
+                            </td>
+                            <td th:text="${carrier.displayName}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                    th:text="#{general.save}">Save</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <form th:action="@{/dashboard/store/shipping/pickup-sender/save}" th:object="${form}" method="post" class="mt-4">
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{shipping.pickup.addresses}"></h2>
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.default}"></th>
+                            <th th:text="#{order.address.company}"></th>
+                            <th th:text="#{order.address.street}"></th>
+                            <th th:text="#{order.address.postal}"></th>
+                            <th th:text="#{order.address.city}"></th>
+                            <th th:text="#{order.address.country}"></th>
+                            <th th:text="#{order.address.email}"></th>
+                            <th th:text="#{order.address.phone}"></th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        <tr th:each="ship, stat : *{store.shippingConfiguration.pickUpAddresses}">
+                            <td style="text-align:center;">
+                                <input type="radio" name="defaultPickupAddressId"
+                                       th:value="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].id}"
+                                       th:checked="${ship._default}"/>
+                            </td>
+                            <input type="hidden" th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].id}" />
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].companyName}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].streetAndNumber}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].postalCode}"
+                                       pattern="^\d{2}-\d{3}$"
+                                       th:title="#{shipping.postalCode.invalid}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].city}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].country}"/></td>
+                            <td><input class="input"
+                                       type="email"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].email}"
+                                       th:title="#{billing.email.invalid}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].phone}"
+                                       pattern="[0-9+ ]{9,15}"
+                                       th:title="#{shipping.phone.invalid}"/>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <h2 class="subtitle" th:text="#{shipping.sender.addresses}"></h2>
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.default}"></th>
+                            <th th:text="#{order.address.company}"></th>
+                            <th th:text="#{order.address.street}"></th>
+                            <th th:text="#{order.address.postal}"></th>
+                            <th th:text="#{order.address.city}"></th>
+                            <th th:text="#{order.address.country}"></th>
+                            <th th:text="#{order.address.email}"></th>
+                            <th th:text="#{order.address.phone}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="ship, stat : *{store.shippingConfiguration.senderAddresses}">
+                            <td style="text-align: center;">
+                                <input type="radio" name="defaultSenderAddressId"
+                                       th:value="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].id}"
+                                       th:checked="${ship._default}"/>
+                            </td>
+                            <input type="hidden"
+                                   th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].id}" />
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].companyName}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].streetAndNumber}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].postalCode}"
+                                       pattern="^\d{2}-\d{3}$"
+                                       th:title="#{shipping.postalCode.invalid}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].city}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].country}"/></td>
+                            <td><input class="input"
+                                       type="email"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].email}"
+                                       th:title="#{billing.email.invalid}"/></td>
+                            <td><input class="input"
+                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].phone}"
+                                       pattern="[0-9+ ]{9,15}"
+                                       th:title="#{shipping.phone.invalid}"/></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="mt-4">
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{shipping.package.templates}"></h2>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th style="width: 80px" th:text="#{bank.default}"></th>
+                            <th th:text="#{fulfilment.name}"></th>
+                            <th th:text="#{general.actions}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="tpl, tplStat : *{form.store.shippingConfiguration.packageTemplates}">
+                            <td style="text-align: center;">
+                                <span th:if="${tpl.default}" class="tag is-success" th:text="#{general.yes}"></span>
+                                <span th:if="${!tpl.default}" class="has-text-grey" th:text="#{general.no}"></span>
+                            </td>
+                            <td><span th:text="*{tpl.name}" /></td>
+                            <td>
+                                <div class="dropdown is-hoverable is-right">
+                                    <div class="dropdown-trigger">
+                                        <button class="button is-small is-ghost"
+                                                aria-haspopup="true"
+                                                aria-controls="shipping-template-actions">
+                <span class="icon is-small">
+                    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                </span>
+                                        </button>
+                                    </div>
+
+                                    <div class="dropdown-menu" role="menu">
+                                        <div class="dropdown-content">
+                                            <a th:if="${tpl.isComplete()}" class="dropdown-item"
+                                               th:href="@{/dashboard/store/shipping/templates/edit(templateId=${tpl.id})}"
+                                               th:text="#{shipping.package.template.edit}">
+                                            </a>
+                                            <form th:if="${!tpl.default}" th:action="@{/dashboard/store/shipping/templates/default}" method="post">
+                                                <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
+                                                <input type="hidden" name="templateId" th:value="${tpl.id}"/>
+                                                <button type="submit"
+                                                        class="dropdown-item button is-ghost is-shadowless has-text-left"
+                                                        style="width:100%;text-decoration:none;">
+                                                    <span th:text="#{shipping.save.as.default}"></span>
+                                                </button>
+                                            </form>
+                                            <hr class="dropdown-divider">
+                                            <form th:action="@{/dashboard/store/shipping/templates/delete}" method="post">
+                                                <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
+                                                <input type="hidden" name="templateId" th:value="${tpl.id}"/>
+                                                <button type="button"
+                                                        class="dropdown-item button is-ghost is-shadowless has-text-left has-text-danger"
+                                                        style="width:100%;text-decoration:none;"
+                                                        onclick="confirmDelete(this)">
+                                                    <span th:text="#{general.delete}"></span>
+                                                </button>
+                                            </form>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div class="field is-grouped mt-4">
+                        <a class="button is-primary" th:href="@{/dashboard/store/shipping/templates/new}" th:text="#{shipping.package.template.add}"></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field mt-4">
+                <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

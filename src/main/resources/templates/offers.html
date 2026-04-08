@@ -1,0 +1,157 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <style>
+        .offer-section {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <div class="box offer-section">
+                <div class="offer-section">
+                    <form method="get" th:action="@{/dashboard/offers}">
+                        <div class="field">
+                            <label class="label" th:text="#{baskets.id}"></label>
+                            <div class="control">
+                                <input class="input" type="text" name="basketId" th:value="${searchParams.basketId}">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="label" th:text="#{offers.name}"></label>
+                            <div class="control">
+                                <input class="input" type="text" name="name" th:value="${searchParams.name}">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="label" th:text="#{offers.type}">]</label>
+                            <div class="control">
+                                <div class="select">
+                                    <select name="type">
+                                        <option th:text="#{offers.all}" value=""></option>
+                                        <option th:each="basketType : ${basketTypes}"
+                                                th:value="${basketType.name()}"
+                                                th:text="${basketType.name()}"
+                                                th:selected="${searchParams.type == basketType.name()}">
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field is-grouped">
+                            <div class="control is-expanded">
+                                <label class="label" th:text="#{offers.created.at.start}"></label>
+                                <input class="input" type="date" name="createdAtStart"
+                                       th:value="${searchParams.createdAtStart}">
+                            </div>
+                            <div class="control is-expanded">
+                                <label class="label" th:text="#{offers.created.at.end}"></label>
+                                <input class="input" type="date" name="createdAtEnd"
+                                       th:value="${searchParams.createdAtEnd}">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <div class="control">
+                                <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="offer-section">
+                    <table class="table is-fullwidth is-striped">
+                        <tr>
+                            <th th:text="#{source.basket.id.label}"></th>
+                            <th th:text="#{catalog.name}"></th>
+                            <th th:text="#{offers.type}"></th>
+                            <th th:text="#{offers.created.at}"></th>
+                            <th th:text="#{offers.expired.at}"></th>
+                            <th th:text="#{general.actions}"></th>
+                        </tr>
+                        <tr th:each="offer : ${offers}">
+                            <td th:text="${offer.basketId}"></td>
+                            <td th:text="${offer.name}"></td>
+                            <td th:text="${offer.type}"></td>
+                            <td th:text="${#temporals.format(offer.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            <td th:text="${#temporals.format(offer.expiresAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            <td>
+                                <div class="buttons">
+                                    <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}"
+                                       class="button is-small is-info"
+                                       th:href="@{/dashboard/offer/new/from-template(templateId=${offer.basketId})}"
+                                       th:text="#{offers.manual.button}">
+                                    </a>
+
+                                    <th:block th:if="${offer.type != T(pl.commercelink.baskets.BasketType).Basket}">
+                                        <a class="button is-small is-info"
+                                           th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}"
+                                           th:text="#{general.edit}"></a>
+                                        <form th:action="@{/dashboard/offer/{offerId}/delete(offerId=${offer.basketId})}"
+                                              method="post" style="display:inline;">
+                                            <button type="button" class="button is-small is-danger"
+                                                    onclick="confirmDelete(this)" th:text="#{general.delete}"></button>
+                                        </form>
+                                    </th:block>
+
+                                    <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
+                                       class="button is-small is-info"
+                                       th:href="@{/dashboard/basket/view/{basketId}(basketId=${offer.basketId})}"
+                                       th:text="#{general.view}">
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div th:replace="~{fragments/pagination :: pagination('/dashboard/offers', ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
+
+                </div>
+            </div>
+
+            <div class="box">
+                <h3 th:text="#{offers.create}"></h3>
+
+                <!-- Import Options -->
+                <div class="columns">
+                    <div class="column">
+                        <div class="card">
+                            <div class="card-content">
+                                <h4 class="title is-6" th:text="#{offers.import.sources.title}">Import from Sources</h4>
+                                <p class="subtitle is-7" th:text="#{offers.import.sources.description}">Create offers from external sources</p>
+                                <a href="/dashboard/offer/new" class="button is-primary is-fullwidth" th:text="#{offers.import.sources.button}">Import Offer</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column">
+                        <div class="card">
+                            <div class="card-content">
+                                <h4 class="title is-6" th:text="#{offers.manual.title}">Create Manual Offer</h4>
+                                <p class="subtitle is-7" th:text="#{offers.manual.description}">Start with empty offer</p>
+                                <a href="/dashboard/offer/new/manual" class="button is-link is-fullwidth" th:text="#{offers.manual.button}">Create Offer</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

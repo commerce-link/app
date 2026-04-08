@@ -1,0 +1,68 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+
+            <div class="level">
+                <div class="level-left">
+                    <h1 class="title" th:text="#{rma.centers}"></h1>
+                </div>
+                <div class="level-right">
+                    <a th:href="@{/dashboard/store/rma-centers/new}" class="button is-link is-light">
+                        <span class="icon"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{rma.add.new.center}"></span>
+                    </a>
+                </div>
+            </div>
+
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                <tr>
+                    <th th:text="#{warehouse.item.provider}"></th>
+                    <th th:text="#{order.address.company}"></th>
+                    <th th:text="#{order.address.street}"></th>
+                    <th th:text="#{order.address.postal}"></th>
+                    <th th:text="#{order.address.city}"></th>
+                    <th th:text="#{order.address.country}"></th>
+                    <th th:text="#{order.address.email}"></th>
+                    <th th:text="#{order.address.phone}"></th>
+                    <th th:text="#{warehouse.item.action}"></th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <tr th:each="center : ${rmaCenters}">
+                    <td th:text="${center.provider}"></td>
+                    <td th:text="${center.shippingDetails.companyName}"></td>
+                    <td th:text="${center.shippingDetails.streetAndNumber}"></td>
+                    <td th:text="${center.shippingDetails.postalCode}"></td>
+                    <td th:text="${center.shippingDetails.city}"></td>
+                    <td th:text="${center.shippingDetails.country}"></td>
+                    <td th:text="${center.shippingDetails.email}"></td>
+                    <td th:text="${center.shippingDetails.phone}"></td>
+                    <td>
+                        <div  th:if="${center.storeId.equals(scope)}">
+                            <a class="button is-small is-primary is-info mb-2"
+                               th:text="#{product.edit}"
+                               th:href="@{'/dashboard/store/rma-centers/' + ${center.rmaCenterId} + '/edit'}"></a>
+
+                            <form th:action="@{'/dashboard/store/rma-centers/' + ${center.rmaCenterId} + '/delete'}" method="post">
+                                <button type="button" class="button is-small is-danger"
+                                        onclick="confirmDelete(this)" th:text="#{general.delete}"></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+</body>
+</html>

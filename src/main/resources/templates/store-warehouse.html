@@ -1,0 +1,61 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="#{store.warehouse.page.title}"></h1>
+
+            <form th:action="@{/dashboard/store/warehouse/edit}" th:object="${form}" method="post">
+
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <!-- Warehouse Configuration -->
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{store.warehouse.title}"></h2>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.warehouse.configuration.warehouse.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.warehouseConfiguration.warehouseId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.warehouse.configuration.cost.center.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.warehouseConfiguration.costCenterId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.warehouseConfiguration.documentsGenerationEnabled}">
+                            <span th:text="#{store.warehouse.configuration.documentation.enabled}"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

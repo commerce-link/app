@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title mb-5" th:text="#{item.history}"></h1>
+
+            <!-- Search Box -->
+            <div class="box">
+                <form method="get" action="/dashboard/item/history">
+                    <div class="field is-grouped">
+                        <div class="control is-expanded">
+                            <input class="input" type="text" name="serialNo" th:placeholder="#{collection.serial.no}" th:value="${serialNo}">
+                        </div>
+                        <div class="control">
+                            <button class="button is-link" type="submit">
+                                <span class="icon"><i class="fas fa-search"></i></span>
+                                <span th:text="#{general.search}"></span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="box" th:if="${serialNo}">
+                <h3 class="subtitle mb-4" th:text="${serialNo}"></h3>
+
+                <div th:if="${#lists.isEmpty(history)}">
+                    <p class="has-text-grey" th:text="#{item.history.not.found}"></p>
+                </div>
+
+                <!-- Timeline -->
+                <div th:if="${!#lists.isEmpty(history)}">
+                    <div class="timeline is-centered">
+                        <header class="timeline-header">
+                            <span class="tag is-medium is-success" th:text="#{item.history.start}"></span>
+                        </header>
+
+                        <div class="timeline-item" th:each="event : ${history}">
+                            <div class="timeline-marker is-icon"
+                                 th:classappend="${event.source == 'Order' ? 'has-background-link' : (event.source == 'Warehouse' ? 'has-background-warning' : (event.source == 'RMA' ? 'has-background-danger' : (event.source == 'Delivery' ? 'has-background-info' : 'has-background-grey')))}">
+                                <i class="fas has-text-white"
+                                   th:classappend="${event.source == 'Order' ? 'fa-shopping-cart' : (event.source == 'Warehouse' ? 'fa-warehouse' : (event.source == 'RMA' ? 'fa-undo' : (event.source == 'Delivery' ? 'fa-truck' : 'fa-box')))}"></i>
+                            </div>
+
+                            <div class="timeline-content">
+                                <p class="heading" th:text="${#temporals.format(event.date, 'yyyy-MM-dd HH:mm')}"></p>
+                                <p class="is-size-6 mb-2">
+                                    <strong th:text="${event.title}"></strong>
+                                </p>
+                                <p class="has-text-grey" th:text="${event.source + ' #' + event.id}"></p>
+
+                                <a th:if="${event.link}" th:href="${event.link}" class="has-text-link has-text-weight-semibold" target="_blank">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    <span th:text="#{item.history.view.detail}"></span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <header class="timeline-header">
+                            <span class="tag is-medium is-success" th:text="#{item.history.end}"></span>
+                        </header>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

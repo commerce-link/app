@@ -1,0 +1,273 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+
+    <!-- Separate section for catalogId, productId, and pimId -->
+    <div class="box" style="margin-bottom: 20px;">
+        <div class="field">
+            <label class="label" th:text="#{catalog.catalog.id}"></label>
+            <div class="control">
+                <span id="catalogId" th:text="${catalogId}"></span>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{product.id}"></label>
+            <div class="control">
+                <span id="productId" th:text="${product.productId}"></span>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{product.pim.id}"></label>
+            <div class="control">
+                <span id="pimId" th:text="${product.pimId}"></span>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{product.category}"></label>
+            <div class="control">
+                <span id="category" th:text="${product.category}"></span>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{product.brand}"></label>
+            <div class="control">
+                <span id="brand" th:text="${product.brand}"></span>
+            </div>
+        </div>
+    </div>
+
+    <form th:action="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}(catalogId=${catalogId}, categoryId=${product.categoryId}, productId=${product.productId})}" th:object="${product}" method="post">
+        <input type="hidden" th:field="*{categoryId}" />
+        <input type="hidden" th:field="*{productId}" />
+        <input type="hidden" th:field="*{pimId}" />
+        <input type="hidden" th:field="*{category}" />
+        <input type="hidden" th:field="*{brand}" />
+
+        <div class="field">
+            <label class="label" for="ean" th:text="#{product.ean}"></label>
+            <div class="control">
+                <input class="input" type="text" id="ean" th:field="*{ean}" />
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="manufacturerCode" th:text="#{product.manufacturer.code}"></label>
+            <div class="control">
+                <input class="input" type="text" id="manufacturerCode" th:field="*{manufacturerCode}" />
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <div th:if="${#lists.isEmpty(labels)}">
+                    <label class="label" for="label_input" th:text="#{product.label}"></label>
+                    <input class="input" type="text" id="label_input" th:field="*{label}" />
+                </div>
+                <div th:if="${!#lists.isEmpty(labels)}" class="select">
+                    <label class="label" for="label_select" th:text="#{product.label}"></label>
+                    <select id="label_select" th:field="*{label}">
+                        <option th:each="label : ${labels}" th:value="${label}" th:text="${label}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="name" th:text="#{product.name}"></label>
+            <div class="control">
+                <input class="input" type="text" id="name" th:field="*{name}" />
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="recommendation" th:text="#{product.recommendation}"></label>
+            <div class="control">
+                <input class="input" type="text" id="recommendation" th:field="*{recommendation}" />
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="enabled" th:text="#{general.enabled}"></label>
+            <div class="control">
+                <input class="checkbox" type="checkbox" id="enabled" th:field="*{enabled}" />
+            </div>
+        </div>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{product.compatibility.filter}"></legend>
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{product.category}"></th>
+                    <th th:text="#{catalog.metadata.name}"></th>
+                    <th th:text="#{catalog.metadata.value}"></th>
+                    <th th:text="#{catalog.filter.operator}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="filter, iterStat : ${product.customAttributesFilters}">
+                    <td>
+                        <div class="select">
+                            <select th:field="*{customAttributesFilters[__${iterStat.index}__].category}">
+                                <option th:each="category : ${productCategories}" th:value="${category}" th:text="${category}"></option>
+                            </select>
+                        </div>
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{customAttributesFilters[__${iterStat.index}__].name}" />
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{customAttributesFilters[__${iterStat.index}__].value}" />
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{customAttributesFilters[__${iterStat.index}__].operator}" />
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{product.compatibility.tags}"></legend>
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{catalog.metadata.name}"></th>
+                    <th th:text="#{catalog.metadata.value}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="tag, iterStat : ${product.customAttributes}">
+                    <td>
+                        <input class="input" type="text" th:field="*{customAttributes[__${iterStat.index}__].name}" />
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{customAttributes[__${iterStat.index}__].value}" />
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{product.quick.filters}"></legend>
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{catalog.filter}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="filter, iterStat : ${product.quickFilters}">
+                    <td>
+                        <input class="input" type="text" th:field="*{quickFilters[__${iterStat.index}__]}" />
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{product.pricing.availability}"></legend>
+            <div class="field">
+                <label class="label" for="availabilityType" th:text="#{product.availability.type}"></label>
+                <div class="control">
+                    <div class="select">
+                        <select id="availabilityType" th:field="*{availabilityType}">
+                            <option th:each="availabilityType : ${availabilityTypes}" th:value="${availabilityType}" th:text="${availabilityType}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="suggestedRetailPrice" th:text="#{product.srp}"></label>
+                <div class="control">
+                    <input class="input" type="number" id="suggestedRetailPrice" th:field="*{suggestedRetailPrice}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="stockExpectedQty" th:text="#{product.stock.expected}"></label>
+                <div class="control">
+                    <input class="input" type="number" id="stockExpectedQty" th:field="*{stockExpectedQty}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="restockPricePromo" th:text="#{product.restock.price.promo}"></label>
+                <div class="control">
+                    <input class="input" type="number" id="restockPricePromo" th:field="*{restockPricePromo}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="restockPriceStandard" th:text="#{product.restock.price.standard}"></label>
+                <div class="control">
+                    <input class="input" type="number" id="restockPriceStandard" th:field="*{restockPriceStandard}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="estimatedDeliveryDays" th:text="#{product.estimated.delivery.days}"></label>
+                <div class="control">
+                    <input class="input" type="number" id="estimatedDeliveryDays" th:field="*{estimatedDeliveryDays}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="pricingGroup" th:text="#{product.pricing.group}"></label>
+                <div class="control">
+                    <div class="select">
+                        <select id="pricingGroup" th:field="*{pricingGroup}">
+                            <option th:each="pricingGroup : ${pricingGroups}" th:value="${pricingGroup}" th:text="${pricingGroup}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="box">
+            <div class="field">
+                <label class="label" th:text="#{product.marketplaces}"></label>
+                <div class="control">
+                    <div th:each="marketplaceType : ${marketplaceTypes}" class="field">
+                        <label class="checkbox">
+                            <input type="checkbox"
+                                   th:value="${marketplaceType}"
+                                   th:field="*{marketplaces}" />
+                            <span th:text="${marketplaceType}"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{product.metadata}"></legend>
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{catalog.metadata.key}"></th>
+                    <th th:text="#{catalog.metadata.value}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="entry, iterStat : ${product.metadata}">
+                    <td>
+                        <input class="input" type="text" th:field="*{metadata[__${iterStat.index}__].key}" />
+                    </td>
+                    <td>
+                        <input class="input" type="text" th:field="*{metadata[__${iterStat.index}__].value}" />
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </fieldset>
+
+        <div class="field">
+            <div class="control">
+                <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+            </div>
+        </div>
+    </form>
+
+</div>
+
+</body>
+</html>

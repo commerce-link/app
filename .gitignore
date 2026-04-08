@@ -1,0 +1,41 @@
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+nul
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+.DS_Store
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/build/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+/src/main/resources/feeds/*
+/src/main/resources/products/*/images/*
+/src/main/resources/products/*/thumbnails/*
+/.vscode/*
+tmpclaude-*
+
+.claude/settings.local.json
+
+### Should never go into repository ###
+src/main/resources/application-local.properties
+src/main/resources/application-prod.properties
+
+update.env

@@ -1,0 +1,287 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <div class="level">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h1>
+                            <span th:text="#{deliveries.create.title}">Create Delivery</span>
+                            <span th:text="' - ' + ${form.provider}"></span>
+                        </h1>
+                    </div>
+                </div>
+            </div>
+
+            <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create(storeId=${form.storeId})} : @{/dashboard/deliveries/create}"
+                  th:object="${form}" method="post" id="deliveryCreateForm">
+
+                <input type="hidden" th:field="*{storeId}"/>
+                <input type="hidden" th:field="*{provider}"/>
+
+                <!-- Delivery Details - Full Width Horizontal -->
+                <div class="box mb-5">
+                    <div class="columns is-vcentered">
+                        <div class="column is-2">
+                            <label class="label" th:text="#{general.delivery.id}">Order No</label>
+                            <input class="input" type="text" th:field="*{externalDeliveryId}"/>
+                        </div>
+                        <div class="column is-2">
+                            <label class="label" th:text="#{general.payment.status}">Payment Status</label>
+                            <div class="select is-fullwidth">
+                                <select th:field="*{paymentStatus}" required>
+                                    <option th:each="status : ${T(pl.commercelink.orders.PaymentStatus).values()}"
+                                            th:value="${status}"
+                                            th:text="${status}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-2">
+                            <label class="label" th:text="#{deliveries.estimated.delivery}">Est. Delivery</label>
+                            <input class="input" type="date" th:field="*{estimatedDeliveryAt}"/>
+                        </div>
+                        <div class="column is-narrow">
+                            <label class="label" th:text="#{general.currency}">Currency</label>
+                            <div class="select">
+                                <select th:field="*{sourceCurrency}">
+                                    <option value="PLN">PLN</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-narrow">
+                            <label class="label" th:text="#{deliveries.shippingCost}">Shipping</label>
+                            <input class="input" type="number" th:field="*{shippingCost}" step="0.01" style="width: 120px;" required/>
+                        </div>
+                        <div class="column is-narrow">
+                            <label class="label" th:text="#{deliveries.paymentCost}">Payment</label>
+                            <input class="input" type="number" th:field="*{paymentCost}" step="0.01" style="width: 120px;" required/>
+                        </div>
+                        <div class="column is-narrow">
+                            <label class="label" th:text="#{deliveries.paymentTerms}">Terms</label>
+                            <input class="input" type="number" th:field="*{paymentTerms}" style="width: 100px;" required/>
+                        </div>
+                    </div>
+                    <div class="columns is-vcentered">
+                        <div class="column">
+                            <label class="checkbox">
+                                <input type="checkbox" th:field="*{removeUnselected}"/>
+                                <span th:text="#{deliveries.create.removeUnselected}">Remove unselected</span>
+                            </label>
+                        </div>
+                        <div class="column has-text-right">
+                            <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products List - Full Width -->
+                <p class="help mb-3" th:text="#{deliveries.create.qtyIncrease.note}">Quantities above minimum will be added as warehouse items.</p>
+
+                <div th:each="item, itemStat : *{items}" class="box mb-4">
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
+
+                    <div class="columns is-vcentered mb-2">
+                        <div class="column">
+                            <p class="has-text-weight-semibold mb-0" th:text="${item.name}">Product Name</p>
+                            <p class="has-text-grey">
+                                <span th:text="#{general.ean}">EAN</span>: <span th:text="${item.ean}"></span>
+                                &nbsp;|&nbsp;
+                                <span th:text="#{general.manufacturer.code}">MFN</span>: <span th:text="${item.mfn}"></span>
+                            </p>
+                        </div>
+                        <div class="column is-narrow has-text-centered">
+                            <label class="label mb-1" th:text="#{deliveries.minQty}">Min Qty</label>
+                            <span class="tag is-light is-medium" th:id="'minQty-' + ${item.mfn}" th:text="${item.minQty}"></span>
+                        </div>
+                        <div class="column is-narrow has-text-centered">
+                            <label class="label mb-1" th:text="#{deliveries.requestedQty}">Requested Qty</label>
+                            <input class="input" type="number" style="width: 100px;"
+                                   th:field="*{items[__${itemStat.index}__].requestedQty}"
+                                   th:min="${item.minQty}"
+                                   th:data-mfn="${item.mfn}"
+                                   oninput="updateExtraStock(this.dataset.mfn)"
+                                   onchange="validateQty(this)"/>
+                        </div>
+                        <div class="column is-narrow has-text-centered">
+                            <label class="label mb-1" th:text="#{general.net.cost}">Unit Cost</label>
+                            <input class="input" type="number" style="width: 120px;"
+                                   th:field="*{items[__${itemStat.index}__].unitCost}"
+                                   step="0.01" min="0"/>
+                        </div>
+                    </div>
+
+                    <table class="table is-fullwidth is-narrow">
+                        <thead>
+                        <tr>
+                            <th style="width: 60px;" th:text="#{deliveries.create.include}">Include</th>
+                            <th th:text="#{deliveries.source}">Source</th>
+                            <th style="width: 80px;" th:text="#{general.quantity}">Qty</th>
+                            <th style="width: 100px;" th:text="#{deliveries.allocation.type}">Type</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="allocation, allocStat : ${item.allocations}">
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
+
+                            <td>
+                                <input type="checkbox"
+                                       th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"
+                                       th:data-mfn="${allocation.mfn}"
+                                       th:data-qty="${allocation.qty}"
+                                       th:data-type="${allocation.type}"
+                                       onchange="updateMinQty(this)"/>
+                            </td>
+                            <td>
+                                <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.name}" target="_blank"></a>
+                            </td>
+                            <td th:text="${allocation.qty}"></td>
+                            <td>
+                                <span class="tag" th:classappend="${allocation.type.name() == 'Order'} ? 'is-info' : 'is-warning'"
+                                      th:text="${allocation.type}"></span>
+                            </td>
+                        </tr>
+                        <tr th:id="'extraStock-' + ${item.mfn}" class="has-background-success-light" style="display: none;">
+                            <td>
+                                <span th:id="'extraStockIcon-' + ${item.mfn}" class="icon has-text-success"><i class="fas fa-plus"></i></span>
+                            </td>
+                            <td th:text="#{deliveries.create.warehouseAdjustment}">Warehouse adjustment</td>
+                            <td th:id="'extraStockQty-' + ${item.mfn}">0</td>
+                            <td>
+                                <span th:id="'extraStockTag-' + ${item.mfn}" class="tag is-success">Warehouse</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+    <script>
+        function validateQty(input) {
+            const min = parseInt(input.min);
+            const value = parseInt(input.value);
+            if (value < min) {
+                input.value = min;
+            }
+            updateExtraStock(input.dataset.mfn);
+        }
+
+        function updateMinQty(checkbox) {
+            const mfn = checkbox.dataset.mfn;
+            const allocQty = parseInt(checkbox.dataset.qty);
+            const allocType = checkbox.dataset.type;
+
+            const minQtySpan = document.getElementById('minQty-' + mfn);
+            if (!minQtySpan) return;
+
+            const qtyInput = document.querySelector('input[data-mfn="' + mfn + '"][type="number"]');
+            const currentQty = qtyInput ? parseInt(qtyInput.value) : 0;
+
+            // Only Order allocations affect minQty
+            if (allocType === 'Order') {
+                const currentMin = parseInt(minQtySpan.textContent);
+                let newMin;
+
+                if (checkbox.checked) {
+                    newMin = currentMin + allocQty;
+                } else {
+                    newMin = currentMin - allocQty;
+                }
+
+                newMin = Math.max(0, newMin);
+                minQtySpan.textContent = newMin;
+
+                if (qtyInput) {
+                    qtyInput.min = newMin;
+
+                    if (checkbox.checked) {
+                        if (currentQty < newMin) {
+                            qtyInput.value = newMin;
+                        }
+                    } else {
+                        qtyInput.value = Math.max(newMin, currentQty - allocQty);
+                    }
+                }
+            } else if (allocType === 'Warehouse') {
+                // Warehouse allocations: adjust qty but not minQty
+                if (qtyInput) {
+                    if (checkbox.checked) {
+                        qtyInput.value = currentQty + allocQty;
+                    } else {
+                        const minQty = parseInt(minQtySpan.textContent);
+                        qtyInput.value = Math.max(minQty, currentQty - allocQty);
+                    }
+                }
+            }
+
+            updateExtraStock(mfn);
+        }
+
+        function updateExtraStock(mfn) {
+            const minQtySpan = document.getElementById('minQty-' + mfn);
+            const qtyInput = document.querySelector('input[data-mfn="' + mfn + '"][type="number"]');
+            const extraStockRow = document.getElementById('extraStock-' + mfn);
+            const extraStockQty = document.getElementById('extraStockQty-' + mfn);
+            const extraStockIcon = document.getElementById('extraStockIcon-' + mfn);
+            const extraStockTag = document.getElementById('extraStockTag-' + mfn);
+
+            if (!minQtySpan || !qtyInput || !extraStockRow || !extraStockQty) return;
+
+            const minQty = parseInt(minQtySpan.textContent);
+            const requestedQty = parseInt(qtyInput.value);
+
+            // Calculate selected warehouse qty
+            const warehouseCheckboxes = document.querySelectorAll('input[data-mfn="' + mfn + '"][data-type="Warehouse"]:checked');
+            let selectedWarehouseQty = 0;
+            warehouseCheckboxes.forEach(cb => {
+                selectedWarehouseQty += parseInt(cb.dataset.qty);
+            });
+
+            const availableForWarehouse = requestedQty - minQty;
+            const warehouseAdjustment = availableForWarehouse - selectedWarehouseQty;
+
+            if (warehouseAdjustment > 0) {
+                extraStockQty.textContent = '+' + warehouseAdjustment;
+                extraStockRow.className = 'has-background-success-light';
+                extraStockIcon.className = 'icon has-text-success';
+                extraStockIcon.innerHTML = '<i class="fas fa-plus"></i>';
+                extraStockTag.className = 'tag is-success';
+                extraStockRow.style.display = '';
+            } else if (warehouseAdjustment < 0) {
+                extraStockQty.textContent = warehouseAdjustment;
+                extraStockRow.className = 'has-background-danger-light';
+                extraStockIcon.className = 'icon has-text-danger';
+                extraStockIcon.innerHTML = '<i class="fas fa-minus"></i>';
+                extraStockTag.className = 'tag is-danger';
+                extraStockRow.style.display = '';
+            } else {
+                extraStockRow.style.display = 'none';
+            }
+        }
+    </script>
+
+</div>
+</body>
+</html>

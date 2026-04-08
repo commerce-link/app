@@ -1,0 +1,143 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <div class="box">
+                <h3 class="title is-3" th:text="#{order.item.edit}">Edit Order Item</h3>
+                <form id="editForm"
+                      th:object="${orderItem}" method="post"
+                      th:action="@{/dashboard/orders/{orderId}/items/{itemId}/save(orderId=${orderId}, itemId=${orderItem.itemId})}">
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.category}">Category</label>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{category}" th:disabled="${isCompletedOrder}">
+                                    <option th:each="category : ${categories}" th:value="${category}" th:text="${pcl.name(category)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.sku}">SKU</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{sku}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.name}">Name</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{name}" th:disabled="${isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.unit.price}">Unit Price</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{price}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.unit.cost.net}">Net Cost</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{cost}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.quantity}">Quantity</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{qty}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.tax}">Tax</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{tax}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{general.ean}">EAN</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{ean}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{general.manufacturer.code}">Manufacturer Code</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{manufacturerCode}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{general.delivery.id}">Order No</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{deliveryId}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.serial.no}">Serial No</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{serialNo}" th:disabled="${isCompletedOrder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.status}">Status</label>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{status}" disabled>
+                                    <option th:each="status : ${fulfilmentStatuses}"
+                                            th:value="${status}"
+                                            th:text="${status.localizedName}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{consolidated}" th:disabled="${isCompletedOrder}">
+                            <span th:text="#{order.item.consolidated}">Consolidated</span>
+                        </label>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.comment}">Comment</label>
+                        <div class="control">
+                            <textarea class="textarea" th:field="*{comment}" th:disabled="${isCompletedOrder}"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped mt-5">
+                        <div class="control">
+                            <button class="button is-primary" type="submit" th:disabled="${isCompletedOrder}" th:text="#{general.save}">Save</button>
+                        </div>
+                        <div class="control">
+                            <a class="button" th:href="@{/dashboard/orders/{orderId}(orderId=${orderId})}" th:text="#{general.cancel}">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

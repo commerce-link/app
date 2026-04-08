@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+
+    <form th:action="@{/dashboard/offers/new/create}" th:object="${form}" enctype="multipart/form-data" method="post" class="box">
+        <h2 class="title is-4" th:text="#{offers.create.from.source}"></h2>
+        <div class="field">
+            <label class="label" for="orderReferenceType" th:text="#{client.order.reference.type}"></label>
+            <div class="control">
+                <input class="input" type="text" id="orderReferenceType" th:field="*{type}" readonly />
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{client.csv.file}"></label>
+            <div class="control">
+                <input class="input" type="file" th:field="*{csvFile}" accept=".csv" required>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="offerName" th:text="#{offers.name}">Offer Name</label>
+            <div class="control">
+                <input class="input" type="text" id="offerName" th:field="*{offerName}" required>
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="control" style="margin-top: 20px">
+                <button class="button is-primary" type="submit" th:text="#{offers.create}"></button>
+                <a th:href="@{/dashboard/offers}" class="button is-light" th:text="#{general.cancel}"></a>
+            </div>
+        </div>
+    </form>
+
+
+</div>
+
+</body>
+</html>

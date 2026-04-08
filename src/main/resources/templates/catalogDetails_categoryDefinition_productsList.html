@@ -1,0 +1,217 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <div class="box">
+        <article class="media">
+            <div class="media-content">
+                <div class="content">
+                    <div class="field">
+                        <label class="label" th:text="#{catalog.catalog.id}"></label>
+                        <div class="control">
+                            <a class="is-link is-medium" th:href="@{/dashboard/catalogs/{catalogId}(catalogId=${catalogId})}" th:text="${catalogId}"></a>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{catalog.category.name}"></label>
+                        <div class="control">
+                            <a class="is-link" th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}(catalogId=${catalogId}, categoryId=${categoryDefinition.categoryId})}" th:text="${categoryDefinition.name}"></a>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{product.category}"></label>
+                        <div class="control">
+                            <span th:text="${categoryDefinition.category}"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <div th:if="${not #lists.isEmpty(brands)}" class="notification info">
+        <strong th:text="#{catalog.following.brands.mapped}"></strong>
+        <ul>
+            <li th:each="label : ${brands}" th:text="${label}"></li>
+        </ul>
+    </div>
+
+    <div th:if="${not #lists.isEmpty(quickFilters)}" class="notification info">
+        <strong th:text="#{catalog.following.quick.filters}"></strong>
+        <ul>
+            <li th:each="label : ${quickFilters}" th:text="${label}"></li>
+        </ul>
+    </div>
+
+    <div th:if="${not #lists.isEmpty(customAttributes)}" class="notification info">
+        <strong th:text="#{catalog.following.compatibility.tags}"></strong>
+        <ul>
+            <li th:each="label : ${customAttributes}" th:text="${label}"></li>
+        </ul>
+    </div>
+
+    <div th:if="${not #lists.isEmpty(customAttributesFilters)}" class="notification info">
+        <strong th:text="#{catalog.following.compatibility.filters}"></strong>
+        <ul>
+            <li th:each="label : ${customAttributesFilters}" th:text="${label}"></li>
+        </ul>
+    </div>
+
+    <div th:if="${not #lists.isEmpty(metadataTags)}" class="notification info">
+        <strong th:text="#{catalog.following.metadata}"></strong>
+        <ul>
+            <li th:each="label : ${metadataTags}" th:text="${label}"></li>
+        </ul>
+    </div>
+
+    <div>
+        <form method="get" class="mb-3">
+            <div class="field is-grouped">
+                <input type="hidden" name="status" th:value="${param.status}" />
+                <div class="control">
+                    <input class="input" type="text" name="brand" th:placeholder="#{product.brand}" th:value="${param.brand}">
+                </div>
+                <div class="control">
+                    <input class="input" type="text" name="label" th:placeholder="#{product.label}" th:value="${param.label}">
+                </div>
+                <div class="control">
+                    <input class="input" type="text" name="pimId" th:placeholder="#{product.pim.id}" th:value="${param.pimId}">
+                </div>
+                <div class="control">
+                    <input class="input" type="text" name="ean" th:placeholder="#{product.ean}" th:value="${param.ean}">
+                </div>
+                <div class="control">
+                    <input class="input" type="text" name="mfn" th:placeholder="#{product.manufacturer.code}" th:value="${param.mfn}">
+                </div>
+                <div class="control">
+                    <button class="button is-primary" type="submit" th:text="#{general.search}"></button>
+                </div>
+            </div>
+        </form>
+        <form id="bulkForm" method="post">
+            <div style="overflow-x: auto;">
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th th:text="#{product.pim.id}"></th>
+                        <th th:text="#{product.ean}"></th>
+                        <th th:text="#{product.manufacturer.code}"></th>
+                        <th th:text="#{product.brand}"></th>
+                        <th th:text="#{product.label}"></th>
+                        <th th:text="#{product.name}"></th>
+                        <th th:text="#{product.compatibility.filter}"></th>
+                        <th th:text="#{product.compatibility.tags}"></th>
+                        <th th:text="#{product.quick.filters}"></th>
+                        <th th:text="#{product.metadata}"></th>
+                        <th th:text="#{product.pricing.group}"></th>
+                        <th th:text="#{general.actions}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="product : ${products}">
+                        <td>
+                            <input type="checkbox" name="productIds" class="product-checkbox" th:value="${product.productId}"/>
+                        </td>
+                        <td th:text="${product.pimId}"></td>
+                        <td th:text="${product.ean}"></td>
+                        <td th:text="${product.manufacturerCode}"></td>
+                        <td th:text="${product.brand}"></td>
+                        <td th:text="${product.label}"></td>
+                        <td th:text="${product.name}"></td>
+                        <td>
+                            <ul>
+                                <li th:each="filter : ${product.customAttributesFilters}" th:text="${filter}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                <li th:each="tag : ${product.customAttributes}" th:text="${tag}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                <li th:each="filter : ${product.quickFilters}" th:text="${filter}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                <li th:each="metadata : ${product.metadata}" th:text="${metadata}"></li>
+                            </ul>
+                        </td>
+                        <td th:text="${product.pricingGroup}"></td>
+                        <td>
+                            <div th:if="${categoryDefinition.type == T(pl.commercelink.products.CategoryDefinitionType).Managed}" class="field">
+                                <a class="button is-small is-primary"
+                                   th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}(
+                                         catalogId=${catalogId},
+                                         categoryId=${product.categoryId},
+                                         productId=${product.productId})}"
+                                   th:text="#{general.edit}">
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${categoryDefinition.type == T(pl.commercelink.products.CategoryDefinitionType).Managed}" class="field is-grouped">
+                <div class="control">
+                    <div class="select is-small">
+                        <select id="bulkAction" name="action" required>
+                            <option th:if="${param.status == null || param.status[0] == 'Enabled'}" value="disable"  th:text="#{product.bulk.disable}"></option>
+                            <option th:if="${param.status[0] == 'Disabled'}" value="enable" th:text="#{product.bulk.enable}"></option>
+                            <option value="delete" th:text="#{product.bulk.delete}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <button type="submit"
+                            class="button is-small is-primary"
+                            th:disabled="${#lists.isEmpty(products)}"
+                            th:formaction="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-execute(
+                              catalogId=${catalogId},
+                              categoryId=${categoryDefinition.categoryId},
+                              status=${param.status != null ? param.status : 'Enabled'})}"
+                            onclick="return confirmBulkAction()"
+                            th:text="#{general.execute}">
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div th:replace="~{fragments/pagination :: pagination(@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products(catalogId=${catalogId}, categoryId=${categoryId})}, ${currentPage}, ${hasNextPage}, ${paginationParams})}"></div>
+
+    </div>
+
+    <script th:inline="javascript">
+        function confirmBulkAction() {
+            const action = document.getElementById('bulkAction').value;
+            const checkedBoxes = document.querySelectorAll('.product-checkbox:checked');
+
+            if (checkedBoxes.length === 0) {
+                // use #{…} for message lookups
+                const selectionMessage = /*[[#{product.bulk.select.confirm}]]*/ 'You must select at least one item!';
+                alert(selectionMessage);
+                return false;
+            }
+
+            if (action === 'delete') {
+                const confirmationMessage = /*[[#{product.bulk.delete.confirm}]]*/ 'Are you sure you want to delete?';
+                return confirm(confirmationMessage);
+            }
+
+            return true;
+        }
+    </script>
+
+
+</div>
+
+</body>
+</html>

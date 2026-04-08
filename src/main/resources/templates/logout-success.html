@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Logged Out - CommerceLink</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f0ff, #fceeff, #ffffe0);
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .logout-card {
+            background: #ffffffff;
+            border-radius: 10px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid #c6c6cdff;
+        }
+
+        .logout-card h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
+            color: #000716ff;
+        }
+
+        .logout-card p {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 2rem;
+        }
+
+        .logout-card .button {
+            width: 100%;
+            font-weight: 600;
+            font-size: 14px;
+            border-radius: 10px;
+            background-color: #0972d3ff;
+            border-color: #0972d3ff;
+        }
+
+        .logout-card .button:hover {
+            background-color: #005bb5;
+            border-color: #005bb5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="logout-card">
+    <h1 th:text="#{logout.success}"></h1>
+    <p th:text="#{logout.thank.you}"></p>
+    <a class="button is-primary" href="/oauth2/authorization/cognito" th:text="#{logout.return.to.login}">
+    </a>
+</div>
+
+</body>
+</html>

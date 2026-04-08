@@ -1,0 +1,361 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content" class="container">
+
+    <h1 class="title" th:text="#{shipping.title}"></h1>
+
+    <form th:action="@{${shippingForm.shippingTemplateAction}}" th:object="${shippingForm}" method="post" class="box">
+        <div class="field" th:if="${shippingEntityId}">
+            <label class="label" th:text="${shippingForm.shippingEntityType}"></label>
+            <div class="control">
+                <span th:text="*{shippingEntityId}" class="tag is-info"></span>
+                <input type="hidden" th:field="*{shippingEntityId}">
+            </div>
+        </div>
+
+        <input type="hidden" th:field="*{orderItemIds}">
+        <input type="hidden" th:field="*{shippingEntityType}">
+        <input type="hidden" th:field="*{toClient}">
+
+        <div class="field">
+            <label class="label" th:text="#{shipping.delivery.address} + ':'"></label>
+            <div class="control">
+                <div class="select">
+                    <select id="shippingDetailsSelect" name="selectedShippingDetails">
+                        <option value="-1" th:text="#{shipping.select.or.manual.enter.shipping.details}"></option>
+                        <option th:each="shippingDetail, iterStat : ${shippingDetailsList}"
+                                th:value="${iterStat.index}"
+                                th:data-name="${shippingDetail.name}"
+                                th:data-surname="${shippingDetail.surname}"
+                                th:data-company="${shippingDetail.companyName}"
+                                th:data-street="${shippingDetail.streetAndNumber}"
+                                th:data-postal="${shippingDetail.postalCode}"
+                                th:data-city="${shippingDetail.city}"
+                                th:data-country="${shippingDetail.country}"
+                                th:data-email="${shippingDetail.email}"
+                                th:data-phone="${shippingDetail.phone}"
+                                th:text="${shippingDetail.displayName} + ', ' + ${shippingDetail.streetAndNumber} + ', ' + ${shippingDetail.city}">
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="manualShippingDetails" class="box field" style="width: 50%;">
+            <div class="field">
+                <label class="label" th:text="#{person.name}"></label>
+                <div class="control">
+                    <input id="input-name" class="input" type="text" th:field="*{shippingDetails.name}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{person.surname}"></label>
+                <div class="control">
+                    <input id="input-surname" class="input" type="text" th:field="*{shippingDetails.surname}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{order.address.company}"></label>
+                <div class="control">
+                    <input id="input-company" class="input" type="text" th:field="*{shippingDetails.companyName}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{address.street}"></label>
+                <div class="control">
+                    <input id="input-street" class="input" type="text" th:field="*{shippingDetails.streetAndNumber}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{address.postal.code}"></label>
+                <div class="control">
+                    <input id="input-postal" class="input" type="text" th:field="*{shippingDetails.postalCode}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{address.city}"></label>
+                <div class="control">
+                    <input id="input-city" class="input" type="text" th:field="*{shippingDetails.city}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{address.country}"></label>
+                <div class="control">
+                    <input id="input-country" class="input" type="text" th:field="*{shippingDetails.country}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{person.email}"></label>
+                <div class="control">
+                    <input id="input-email" class="input" type="email" th:field="*{shippingDetails.email}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{person.phone}"></label>
+                <div class="control">
+                    <input id="input-phone" class="input" type="tel" th:field="*{shippingDetails.phone}">
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label" for="pickUpAddress" th:text="#{shipping.pickup.address} + ':'"></label>
+            <div class="control">
+                <div class="select">
+                    <select id="pickUpAddress" th:field="*{pickUpAddressId}">
+                        <option th:each="entry : ${pickUpAddresses}"
+                                th:value="${entry.id}"
+                                th:text="${entry.streetAndNumber} + ' ' + ${entry.city}"
+                                th:selected="${entry.id} == *{pickUpAddressId}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="packageTemplate" th:text="#{shipping.template}"></label>
+            <div class="control">
+                <div class="select">
+                    <select id="packageTemplate" th:field="*{packageTemplateId}">
+                        <option th:each="template : ${packageTemplates}"
+                                th:value="${template.id}"
+                                th:text="${template.name}"
+                                th:selected="${template.id} == *{packageTemplateId}"></option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary" th:text="#{shipping.load.data}"></button>
+            </div>
+        </div>
+    </form>
+
+    <form th:action="@{${shippingForm.shippingEstimateAction}}" th:object="${shippingForm}" method="post" class="box">
+        <input type="hidden" th:field="*{shippingEntityId}">
+        <input type="hidden" th:field="*{shippingEntityType}">
+        <input type="hidden" th:field="*{pickUpAddressId}">
+        <input type="hidden" th:field="*{packageTemplateId}">
+        <input type="hidden" th:field="*{orderItemIds}">
+        <input type="hidden" th:field="*{toClient}">
+
+        <!-- Shipping Details -->
+        <input type="hidden" th:field="*{shippingDetails.name}">
+        <input type="hidden" th:field="*{shippingDetails.surname}">
+        <input type="hidden" th:field="*{shippingDetails.companyName}">
+        <input type="hidden" th:field="*{shippingDetails.streetAndNumber}">
+        <input type="hidden" th:field="*{shippingDetails.postalCode}">
+        <input type="hidden" th:field="*{shippingDetails.city}">
+        <input type="hidden" th:field="*{shippingDetails.country}">
+        <input type="hidden" th:field="*{shippingDetails.email}">
+        <input type="hidden" th:field="*{shippingDetails.phone}">
+
+        <div class="field">
+            <label class="label" th:text="#{shipping.adjust.parcels}"></label>
+            <div class="control">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{shipping.depth}"></th>
+                        <th th:text="#{shipping.width}"></th>
+                        <th th:text="#{shipping.height}"></th>
+                        <th th:text="#{shipping.weight}"></th>
+                        <th th:text="#{shipping.insurance}"></th>
+                        <th th:text="#{shipping.type}"></th>
+                        <th th:text="#{shipping.description}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="package, iterStat : *{parcels}">
+                        <td>
+                            <input type="number" min="0" th:field="*{parcels[__${iterStat.index}__].depth}">
+                        </td>
+                        <td>
+                            <input type="number" min="0" th:field="*{parcels[__${iterStat.index}__].width}">
+                        </td>
+                        <td>
+                            <input type="number" min="0" th:field="*{parcels[__${iterStat.index}__].height}">
+                        </td>
+                        <td>
+                            <input type="number" min="0" th:field="*{parcels[__${iterStat.index}__].weight}">
+                        </td>
+                        <td>
+                            <input type="number" min="0" th:field="*{parcels[__${iterStat.index}__].value}">
+                        </td>
+                        <td>
+                            <input type="text" th:field="*{parcels[__${iterStat.index}__].type}" readonly>
+                        </td>
+                        <td>
+                            <input type="text" th:field="*{parcels[__${iterStat.index}__].description}">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" th:field="*{saturdayDelivery}">
+                <span th:text="#{shipping.saturday}"></span>
+            </label>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" th:field="*{cashOnDelivery}" id="codCheckbox">
+                <span th:text="#{shipping.cash.on.delivery}"></span>
+            </label>
+        </div>
+
+        <div class="field" id="codAmountField" style="display: none;">
+            <label class="label" th:text="#{shipping.cod.amount}"></label>
+            <div class="control">
+                <input type="number"
+                       class="input"
+                       th:field="*{cashOnDeliveryAmount}"
+                       min="0" step="0.1" />
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary" th:text="#{shipping.estimate}"></button>
+            </div>
+        </div>
+    </form>
+
+    <!-- New form for selecting service price -->
+    <form th:action="@{${shippingForm.shippingCreateAction}}" th:object="${shippingForm}" method="post" class="box">
+        <input type="hidden" th:field="*{shippingEntityId}">
+        <input type="hidden" th:field="*{shippingEntityType}">
+        <input type="hidden" th:field="*{pickUpAddressId}">
+        <input type="hidden" th:field="*{packageTemplateId}">
+        <input type="hidden" th:field="*{saturdayDelivery}">
+        <input type="hidden" th:field="*{cashOnDelivery}">
+        <input type="hidden" th:field="*{cashOnDeliveryAmount}">
+        <input type="hidden" th:field="*{orderItemIds}">
+        <input type="hidden" th:field="*{toClient}">
+
+        <!-- Shipping Details -->
+        <input type="hidden" th:field="*{shippingDetails.name}">
+        <input type="hidden" th:field="*{shippingDetails.surname}">
+        <input type="hidden" th:field="*{shippingDetails.companyName}">
+        <input type="hidden" th:field="*{shippingDetails.streetAndNumber}">
+        <input type="hidden" th:field="*{shippingDetails.postalCode}">
+        <input type="hidden" th:field="*{shippingDetails.city}">
+        <input type="hidden" th:field="*{shippingDetails.country}">
+        <input type="hidden" th:field="*{shippingDetails.email}">
+        <input type="hidden" th:field="*{shippingDetails.phone}">
+
+        <div th:each="parcel, iterStat : *{parcels}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].width}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].depth}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].height}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].weight}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].value}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].type}">
+            <input type="hidden" th:field="*{parcels[__${iterStat.index}__].description}">
+        </div>
+
+        <div class="field">
+            <label class="label" th:text="#{shipping.options}"></label>
+            <div class="control">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{shipping.choose}"></th>
+                        <th th:text="#{shipping.provider}"></th>
+                        <th th:text="#{shipping.price}"></th>
+                        <th th:text="#{shipping.errors}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="price : ${servicePrices}">
+                        <td>
+                            <input type="radio" th:field="*{serviceId}" th:value="${price.carrierId}" th:disabled="!${price.available}" required>
+                        </td>
+                        <td th:text="${price.carrierName}"></td>
+                        <td th:text="${price.priceGross}"></td>
+                        <td>
+                            <div th:if="${price.hasErrors()}">
+                                <ul>
+                                    <li th:each="error : ${price.errors}">
+                                        <span th:text="${error}"></span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary" th:text="#{shipping.order.courier}"></button>
+            </div>
+        </div>
+    </form>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const select = document.getElementById("shippingDetailsSelect");
+
+            const fields = {
+                name: document.getElementById("input-name"),
+                surname: document.getElementById("input-surname"),
+                company: document.getElementById("input-company"),
+                street: document.getElementById("input-street"),
+                city: document.getElementById("input-city"),
+                postal: document.getElementById("input-postal"),
+                country: document.getElementById("input-country"),
+                email: document.getElementById("input-email"),
+                phone: document.getElementById("input-phone")
+            };
+
+            select.addEventListener("change", function() {
+                const selected = select.options[select.selectedIndex];
+                const idx = selected.value;
+
+                if (idx === "-1" || idx === "") {
+                    // Clear all fields for manual entry
+                    Object.values(fields).forEach(input => input.value = "");
+                    return;
+                }
+
+                // Populate all inputs with data attributes from selected option
+                fields.name.value = selected.dataset.name || "";
+                fields.surname.value = selected.dataset.surname || "";
+                fields.company.value = selected.dataset.company || "";
+                fields.street.value = selected.dataset.street || "";
+                fields.city.value = selected.dataset.city || "";
+                fields.postal.value = selected.dataset.postal || "";
+                fields.country.value = selected.dataset.country || "";
+                fields.email.value = selected.dataset.email || "";
+                fields.phone.value = selected.dataset.phone || "";
+            });
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const codCheckbox = document.getElementById("codCheckbox");
+            const codAmountField = document.getElementById("codAmountField");
+
+            function toggleCodAmount() {
+                codAmountField.style.display = codCheckbox.checked ? "block" : "none";
+            }
+
+            if (codCheckbox) {
+                codCheckbox.addEventListener("change", toggleCodAmount);
+                toggleCodAmount();
+            }
+        });
+    </script>
+</div>
+
+</body>
+</html>

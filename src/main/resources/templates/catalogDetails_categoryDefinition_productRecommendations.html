@@ -1,0 +1,100 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <style>
+        .wrap-text {
+            max-width: 500px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+    </style>
+
+    <div class="section">
+        <h1 class="title" th:text="#{catalog.category.product.recommendations}"></h1>
+
+        <div th:if="${not #lists.isEmpty(brands)}" class="notification info">
+            <strong th:text="#{product.brand} + ' ' + #{general.mapped}"></strong>
+            <ul>
+                <li th:each="label : ${brands}" th:text="${label}"></li>
+            </ul>
+        </div>
+
+        <div>
+            <form method="get" class="mb-3">
+                <div class="field is-grouped">
+                    <div class="control">
+                        <input class="input" type="text" name="brand" th:placeholder="#{product.brand}" th:value="${param.brand}">
+                    </div>
+                    <div class="control">
+                        <input class="input" type="text" name="pimId" th:placeholder="#{product.pim.id}" th:value="${param.pimId}">
+                    </div>
+                    <div class="control">
+                        <input class="input" type="text" name="ean" th:placeholder="#{product.ean}" th:value="${param.ean}">
+                    </div>
+                    <div class="control">
+                        <input class="input" type="text" name="mfn" th:placeholder="#{product.manufacturer.code}" th:value="${param.mfn}">
+                    </div>
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{general.search}"></button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-container">
+                <table class="table is-narrow is-hoverable is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{product.name}"></th>
+                        <th th:text="#{product.brand}"></th>
+                        <th th:text="#{product.ean}"></th>
+                        <th th:text="#{product.manufacturer.code}"></th>
+                        <th th:text="#{inventory.product.lowest.price}"></th>
+                        <th th:text="#{inventory.provider.ean}"></th>
+                        <th th:text="#{inventory.provider.code}"></th>
+                        <th th:text="#{inventory.provider}"></th>
+                        <th th:text="#{general.actions}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="recommendation : ${productRecommendations}">
+                        <td class="wrap-text" th:text="${recommendation.name}"></td>
+                        <td th:text="${recommendation.brand}"></td>
+                        <td th:text="${recommendation.ean}"></td>
+                        <td th:text="${recommendation.manufacturerCode}"></td>
+                        <td th:text="${recommendation.lowestGrossPrice}"></td>
+                        <td>
+                            <ul>
+                                <li th:each="ean : ${recommendation.alternativeEans}" th:text="${ean}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                <li th:each="code : ${recommendation.alternativeProductCodes}" th:text="${code}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                <li th:each="provider : ${recommendation.alternativeSuppliers}" th:text="${provider}"></li>
+                            </ul>
+                        </td>
+                        <td>
+                            <a th:href="@{/dashboard/catalogs/{catalogId}/category/{catogoryId}/products/{ean}/new(catalogId=${catalogId}, catogoryId=${categoryId}, ean=${recommendation.ean})}" class="button is-primary" th:text="#{catalog.category.product.add}"></a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments/pagination :: pagination(@{/dashboard/catalogs/{catalogId}/category/{categoryId}/recommendations(catalogId=${catalogId}, categoryId=${categoryId})}, ${currentPage}, ${hasNextPage}, ${paginationParams})}"></div>
+    </div>
+
+</div>
+
+</body>
+</html>

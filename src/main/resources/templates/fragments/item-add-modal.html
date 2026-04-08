@@ -1,0 +1,171 @@
+<!-- fragments/item-add-modal.html -->
+<div id="itemAddModalId" class="modal"
+     th:fragment="itemAddModal (entityId, actionPrefix, formId)"
+     th:with="actionPrefix=${actionPrefix}">
+    <div class="modal-background" onclick="toggleAddItemModal(false)"></div>
+    <div class="modal-card" style="width: auto; max-width: 90vw;">
+
+        <header class="modal-card-head is-align-items-start">
+            <p class="modal-card-title" th:text="#{offers.add.items}"></p>
+            <button type="button" class="delete" aria-label="close" onclick="toggleAddItemModal(false)"></button>
+        </header>
+
+        <section class="modal-card-body">
+            <!-- From Pricelist -->
+            <div class="field is-grouped is-flex-wrap-wrap" style="gap: 10px; align-items: center">
+                <button class="button is-small is-info" type="submit" formaction="#"
+                        onclick="submitAddOrderItem(event, 'pricelist')"
+                        th:text="#{offers.from.pricelist}"></button>
+                <input type="hidden" name="itemPricelistId" th:value="${pricelistId}"/>
+
+                <div class="control">
+                    <div class="select">
+                        <select id="catalogSelect" onchange="submitCatalogSelection()" name="itemCatalogId">
+                            <option value="" th:text="#{orders.select.catalog}"></option>
+                            <option th:each="catalog : ${catalogs}"
+                                    th:value="${catalog.catalogId}"
+                                    th:text="${catalog.name}"
+                                    th:selected="${catalog.catalogId == catalogId}"></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control">
+                    <div class="select">
+                        <select name="category" onchange="filterByCategory(this)">
+                            <option value="" th:text="#{offers.select.category}"></option>
+                            <option th:each="cat : ${availableCategories}"
+                                    th:value="${cat}" th:text="${cat}"></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control">
+                    <div class="select">
+                        <select name="itemLabel" class="label-select" onchange="filterByLabel(this)">
+                            <option value="" th:text="#{offers.select.label}"></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control">
+                    <div class="select">
+                        <select name="itemName" class="name-select" style="min-width: 140px;">
+                            <option value="" th:text="#{offers.select.name}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- From Inventory -->
+            <div class="field is-grouped" style="gap: 10px; align-items: center">
+                <button class="button is-small is-info" type="submit" formaction="#"
+                        onclick="submitAddOrderItem(event, 'inventory')"
+                        th:text="#{offers.from.inventory}"></button>
+                <div class="control">
+                    <input class="input" type="text" name="itemEan" th:placeholder="#{inventory.ean.placeholder}">
+                </div>
+                <div class="control">
+                    <input class="input" type="text" name="itemManufacturerCode" th:placeholder="#{inventory.product.code.placeholder}">
+                </div>
+            </div>
+
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button" type="button" onclick="toggleAddItemModal(false)" th:text="#{general.close}"></button>
+        </footer>
+    </div>
+
+    <script th:inline="javascript">
+        function toggleAddItemModal(show) {
+            const modal = document.getElementById('itemAddModalId');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function submitCatalogSelection() {
+            const formId = /*[[${formId}]]*/ '';
+            const catalogId = document.getElementById("catalogSelect").value;
+            const form = document.getElementById(formId);
+            const entityId = /*[[${entityId}]]*/ '';
+            const actionPrefix = /*[[${actionPrefix}]]*/ '';
+
+            form.action = `${actionPrefix}/${entityId}/select-catalog`;
+
+            let catalogInput = form.querySelector('input[name="catalogId"]');
+            if (!catalogInput) {
+                catalogInput = document.createElement("input");
+                catalogInput.type = "hidden";
+                catalogInput.name = "catalogId";
+                form.appendChild(catalogInput);
+            }
+            catalogInput.value = catalogId;
+
+            form.method = "POST";
+            form.submit();
+        }
+
+        function submitAddOrderItem(event, type) {
+            const formId = /*[[${formId}]]*/ '';
+
+            event.preventDefault();
+            const form = document.getElementById(formId);
+            const entityId = /*[[${entityId}]]*/ '';
+            const actionPrefix = /*[[${actionPrefix}]]*/ '';
+            let allValid = true;
+
+            if (type === 'pricelist') {
+                const isCatalogValid = validateInputField('select[name="itemCatalogId"]', [[#{offers.catalog.required}]] );
+                const isCategoryValid = validateInputField('select[name="category"]', [[#{offers.category.required}]] );
+                const isItemLabelValid = validateInputField('select[name="itemLabel"]', [[#{offers.label.required}]] );
+                const isItemNameValid = validateInputField('select[name="itemName"]', [[#{offers.name.required}]] );
+
+                allValid = isCatalogValid && isCategoryValid && isItemLabelValid && isItemNameValid;
+                if (!allValid) return;
+
+                form.action = `${actionPrefix}/${entityId}/add-item/pricelist`;
+            } else if (type === 'inventory') {
+                form.action = `${actionPrefix}/${entityId}/add-item/inventory`;
+            }
+
+            form.method = 'POST';
+            form.submit();
+        }
+
+        let availabilityAndPrices = /*[[${availabilityAndPrices}]]*/ [];
+        let filteredAvailabilityAndPrices = [];
+
+        function filterByCategory(selectElement) {
+            const selectedCategory = selectElement.value;
+            const labelSelect = document.querySelector('.label-select');
+            const nameSelect = document.querySelector('.name-select');
+            if (!labelSelect || !nameSelect) return;
+
+            labelSelect.innerHTML = '<option value="">' + [[#{offers.select.label}]] + '</option>';
+            nameSelect.innerHTML = '<option value="">' + [[#{offers.select.name}]] + '</option>';
+
+            filteredAvailabilityAndPrices = availabilityAndPrices.filter(item => item.category === selectedCategory);
+            const uniqueLabels = [...new Set(filteredAvailabilityAndPrices.map(item => item.label))];
+            uniqueLabels.forEach(label => {
+                const option = document.createElement("option");
+                option.value = label;
+                option.text = label;
+                labelSelect.appendChild(option);
+            });
+        }
+
+        function filterByLabel(selectElement) {
+            const selectedLabel = selectElement.value;
+            const nameSelect = document.querySelector('.name-select');
+            nameSelect.innerHTML = '<option value="">' + [[#{offers.select.name}]] + '</option>';
+            const filteredByLabel = filteredAvailabilityAndPrices.filter(item => item.label === selectedLabel);
+            filteredByLabel.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.name;
+                option.text = item.name;
+                nameSelect.appendChild(option);
+            });
+        }
+
+    </script>
+</div>

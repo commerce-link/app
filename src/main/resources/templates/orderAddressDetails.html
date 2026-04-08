@@ -1,0 +1,172 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="${type == 'billing'} ? #{order.billing.details} : #{order.shipping.details}"></h1>
+
+            <form th:action="@{/dashboard/orders/{orderId}/updateAddressDetails(orderId=${order.orderId}, type=${type})}"
+                  th:object="${order}" method="post">
+
+                <div th:if="${type == 'billing'}" class="box">
+                    <div class="field">
+                        <label class="label" th:text="#{person.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.name}"
+                                   th:placeholder="#{person.name.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.surname}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.surname}"
+                                   th:placeholder="#{person.surname.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.street}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.streetAndNumber}"
+                                   th:placeholder="#{address.street.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.postal.code}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.postalCode}"
+                                   th:placeholder="#{address.postal.code.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.city}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.city}"
+                                   th:placeholder="#{address.city.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.country}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.country}"
+                                   th:placeholder="#{address.country.placeholder}" pattern="^[A-Z]{2}$" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.email}"></label>
+                        <div class="control">
+                            <input class="input" type="email" th:field="*{billingDetails.email}"
+                                   th:placeholder="#{person.email.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.phone}"></label>
+                        <div class="control">
+                            <input class="input" type="tel" th:field="*{billingDetails.phone}"
+                                   th:placeholder="#{person.phone.placeholder}" pattern="[0-9+ ]{9,15}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{company.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.companyName}"
+                                   th:placeholder="#{company.name.placeholder}"/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{company.tax.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{billingDetails.taxId}"
+                                   th:placeholder="#{company.tax.id.placeholder}"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${type == 'shipping'}" class="box">
+                    <div class="field">
+                        <label class="label" th:text="#{person.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.name}"
+                                   th:placeholder="#{person.name.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.surname}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.surname}"
+                                   th:placeholder="#{person.surname.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.street}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.streetAndNumber}"
+                                   th:placeholder="#{address.street.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.postal.code}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.postalCode}"
+                                   th:placeholder="#{address.postal.code.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.city}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.city}"
+                                   th:placeholder="#{address.city.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{address.country}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.country}"
+                                   th:placeholder="#{address.country.placeholder}" pattern="^[A-Z]{2}$" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.email}"></label>
+                        <div class="control">
+                            <input class="input" type="email" th:field="*{shippingDetails.email}"
+                                   th:placeholder="#{person.email.placeholder}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{person.phone}"></label>
+                        <div class="control">
+                            <input class="input" type="tel" th:field="*{shippingDetails.phone}"
+                                   th:placeholder="#{person.phone.placeholder}" pattern="[0-9+ ]{9,15}" required/>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{company.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{shippingDetails.companyName}"
+                                   th:placeholder="#{company.name.placeholder}"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a class="button" th:href="@{/dashboard/orders/{orderId}(orderId=${order.orderId})}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

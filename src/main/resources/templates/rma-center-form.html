@@ -1,0 +1,88 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="${rmaCenter.rmaCenterId} != null ? #{rma.edit.center} : #{rma.add.new.center}"></h1>
+
+            <form th:object="${rmaCenter}" th:action="@{/dashboard/store/rma-centers/save}" method="post">
+
+                <input type="hidden" th:field="*{rmaCenterId}" />
+                <input type="hidden" th:field="*{storeId}" />
+
+                <div class="box">
+                    <div class="field">
+                        <label class="label" th:text="#{general.provider.name}"></label>
+                        <div class="control">
+                            <input class="input" th:field="*{provider}" required />
+                        </div>
+                    </div>
+
+                    <hr/>
+
+                    <h2 class="subtitle" th:text="#{order.shipping.details}"></h2>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.company}"></label>
+                            <input class="input" th:field="*{shippingDetails.companyName}" th:placeholder="#{order.address.company}" />
+                        </div>
+
+                        <div class="column is-half">
+                            <label class="label" th:text="#{address.street}"></label>
+                            <input class="input" th:field="*{shippingDetails.streetAndNumber}" th:placeholder="#{address.street}" />
+                        </div>
+
+                        <div class="column is-one-quarter">
+                            <label class="label" th:text="#{address.postal.code}"></label>
+                            <input class="input" th:field="*{shippingDetails.postalCode}" placeholder="00-000" th:title="#{shipping.postalCode.invalid}" />
+                        </div>
+
+                        <div class="column is-one-quarter">
+                            <label class="label" th:text="#{address.city}"></label>
+                            <input class="input" th:field="*{shippingDetails.city}" th:placeholder="#{address.city}" />
+                        </div>
+
+                        <div class="column is-one-quarter">
+                            <label class="label" th:text="#{address.country}"></label>
+                            <input class="input" th:field="*{shippingDetails.country}" th:placeholder="#{address.country}" />
+                        </div>
+
+                        <div class="column is-one-quarter">
+                            <label class="label" th:text="#{person.phone}"></label>
+                            <input class="input"
+                                   th:field="*{shippingDetails.phone}"
+                                   pattern="[0-9+ ]{9,15}"
+                                   placeholder="+48 123 456 789"
+                                   th:title="#{shipping.phone.invalid}" />
+                        </div>
+
+                        <div class="column is-half">
+                            <label class="label" th:text="#{person.email}"></label>
+                            <input class="input" type="email" th:field="*{shippingDetails.email}" placeholder="contact@example.com" />
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped mt-4">
+                        <div class="control">
+                            <button type="submit" class="button is-primary">
+                                <span th:text="${rmaCenter.rmaCenterId} != null ? #{order.items.action.update} : #{general.create}"></span>
+                            </button>
+                        </div>
+                        <div class="control">
+                            <a th:href="@{/dashboard/store/rma-centers}" class="button is-light" th:text="#{general.cancel}"></a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

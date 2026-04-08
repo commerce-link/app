@@ -1,0 +1,120 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title">Invoicing Configuration</h1>
+            
+            <form th:action="@{/dashboard/store/invoicing/edit}" th:object="${form}" method="post">
+
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <!-- General Invoicing Configuration -->
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{store.invoicing.title}"></h2>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.invoicing.configuration.payment.terms}"></label>
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{store.invoicingConfiguration.paymentTerms}">
+                        </div>
+                        <p class="help">Number of days for payment terms</p>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.invoicingConfiguration.sendInvoicesAsAttachment}">
+                            <span th:text="#{store.invoicing.configuration.send.invoices.as.attachment}"></span>
+                        </label>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.invoicingConfiguration.splitPaymentsEnabled}">
+                            <span th:text="#{store.invoicing.configuration.split.payments.enabled}"></span>
+                        </label>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.invoicingConfiguration.positionsConsolidation}">
+                            <span th:text="#{store.invoicing.configuration.positions.consolidation.enabled}"></span>
+                        </label>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.invoicing.configuration.positions.consolidation.prefix}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.invoicingConfiguration.positionsConsolidationPrefix}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bank Accounts Section -->
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{bank.accounts}"></h2>
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.default}"></th>
+                            <th th:text="#{bank.name}"></th>
+                            <th th:text="#{bank.iban}"></th>
+                            <th th:text="#{bank.account.holder}"></th>
+                            <th th:text="#{bank.swift.code}"></th>
+                            <th th:text="#{bank.currency}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="account, iterStat : *{store.bankAccounts}">
+                            <input type="hidden" th:field="*{store.bankAccounts[__${iterStat.index}__].id}">
+                            <td style="text-align: center;">
+                                <input type="radio" name="defaultBankAccountId" th:value="${account.id}" th:checked="${account._default}"/>
+                            </td>
+                            <td>
+                                <input class="input" type="text" th:field="*{store.bankAccounts[__${iterStat.index}__].bankName}" th:placeholder="#{bank.name}">
+                            </td>
+                            <td>
+                                <input class="input" type="text" th:field="*{store.bankAccounts[__${iterStat.index}__].iban}" th:placeholder="#{bank.iban}">
+                            </td>
+                            <td>
+                                <input class="input" type="text" th:field="*{store.bankAccounts[__${iterStat.index}__].accountHolder}" th:placeholder="#{bank.account.holder}">
+                            </td>
+                            <td>
+                                <input class="input" type="text" th:field="*{store.bankAccounts[__${iterStat.index}__].swiftCode}" th:placeholder="#{bank.swift.code}">
+                            </td>
+                            <td>
+                                <input class="input" type="text" th:field="*{store.bankAccounts[__${iterStat.index}__].currency}" th:placeholder="#{bank.currency}">
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                </div>
+            </form>
+
+            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.invoicing.software.provider.label}, ${form.providerConfiguration}, 'invoicing', ${form.store.storeId})}"></div>
+
+            <div class="field">
+                <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+            </div>
+
+        </div>
+    </section>
+
+
+</div>
+
+</body>
+</html>

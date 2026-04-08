@@ -1,0 +1,220 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" th:with="showNavbar=false">
+<body>
+
+<div layout:fragment="content">
+
+    <section>
+        <div class="container">
+            <div class="field">
+                <div class="box" style="padding: 2rem;">
+                    <div class="control">
+                        <table class="table is-fullwidth">
+                            <thead>
+                            <tr>
+                                <th th:text="#{rma.resolution}"></th>
+                                <th th:text="#{rma.item.name}"></th>
+                                <th th:text="#{rma.quantity}"></th>
+                                <th th:text="#{rma.reason}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item : ${rmaItems}">
+                                <td th:text="${item.desiredResolution.localizedName}"></td>
+                                <td th:text="${item.name}"></td>
+                                <td th:text="${item.quantity}"></td>
+                                <td th:text="${item.reason}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <div th:if="${!submitted}" class="box" style="padding: 2rem">
+                    <form th:action="@{/store/{storeId}/client/rma/{rmaId}/submit(storeId=${storeId},rmaId=${rma.rmaId})}" th:object="${form}" method="post" th:if="${rma.status == T(pl.commercelink.orders.rma.RMAStatus).Approved}">
+                        <section>
+                            <h2 class="title is-4" th:text="#{order.shipping.details}"></h2>
+                            <div>
+                                <div class="field">
+                                    <label class="label" th:text="#{rma.return.package.template}"></label>
+                                    <div class="select">
+                                        <select th:field="*{selectedPackageTemplateId}" required>
+                                            <option th:each="package : ${returnedPackageTemplates}"
+                                                    th:value="${package.id}"
+                                                    th:text="${package.name}">
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label class="label" for="shippingName" th:text="#{order.address.name}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingName" th:field="*{shippingDetails.name}" required />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingSurname" th:text="#{order.address.surname}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingSurname" th:field="*{shippingDetails.surname}" required />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingCompanyName" th:text="#{order.address.company}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingCompanyName" th:field="*{shippingDetails.companyName}" />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingStreetAndNumber" th:text="#{order.address.street}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingStreetAndNumber" th:field="*{shippingDetails.streetAndNumber}" required />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingPostalCode" th:text="#{order.address.postal}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingPostalCode"
+                                               th:field="*{shippingDetails.postalCode}"
+                                               pattern="^\d{2}-\d{3}$"
+                                               th:title="#{shipping.postalCode.invalid}"
+                                               required />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingCity" th:text="#{order.address.city}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingCity" th:field="*{shippingDetails.city}" required />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingCountry" th:text="#{order.address.country}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingCountry" th:field="*{shippingDetails.country}" value="PL" readonly />
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingEmail" th:text="#{order.address.email}"></label>
+                                    <div class="control">
+                                        <input class="input" type="email" id="shippingEmail"
+                                               th:field="*{shippingDetails.email}"
+                                               th:title="#{shipping.email.invalid}" required/>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="shippingPhone" th:text="#{order.address.phone}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="shippingPhone"
+                                               th:field="*{shippingDetails.phone}"
+                                               pattern="[0-9+ ]{9,15}"
+                                               th:title="#{shipping.phone.invalid}"
+                                               required />
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="field" th:if="${rma.status == T(pl.commercelink.orders.rma.RMAStatus).Rejected}">
+                            <label class="label" th:text="#{rma.reject.reason}"></label>
+                            <div class="control">
+                                <textarea class="textarea" rows="3" th:field="*{rejectionReason}"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top: 20px">
+                            <button class="button is-primary" type="submit" th:style="'background-color:' + ${branding.primaryColor}" th:text="#{general.submit}"></button>
+                        </div>
+                    </form>
+
+                    <div class="field" th:if="${rma.status == T(pl.commercelink.orders.rma.RMAStatus).Rejected}">
+                        <label class="label" th:text="#{rma.reject.reason}"></label>
+                        <div class="control">
+                            <span th:text="${rma.rejectionReason}"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${submitted}" class="box" style="padding: 2rem">
+                    <h3 class="title is-5 mb-2" th:text="#{shipping.details}"></h3>
+                    <ul style="list-style: none; margin-left: 0">
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-user"></i></span>
+                            <strong th:text="#{offers.recipients} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.name + ' ' + rma.shippingDetails.surname})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-building"></i></span>
+                            <strong th:text="#{order.address.company} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.companyName})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-road"></i></span>
+                            <strong th:text="#{order.address.street} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.streetAndNumber})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-compass"></i></span>
+                            <strong th:text="#{order.address.city} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.city})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-box"></i></span>
+                            <strong th:text="#{order.address.postal} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.postalCode})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-flag"></i></span>
+                            <strong th:text="#{order.address.country} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.country})}"></span>
+                        </li>
+                        <li class="mb-2">
+                            <span class="icon"><i class="fas fa-envelope"></i></span>
+                            <strong th:text="#{order.address.email} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.email})}"></span>
+                        </li>
+                        <li>
+                            <span class="icon"><i class="fas fa-phone"></i></span>
+                            <strong th:text="#{order.address.phone} + ':'"></strong>
+                            <span th:replace="~{fragments/masked-field :: masked(${rma.shippingDetails.phone})}"></span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div th:if="${submitted} and ${!rma.shipments.isEmpty()}" class="box" style="padding: 2rem">
+                    <h3 class="title is-5 mb-2" th:text="#{order.shipments}"></h3>
+
+                    <div class="field">
+                        <div class="control">
+                            <table class="table is-fullwidth">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{order.shipment.type}"></th>
+                                    <th th:text="#{order.shipment.tracking}"></th>
+                                    <th th:text="#{order.shipment.carrier}"></th>
+                                    <th th:text="#{rma.carrier.order.date}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="shipment : ${rma.shipments}">
+                                    <td th:text="${shipment.type.localizedName}"></td>
+                                    <td th:text="${shipment.trackingNo}"></td>
+                                    <td th:text="${shipment.carrier}"></td>
+                                    <td th:text="${shipment.shippedAt}"></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

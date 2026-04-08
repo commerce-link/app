@@ -1,0 +1,363 @@
+    <!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${form.store.storeId} : '/dashboard/store'">
+
+            <div class="level">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h1 class="title"
+                            th:text="${isSuperAdmin} ? ${#messages.msg('store.title.settings', form.store.name)} : #{store.title}">
+                        </h1>
+                    </div>
+                </div>
+                <div class="level-right" th:if="${isSuperAdmin}">
+                    <div class="level-item">
+                        <a th:href="@{'/dashboard/store/' + ${form.store.storeId} + '/copy'}" class="button is-warning">
+                            <span class="icon"><i class="fas fa-copy"></i></span>
+                            <span th:text="#{store.copy}"></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Section -->
+            <div class="box" th:if="${form.store.notifications != null and !form.store.notifications.isEmpty()}">
+                <h2 class="subtitle" th:text="#{store.notifications}"></h2>
+                <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{store.notification.severity}"></th>
+                        <th th:text="#{store.notification.type}"></th>
+                        <th th:text="#{store.notification.message}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="notification : ${form.store.notifications}">
+                        <td th:text="${notification.severity}"></td>
+                        <td th:text="${notification.type}"></td>
+                        <td th:text="${notification.message}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Store Settings Navigation -->
+            <div class="box">
+                <div class="columns">
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-building fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.company.details}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.company.details.configure.information}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/company-details'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.company.details.configure}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-palette fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.branding}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.branding.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/branding'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.branding}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-file-invoice fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.invoicing}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.invoicing.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/invoicing'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.invoicing}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="columns">
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-warehouse fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.warehouse}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.warehouse.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/warehouse'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.warehouse}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-shipping-fast fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.shipping}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.shipping.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/shipping'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.shipping}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-undo-alt fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.rma}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.rma.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/rma'}}" class="button is-primary is-fullwidth" th:text="#{store.configure.rma}"></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="columns">
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-bell fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.notification}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.configure.notification.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/notification'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.notification}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-envelope fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{nav.emailTemplates}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.template.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/email-templates'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.email.template}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-box fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.fulfillment.settings}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.fulfillment.settings.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/fulfillment'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.fulfillment.settings}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="columns">
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-credit-card fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.payments}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.payments.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/payments'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.payments}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-store fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.marketplaces}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.marketplaces.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/marketplaces'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.marketplaces}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third" th:if="${!isSuperAdmin}">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-warehouse fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{nav.rma.centers}"></p>
+                                        <p class="subtitle is-6" th:text="#{rma.center.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/rma-centers'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.rma.centers}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="columns">
+                    <div class="column is-one-third">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="media">
+                                    <div class="media-left">
+                                        <figure class="image is-48x48">
+                                            <i class="fas fa-chart-line fa-2x"></i>
+                                        </figure>
+                                    </div>
+                                    <div class="media-content">
+                                        <p class="title is-5" th:text="#{store.reporting}"></p>
+                                        <p class="subtitle is-6" th:text="#{store.reporting.description}"></p>
+                                    </div>
+                                </div>
+                                <div class="content">
+                                    <a th:href="@{${basePath + '/report'}}" class="button is-primary is-fullwidth"
+                                       th:text="#{store.configure.reporting}">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

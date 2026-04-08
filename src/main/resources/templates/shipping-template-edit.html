@@ -1,0 +1,111 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="${isNew} ? #{shipping.package.template.add} : #{shipping.package.template.edit}"></h1>
+
+            <form th:action="@{/dashboard/store/shipping/templates/edit}" th:object="${form}" method="post">
+                <input type="hidden" th:field="*{templateId}"/>
+                <input type="hidden" th:field="*{storeId}"/>
+
+                <div class="box">
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.name}"></label>
+                        <div class="control">
+                            <input class="input" th:field="*{templateName}" required />
+                        </div>
+                    </div>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{shipping.parcel.width}"></th>
+                            <th th:text="#{shipping.parcel.depth}"></th>
+                            <th th:text="#{shipping.parcel.height}"></th>
+                            <th th:text="#{shipping.parcel.weight}"></th>
+                            <th th:text="#{shipping.parcel.insurance}"></th>
+                            <th th:text="#{general.description}"></th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        <tr th:each="parcel, pStat : *{parcels}">
+                            <td>
+                                <input class="input"
+                                       type="number"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{parcels[__${pStat.index}__].width}"
+                                       required />
+                            </td>
+
+                            <td>
+                                <input class="input"
+                                       type="number"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{parcels[__${pStat.index}__].depth}"
+                                       required />
+                            </td>
+
+                            <td>
+                                <input class="input"
+                                       type="number"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{parcels[__${pStat.index}__].height}"
+                                       required />
+                            </td>
+
+                            <td>
+                                <input class="input"
+                                       type="number"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{parcels[__${pStat.index}__].weight}"
+                                       required />
+                            </td>
+
+                            <td>
+                                <input class="input"
+                                       type="number"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{parcels[__${pStat.index}__].value}"
+                                       required />
+                            </td>
+
+                            <td>
+                                <input class="input"
+                                       th:field="*{parcels[__${pStat.index}__].description}"/>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="field is-grouped mt-4">
+                        <div class="control">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                        </div>
+                        <div class="control">
+                            <a th:href="@{/dashboard/store/shipping}" class="button is-light" th:text="#{general.cancel}"></a>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

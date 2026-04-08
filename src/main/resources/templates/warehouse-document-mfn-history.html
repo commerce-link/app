@@ -1,0 +1,77 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <div class="level mb-4">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h1>
+                            <span th:text="#{warehouse.documents.mfn.history}">MFN History</span>
+                        </h1>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box mb-5">
+                <div class="columns">
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.delivery.id}"></p>
+                        <p class="title is-5" th:text="${deliveryId}"></p>
+                    </div>
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.item.mfn}"></p>
+                        <p class="title is-5" th:text="${mfn}"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box">
+                <table class="table is-fullwidth is-narrow">
+                    <thead>
+                    <tr>
+                        <th th:text="#{warehouse.documents.document.no}"></th>
+                        <th th:text="#{warehouse.documents.type}"></th>
+                        <th th:text="#{warehouse.documents.date}"></th>
+                        <th th:text="#{warehouse.documents.item.quantity}"></th>
+                        <th th:text="#{warehouse.documents.stock.change}"></th>
+                        <th th:text="#{warehouse.documents.stock.after}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${rows}">
+                        <td>
+                            <a th:href="@{/dashboard/warehouse-documents/details(documentNo=${row.documentNo()})}"
+                               th:text="${row.documentNo()}"></a>
+                        </td>
+                        <td>
+                            <span class="tag is-info" th:text="${row.documentType().localizedName}"></span>
+                        </td>
+                        <td th:text="${row.createdAt() != null} ? ${#temporals.format(row.createdAt(), 'yyyy-MM-dd HH:mm')} : '-'"></td>
+                        <td th:text="${row.qty()}"></td>
+                        <td>
+                            <span th:if="${row.stockChange() > 0}" class="has-text-success" th:text="'+' + ${row.stockChange()}"></span>
+                            <span th:if="${row.stockChange() <= 0}" class="has-text-danger" th:text="${row.stockChange()}"></span>
+                        </td>
+                        <td th:text="${row.stockAfter()}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p th:if="${rows.isEmpty()}" class="has-text-grey" th:text="#{warehouse.documents.no.documents}"></p>
+            </div>
+
+            <div class="field">
+                <div class="control">
+                    <a th:href="@{/dashboard/deliveries/details(deliveryId=${deliveryId})}"
+                       class="button is-light" th:text="#{general.back}"></a>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>

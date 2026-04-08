@@ -1,0 +1,338 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" th:with="showNavbar=false">
+<body>
+
+<div layout:fragment="content">
+
+    <style>
+        @media screen and (max-width: 768px) {
+            .columns.is-mobile-stack {
+                flex-direction: column !important;
+            }
+
+            .column.is-mobile-column {
+                width: 100% !important;
+            }
+
+            .is-mobile-padding {
+                padding: 1.25rem !important;
+            }
+
+            .is-desktop-only {
+                display: none !important;
+            }
+
+            .is-mobile-only {
+                display: block !important;
+            }
+
+            .is-size-5 {
+                font-size: 1.1rem !important;
+            }
+        }
+
+        @media screen and (min-width: 769px) {
+            .is-desktop-only {
+                display: block !important;
+            }
+
+            .is-mobile-only {
+                display: none !important;
+            }
+        }
+    </style>
+
+    <div th:if="${offer.expired}" class="notification is-danger" style="margin: 2rem auto; padding: 2rem; border-radius: 12px; text-align: center; max-width: 500px;">
+        <i class="fas fa-exclamation-circle" style="font-size: 48px; margin-bottom: 1rem;"></i>
+        <h2 class="title is-4" th:text="#{offers.expiration.title}"></h2>
+        <p th:text="#{offers.expiration.message}"></p>
+    </div>
+
+    <div class="container" th:if="${!offer.expired}">
+
+        <div class="field">
+            <label class="label" style="display: inline;"><strong th:text="#{offers.id} + ':'"></strong></label>
+            <div class="control" style="display: inline;">
+                <span th:text="${offer.basketId}"></span>
+            </div>
+        </div>
+
+        <div class="field" th:if="${offer.expiresAt != null}">
+            <div class="is-size-7" th:text="#{offers.valid.until} + ' ' + ${#temporals.format(offer.expiresAt, 'dd MMMM yyyy, HH:mm')}"></div>
+        </div>
+
+        <div class="columns is-flex is-mobile-stack">
+            <div class="column">
+                <div class="field is-desktop-only">
+                    <div class="box" style="padding: 2rem;">
+                        <div class="control">
+                            <table class="table is-fullwidth">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{product.category}"></th>
+                                    <th th:text="#{product.name}"></th>
+                                    <th th:text="#{offers.quantity}"></th>
+                                    <th th:text="#{offers.price}" th:if="${offer.showPrices}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${offer.basketItems}">
+                                    <td th:text="${pcl.singular(item.category)}"></td>
+                                    <td th:text="${item.name}"></td>
+                                    <td th:text="${item.qty}"></td>
+                                    <td th:text="${item.price}" th:if="${offer.showPrices}"></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field is-mobile-only">
+                    <div class="box" style="padding: 2rem;">
+                        <div th:each="item : ${offer.basketItems}">
+                            <div th:if="${offer.showPrices}">
+                                <div class="mb-2">
+                                    <strong th:text="${item.qty} + ' x ' + ${item.name}"></strong>
+                                    <div class="is-size-7" th:text="#{catalog.category} + ': ' + ${pcl.singular(item.category)}"></div>
+                                    <div class="is-size-7" th:text="#{offers.per.unit} + ': ' + ${#numbers.formatDecimal(item.price, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
+                                </div>
+                                <div class="has-text-weight-bold" th:text="${#numbers.formatDecimal(item.price * item.qty, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
+                                <hr class="my-2" />
+                            </div>
+                            <div th:if="${!offer.showPrices}">
+                                <strong th:text="${item.qty} + ' x ' + ${item.name}"></strong>
+                                <div class="is-size-7" th:text="#{catalog.category} + ': ' + ${pcl.singular(item.category)}"></div>
+                                <hr class="my-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field" th:if="${deliveryOption != null}">
+                    <div class="box" style="padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                        <span class="icon is-large has-text-info">
+                            <i th:class="${deliveryOption.type.name() == 'PersonalCollection'} ? 'fas fa-building fa-2x' : 'fas fa-truck fa-2x'"></i>
+                        </span>
+                        <div style="flex: 1;">
+                            <p class="has-text-weight-bold" th:text="${deliveryOption.name}"></p>
+                            <p class="is-size-7 has-text-grey" th:if="${deliveryOption.description != null}" th:text="${deliveryOption.description}"></p>
+                        </div>
+                        <div th:if="${offer.showPrices}" class="has-text-right">
+                            <span class="has-text-weight-bold" th:text="${#numbers.formatDecimal(deliveryOption.price, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div th:if="${!submitted}" class="box is-mobile-padding" style="padding: 2rem">
+                        <input type="hidden" id="shipmentType" name="shipmentType" value="Courier">
+                        <form th:action="@{/store/{storeId}/individual/offer/{offerId}/submit(storeId=${store.storeId},offerId=${offer.basketId})}" th:object="${form}" enctype="multipart/form-data" method="post" onsubmit="copyBillingDetailsIfNeeded()">
+                            <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
+
+                            <div class="field" style="margin-top: 20px">
+                                <button class="button is-primary" type="submit" th:style="'background-color:' + ${branding.primaryColor}" th:text="#{general.submit}"></button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div th:if="${submitted}" class="box is-mobile-padding" style="padding: 2rem">
+                        <div class="columns">
+                            <div class="column">
+                                <h3 class="title is-5 mb-2" th:text="#{order.billing.details}"></h3>
+                                <ul style="list-style: none; margin-left: 0">
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-user"></i></span>
+                                        <strong th:text="#{offers.recipients} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.name + ' ' + offer.billingDetails.surname})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-building"></i></span>
+                                        <strong th:text="#{order.address.company} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.companyName})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-id-card"></i></span>
+                                        <strong th:text="#{order.address.tax.id} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.taxId})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-road"></i></span>
+                                        <strong th:text="#{order.address.street} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.streetAndNumber})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-compass"></i></span>
+                                        <strong th:text="#{order.address.city} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.city})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-box"></i></span>
+                                        <strong th:text="#{order.address.postal} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.postalCode})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-flag"></i></span>
+                                        <strong th:text="#{order.address.country} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.country})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-envelope"></i></span>
+                                        <strong th:text="#{order.address.email} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.email})}"></span>
+                                    </li>
+                                    <li>
+                                        <span class="icon"><i class="fas fa-phone"></i></span>
+                                        <strong th:text="#{order.address.phone} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.billingDetails.phone})}"></span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="column">
+                                <h3 class="title is-5 mb-2" th:text="#{shipping.details}"></h3>
+                                <ul style="list-style: none; margin-left: 0">
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-user"></i></span>
+                                        <strong th:text="#{offers.recipients} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.name + ' ' + offer.shippingDetails.surname})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-building"></i></span>
+                                        <strong th:text="#{order.address.company} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.companyName})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-road"></i></span>
+                                        <strong th:text="#{order.address.street} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.streetAndNumber})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-compass"></i></span>
+                                        <strong th:text="#{order.address.city} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.city})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-box"></i></span>
+                                        <strong th:text="#{order.address.postal} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.postalCode})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-flag"></i></span>
+                                        <strong th:text="#{order.address.country} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.country})}"></span>
+                                    </li>
+                                    <li class="mb-2">
+                                        <span class="icon"><i class="fas fa-envelope"></i></span>
+                                        <strong th:text="#{order.address.email} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.email})}"></span>
+                                    </li>
+                                    <li>
+                                        <span class="icon"><i class="fas fa-phone"></i></span>
+                                        <strong th:text="#{order.address.phone} + ':'"></strong>
+                                        <span th:replace="~{fragments/masked-field :: masked(${offer.shippingDetails.phone})}"></span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div th:if="${submitted}" class="field" style="margin-top: 20px">
+                    <form th:action="@{/store/{storeId}/individual/offer/{offerId}/send-proforma-invoice(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
+                        <button type="submit" class="button is-text">
+                            <span th:text="#{offers.send.invoice.to.billing.address}"></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="column is-narrow is-mobile-column" style="width: 30%;">
+                <div class="box" style="margin-left: auto;">
+                    <div style="margin-bottom: 20px">
+                        <div class="is-flex is-justify-content-space-between mb-2">
+                            <span class="has-text-weight-bold is-size-5" th:text="#{offers.price.incl.vat}"></span>
+                            <span class="has-text-weight-bold is-size-5"
+                                  th:text="${#numbers.formatDecimal(totalPrice, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></span>
+                        </div>
+                        <div class="is-flex is-justify-content-space-between mb-1">
+                            <span th:text="#{order.item.tax}"></span>
+                            <span th:text="${#numbers.formatDecimal(totalPrice - totalPriceNet, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></span>
+                        </div>
+                        <div class="is-flex is-justify-content-space-between">
+                            <span th:text="#{offers.price.net}"></span>
+                            <span th:text="${#numbers.formatDecimal(totalPriceNet, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></span>
+                        </div>
+                    </div>
+
+                    <div th:if="${bankAccount != null}">
+                        <p class="is-size-7 mb-0" th:text="#{offers.bank.description}"></p>
+                        <ul style="list-style: none; margin-left: 0; margin-top: 8px">
+                            <li class="mb-2">
+                                <strong th:text="#{bank.account.holder} + ':'"></strong>
+                                <span th:text="${bankAccount.accountHolder}"></span>
+                            </li>
+                            <li class="mb-2">
+                                <strong th:text="#{bank.iban} + ':'"></strong>
+                                <span th:text="${bankAccount.iban}"></span>
+                            </li>
+                            <li class="mb-2">
+                                <strong th:text="#{bank.swift} + ':'"></strong>
+                                <span th:text="${bankAccount.swiftCode}"></span>
+                            </li>
+                            <li class="mb-2">
+                                <strong th:text="#{bank.name} + ':'"></strong>
+                                <span th:text="${bankAccount.bankName}"></span>
+                            </li>
+                            <li class="mb-2">
+                                <strong th:text="#{bank.currency} + ':'"></strong>
+                                <span th:text="${bankAccount.currency}"></span>
+                            </li>
+                            <li class="mb-2">
+                                <strong th:text="#{bank.transfer.title} + ':'"></strong>
+                                <span th:text="${offer.basketId}"></span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div th:if="${submitted && !isSplitPaymentRequired}">
+<!--                <div th:if="${submitted && store.hasIntegration(T(pl.commercelink.stores.IntegrationType).PAYMENT_PROVIDER)}">-->
+                    <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
+                        <button type="submit" class="button is-primary"
+                                th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%;'">
+                            <span th:text="#{offer.payment.btn.text}">Order and pay</span>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="image-preview mt-2 field has-text-centered" th:if="${branding.logo != null}">
+                    <img th:src="@{'/StoreLogo/' + ${store.storeId}}"
+                         alt="Store Logo"
+                         style="max-width: 200px; max-height: 200px; border-radius: 12px; padding: 8px; margin: 0 auto;">
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function copyBillingDetailsIfNeeded() {
+            if (!document.getElementById('differentShippingAddress').checked) {
+                document.getElementById('shippingName').value = document.getElementById('billingName').value;
+                document.getElementById('shippingSurname').value = document.getElementById('billingSurname').value;
+                document.getElementById('shippingCompanyName').value = document.getElementById('billingCompanyName').value;
+                document.getElementById('shippingStreetAndNumber').value = document.getElementById('billingStreetAndNumber').value;
+                document.getElementById('shippingPostalCode').value = document.getElementById('billingPostalCode').value;
+                document.getElementById('shippingCity').value = document.getElementById('billingCity').value;
+                document.getElementById('shippingEmail').value = document.getElementById('billingEmail').value;
+                document.getElementById('shippingPhone').value = document.getElementById('billingPhone').value;
+            }
+        }
+    </script>
+</div>
+
+</body>
+</html>

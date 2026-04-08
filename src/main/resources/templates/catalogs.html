@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h2 class="title" th:text="#{catalog.title}"></h2>
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                <tr>
+                    <th th:text="#{catalog.id}"></th>
+                    <th th:text="#{catalog.name}"></th>
+                    <th th:text="#{catalog.categories.count}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="catalog : ${productCatalogs}">
+                    <td>
+                        <a th:href="@{/dashboard/catalogs/{id}(id=${catalog.catalogId})}" th:text="${catalog.catalogId}"></a>
+                    </td>
+                    <td th:text="${catalog.name}"></td>
+                    <td th:text="${catalog.categories.size()}"></td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div th:replace="~{fragments/pagination :: pagination( '/dashboard/catalogs', ${currentPage}, ${hasNextPage}, null)}"></div>
+            
+            <div class="field">
+                <a class="button is-primary" th:href="@{/dashboard/catalogs/new}" th:text="#{catalog.create}"></a>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

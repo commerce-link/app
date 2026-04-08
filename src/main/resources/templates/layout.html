@@ -1,0 +1,203 @@
+<!DOCTYPE HTML>
+<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title th:text="#{general.title}"></title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@latest/dist/css/bulma-timeline.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        .navbar-logo {
+            min-height: 6.25rem;
+            min-width: 200px ;
+            padding: 10px 10px 10px 10px;
+        }
+        .navbar-item, .navbar-link {
+            padding-right: 38px;
+            padding-left: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div th:if="${showNavbar != false}">
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+    <div class="navbar-brand">
+        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </a>
+    </div>
+
+    <div id="navbarBasicExample" class="navbar-menu ml-5 mr-5">
+        <div class="navbar-start">
+            <div class="is-flex" sec:authorize="hasRole('USER')">
+                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
+                <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
+                <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
+                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries}"></a>
+                <a class="navbar-item" href="/dashboard/warehouse" th:text="#{nav.warehouse}"></a>
+                <a class="navbar-item" href="/dashboard/warehouse-documents" th:text="#{nav.warehouse.documents}"></a>
+                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
+                <a class="navbar-item" href="/dashboard/clients" th:text="#{nav.clients}"></a>
+            </div>
+
+            <div class="is-flex" sec:authorize="hasRole('ADMIN')">
+                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
+                <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
+                <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
+                <a class="navbar-item" href="/dashboard/rma" th:text="#{nav.rma}"></a>
+                <a class="navbar-item" href="/dashboard/fulfilment/queue" th:text="#{nav.fulfilment}"></a>
+                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries}"></a>
+                <a class="navbar-item" href="/dashboard/payments" th:text="#{nav.payments}"></a>
+                <a class="navbar-item" href="/dashboard/warehouse" th:text="#{nav.warehouse}"></a>
+                <a class="navbar-item" href="/dashboard/warehouse-documents" th:text="#{nav.warehouse.documents}"></a>
+                <a class="navbar-item" href="/dashboard/catalogs" th:text="#{nav.product.catalog}"></a>
+                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
+                <a class="navbar-item" href="/dashboard/clients" th:text="#{nav.clients}"></a>
+                <a class="navbar-item" href="/dashboard/reports" th:text="#{nav.reports}"></a>
+                <a class="navbar-item" href="/dashboard/store" th:text="#{nav.settings}"></a>
+            </div>
+
+            <div class="is-flex" sec:authorize="hasRole('SUPER_ADMIN')">
+                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
+                <a class="navbar-item" href="/dashboard/fulfilment/queue" th:text="#{nav.fulfilment.queue}"></a>
+                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries.queue}"></a>
+                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
+                <a class="navbar-item" href="/dashboard/stores" th:text="#{nav.stores}"></a>
+                <a class="navbar-item" href="/dashboard/store/rma-centers" th:text="#{nav.rma.centers}"></a>
+            </div>
+        </div>
+        <div class="navbar-end">
+            <!-- Language switcher -->
+            <div class="navbar-item">
+                <div class="buttons">
+                    <a class="button is-small" th:href="${currentUri + '?' + currentQuery + 'lang=en'}">EN</a>
+                    <a class="button is-small" th:href="${currentUri + '?' + currentQuery + 'lang=pl'}">PL</a>
+                </div>
+            </div>
+            <form th:action="@{/logout}" method="get">
+                <button type="submit" class="button is-danger is-small" style="margin-top: 8px" th:text="#{general.logout}"> </button>
+            </form>
+        </div>
+    </div>
+</nav>
+</div>
+
+<div th:if="${successMessage}" class="notification is-success is-small has-text-centered">
+    <button class="delete" onclick="hideNotification(this)"></button>
+    <span th:text="${successMessage}"></span>
+</div>
+
+<div th:if="${errorMessage}" class="notification is-danger  is-small has-text-centered">
+    <button class="delete" onclick="hideNotification(this)"></button>
+    <span th:text="${errorMessage}"></span>
+</div>
+
+<section class="section">
+    <div class="container content is-fluid" layout:fragment="content">
+    </div>
+</section>
+
+<!-- Confirm delete modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+        <div class="box">
+            <p th:text="#{confirm.delete}"></p>
+            <button class="button is-danger" id="confirmDeleteButton" th:text="#{confirm.yes.delete}">
+            </button>
+            <button class="button" onclick="closeDelete()" th:text="#{confirm.no}"></button>
+        </div>
+    </div>
+    <button class="modal-close is-large" aria-label="close" onclick="closeDelete()"></button>
+</div>
+
+<!-- Confirm save modal -->
+<div id="saveModal" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+        <div class="box">
+            <p th:text="#{confirm.save}"></p>
+            <button class="button is-primary" id="confirmSaveButton" th:text="#{confirm.yes.continue}"></button>
+            <button class="button" onclick="closeSave()" th:text="#{confirm.no}"></button>
+        </div>
+    </div>
+    <button class="modal-close is-large" aria-label="close" onclick="closeSave()"></button>
+</div>
+
+<script>
+    let formToSubmit;
+    let onConfirmCallback;
+
+    function hideNotification(button) {
+        const notification = button.parentNode;
+        notification.parentNode.removeChild(notification);
+    }
+
+    function confirmDelete(button) {
+        formToSubmit = button.closest('form');
+        document.getElementById('deleteModal').classList.add('is-active');
+    }
+
+    function closeDelete() {
+        document.getElementById('deleteModal').classList.remove('is-active');
+    }
+
+    document.getElementById('confirmDeleteButton').addEventListener('click', function() {
+        formToSubmit.submit();
+    });
+
+    function confirmSave(button, callback = null) {
+        formToSubmit = button.closest('form');
+        if (formToSubmit.checkValidity()) {
+            onConfirmCallback = callback;
+            document.getElementById('saveModal').classList.add('is-active');
+        } else {
+            formToSubmit.reportValidity();
+        }
+    }
+
+    function closeSave() {
+        document.getElementById('saveModal').classList.remove('is-active');
+    }
+
+    document.getElementById('confirmSaveButton').addEventListener('click', function() {
+        if (onConfirmCallback) {
+            onConfirmCallback();
+        }
+        formToSubmit.submit();
+    });
+
+    function validateInputField(inputSelector, errorMessage) {
+        const input = document.querySelector(inputSelector);
+        if (!input || input.value.trim() === '') {
+            let warningDiv = input.closest('div').parentElement;
+            let warning = warningDiv.querySelector('.warning-text');
+            if (!warning) {
+                warning = document.createElement('p');
+                warning.className = 'help is-danger warning-text';
+                warningDiv.appendChild(warning);
+            }
+            warning.textContent = errorMessage;
+            input.classList.add('is-danger');
+            return false;
+        } else {
+            input.classList.remove('is-danger');
+            let warningDiv = input.closest('div').parentElement;
+            let warning = warningDiv.querySelector('.warning-text');
+            if (warning) {
+                warning.remove();
+            }
+            return true;
+        }
+    }
+</script>
+
+</body>
+</html>

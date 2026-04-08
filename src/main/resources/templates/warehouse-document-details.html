@@ -1,0 +1,189 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <div class="level mb-4">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h1 th:text="#{warehouse.documents.details}"></h1>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div class="level-item">
+                        <span class="is-size-7 has-text-grey">
+                            <span th:text="#{warehouse.documents.created.at}"></span>:
+                            <span th:text="${#temporals.format(document.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></span>
+                            <span th:if="${document.createdBy}">
+                                | <span th:text="#{warehouse.documents.created.by}"></span>:
+                                <span th:text="${document.createdBy}"></span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box mb-5">
+                <div class="columns is-vcentered">
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.document.no}"></p>
+                        <p class="title is-5" th:text="${document.documentNo}"></p>
+                    </div>
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.type}"></p>
+                        <p class="title is-5">
+                            <span class="tag is-info" th:text="${document.type.localizedName}"></span>
+                            <span th:if="${document.reason}" class="tag is-light ml-1" th:text="${document.reason.localizedName}"></span>
+                        </p>
+                    </div>
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.warehouse.id}"></p>
+                        <p class="title is-5" th:text="${document.warehouseId}"></p>
+                    </div>
+                    <div class="column" th:if="${document.deliveryId}">
+                        <p class="heading" th:text="#{warehouse.documents.delivery.id}"></p>
+                        <p class="title is-5">
+                            <a th:href="@{${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/deliveries/details' : '/dashboard/deliveries/details'(deliveryId=${document.deliveryId})}"
+                               th:text="${document.getShortenedDeliveryId}"></a>
+                        </p>
+                    </div>
+                    <div class="column" th:if="${document.orderId}">
+                        <p class="heading" th:text="#{warehouse.documents.order.id}"></p>
+                        <p class="title is-5">
+                            <a th:href="@{${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/orders/' + ${document.orderId} : '/dashboard/orders/' + ${document.orderId}}"
+                               th:text="${document.shortenedOrderId}"></a>
+                        </p>
+                    </div>
+                </div>
+                <div class="columns" th:if="${document.note}">
+                    <div class="column">
+                        <p class="heading" th:text="#{warehouse.documents.note}"></p>
+                        <p th:text="${document.note}"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns" th:if="${document.issuer != null or document.counterparty != null}">
+                <div class="column is-half is-flex" th:if="${document.issuer}">
+                    <div class="box is-flex-grow-1">
+                        <h2 class="title is-5" th:text="#{warehouse.documents.issuer}"></h2>
+                        <div class="field" th:if="${document.issuer.companyName}">
+                            <label class="label" th:text="#{billing.company.name}"></label>
+                            <div class="control">
+                                <span th:text="${document.issuer.companyName}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${document.issuer.taxId}">
+                            <label class="label" th:text="#{billing.tax.id}"></label>
+                            <div class="control">
+                                <span th:text="${document.issuer.taxId}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${document.issuer.streetAndNumber}">
+                            <label class="label" th:text="#{billing.address}"></label>
+                            <div class="control">
+                                <span th:text="${document.issuer.streetAndNumber}"></span><br/>
+                                <span th:text="${document.issuer.postalCode + ' ' + document.issuer.city}"></span><br/>
+                                <span th:text="${document.issuer.country}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-half is-flex" th:if="${document.counterparty}">
+                    <div class="box is-flex-grow-1">
+                        <h2 class="title is-5" th:text="#{warehouse.documents.counterparty}"></h2>
+                        <div class="field" th:if="${document.counterparty.name}">
+                            <label class="label" th:text="#{billing.name}"></label>
+                            <div class="control">
+                                <span th:text="${document.counterparty.name + (document.counterparty.surname != null ? ' ' + document.counterparty.surname : '')}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${document.counterparty.companyName}">
+                            <label class="label" th:text="#{billing.company.name}"></label>
+                            <div class="control">
+                                <span th:text="${document.counterparty.companyName}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${document.counterparty.taxId}">
+                            <label class="label" th:text="#{billing.tax.id}"></label>
+                            <div class="control">
+                                <span th:text="${document.counterparty.taxId}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${document.counterparty.streetAndNumber}">
+                            <label class="label" th:text="#{billing.address}"></label>
+                            <div class="control">
+                                <span th:text="${document.counterparty.streetAndNumber}"></span><br/>
+                                <span th:text="${document.counterparty.postalCode + ' ' + document.counterparty.city}"></span><br/>
+                                <span th:text="${document.counterparty.country}"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box" th:if="${document.deliveryAddress}">
+                <h2 class="title is-5" th:text="#{warehouse.documents.delivery.address}"></h2>
+                <div class="field" th:if="${document.deliveryAddress.name}">
+                    <label class="label" th:text="#{billing.name}"></label>
+                    <div class="control">
+                        <span th:text="${document.deliveryAddress.name + (document.deliveryAddress.surname != null ? ' ' + document.deliveryAddress.surname : '')}"></span>
+                    </div>
+                </div>
+                <div class="field" th:if="${document.deliveryAddress.companyName}">
+                    <label class="label" th:text="#{billing.company.name}"></label>
+                    <div class="control">
+                        <span th:text="${document.deliveryAddress.companyName}"></span>
+                    </div>
+                </div>
+                <div class="field" th:if="${document.deliveryAddress.streetAndNumber}">
+                    <label class="label" th:text="#{billing.address}"></label>
+                    <div class="control">
+                        <span th:text="${document.deliveryAddress.streetAndNumber}"></span><br/>
+                        <span th:text="${document.deliveryAddress.postalCode + ' ' + document.deliveryAddress.city}"></span><br/>
+                        <span th:text="${document.deliveryAddress.country}"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box">
+                <h2 class="title is-5" th:text="#{warehouse.documents.items}"></h2>
+
+                <table class="table is-fullwidth is-narrow">
+                    <thead>
+                    <tr>
+                        <th th:text="#{warehouse.documents.item.ean}"></th>
+                        <th th:text="#{warehouse.documents.item.mfn}"></th>
+                        <th th:text="#{warehouse.documents.item.name}"></th>
+                        <th th:text="#{warehouse.documents.item.quantity}"></th>
+                        <th th:text="#{warehouse.documents.item.unit.price}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${items}">
+                        <td th:text="${item.ean}"></td>
+                        <td th:text="${item.mfn}"></td>
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.qty}"></td>
+                        <td th:text="${#numbers.formatDecimal(item.unitPrice, 1, 2)} + ' PLN'"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="field">
+                <div class="control">
+                    <a th:href="${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents'"
+                       class="button is-light" th:text="#{general.back}"></a>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>

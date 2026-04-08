@@ -1,0 +1,278 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <style>
+        .category-CPU {
+            background-color: #b2d8d8; /* Light pastel blue */
+        }
+
+        .category-Cooler {
+            background-color: #ffd8bf; /* Light pastel orange */
+        }
+
+        .category-GPU {
+            background-color: #d8b2d8; /* Light pastel purple */
+        }
+
+        .category-Motherboard {
+            background-color: #c8f0c8; /* Light pastel green */
+        }
+
+        .category-PSU {
+            background-color: #f0c8c8; /* Light pastel pink */
+        }
+
+        .category-Storage {
+            background-color: #d8d8b2; /* Light pastel yellow */
+        }
+
+        .category-Memory {
+            background-color: #f0d8f0; /* Light pastel lavender */
+        }
+
+        .category-Case {
+            background-color: #b2b2d8; /* Light pastel indigo */
+        }
+
+        .category-Fan {
+            background-color: #d8b2b2; /* Light pastel rose */
+        }
+
+        .category-OS {
+            background-color: #b2d8b2; /* Light pastel lime */
+        }
+
+        .category-Other {
+            background-color: #d8d8d8; /* Light pastel grey */
+        }
+
+        /* Floating box styling */
+        #summary-box {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            width: 250px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #ccc;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            overflow-y: auto; /* Scroll if content exceeds height */
+            max-height: 90vh; /* Adjust height for better visibility */
+        }
+
+        #total-summary-box {
+            position: fixed;
+            right: 20px;
+            top: 300px; /* Position below the first box */
+            width: 250px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #ccc;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+
+        /* Ensure the form content does not shift due to floating box */
+        body {
+            margin-right: 300px; /* Adjust according to the width of the summary box */
+        }
+    </style>
+
+    <h1 th:text="#{fulfilment.title}"></h1>
+
+    <!-- Floating summary box -->
+    <div id="summary-box">
+        <h2 th:text="#{fulfilment.summary}"></h2>
+        <div id="provider-summary">
+            <!-- Net prices grouped by provider will be displayed here -->
+        </div>
+    </div>
+
+    <!-- Total summary floating box -->
+    <div id="total-summary-box">
+        <div id="total-summary">
+            <!-- Total sum from all providers will be displayed here -->
+        </div>
+    </div>
+
+
+    <div th:with="type=${isSuperAdmin} ? 'orders' : ${form.fulfilmentType}, basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard'">
+
+        <form id="action-from" method="post" th:object="${form}">
+
+            <input type="hidden" id="isSuperAdmin" th:value="${isSuperAdmin}" />
+            <input type="hidden" id="storeId" th:value="${storeId}" />
+            <input type="hidden" id="fulfilmentType" th:value="${form.fulfilmentType}" />
+            <input type="hidden" th:name="redirectUrl" th:value="${form.redirectUrl}" />
+
+            <div th:each="order, stat : ${form.selectedOrders}">
+                <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />
+            </div>
+
+            <table class="table is-bordered is-narrow is-hoverable is-fullwidth is-narrowed">
+                <thead>
+                <tr>
+                    <th th:text="#{fulfilment.order.no}"></th>
+                    <th th:text="#{fulfilment.category}"></th>
+                    <th th:text="#{fulfilment.name}"></th>
+                    <th th:text="#{fulfilment.quantity}"></th>
+                    <th th:text="#{fulfilment.price}"></th>
+                    <th th:text="#{fulfilment.ean}"></th>
+                    <th th:text="#{fulfilment.product.code}"></th>
+                    <th th:text="#{fulfilment.provider}"></th>
+                    <th th:text="#{fulfilment.provider.quantity}"></th>
+                    <th th:text="#{fulfilment.net.price}"></th>
+                    <th th:text="#{fulfilment.gross.price}"></th>
+                    <th th:text="#{fulfilment.accepted}"></th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <!-- Loop through items -->
+                <tr th:each="entry, itemStat : ${form.entries}" th:class="${'category-' + entry.source.category.name()}">
+                    <td>
+                        <span th:each="allocation, stat : ${entry.allocations}">
+                            <span th:if="${stat.index > 0}">, </span>
+                            <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.refName}" target="_blank"></a>
+                        </span>
+                    </td>
+                    <td th:text="${entry.source.category}"></td>
+                    <td th:text="${entry.source.name}"></td>
+                    <td th:text="${entry.targetQty}" class="target-qty"></td>
+                    <td th:text="${entry.targetPrice}"></td>
+                    <td th:text="${entry.source.ean}"></td>
+                    <td th:text="${entry.source.mfn}"></td>
+                    <td th:text="${entry.source.provider}" class="provider"></td>
+                    <td th:text="${entry.source.qty}"></td>
+                    <td th:text="${entry.source.priceNet}" class="net-price"></td>
+                    <td th:text="${entry.source.priceGross}"></td>
+                    <td>
+
+                        <div th:each="allocation, allocStat : ${entry.allocations}">
+                            <input type="hidden"
+                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderId"
+                                   th:value="${allocation.orderId}" />
+                            <input type="hidden"
+                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemId"
+                                   th:value="${allocation.orderItemId}" />
+                            <input type="hidden"
+                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemQty"
+                                   th:value="${allocation.orderItemQty}" />
+                            <input type="hidden"
+                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemPrice"
+                                   th:value="${allocation.orderItemPrice}" />
+                        </div>
+
+                        <!-- Hidden fields for entire object -->
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.name" th:value="${entry.source.name}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.category" th:value="${entry.source.category}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.ean" th:value="${entry.source.ean}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.mfn" th:value="${entry.source.mfn}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.provider" th:value="${entry.source.provider}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.qty" th:value="${entry.source.qty}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.priceNet" th:value="${entry.source.priceNet}" />
+                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.priceGross" th:value="${entry.source.priceGross}" />
+                        <input type="checkbox" th:checked="${entry.accepted}" th:id="'accepted_' + ${entry.id}" th:name="entries[__${itemStat.index}__].accepted" th:value="true" />
+                        <label th:for="'accepted_' + ${entry.id}"></label>
+                    </td>
+                </tr>
+                <!-- End Loop -->
+                </tbody>
+            </table>
+
+            <div class="field">
+                <div class="control">
+                    <div class="select is-small">
+                        <select id="action-select" th:disabled="${isCompletedOrder}">
+                            <option value="commit" th:text="#{general.save}"></option>
+                            <option value="commitAndContinue"
+                                    th:if="${form.fulfilmentType == 'orders'}"
+                                    th:text="#{general.saveAndContinue}"></option>
+                        </select>
+
+                    </div>
+                    <button class="button is-primary is-small" type="button" onclick="submitFulfilmentForm()" th:text="#{general.submit}"></button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+
+        function submitFulfilmentForm() {
+            const form = document.getElementById('action-from');
+            const action = document.getElementById('action-select').value;
+            const isSuperAdmin = document.getElementById('isSuperAdmin').value === 'true';
+            const storeId = document.getElementById('storeId').value;
+            const fulfilmentType = document.getElementById('fulfilmentType').value;
+
+            let type = isSuperAdmin ? 'orders' : fulfilmentType;
+            let basePath = isSuperAdmin ? `/dashboard/store/${storeId}` : '/dashboard';
+
+            form.action = `${basePath}/${type}/fulfilment/${action}`;
+            form.method = 'POST';
+            form.submit();
+        }
+
+        function updateTotalNetPrice() {
+            let checkboxes = document.querySelectorAll('input[type="checkbox"][name^="entries"]:checked');
+            let providerSummary = {};
+            let totalSum = 0;
+
+            checkboxes.forEach(function(checkbox) {
+                let row = checkbox.closest('tr');
+                let provider = row.querySelector('.provider').textContent.trim();
+                let netPriceElement = row.querySelector('.net-price');
+                let qtyElement = row.querySelector('.target-qty');
+                let netPrice = parseFloat(netPriceElement.textContent.trim().replace(',', '.'));
+                let qty = parseInt(qtyElement.textContent.trim(), 10);
+
+                if (!isNaN(netPrice) && !isNaN(qty)) {
+                    if (!providerSummary[provider]) {
+                        providerSummary[provider] = 0;
+                    }
+                    let itemTotal = netPrice * qty;
+                    providerSummary[provider] += itemTotal;
+                    totalSum += itemTotal;
+                }
+            });
+
+            // Aktualizacja podsumowania dostawców
+            let providerSummaryDiv = document.getElementById('provider-summary');
+            providerSummaryDiv.innerHTML = '';
+
+            // Wyświetl grupowane ceny netto według dostawcy
+            for (let provider in providerSummary) {
+                let summaryItem = document.createElement('p');
+                summaryItem.textContent = provider + ': ' + providerSummary[provider].toFixed(2) + ' PLN';
+                providerSummaryDiv.appendChild(summaryItem);
+            }
+
+            // Aktualizacja sumy całkowitej
+            let totalSummaryDiv = document.getElementById('total-summary');
+            totalSummaryDiv.innerHTML = '<p><strong>Razem: ' + totalSum.toFixed(2) + ' PLN</strong></p>';
+        }
+
+
+        // Dodaj nasłuchiwacze zdarzeń do wszystkich checkboxów, aby uruchamiać funkcję aktualizacji
+        document.querySelectorAll('input[type="checkbox"][name^="entries"]').forEach(function(checkbox) {
+            checkbox.addEventListener('change', updateTotalNetPrice);
+        });
+
+        // Początkowe obliczenie przy załadowaniu strony
+        window.onload = updateTotalNetPrice;
+    </script>
+
+</div>
+
+</body>
+</html>

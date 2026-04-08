@@ -1,0 +1,85 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{fulfilment.queue}"></h1>
+
+            <form id="fulfilmentQueueForm" method="post">
+                <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{orders.select}"></th>
+                        <th th:text="#{store.id}"></th>
+                        <th th:text="#{orders.id}"></th>
+                        <th th:text="#{offers.fulfilment.type}"></th>
+                        <th th:text="#{orders.status}"></th>
+                        <th th:text="#{orders.ordered.at.date}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="order : ${orders}">
+                        <td>
+                            <input type="checkbox" name="selectedOrders" th:value="${order.orderId}" />
+                        </td>
+                        <td th:text="${order.storeId}"></td>
+                        <td>
+                            <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${order.storeId}, orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}">
+                                <span th:text="${order.orderId}"></span>
+                            </a>
+                        </td>
+                        <td th:text="${order.fulfilmentType}"></td>
+                        <td th:text="${order.status.localizedName}"></td>
+                        <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div class="field" th:if="${orders.size() > 0}">
+                    <div class="control">
+                        <div class="select is-small">
+                            <select id="actionSelect" name="action" th:with="orderFulfilmentBasePath=${isSuperAdmin} ? '/dashboard/store/' + ${orders[0].storeId} + '/orders/fulfilment' : '/dashboard/orders/fulfilment'">
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='default')}" th:text="#{orders.choose.suppliers}"></option>
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest')}" th:text="#{orders.suggest.cheapest.suppliers}"></option>
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-min')}" th:text="#{orders.suggest.cheapest.suppliers.min.orders}"></option>
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-local-min')}" th:text="#{orders.suggest.cheapest.local.suppliers.min.orders}"></option>
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-local-avg')}" th:text="#{orders.suggest.cheapest.local.suppliers.avg.orders}"></option>
+                            </select>
+                        </div>
+                        <button class="button is-primary is-small" type="submit" th:text="#{orders.apply}"></button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="buttons is-right mt-4">
+                <a href="/dashboard/fulfilment/queue" class="button is-light is-danger">
+                    <span class="icon"><i class="fas fa-undo-alt"></i></span>
+                    <span th:text="#{fulfilment.queue.reset}"></span>
+                </a>
+                <form action="/dashboard/fulfilment/queue" method="get">
+                    <div th:each="id : ${orderIds}">
+                        <input type="hidden" name="orderIds" th:value="${id}" />
+                    </div>
+                    <button type="submit" class="button is-primary" th:disabled="${!hasNext}">
+                        <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                        <span th:text="#{fulfilment.queue.next.group}"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        document.getElementById('fulfilmentQueueForm').addEventListener('submit', function () {
+            this.action = document.getElementById('actionSelect').value;
+        });
+    </script>
+
+</div>
+
+</body>
+</html>

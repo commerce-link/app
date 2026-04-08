@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-4">
+                <h2 class="title mb-0" th:text="#{payments.unpaid.deliveries}"></h2>
+                <form th:action="@{/dashboard/deliveries/syncPaymentStatuses}" method="post" onsubmit="event.preventDefault();">
+                    <button type="submit" class="button is-info" onclick="confirmSave(this)" th:text="#{payments.sync.statuses}"></button>
+                </form>
+            </div>
+            <p>
+                <span th:text="#{payments.total.unpaid.net} + ': ' + ${#numbers.formatDecimal(unpaidDeliveriesAmountNet, 1, 2)} + ' PLN'"></span>
+                <span class="mx-3">|</span>
+                <span th:text="#{payments.total.unpaid.gross} + ': ' + ${#numbers.formatDecimal(unpaidDeliveriesAmountGross, 1, 2)} + ' PLN'"></span>
+            </p>
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                <tr>
+                    <th style="width: 150px;" th:text="#{deliveries.provider}"></th>
+                    <th style="width: 280px;" th:text="#{deliveries.order.no}"></th>
+                    <th th:text="#{payments.amount.net}"></th>
+                    <th th:text="#{payments.amount.gross}"></th>
+                    <th th:text="#{payments.order.date}"></th>
+                    <th th:text="#{payments.due.date}"></th>
+                    <th th:text="#{general.operations}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="delivery : ${unpaidDeliveries}">
+                    <td th:text="${delivery.provider}"></td>
+                    <td>
+                        <a th:href="@{/dashboard/deliveries/details(deliveryId=${delivery.deliveryId})}">
+                            <span th:text="${delivery.shortenedDeliveryId}"></span>
+                        </a>
+                    </td>
+                    <td th:text="${delivery.unpaidAmount.netValue}"></td>
+                    <td th:text="${delivery.unpaidAmount.grossValue}"></td>
+                    <td th:text="${delivery.orderedAt.toLocalDate}"></td>
+                    <td th:text="${delivery.paymentDueDate}"></td>
+                    <td>
+                        <form th:action="@{/dashboard/deliveries/markAsPaid?deliveryId={deliveryId}(deliveryId=${delivery.deliveryId})}" method="post" th:id="'form-' + ${delivery.deliveryId}" onsubmit="event.preventDefault();">
+                            <button type="submit" class="button is-small is-primary" onclick="confirmSave(this)" th:text="#{payments.mark.paid}"></button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="title" th:text="#{payments.unpaid.orders}"></h2>
+            <p>
+                <span th:text="#{payments.total.unpaid.net} + ': ' + ${#numbers.formatDecimal(unpaidOrdersAmountNet, 1, 2)} + ' PLN'"></span>
+                <span class="mx-3">|</span>
+                <span th:text="#{payments.total.unpaid.gross} + ': ' + ${#numbers.formatDecimal(unpaidOrdersAmountGross, 1, 2)} + ' PLN'"></span>
+            </p>
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                <tr>
+                    <th style="width: 150px;" th:text="#{payments.status}"></th>
+                    <th style="width: 280px;" th:text="#{order.order.id}"></th>
+                    <th th:text="#{payments.amount.net}"></th>
+                    <th th:text="#{payments.amount.gross}"></th>
+                    <th th:text="#{order.payment.reference.no}"></th>
+                    <th th:text="#{payments.method}"></th>
+                    <th th:text="#{general.operations}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="order : ${unpaidOrders}">
+                    <td th:text="${order.status.localizedName}"></td>
+                    <td>
+                        <a th:href="@{/dashboard/orders/{orderId}(orderId=${order.orderId})}" th:text="${order.email}"></a>
+                    </td>
+                    <td th:text="${order.unpaidAmountNet}"></td>
+                    <td th:text="${order.unpaidAmountGross}"></td>
+                    <td th:text="${order.latestPayment.referenceNo}"></td>
+                    <td th:text="${order.latestPayment.source}"></td>
+                    <td>
+                        <form th:action="@{/dashboard/orders/{orderId}/markAsPaid(orderId=${order.orderId})}" method="post" onsubmit="event.preventDefault();">
+                            <button type="submit" class="button is-small is-primary" onclick="confirmSave(this)" th:text="#{payments.mark.paid}"></button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

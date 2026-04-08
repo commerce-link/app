@@ -1,0 +1,115 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 th:text="#{deliveries.title}"></h1>
+
+            <div class="box">
+                <form method="get" action="/dashboard/deliveries">
+                    <div class="field">
+                        <label class="label" th:text="#{deliveries.order.no}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="deliveryId" th:value="${searchParams.deliveryId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{deliveries.external.order.no}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="externalDeliveryId" th:value="${searchParams.externalDeliveryId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{deliveries.provider}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="provider" th:value="${searchParams.provider}">
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped">
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{orders.ordered.at.start}"></label>
+                            <input class="input" type="date" name="orderedAtStart"
+                                   th:value="${searchParams.orderedAtStart}">
+                        </div>
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{orders.ordered.at.end}"></label>
+                            <input class="input" type="date" name="orderedAtEnd"
+                                   th:value="${searchParams.orderedAtEnd}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <div class="control">
+                            <label class="checkbox">
+                                <input type="checkbox" name="showArchived" value="true" th:checked="${searchParams.showArchived}">
+                                <span th:text="#{deliveries.show.archived}"></span>
+                            </label>
+                            <label class="checkbox ml-4">
+                                <input type="checkbox" name="showWithoutInvoice" value="true" th:checked="${searchParams.showWithoutInvoice}">
+                                <span th:text="#{deliveries.show.withoutInvoice}"></span>
+                            </label>
+                            <label class="checkbox ml-4">
+                                <input type="checkbox" name="showWithoutSync" value="true" th:checked="${searchParams.showWithoutSync}">
+                                <span th:text="#{deliveries.show.withoutSync}"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                        </div>
+                        <div class="control" th:if="${isAdmin or isSuperAdmin}">
+                            <a th:href="@{/dashboard/deliveries/preview}" class="button is-light" th:text="#{deliveries.preview.create}"></a>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-5">
+                    <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.store.id}" th:if="${isSuperAdmin}"></th>
+                            <th th:text="#{deliveries.provider}"></th>
+                            <th th:text="#{deliveries.order.no}"></th>
+                            <th th:text="#{deliveries.external.order.no}"></th>
+                            <th th:text="#{deliveries.estimated.delivery}"></th>
+                            <th th:text="#{general.actions}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="delivery : ${deliveries}"
+                            th:with="detailPath=${isSuperAdmin} ? '/dashboard/store/' + ${delivery.storeId} : '/dashboard'">
+                            <td th:if="${isSuperAdmin}" th:text="${delivery.storeId}"></td>
+                            <td th:text="${delivery.provider}"></td>
+                            <td>
+                                <a th:href="@{${detailPath + '/deliveries/details'}(deliveryId=${delivery.deliveryId})}"
+                                   th:text="${delivery.shortenedDeliveryId}"></a>
+                            </td>
+                            <td th:text="${delivery.externalDeliveryId}"></td>
+                            <td th:text="${delivery.estimatedDeliveryAt}"></td>
+                            <td>
+                                <a th:href="@{${detailPath + '/deliveries/details'}(deliveryId=${delivery.deliveryId})}"
+                                   class="button is-small is-info"
+                                   th:text="#{deliveries.action.edit.delivery.link}"></a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div th:replace="~{fragments/pagination :: pagination(${'/dashboard/deliveries'}, ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

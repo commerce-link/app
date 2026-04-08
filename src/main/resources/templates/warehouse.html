@@ -1,0 +1,183 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <div th:if="${hasExternalWarehouse}" class="notification is-info is-light">
+        <span th:text="#{warehouse.external.wms.info}"></span>
+    </div>
+
+    <div class="notification has-background-grey-lighter">
+        <strong th:text="#{warehouse.value.net} + ': '"></strong>
+        <span th:text="${#numbers.formatDecimal(warehouseNetValue, 1, 2)} + ' PLN'"></span>
+        <span class="mx-3">|</span>
+        <strong th:text="#{warehouse.value.gross} + ': '"></strong>
+        <span th:text="${#numbers.formatDecimal(warehouseGrossValue, 1, 2)} + ' PLN'"></span>
+    </div>
+
+    <div class="box">
+        <h4 class="title is-5">Filter by Category and Status</h4>
+        <div class="field is-grouped is-grouped-multiline" id="filterTags">
+            <div class="control">
+                <div class="tags has-addons">
+                    <span class="tag is-info">Categories:</span>
+                </div>
+            </div>
+            <div class="control" th:each="category : ${categories}">
+                <div class="tags has-addons">
+                    <a class="tag category-tag"
+                       th:classappend="${#lists.contains(selectedCategories, category)} ? 'is-link' : 'is-link is-light'"
+                       th:text="${category}"
+                       th:data-category="${category}"
+                       href="javascript:void(0)"></a>
+                </div>
+            </div>
+
+            <div class="control">
+                <div class="tags has-addons">
+                    <span class="tag is-info">Statuses:</span>
+                </div>
+            </div>
+            <div class="control" th:each="status : ${statuses}">
+                <div class="tags has-addons">
+                    <a class="tag status-tag"
+                       th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
+                       th:text="${status.localizedName}"
+                       th:data-status="${status.name()}"
+                       href="javascript:void(0)"></a>
+                </div>
+            </div>
+
+            <div class="control">
+                <button class="button is-small is-danger is-light" id="clearFilters">
+                    <span class="icon is-small"><i class="fas fa-times"></i></span>
+                    <span>Clear Filters</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <th:block th:if="${!#lists.isEmpty(deliveredItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.stock}, ${deliveredItems}, ${DeliveredStatus}, true)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(orderedItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.ordered}, ${orderedItems}, ${OrderedStatus}, false)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(allocationItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.ordering}, ${allocationItems}, ${AllocationStatus}, false)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(newItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.new}, ${newItems}, ${NewStatus}, true)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(reservedItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.reserved}, ${reservedItems}, ${ReservedStatus}, true)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(inRMAItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.rma}, ${inRMAItems}, ${InRMAStatus}, true)}"></div>
+    </th:block>
+    <th:block th:if="${!#lists.isEmpty(inExternalServiceItems)}">
+        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.external.service}, ${inExternalServiceItems}, ${InExternalServiceStatus}, true)}"></div>
+    </th:block>
+
+    <div class="box">
+        <form action="/dashboard/warehouse/restock" method="post">
+            <div class="field is-grouped is-grouped-centered">
+                <div class="control">
+                    <div class="select is-small is-fullwidth">
+                        <select id="restockOperation" name="restockPrice" required>
+                            <option value="Lowest" th:text="#{warehouse.restock.lowest}">Najniższa cena</option>
+                            <option value="Promo" th:text="#{warehouse.restock.promo}">Promocyjna</option>
+                            <option value="Standard" th:text="#{warehouse.restock.standard}">Standardowa</option>
+                            <option value="" th:text="#{warehouse.restock.current}">Aktualna</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <label class="checkbox">
+                        <input type="checkbox" name="onlyMissingItems" value="true"/>
+                        <span th:text="#{warehouse.restock.only.missing}">Tylko brakujące przedmioty</span>
+                    </label>
+                </div>
+                <div class="control">
+                    <button type="submit" class="button is-primary is-small">
+                        <span class="icon is-small"><i class="fas fa-sync-alt"></i></span>
+                        <span th:text="#{general.execute}">Uzupełnij</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <form action="/dashboard/warehouse/deal-hunter" method="post" class="mt-2">
+            <div class="field is-grouped is-grouped-centered">
+                <div class="control">
+                    <button type="submit" class="button is-warning is-small">
+                        <span class="icon is-small"><i class="fas fa-fire"></i></span>
+                        <span th:text="#{warehouse.deal.hunter}">Deal hunter</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <div class="buttons is-centered mt-2">
+            <a href="/dashboard/warehouse/items/add" class="button is-link is-light is-small">
+                <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                <span th:text="#{warehouse.add.item}">Dodaj przedmiot ręcznie</span>
+            </a>
+            <a href="/dashboard/warehouse/items/destroyed" class="button is-danger is-light is-small">
+                <span class="icon is-small"><i class="fas fa-trash"></i></span>
+                <span th:text="#{warehouse.view.destroyed.items}"></span>
+            </a>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        // Initialize from server-side selected values (includes defaults)
+        const selectedCategories = new Set(/*[[${selectedCategories}]]*/ []);
+        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
+
+        function navigateWithFilters() {
+            const params = new URLSearchParams();
+
+            selectedCategories.forEach(cat => params.append('categories', cat));
+            selectedStatuses.forEach(status => params.append('statuses', status));
+
+            window.location.href = '/dashboard/warehouse?' + params.toString();
+        }
+
+        // Category tag click handler
+        document.querySelectorAll('.category-tag').forEach(tag => {
+            tag.addEventListener('click', function() {
+                const category = this.getAttribute('data-category');
+                if (selectedCategories.has(category)) {
+                    selectedCategories.delete(category);
+                } else {
+                    selectedCategories.add(category);
+                }
+                navigateWithFilters();
+            });
+        });
+
+        // Status tag click handler
+        document.querySelectorAll('.status-tag').forEach(tag => {
+            tag.addEventListener('click', function() {
+                const status = this.getAttribute('data-status');
+                if (selectedStatuses.has(status)) {
+                    selectedStatuses.delete(status);
+                } else {
+                    selectedStatuses.add(status);
+                }
+                navigateWithFilters();
+            });
+        });
+
+        // Clear filters button
+        document.getElementById('clearFilters').addEventListener('click', function() {
+            window.location.href = '/dashboard/warehouse?showAll=true';
+        });
+    </script>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1064 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <style>
+        .fixed-width-select {
+            width: 200px;
+        }
+        .truncate-sku {
+            max-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+        .truncate-serial {
+            max-width: 160px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+        .copyable {
+            cursor: pointer;
+        }
+        .copyable:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+    <div class="box mb-5">
+        <div class="columns is-vcentered">
+            <div class="column">
+                <p class="heading" th:text="#{order.order.id}"></p>
+                <p class="title is-5" th:text="${order.orderId}"></p>
+            </div>
+            <div class="column">
+                <p class="heading" th:text="#{order.ordered.at}"></p>
+                <p class="title is-5" th:text="${order.orderedAt}"></p>
+            </div>
+            <div class="column">
+                <p class="heading" th:text="#{order.source}"></p>
+                <p class="title is-5">
+                    <span th:text="${order.source?.name != null ? order.source.name : '-'}"></span>
+                    <span th:if="${order.source?.type != null}" th:text="' (' + ${order.source.type} + ')'" class="is-size-6 has-text-grey"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            <div class="box">
+                <form th:action="@{/dashboard/orders/{orderId}/updateOrderInfo(orderId=${order.orderId})}"
+                      th:object="${order}" method="post">
+                    <article class="media">
+                        <div class="media-content">
+                            <div class="content">
+                                <div class="field">
+                                    <label class="label" th:text="#{order.estimated.assembly}"></label>
+                                    <div class="control">
+                                        <input class="input" type="date" th:field="*{estimatedAssemblyAt}" th:disabled="${isCompletedOrder}"/>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{order.estimated.shipping}"></label>
+                                    <div class="control">
+                                        <input class="input" type="date" th:field="*{estimatedShippingAt}" th:disabled="${isCompletedOrder}"/>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{order.status}"></label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select th:field="*{status}" th:disabled="${isCompletedOrder}">
+                                                <option th:each="status : ${orderStatuses}" th:value="${status}"
+                                                        th:text="${status.localizedName}"></option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{offers.fulfilment.type}"></label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder}">
+                                                <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{order.affiliate.id}"></label>
+                                    <div class="control">
+                                        <label>
+                                            <input class="input" type="text" th:field="*{affiliateId}" th:disabled="${isCompletedOrder}"/>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{order.gclid}"></label>
+                                    <div class="control">
+                                        <label>
+                                            <input class="input" type="text" th:field="*{gclid}" th:disabled="${isCompletedOrder}"/>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox" th:field="*{emailNotificationsEnabled}" th:disabled="${isCompletedOrder}">
+                                        <span th:text="#{order.email.notifications}"></span>
+                                    </label>
+                                </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{order.comment}"></label>
+                                    <div class="control">
+                                        <textarea class="textarea" th:field="*{comment}"
+                                                  th:placeholder="#{order.comment.placeholder}" th:disabled="${isCompletedOrder}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="control">
+                                        <button class="button is-primary is-small" type="submit" th:disabled="${isCompletedOrder}" th:text="#{general.save}"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </form>
+            </div>
+        </div>
+
+        <!-- New Profit Information Section -->
+        <div class="column">
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.profit.info}"></th>
+                        <th th:text="#{order.cost.info}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><strong th:text="#{order.total.items.price} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalItemsPrice}"></span></td>
+                        <td><strong th:text="#{order.total.items.cost} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalItemsCostGross}"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong th:text="#{order.total.services.price} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalServicesPrice}"></span></td>
+                        <td><strong th:text="#{order.total.services.cost} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalServicesCostGross}"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong th:text="#{order.total.processing.fees.price} + ':'"></strong> <span
+                                th:text="0"></span></td>
+                        <td><strong th:text="#{order.total.processing.fees.cost} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalProcessingFeesCostGross}"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong th:text="#{order.total.price} + ':'"></strong> <span th:id="totalPrice" th:text="${order.totalPrice}"></span>
+                        </td>
+                        <td><strong th:text="#{order.total.cost} + ':'"></strong> <span th:id="totalCost" th:text="${orderFinancials.totalCost}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                    <tfoot>
+                    <tr>
+                        <td colspan="2"><strong th:text="#{order.total.profit.gross} + ':'"></strong> <span
+                                th:text="${orderFinancials.totalProfit}"></span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong th:text="#{order.total.profit.net} + ':'"></strong> <strong><span
+                                th:text="${orderFinancials.totalProfitNet}" class="has-text-success"></span></strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong th:text="#{order.unpaid.amount} + ':'"></strong>
+                            <span th:text="${order.unpaidAmount}"
+                                  th:classappend="${order.unpaidAmount != 0} ? 'has-text-danger' : ''"></span>
+                        </td>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- New Order Events Section -->
+        <div class="column">
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.event.type}"></th>
+                        <th th:text="#{order.event.name}"></th>
+                        <th th:text="#{order.event.date}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="event : ${orderEvents}">
+                        <td th:text="${event.type}"></td>
+                        <td th:text="${event.name}"></td>
+                        <td th:text="${event.createdAt}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
+        <h2 class="subtitle" th:text="#{order.items}"></h2>
+        <div class="box mb-5">
+            <div class="table-container mb-4">
+                <table class="table is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.item.select}" style="width: 60px;"></th>
+                        <th style="width: 80px;">ID</th>
+                        <th th:text="#{order.item.category}"></th>
+                        <th th:text="#{order.item.sku}"></th>
+                        <th th:text="#{order.item.name}"></th>
+                        <th th:text="#{order.item.unit.price}"></th>
+                        <th th:text="#{order.item.unit.cost}"></th>
+                        <th th:text="#{order.item.quantity}"></th>
+                        <th th:text="#{general.manufacturer.code}"></th>
+                        <th th:text="#{general.delivery.id}"></th>
+                        <th th:text="#{order.item.serial.no}"></th>
+                        <th th:text="#{order.item.status}"></th>
+                        <th th:text="#{order.item.consolidated}"></th>
+                        <th th:text="#{order.item.comment}"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="orderItemsRows">
+                    <tr th:each="item, iterStat : *{orderItems}">
+                        <td style="width: 60px;">
+                            <input type="checkbox" th:field="*{orderItems[__${iterStat.index}__].selected}" th:disabled="${isCompletedOrder or hasWarehouseDocument}"/>
+                            <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
+                            <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].itemId}"/>
+                        </td>
+                        <td>
+                            <a th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
+                               th:text="${item.shortenedItemId}"></a>
+                        </td>
+                        <td th:text="${pcl.name(item.category)}"></td>
+                        <td>
+                            <span th:if="${item.sku}" class="copyable truncate-sku" th:text="${item.sku}" th:title="${item.sku}" th:data-copy="${item.sku}" onclick="copyToClipboard(this)"></span>
+                        </td>
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.price}"></td>
+                        <td th:text="${item.unitCost.grossValue}"></td>
+                        <td th:text="${item.qty}"></td>
+                        <td>
+                            <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
+                        </td>
+                        <td>
+                            <a th:if="${item.deliveryId != null}" th:href="@{/dashboard/deliveries/details(deliveryId=${item.deliveryId})}" th:text="${item.shortenedDeliveryId}"></a>
+                        </td>
+                        <td>
+                            <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
+                        </td>
+                        <td>
+                            <span class="tag"
+                                  th:classappend="${item.status.name() == 'Reserved'} ? 'is-warning-light' :
+                                                  (${item.status.name() == 'Allocation'} ? 'is-warning' :
+                                                  (${item.status.name() == 'Ordered'} ? 'is-link' :
+                                                  (${item.status.name() == 'Delivered'} ? 'is-success' :
+                                                  (${item.status.name() == 'InRMA'} ? 'is-danger' : ''))))"
+                                  th:text="${item.status.localizedName}"
+                                  th:id="'status-tag-' + ${iterStat.index}"
+                                  th:attr="data-status=${item.status}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${item.consolidated}" class="icon has-text-success"><i class="fas fa-check"></i></span>
+                        </td>
+                        <td th:text="${item.comment}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${order.orderId}, actionPrefix='/dashboard/orders', formId='orderItemsForm')}"></div>
+
+            <div class="field">
+                <div class="control">
+                    <div class="select is-small">
+                        <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument}">
+                            <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
+                            <option value="moveSelectedItemsToTheWarehouse" th:text="#{order.items.action.move.warehouse}"></option>
+                            <option value="moveSelectedItemsToTheWarehouseForRMA" th:text="#{order.items.action.move.warehouse.rma}"></option>
+                            <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
+                        </select>
+                    </div>
+                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
+                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced}" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
+                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or isNewOrder or #lists.isEmpty(serialUpdateItems)}" onclick="toggleSerialUpdateModal(true)" th:text="#{order.update.serial.no}"></button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div id="serialUpdateModal" class="modal">
+        <div class="modal-background" onclick="toggleSerialUpdateModal(false)"></div>
+
+        <div class="modal-card" style="width: 70vw">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.update.serial.no}"></p>
+                <button class="delete" onclick="toggleSerialUpdateModal(false)"></button>
+            </header>
+
+            <form th:action="@{/dashboard/orders/{orderId}/updateSerialNumbers(orderId=${order.orderId})}" method="post" onkeydown="if(event.key === 'Enter') event.preventDefault()">
+                <section class="modal-card-body">
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.manufacturer.code}"></th>
+                            <th th:text="#{order.item.name}"></th>
+                            <th th:text="#{order.item.quantity}"></th>
+                            <th th:text="#{general.delivery.id}"></th>
+                            <th th:text="#{order.item.serial.no}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item, i : ${serialUpdateItems}">
+                            <td th:text="${item.manufacturerCode}" class="pt-4"></td>
+                            <td th:text="${item.name}" class="pt-4"></td>
+                            <td th:text="${item.qty}" class="pt-4"></td>
+                            <td th:text="${item.shortenedDeliveryId}" class="pt-4"></td>
+                            <td>
+                                <input class="input" type="text" th:name="'orderItems[' + ${i.index} + '].serialNo'" th:value="${item.serialNo}">
+                                <input type="hidden" th:name="'orderItems[' + ${i.index} + '].itemId'" th:value="${item.itemId}">
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    <button class="button" type="button" onclick="toggleSerialUpdateModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.billing.details}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth is-narrow">
+                    <tbody>
+                    <tr>
+                        <th th:text="#{person.name}"></th>
+                        <td th:text="${order.billingDetails?.name}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.surname}"></th>
+                        <td th:text="${order.billingDetails?.surname}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.street}"></th>
+                        <td th:text="${order.billingDetails?.streetAndNumber}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.postal.code}"></th>
+                        <td th:text="${order.billingDetails?.postalCode}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.city}"></th>
+                        <td th:text="${order.billingDetails?.city}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.country}"></th>
+                        <td th:text="${order.billingDetails?.country}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.email}"></th>
+                        <td th:text="${order.billingDetails?.email}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.phone}"></th>
+                        <td th:text="${order.billingDetails?.phone}"></td>
+                    </tr>
+                    <tr th:if="${order.billingDetails?.companyName}">
+                        <th th:text="#{company.name}"></th>
+                        <td th:text="${order.billingDetails?.companyName}"></td>
+                    </tr>
+                    <tr th:if="${order.billingDetails?.taxId}">
+                        <th th:text="#{company.tax.id}"></th>
+                        <td th:text="${order.billingDetails?.taxId}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <a th:if="${!isCompletedOrder}" class="button is-primary is-small"
+                   th:href="@{/dashboard/orders/{orderId}/address(orderId=${order.orderId}, type='billing')}"
+                   th:text="#{general.edit}"></a>
+            </div>
+        </div>
+
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.shipping.details}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth is-narrow">
+                    <tbody>
+                    <tr>
+                        <th th:text="#{person.name}"></th>
+                        <td th:text="${order.shippingDetails?.name}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.surname}"></th>
+                        <td th:text="${order.shippingDetails?.surname}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.street}"></th>
+                        <td th:text="${order.shippingDetails?.streetAndNumber}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.postal.code}"></th>
+                        <td th:text="${order.shippingDetails?.postalCode}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.city}"></th>
+                        <td th:text="${order.shippingDetails?.city}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{address.country}"></th>
+                        <td th:text="${order.shippingDetails?.country}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.email}"></th>
+                        <td th:text="${order.shippingDetails?.email}"></td>
+                    </tr>
+                    <tr>
+                        <th th:text="#{person.phone}"></th>
+                        <td th:text="${order.shippingDetails?.phone}"></td>
+                    </tr>
+                    <tr th:if="${order.shippingDetails?.companyName}">
+                        <th th:text="#{company.name}"></th>
+                        <td th:text="${order.shippingDetails?.companyName}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <a th:if="${!isCompletedOrder}" class="button is-primary is-small"
+                   th:href="@{/dashboard/orders/{orderId}/address(orderId=${order.orderId}, type='shipping')}"
+                   th:text="#{general.edit}"></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.shipments}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.shipment.type}"></th>
+                        <th th:text="#{order.shipment.tracking.no}"></th>
+                        <th th:text="#{order.shipment.carrier}"></th>
+                        <th th:text="#{order.shipment.shipped.at}"></th>
+                        <th th:text="#{order.shipment.delivered.at}"></th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr th:each="shipment : ${order.shipments}">
+                            <td th:text="${shipment.type}"></td>
+                            <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank"></a></td>
+                            <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
+                            <td th:text="${shipment.carrier}"></td>
+                            <td th:text="${shipment.shippedAt}"></td>
+                            <td th:text="${shipment.deliveredAt}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="field is-grouped mt-3">
+                    <div class="control">
+                        <button class="button is-primary is-small"
+                                type="button"
+                                th:disabled="${isCompletedOrder}"
+                                onclick="toggleEditShipmentsModal(true)"
+                                th:text="#{general.edit}">
+                        </button>
+                        <button
+                                class="button is-link is-small"
+                                type="button"
+                                th:disabled="${isCompletedOrder}"
+                                th:text="#{order.action.shipment}"
+                                th:attr="data-href=@{/dashboard/orders/{orderId}/shipping(orderId=${order.orderId})}"
+                                onclick="if(!this.disabled) window.location.href=this.getAttribute('data-href')">
+                        </button>
+                        <button
+                                class="button is-danger is-small"
+                                type="button"
+                                th:attr="data-order-id=${order.orderId}"
+                                th:disabled="${isCompletedOrder}"
+                                onclick="submitCancelForm(this.getAttribute('data-order-id'))">
+                            <span th:text="#{order.shipment.cancel}"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="editShipmentsModal" class="modal">
+                <div class="modal-background" onclick="toggleEditShipmentsModal(false)"></div>
+
+                <div class="modal-card is-large" style="width: 60vw">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{order.shipments}"></p>
+                        <button class="delete" onclick="toggleEditShipmentsModal(false)"></button>
+                    </header>
+
+                    <form th:action="@{/dashboard/orders/{orderId}/updateShipments(orderId=${order.orderId})}"
+                          th:object="${order}"
+                          method="post">
+
+                        <section class="modal-card-body">
+                            <table class="table is-fullwidth">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{order.shipment.type}"></th>
+                                    <th th:text="#{order.shipment.tracking.no}"></th>
+                                    <th th:text="#{order.shipment.carrier}"></th>
+                                    <th th:text="#{order.shipment.tracking.url}"></th>
+                                    <th th:text="#{order.shipment.shipped.at}"></th>
+                                    <th th:text="#{order.shipment.delivered.at}"></th>
+                                </tr>
+                                </thead>
+
+                                <tbody id="editShipmentsBody">
+                                <tr th:each="shipment, i : *{shipments}">
+                                    <td>
+                                        <div class="select is-fullwidth">
+                                            <select th:field="*{shipments[__${i.index}__].type}">
+                                                <option th:each="type : ${shipmentTypes}"
+                                                        th:value="${type}"
+                                                        th:text="${type}">
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td><input class="input" th:field="*{shipments[__${i.index}__].trackingNo}"></td>
+                                    <td><input class="input" th:field="*{shipments[__${i.index}__].carrier}"></td>
+                                    <td><input class="input" th:field="*{shipments[__${i.index}__].trackingUrl}" type="url"></td>
+                                    <td>
+                                        <input class="input"
+                                               type="datetime-local"
+                                               th:name="'shipments[' + ${i.index} + '].shippedAt'"
+                                               th:value="${order.shipments[i.index].shippedAt != null ? #temporals.format(order.shipments[i.index].shippedAt, 'yyyy-MM-dd''T''HH:mm'): ''}">
+                                    </td>
+                                    <td>
+                                        <input class="input"
+                                               type="datetime-local"
+                                               th:name="'shipments[' + ${i.index} + '].deliveredAt'"
+                                               th:value="${order.shipments[i.index].deliveredAt != null ? #temporals.format(order.shipments[i.index].deliveredAt, 'yyyy-MM-dd''T''HH:mm') : ''}">
+                                    </td>
+                                </tr>
+
+                                <tr th:if="${#lists.isEmpty(order.shipments)}">
+                                    <td colspan="6" class="has-text-centered has-text-grey">-</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <footer class="modal-card-foot">
+                            <button class="button is-primary"
+                                    type="submit"
+                                    th:text="#{general.save}">
+                            </button>
+                            <button class="button"
+                                    type="button"
+                                    onclick="toggleEditShipmentsModal(false)"
+                                    th:text="#{general.cancel}">
+                            </button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.documents}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.document.no}"></th>
+                        <th th:text="#{order.document.link}"></th>
+                        <th th:text="#{order.document.type}"></th>
+                        <th th:text="#{order.document.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="document : ${order.documents}">
+                        <td th:text="${document.number}"></td>
+                        <td>
+                            <a th:if="${document.viewUrl}" th:href="${document.viewUrl}" th:target="${document.external} ? '_blank' : '_self'" th:text="${document.number}"></a>
+                            <span th:if="${document.viewUrl == null}">-</span>
+                        </td>
+                        <td th:text="${document.type}"></td>
+                        <td th:text="#{document.status.issued}"></td>
+                    </tr>
+                    <tr th:if="${!order.closingDocument.isPresent() and !order.isRMAReplacementOrder()}">
+                        <td>-</td>
+                        <td>-</td>
+                        <td th:text="${order.receiptType}"></td>
+                        <td th:text="#{document.status.toBeIssued}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or !canAddDocumentManually}" onclick="toggleReceiptModal(true)" th:text="#{general.add}"></button>
+                    </div>
+                    <div class="control">
+                        <form th:action="@{/dashboard/orders/{orderId}/invoicing(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
+                            <button class="button is-link is-small" type="submit" th:disabled="${isCompletedOrder}" th:text="#{order.action.create.invoice}" onclick="confirmSave(this)"></button>
+                        </form>
+                    </div>
+                    <div class="control">
+                        <form th:action="@{/dashboard/orders/{orderId}/invoicing(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
+                            <input type="hidden" name="send" value="true"/>
+                            <button class="button is-link is-small" type="submit" th:disabled="${isCompletedOrder}" th:text="#{order.action.create.and.send.invoice}" onclick="confirmSave(this)"></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div id="receiptModal" class="modal">
+                <div class="modal-background" onclick="toggleReceiptModal(false)"></div>
+                <div class="modal-card" style="width: 60vw">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{order.document.add}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleReceiptModal(false)"></button>
+                    </header>
+                    <form th:action="@{/dashboard/orders/{orderId}/addReceipt(orderId=${order.orderId})}" method="post">
+                        <section class="modal-card-body">
+                            <div class="field">
+                                <label class="label" th:text="#{order.document.no}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="number"
+                                           th:placeholder="#{order.document.no.placeholder}" required />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{order.document.link}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="link"
+                                           th:placeholder="#{order.document.link.placeholder}" />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{order.document.type}"></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select name="type" required>
+                                            <option th:each="type : ${receiptTypes}" th:value="${type}" th:text="${type}"
+                                                    th:selected="${nextInvoiceToIssue != null && nextInvoiceToIssue == type}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                            <button class="button" type="button" onclick="toggleReceiptModal(false)" th:text="#{general.cancel}"></button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="columns">
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.review}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.review.reference.no}"></th>
+                        <th th:text="#{order.review.requested.at}"></th>
+                        <th th:text="#{order.review.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td th:text="${order.review?.referenceNo != null && !#strings.isEmpty(order.review.referenceNo) ? order.review.referenceNo : '-'}"></td>
+                        <td th:text="${order.review?.requestedAt != null ? order.review.requestedAt : '-'}"></td>
+                        <td th:text="${order.review?.status != null ? order.review.status : '-'}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-primary is-small"
+                                type="button"
+                                th:disabled="${isCompletedOrder}"
+                                onclick="toggleReviewModal(true)"
+                                th:text="#{general.edit}"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reviewModal" class="modal">
+                <div class="modal-background" onclick="toggleReviewModal(false)"></div>
+                <div class="modal-card" style="width: 60vw">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{order.review}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleReviewModal(false)"></button>
+                    </header>
+
+                    <form th:action="@{/dashboard/orders/{orderId}/updateReview(orderId=${order.orderId})}" th:object="${order}" method="post">
+                        <section class="modal-card-body">
+                            <table class="table is-fullwidth">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{order.review.reference.no}"></th>
+                                    <th th:text="#{order.review.requested.at}"></th>
+                                    <th th:text="#{order.review.status}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>
+                                        <input class="input" type="text" th:field="*{review.referenceNo}"
+                                               th:placeholder="#{order.review.reference.no.placeholder}"/>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="date" th:field="*{review.requestedAt}"
+                                               th:placeholder="#{order.review.requested.at.placeholder}"/>
+                                    </td>
+                                    <td>
+                                        <div class="select">
+                                            <select th:field="*{review.status}">
+                                                <option th:each="status : ${orderReviewStatuses}" th:value="${status}" th:text="${status}"></option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <footer class="modal-card-foot">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                            <button class="button" type="button" onclick="toggleReviewModal(false)" th:text="#{general.cancel}"></button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="column">
+            <h2 class="subtitle" th:text="#{order.payments}"></h2>
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.payment.reference.no}"></th>
+                        <th th:text="#{payments.source.name}"></th>
+                        <th th:text="#{order.payment.source}"></th>
+                        <th th:text="#{order.payment.amount}"></th>
+                        <th th:text="#{order.payment.processing.fee}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="payment : ${order.payments}">
+                        <td th:text="${payment.referenceNo}"></td>
+                        <td th:text="${payment.name}"></td>
+                        <td th:text="${payment.source}"></td>
+                        <td th:text="${payment.amount}"></td>
+                        <td th:text="${payment.processingFee}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-primary is-small"
+                                type="button"
+                                th:disabled="${isCompletedOrder}"
+                                onclick="togglePaymentsModal(true)"
+                                th:text="#{general.edit}"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="paymentsModal" class="modal">
+                <div class="modal-background" onclick="togglePaymentsModal(false)"></div>
+                <div class="modal-card" style="width: 60vw">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{order.payments}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="togglePaymentsModal(false)"></button>
+                    </header>
+
+                    <form th:action="@{/dashboard/orders/{orderId}/updatePayments(orderId=${order.orderId})}" th:object="${order}" method="post">
+                        <section class="modal-card-body">
+                            <table class="table is-fullwidth">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{order.payment.reference.no}"></th>
+                                    <th th:text="#{payments.source.name}"></th>
+                                    <th th:text="#{order.payment.source}"></th>
+                                    <th th:text="#{order.payment.amount}"></th>
+                                    <th th:text="#{order.payment.processing.fee}"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="editPaymentsBody">
+                                <tr th:each="payment, iterStat : ${order.payments}">
+                                    <td>
+                                        <input class="input" type="text" th:field="*{payments[__${iterStat.index}__].referenceNo}"
+                                               th:placeholder="#{order.payment.reference.no.placeholder}"/>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="text" th:field="*{payments[__${iterStat.index}__].name}"
+                                               th:placeholder="#{payments.source.name.placeholder}"/>
+                                    </td>
+                                    <td>
+                                        <div class="select">
+                                            <select th:field="*{payments[__${iterStat.index}__].source}">
+                                                <option th:each="source : ${paymentSources}" th:value="${source}" th:text="${source}"></option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="number" step="0.01" th:field="*{payments[__${iterStat.index}__].amount}"
+                                               th:placeholder="#{order.payment.amount.placeholder}"/>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="number" step="0.01" th:field="*{payments[__${iterStat.index}__].processingFee}"
+                                               th:placeholder="#{order.payment.processing.fee.placeholder}"/>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <footer class="modal-card-foot">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                            <button class="button" type="button" onclick="togglePaymentsModal(false)" th:text="#{general.cancel}"></button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field">
+        <div class="control is-flex is-align-items-center">
+            <a class="button is-link ml-2" th:href="${isSuperAdmin} ? '/dashboard/store/' + ${order.storeId} + '/orders/' + ${order.orderId} + '/collection' : '/dashboard/orders/' + ${order.orderId} + '/collection'"
+               th:text="#{order.action.collection}">
+            </a>
+            <a class="button is-link ml-2" th:href="${isSuperAdmin} ? '/dashboard/store/' + ${order.storeId} + '/orders/' + ${order.orderId} + '/card' : '/dashboard/orders/' + ${order.orderId} + '/card'"
+               th:text="#{order.action.card}">
+            </a>
+            <form th:if="${canDeleteOrder}" method="post" th:action="@{/dashboard/orders/{orderId}/delete(orderId=${order.orderId})}" class="ml-2"
+                  onsubmit="return confirm('Czy na pewno chcesz usunąć to zamówienie?');">
+                <button class="button is-danger" type="submit" th:text="#{order.action.delete}"></button>
+            </form>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', () => {
+            const shouldOpenModal = /*[[${openModal}]]*/ false;
+            if (shouldOpenModal) toggleOrderItemModal(true);
+        });
+
+        function submitCancelForm(orderId) {
+            if (confirm("Are you sure you want to cancel this shipment?")) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/dashboard/orders/${orderId}/cancelShipment`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        function submitOrderItemsForm() {
+            const form = document.getElementById('orderItemsForm');
+            const actionSelect = document.getElementById('action-select');
+            const selectedAction = actionSelect.value;
+            const orderId = form.getAttribute('data-order-id');
+            form.action = `/dashboard/orders/${orderId}/${selectedAction}`;
+            form.method = 'POST';
+            form.submit();
+        }
+
+        function toggleOrderItemModal(show) {
+            const modal = document.getElementById('itemAddModalId');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function toggleReceiptModal(show) {
+            const modal = document.getElementById('receiptModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function toggleReviewModal(show) {
+            const modal = document.getElementById('reviewModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function togglePaymentsModal(show) {
+            const modal = document.getElementById('paymentsModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+
+            modal.classList.toggle('is-active', show);
+
+            if (show) {
+                const tbody = document.getElementById('editPaymentsBody');
+                if (tbody && !tbody.dataset.blankAdded) {
+                    addEmptyPaymentRow();
+                    tbody.dataset.blankAdded = 'true';
+                }
+            }
+        }
+
+        function copyToClipboard(element) {
+            navigator.clipboard.writeText(element.getAttribute('data-copy'));
+        }
+
+        function toggleEditShipmentsModal(show) {
+            const modal = document.getElementById('editShipmentsModal');
+            if (!modal) return;
+
+            modal.classList.toggle('is-active', show);
+
+            if (show) {
+                const tbody = document.getElementById('editShipmentsBody');
+                if (tbody && !tbody.dataset.blankAdded) {
+                    addEmptyShipmentRow();
+                    tbody.dataset.blankAdded = 'true';
+                }
+            }
+        }
+
+        function addEmptyShipmentRow() {
+            const tbody = document.getElementById('editShipmentsBody');
+            if (!tbody) return;
+
+            const index = tbody.querySelectorAll('tr').length;
+
+            const shipmentTypes = /*[[${shipmentTypes}]]*/ [];
+
+            const typeOptions = shipmentTypes.map(t =>
+                `<option value="${t}">${t}</option>`
+            ).join('');
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+        <td>
+            <div class="select is-fullwidth">
+                <select name="shipments[${index}].type">
+                    ${typeOptions}
+                </select>
+            </div>
+        </td>
+
+        <td>
+            <input class="input"
+                   name="shipments[${index}].trackingNo"/>
+        </td>
+
+        <td>
+            <input class="input"
+                   name="shipments[${index}].carrier"/>
+        </td>
+
+        <td>
+            <input class="input"
+                   type="url"
+                   name="shipments[${index}].trackingUrl"/>
+        </td>
+
+        <td>
+            <input class="input"
+                   type="datetime-local"
+                   name="shipments[${index}].shippedAt"/>
+        </td>
+
+        <td>
+            <input class="input"
+                   type="datetime-local"
+                   name="shipments[${index}].deliveredAt"/>
+        </td>
+    `;
+
+            tbody.appendChild(row);
+        }
+
+        function addEmptyPaymentRow() {
+            const tbody = document.getElementById('editPaymentsBody');
+            if (!tbody) return;
+
+            const index = tbody.querySelectorAll('tr').length;
+            const paymentSources = /*[[${paymentSources}]]*/ [];
+
+            const sourceOptions = paymentSources.map(s =>
+                `<option value="${s}">${s}</option>`
+            ).join('');
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+        <td>
+            <input class="input" name="payments[${index}].referenceNo">
+        </td>
+
+        <td>
+            <input class="input" name="payments[${index}].name">
+        </td>
+
+        <td>
+            <div class="select">
+                <select name="payments[${index}].source">
+                    ${sourceOptions}
+                </select>
+            </div>
+        </td>
+
+        <td>
+            <input class="input"
+                   type="number"
+                   step="0.01"
+                   value="0"
+                   name="payments[${index}].amount">
+        </td>
+
+        <td>
+            <input class="input"
+                   type="number"
+                   step="0.01"
+                   value="0"
+                   name="payments[${index}].processingFee">
+        </td>
+    `;
+
+            tbody.appendChild(row);
+        }
+
+        function toggleSerialUpdateModal(show) {
+            const modal = document.getElementById('serialUpdateModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+    </script>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="#{store.branding.title}"></h1>
+            
+            <form th:action="@{/dashboard/store/branding/edit}" th:object="${form}" method="post" enctype="multipart/form-data">
+
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <!-- Branding Section -->
+                <div class="box">
+                    <h2 class="subtitle">Store Identity</h2>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.name}" th:placeholder="#{store.name.placeholder}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.logo}"></label>
+                        <div class="field" th:if="${form.store.branding.logo != null}">
+                            <p class="help">Current logo:</p>
+                            <input class="input" type="text"
+                                   th:value="${backofficeDomain + '/StoreLogo/' + form.store.storeId}"
+                                   readonly>
+                        </div>
+                        <div class="file has-name is-fullwidth">
+                            <label class="file-label">
+                                <input class="file-input" type="file" th:field="*{logoFile}" accept="image/*"
+                                       onchange="updateFileName(this)">
+                                <span class="file-cta">
+                                    <span class="file-icon">
+                                        <i class="fas fa-upload"></i>
+                                    </span>
+                                    <span class="file-label" th:text="#{store.choose.file} + '...'"></span>
+                                </span>
+                                <span class="file-name" id="fileNameDisplay" th:text="#{store.no.file.uploaded}"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.primary.color}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.branding.primaryColor}" placeholder="Enter primary color code">
+                        </div>
+                        <p class="help">Use hex color codes (e.g., #3273dc)</p>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.secondary.color}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.branding.secondaryColor}" placeholder="Enter secondary color code">
+                        </div>
+                        <p class="help">Use hex color codes (e.g., #363636)</p>
+                    </div>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+<script layout:fragment="scripts">
+    function updateFileName(input) {
+        const fileName = input.files[0] ? input.files[0].name : 'No file uploaded';
+        document.getElementById('fileNameDisplay').textContent = fileName;
+    }
+</script>
+
+</body>
+</html>

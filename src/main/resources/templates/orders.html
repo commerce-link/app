@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <div class="box">
+        <h4 class="title is-5">Filter by Order Status</h4>
+        <div class="field is-grouped is-grouped-multiline" id="filterTags">
+            <div class="control">
+                <div class="tags has-addons">
+                    <span class="tag is-info">Statuses:</span>
+                </div>
+            </div>
+            <div class="control" th:each="status : ${statuses}">
+                <div class="tags has-addons">
+                    <a class="tag status-tag"
+                       th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
+                       th:data-status="${status.name()}"
+                       href="javascript:void(0)">
+                        <span th:text="${status.localizedName}"></span>
+                        <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
+                        <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="control">
+                <button class="button is-small is-danger is-light" id="clearFilters">
+                    <span class="icon is-small"><i class="fas fa-times"></i></span>
+                    <span>Clear Filters</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sections for each order status -->
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(NewStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('Nowe', ${ordersByStatus.get(NewStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssemblyStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('W trakcie kompletowania', ${ordersByStatus.get(AssemblyStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssembledStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('Gotowe do realizacji', ${ordersByStatus.get(AssembledStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(BlockedStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('Zablokowane', ${ordersByStatus.get(BlockedStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(RealizationStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('W realizacji', ${ordersByStatus.get(RealizationStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(PackagingStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('W trakcie pakowania', ${ordersByStatus.get(PackagingStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(ShippingStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('W dostawie', ${ordersByStatus.get(ShippingStatus)})}"></div>
+    </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(DeliveredStatus))}">
+        <div th:replace="~{fragments/ordersListFragment :: box('Dostarczone', ${ordersByStatus.get(DeliveredStatus)})}"></div>
+    </th:block>
+
+    <script th:inline="javascript">
+        // Initialize from server-side selected values (includes defaults)
+        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
+
+        function navigateWithFilters() {
+            const params = new URLSearchParams();
+
+            selectedStatuses.forEach(status => params.append('statuses', status));
+
+            window.location.href = '/dashboard/orders?' + params.toString();
+        }
+
+        // Status tag click handler
+        document.querySelectorAll('.status-tag').forEach(tag => {
+            tag.addEventListener('click', function() {
+                const status = this.getAttribute('data-status');
+                if (selectedStatuses.has(status)) {
+                    selectedStatuses.delete(status);
+                } else {
+                    selectedStatuses.add(status);
+                }
+                navigateWithFilters();
+            });
+        });
+
+        // Clear filters button
+        document.getElementById('clearFilters').addEventListener('click', function() {
+            window.location.href = '/dashboard/orders?showAll=true';
+        });
+    </script>
+
+</div>
+
+</body>
+</html>

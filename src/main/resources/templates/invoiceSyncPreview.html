@@ -1,0 +1,202 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h2 th:text="#{invoiceSync.title}"></h2>
+
+            <div class="columns">
+                <div class="column is-half">
+                    <div class="box">
+                        <h4 class="title is-5" th:text="#{invoiceSync.invoiceDetails}"></h4>
+                        <table class="table is-fullwidth is-narrow">
+                            <tbody>
+                            <tr>
+                                <th th:text="#{invoiceSync.invoiceNumber}"></th>
+                                <td>
+                                    <a th:href="${preview.viewUrl}" target="_blank" th:text="${preview.invoiceNumber}"></a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th th:text="#{invoiceSync.orderNo}"></th>
+                                <td th:text="${preview.externalDeliveryId}"></td>
+                            </tr>
+                            <tr>
+                                <th th:text="#{invoiceSync.priceNet}"></th>
+                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></td>
+                            </tr>
+                            <tr>
+                                <th th:text="#{invoiceSync.priceGross}"></th>
+                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></td>
+                            </tr>
+                            <tr>
+                                <th th:text="#{invoiceSync.currency}"></th>
+                                <td th:text="${preview.currency}"></td>
+                            </tr>
+                            <tr>
+                                <th th:text="#{invoiceSync.exchangeRate}"></th>
+                                <td th:text="${#numbers.formatDecimal(preview.exchangeRate, 1, 4)}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="box">
+                        <h4 class="title is-5" th:text="#{invoiceSync.synchronization}"></h4>
+                        <table class="table is-fullwidth is-narrow">
+                            <colgroup>
+                                <col style="width: 35%"/>
+                                <col style="width: 25%"/>
+                                <col style="width: 10%"/>
+                                <col style="width: 30%"/>
+                            </colgroup>
+                            <tbody>
+                            <tr>
+                                <th th:text="#{invoiceSync.paymentStatus}"></th>
+                                <td th:unless="${preview.paymentStatusDiffers}" colspan="3">
+                                    <span th:if="${preview.invoicePaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
+                                    <span th:unless="${preview.invoicePaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
+                                </td>
+                                <td th:if="${preview.paymentStatusDiffers}">
+                                    <span th:if="${preview.deliveryPaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
+                                    <span th:unless="${preview.deliveryPaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
+                                </td>
+                                <td th:if="${preview.paymentStatusDiffers}" class="has-text-centered">&rarr;</td>
+                                <td th:if="${preview.paymentStatusDiffers}">
+                                    <span th:if="${preview.invoicePaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
+                                    <span th:unless="${preview.invoicePaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
+                                </td>
+                            </tr>
+                            <tr th:if="${preview.invoicePaymentToDate}">
+                                <th th:text="#{invoiceSync.paymentToDate}"></th>
+                                <td th:unless="${preview.paymentDueDateDiffers}" colspan="3">
+                                    <span class="tag" th:text="${preview.invoicePaymentToDate}"></span>
+                                </td>
+                                <td th:if="${preview.paymentDueDateDiffers}">
+                                    <span class="tag" th:text="${preview.deliveryPaymentDueDate} ?: '-'"></span>
+                                </td>
+                                <td th:if="${preview.paymentDueDateDiffers}" class="has-text-centered">&rarr;</td>
+                                <td th:if="${preview.paymentDueDateDiffers}">
+                                    <span class="tag is-info" th:text="${preview.invoicePaymentToDate}"></span>
+                                </td>
+                            </tr>
+                            <tr th:if="${preview.invoiceShortcut}">
+                                <th th:text="#{invoiceSync.provider}"></th>
+                                <td th:unless="${preview.shortcutDiffers}" colspan="3">
+                                    <span class="tag" th:text="${preview.invoiceShortcut}"></span>
+                                </td>
+                                <td th:if="${preview.shortcutDiffers}">
+                                    <span class="tag" th:text="${preview.deliveryProvider} ?: '-'"></span>
+                                </td>
+                                <td th:if="${preview.shortcutDiffers}" class="has-text-centered">&rarr;</td>
+                                <td th:if="${preview.shortcutDiffers}">
+                                    <span class="tag is-info" th:text="${preview.invoiceShortcut}"></span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <form th:action="@{/dashboard/deliveries/sync/apply}" th:object="${preview}" method="post">
+
+                <input type="hidden" th:field="*{deliveryId}"/>
+                <input type="hidden" th:field="*{externalDeliveryId}"/>
+                <input type="hidden" th:field="*{invoiceId}"/>
+                <input type="hidden" th:field="*{invoiceNumber}"/>
+                <input type="hidden" th:field="*{currency}"/>
+                <input type="hidden" th:field="*{exchangeRate}"/>
+                <input type="hidden" th:field="*{invoiceShortcut}"/>
+                <input type="hidden" th:field="*{deliveryProvider}"/>
+
+                <div class="box">
+                    <h4 class="title is-5" th:text="#{invoiceSync.itemMapping}"></h4>
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.name}"></th>
+                            <th th:text="#{general.manufacturer.code}"></th>
+                            <th th:text="#{general.quantity}"></th>
+                            <th th:text="#{invoiceSync.deliveryUnitCost}"></th>
+                            <th th:text="#{invoiceSync.invoicePosition}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="mapping, stat : ${preview.mappings}">
+                            <td th:text="${mapping.name}"></td>
+                            <td th:text="${mapping.mfn}"></td>
+                            <td th:text="${mapping.qty}"></td>
+                            <td th:text="${#numbers.formatDecimal(mapping.unitCost, 1, 2)} + ' PLN'"></td>
+                            <td>
+                                <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
+                                <div class="select is-fullwidth">
+                                    <select th:field="*{mappings[__${stat.index}__].selectedPositionId}">
+                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
+                                        <option th:each="pos : ${preview.options}"
+                                                th:value="${pos.id}"
+                                                th:text="${pos.label}">
+                                        </option>
+                                    </select>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td th:text="#{invoiceSync.shippingCost}"></td>
+                            <td>-</td>
+                            <td>1</td>
+                            <td th:text="${#numbers.formatDecimal(preview.shippingCost, 1, 2)} + ' PLN'"></td>
+                            <td>
+                                <div class="select is-fullwidth">
+                                    <select th:field="*{shippingCostPositionId}">
+                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
+                                        <option th:each="pos : ${preview.options}"
+                                                th:value="${pos.id}"
+                                                th:text="${pos.label}">
+                                        </option>
+                                    </select>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td th:text="#{invoiceSync.paymentCost}"></td>
+                            <td>-</td>
+                            <td>1</td>
+                            <td th:text="${#numbers.formatDecimal(preview.paymentCost, 1, 2)} + ' PLN'"></td>
+                            <td>
+                                <div class="select is-fullwidth">
+                                    <select th:field="*{paymentCostPositionId}">
+                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
+                                        <option th:each="pos : ${preview.options}"
+                                                th:value="${pos.id}"
+                                                th:text="${pos.label}">
+                                        </option>
+                                    </select>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button type="submit" class="button is-primary" th:text="#{invoiceSync.apply}"></button>
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+    </section>
+
+</div>
+</body>
+</html>

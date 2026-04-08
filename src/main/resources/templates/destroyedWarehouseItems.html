@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.destroyed}, ${warehouseItems}, ${DestroyedStatus}, false)}"></div>
+
+    <div class="field">
+        <a class="button is-light" th:href="@{/dashboard/warehouse}" th:text="#{general.cancel}"></a>
+    </div>
+
+</div>
+
+</body>
+</html>

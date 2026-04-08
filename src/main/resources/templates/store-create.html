@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{store.create}"></h1>
+
+            <form th:action="@{/dashboard/store/create}" th:object="${store}" method="post">
+                <input type="hidden" th:field="*{storeId}" />
+                <div class="field">
+                    <label class="label" for="storeName" th:text="#{store.name}"></label>
+                    <div class="control">
+                        <input class="input" type="text" id="storeName" th:field="*{name}" required />
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="storeApiKey" th:text="#{store.api.key}"></label>
+                    <div class="control">
+                        <input class="input" type="text" id="storeApiKey" th:field="*{apiKey}" />
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="control">
+                        <button type="submit" class="button is-success" th:text="#{general.create}"></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

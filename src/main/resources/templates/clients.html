@@ -1,0 +1,80 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h2 th:text="#{clients.archived.orders}"></h2>
+
+            <div class="mb-5">
+                <form th:action="@{/dashboard/clients}">
+                    <div class="field">
+                        <label class="label" th:text="#{orders.id}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="orderId" th:value="${searchParams.orderId}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{orders.email}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="email" th:value="${searchParams.email}">
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped">
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{orders.ordered.at.start}"></label>
+                            <input class="input" type="date" name="orderedAtStart"
+                                   th:value="${searchParams.orderedAtStart}">
+                        </div>
+                        <div class="control is-expanded">
+                            <label class="label" th:text="#{orders.ordered.at.end}"></label>
+                            <input class="input" type="date" name="orderedAtEnd"
+                                   th:value="${searchParams.orderedAtEnd}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
+                <tr>
+                    <th th:text="#{orders.id}"></th>
+                    <th th:text="#{store.id}"></th>
+                    <th th:text="#{order.ordered.at}"></th>
+                    <th th:text="#{orders.status}"></th>
+                    <th th:text="#{orders.email}"></th>
+                </tr>
+                <tr th:each="pastOrder : ${pastOrders}">
+                    <td>
+                        <a th:href="@{/dashboard/orders/{id}(id=${pastOrder.orderId})}">
+                            <span th:text="${pastOrder.orderId}"></span>
+                        </a>
+                    </td>
+                    <td th:text="${pastOrder.storeId}"></td>
+                    <td th:text="${#temporals.format(pastOrder.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    <td th:text="${pastOrder.status}"></td>
+                    <td th:text="${pastOrder.email}"></td>
+                </tr>
+            </table>
+
+            <div th:replace="~{fragments/pagination :: pagination('/dashboard/clients', ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <h1 class="title"
+        th:text="${mode == 'EDIT'} ? #{general.edit} + ' ' + (${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} : #{offers.template}) : #{general.create} + ' ' + (${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} : #{offers.template})">
+    </h1>
+
+    <form id="offerForm" th:object="${offer}" method="post">
+        <input type="hidden" th:field="*{storeId}" />
+        <input type="hidden" th:field="*{type}" />
+
+        <div class="field">
+            <h4 th:text="#{offers.id}"></h4>
+            <div class="control">
+                <input class="input" type="text" th:field="*{basketId}" placeholder="Offer ID" readonly>
+            </div>
+        </div>
+
+        <div class="field">
+            <h4 th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.name} : #{offers.template} + ' ' + #{offers.name}"></h4>
+            <div class="control">
+                <input class="input" type="text" th:field="*{name}" th:placeholder="#{offers.name.placeholder}" required>
+            </div>
+        </div>
+
+        <div class="field">
+            <h4 th:text="#{offers.fulfilment.type}"></h4>
+            <div class="select">
+                <select th:field="*{fulfilmentType}">
+                    <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+            <h4 th:text="#{offers.expired.at}"></h4>
+            <div class="control">
+                <input type="datetime-local" name="expiresAt"
+                       th:value="${#temporals.format(offer.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
+                       class="input is-small">
+            </div>
+        </div>
+
+        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer && mode == 'EDIT'}">
+            <h4 th:text="#{offers.link.for.client}"></h4>
+            <div class="control is-flex" style="gap: 8px; align-items: center;">
+                <input class="input"
+                       type="text"
+                       id="offerLinkInput"
+                       th:value="${offer.createOfferUrl(backofficeDomain)}"
+                       readonly
+                       style="text-decoration: underline; cursor: pointer;"
+                       onclick="openOfferLink()" />
+                <button class="button is-small is-info" type="button"
+                        onclick="copyOfferLink()" th:text="#{general.copy}"></button>
+            </div>
+        </div>
+
+        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+            <h4 th:text="#{offers.delivery.option}"></h4>
+            <div class="select">
+                <select th:field="*{deliveryOptionId}">
+                    <option value="" th:text="'— ' + #{general.select} + ' —'"></option>
+                    <option th:each="opt : ${deliveryOptions}" th:value="${opt.id}" th:text="${opt.name} + ' (' + ${opt.price} + ' PLN)'"></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" th:field="*{showPrices}" />
+                <span th:text="#{offers.show.prices}"></span>
+            </label>
+        </div>
+
+        <h4 th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.items} : #{offers.template} + ' ' + #{offers.items}"></h4>
+        <div class="box">
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{product.category}"></th>
+                        <th th:text="#{product.name}"></th>
+                        <th th:text="#{product.manufacturer.code}"></th>
+                        <th th:text="#{offers.quantity}"></th>
+                        <th th:text="#{offers.price}"></th>
+                        <th th:text="#{offers.cost}"></th>
+                        <th th:text="#{offers.costs.distribution}"></th>
+                        <th th:text="#{offers.availability.distribution}"></th>
+                        <th th:text="#{offers.providers.distribution}"></th>
+                        <th th:text="#{offers.item.consolidated}"></th>
+                        <th th:text="#{general.actions}"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="offerRows">
+                    <tr th:each="offerItem : ${offerItems}">
+                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
+                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
+                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
+                        <td>
+                            <div class="select">
+                                <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
+                                    <option value=""></option>
+                                    <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
+                                </select>
+                            </div>
+                        </td>
+                        <td style="min-width: 200px;">
+                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].name}" />
+                        </td>
+                        <td style="min-width: 180px;">
+                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].manufacturerCode}" />
+                        </td>
+                        <td style="min-width: 140px;">
+                            <input class="input" type="number" th:field="*{basketItems[__${offerItem.sequenceNumber}__].qty}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        </td>
+                        <td style="min-width: 140px;">
+                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].price}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        </td>
+                        <td style="min-width: 140px;">
+                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].cost}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        </td>
+                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.costRangeDistribution}"></td>
+                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.qtyDistribution}"></td>
+                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.suppliersDistribution}"></td>
+                        <td>
+                            <input type="checkbox" th:field="*{basketItems[__${offerItem.sequenceNumber}__].consolidated}" />
+                        </td>
+                        <td>
+                            <button class="button is-small is-danger" type="button"
+                                    th:onclick="|submitRemoveItem(event, ${offerItem.sequenceNumber})|"
+                                    th:text="#{general.delete}">
+                            </button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button class="button is-info is-small" type="button" onclick="toggleOfferItemModal(true)" th:text="#{offers.add.items}"></button>
+            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${offer.basketId}, actionPrefix='/dashboard/offer', formId='offerForm')}"></div>
+        </div>
+
+        <div class="field">
+            <h4 th:text="#{order.comment}"></h4>
+            <div class="control">
+                <textarea class="textarea" th:field="*{comment}" th:placeholder="#{order.comment.placeholder}"></textarea>
+            </div>
+        </div>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{offers.summary}"></legend>
+            <div class="field">
+                <label class="label" th:text="#{offers.client.price} + ': ' + ${totalPrice}"></label>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.our.cost} + ': ' + ${totalCost}"></label>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.our.profit.gross} + ': ' + ${totalProfitGross}"></label>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.our.profit.net} + ': ' + ${totalProfitNet}"></label>
+            </div>
+        </fieldset>
+
+        <div class="field is-grouped">
+            <div class="field is-grouped control" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                <div class="control" th:if="${mode == 'EDIT'}">
+                    <button class="button is-primary" type="button" onclick="submitForm('createOrder')"
+                            th:text="#{offers.create.order}"></button>
+                </div>
+                <div class="control">
+                    <button class="button is-primary" type="submit" onclick="submitForm('save')" th:text="#{offers.save}"></button>
+                </div>
+                <div class="control">
+                    <button class="button is-primary" type="button" onclick="submitForm('saveAsTemplate')" th:text="#{offers.save.as.template}"></button>
+                </div>
+                <div class="control" th:if="${mode == 'EDIT'}" >
+                    <button class="button is-warning" type="button" onclick="submitForm('recalculate')" th:text="#{offers.recalculate}"></button>
+                </div>
+                <div class="control" th:if="${mode == 'EDIT'}">
+                    <button class="button is-warning" type="button" onclick="submitForm('createProformaInvoice')" th:text="#{offers.createProformaInvoice}"></button>
+                </div>
+                <div class="control" th:if="${mode == 'EDIT'}">
+                    <button class="button is-warning" type="button" onclick="submitForm('copy')" th:text="#{offers.duplicate}"></button>
+                </div>
+            </div>
+            <div class="control" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}">
+                <button class="button is-primary" type="submit" onclick="submitForm('save')" th:text="#{offers.save.template}"></button>
+                <a class="button is-primary"
+                   th:href="@{/dashboard/offer/new/from-template(templateId=${offer.basketId})}"
+                   th:text="#{offers.manual.button}">
+                </a>
+            </div>
+            <div class="control">
+                <a class="button is-light" th:href="@{/dashboard/offers}" th:text="#{general.cancel}"></a>
+            </div>
+        </div>
+    </form>
+
+    <div id="copyNotification" style="display:none; position:fixed; top:32px; right:32px; z-index:9999; background:#48c774; color:#fff; padding:16px 32px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); font-size:1.1em;">
+        <span th:text="#{general.copied}">Skopiowano!</span>
+    </div>
+
+    <style>
+        /* Możesz przenieść do pliku CSS */
+        #copyNotification {
+            transition: opacity 0.3s;
+        }
+    </style>
+
+    <script th:inline="javascript">
+        function openOfferLink() {
+            const input = document.getElementById('offerLinkInput');
+            window.open(input.value, '_blank', 'noopener');
+        }
+
+        function copyOfferLink() {
+            const link = /*[[${offer.createOfferUrl(backofficeDomain)}]]*/ '';
+            navigator.clipboard.writeText(link).then(function() {
+                const notification = document.getElementById('copyNotification');
+                notification.style.display = 'block';
+                notification.style.opacity = '1';
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => notification.style.display = 'none', 300);
+                }, 2000); // znika po 2 sekundach
+            });
+        }
+    </script>
+
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', () => {
+            const shouldOpenModal = /*[[${openModal}]]*/ false;
+            if (shouldOpenModal) toggleOfferItemModal(true);
+        });
+        function submitForm(actionType) {
+            const form = document.getElementById('offerForm');
+            const offerId = /*[[${offer.basketId}]]*/ '';
+
+            if (actionType === 'recalculate') {
+                form.action = `/dashboard/offer/${offerId}/recalculate`;
+            } else if (actionType === 'save') {
+                const isOfferNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
+                if (!isOfferNameValid) return;
+                form.action = `/dashboard/offer/${offerId}`;
+            } else if (actionType === 'saveAsTemplate') {
+                const isTemplateNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
+                if (!isTemplateNameValid) return;
+                form.action = `/dashboard/offer/${offerId}/saveAsTemplate`;
+            } else if (actionType === 'createProformaInvoice') {
+                form.action = `/dashboard/offer/${offerId}/createProformaInvoice`;
+            } else if (actionType === 'copy') {
+                form.action = `/dashboard/offer/${offerId}/copy`;
+            } else if (actionType === 'createOrder') {
+                window.location.href = `/dashboard/orders/new/from-basket?basketId=${offerId}`;
+                return;
+            }
+
+            form.submit();
+        }
+
+        function submitRemoveItem(event, index) {
+            event.preventDefault();
+            const form = document.getElementById('offerForm');
+            const offerId = /*[[${offer.basketId}]]*/ '';
+
+            const items = document.querySelectorAll('#offerRows tr');
+            if (items.length <= 1) {
+                alert([[#{offers.min.items.error}]]);
+                return;
+            }
+
+            form.action = `/dashboard/offer/${offerId}/remove-item/${index}`;
+            form.method = 'POST';
+            form.submit();
+        }
+
+        function toggleOfferItemModal(show) {
+            const modal = document.getElementById('itemAddModalId');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+    </script>
+</div>
+
+</body>
+</html>

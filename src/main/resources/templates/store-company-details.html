@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{store.company.details.configuration}"></h1>
+
+            <form th:action="@{/dashboard/store/company-details/edit}" th:object="${form}" method="post">
+                <input type="hidden" th:field="*{store.storeId}"/>
+
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{order.billing.details}"></h2>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.company}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.companyName}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.street}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.streetAndNumber}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.postal}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.postalCode}" pattern="^\d{2}-\d{3}$" th:title="#{billing.postalCode.invalid}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.city}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.city}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.country}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.country}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.email}"></label>
+                            <input class="input" type="email" th:field="*{store.billingDetails.email}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.phone}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.phone}" pattern="[0-9+ ]{9,15}" th:title="#{billing.phone.invalid}"/>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{order.address.tax.id}"></label>
+                            <input class="input" type="text" th:field="*{store.billingDetails.taxId}"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{shipping.details}"></h2>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.default}"></th>
+                            <th th:text="#{order.address.company}"></th>
+                            <th th:text="#{order.address.street}"></th>
+                            <th th:text="#{order.address.postal}"></th>
+                            <th th:text="#{order.address.city}"></th>
+                            <th th:text="#{order.address.country}"></th>
+                            <th th:text="#{order.address.email}"></th>
+                            <th th:text="#{order.address.phone}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="ship, stat : *{store.shippingDetails}">
+                            <td style="text-align:center;">
+                                <input type="radio" name="defaultShippingDetailIndex" th:value="${stat.index}" th:checked="${ship._default}"/>
+                            </td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].companyName}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].streetAndNumber}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].postalCode}" pattern="^\d{2}-\d{3}$" th:title="#{shipping.postalCode.invalid}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].city}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].country}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].email}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].phone}" pattern="[0-9+ ]{9,15}" th:title="#{shipping.phone.invalid}"/></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

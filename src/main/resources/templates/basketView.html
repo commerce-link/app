@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <h1 class="title" th:text="#{baskets.view}" />
+    <div class="box">
+        <div class="table-container">
+            <table class="table is-fullwidth is-striped">
+                <thead>
+                <tr>
+                    <th th:text="#{product.category}"></th>
+                    <th th:text="#{product.name}"></th>
+                    <th th:text="#{product.manufacturer.code}"></th>
+                    <th th:text="#{offers.quantity}"></th>
+                    <th th:text="#{offers.price}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${basketItems}">
+                    <td th:text="${item.category}"></td>
+                    <td th:text="${item.name}"></td>
+                    <td th:text="${item.manufacturerCode}"></td>
+                    <td th:text="${item.qty}"></td>
+                    <td th:text="${item.price}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <fieldset class="box">
+        <legend class="label" th:text="#{offers.summary}"></legend>
+        <div class="field">
+            <label class="label" th:text="#{offers.client.price} + ': ' + ${totalPrice}"></label>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{offers.our.cost} + ': ' + ${totalCost}"></label>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{offers.our.profit.gross} + ': ' + ${totalProfitGross}"></label>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{offers.our.profit.net} + ': ' + ${totalProfitNet}"></label>
+        </div>
+    </fieldset>
+
+    <div class="field is-grouped mt-4">
+        <div>
+            <form th:action="@{/dashboard/orders/new/from-basket}" th:object="${basket}" method="get">
+                <input class="input" type="hidden" th:field="*{basketId}">
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{offers.create.order}"></button>
+                    </div>
+                </div>
+            </form>
+            <form th:action="@{/dashboard/offer/{offerId}/copy(offerId=${basket.basketId})}" method="post">
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-info" type="submit" th:text="#{offers.duplicate}"></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="control">
+            <a class="button is-light" th:href="@{/dashboard/offers}" th:text="#{general.cancel}"></a>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

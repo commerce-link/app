@@ -1,0 +1,460 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h2 th:text="#{deliveries.action.edit.delivery.link}"></h2>
+
+            <div class="columns">
+                <div class="column is-half">
+                    <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box">
+                        <input type="hidden" th:field="*{storeId}"/>
+                        <input type="hidden" th:field="*{deliveryId}"/>
+                        <input type="hidden" th:field="*{externalDeliveryId}"/>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.order.no}"></label>
+                            <div class="control" th:with="partnerSiteUrl=${supplierRegistry.getPartnerSiteUrl(delivery.provider, delivery.externalDeliveryId)}">
+                                <a th:if="${not #strings.isEmpty(partnerSiteUrl)}" th:href="${partnerSiteUrl}" target="_blank"
+                                   th:text="${delivery.shortenedDeliveryId} + ' (' + ${delivery.externalDeliveryId} + ')'"
+                                ></a>
+                                <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${delivery.externalDeliveryId} + ')'"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{general.provider.name}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.provider}"></span>
+                                <input type="hidden" th:field="*{provider}"/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.statuses}"></label>
+                            <div class="control">
+                                <span class="tag"
+                                      th:classappend="${delivery.paymentStatus.name() == 'Paid'} ? 'is-success' :
+                                                      (${delivery.paymentStatus.name() == 'Unpaid'} ? 'is-warning' : '')"
+                                      th:text="${delivery.paymentStatus.localizedName}"></span>
+                                <span class="tag ml-1"
+                                      th:classappend="${delivery.invoiced} ? 'is-success' : 'is-light'"
+                                      th:text="${delivery.invoiced} ? #{deliveries.status.invoiced} : #{deliveries.status.not.invoiced}"></span>
+                                <span class="tag ml-1"
+                                      th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
+                                      th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
+                                <input type="hidden" th:field="*{paymentStatus}"/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.paymentTerms}"></label>
+                            <div class="control">
+                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
+                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentTerms}"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.estimated.delivery}"></label>
+                            <div class="control">
+                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="date" th:field="*{estimatedDeliveryAt}" required/>
+                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.estimatedDeliveryAt}"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.shippingCost}"></label>
+                            <div class="control">
+                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
+                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.shippingCost}"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.paymentCost}"></label>
+                            <div class="control">
+                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
+                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentCost}"></span>
+                            </div>
+                        </div>
+
+                        <div class="field is-grouped" th:unless="${delivery.hasBeenReceived()}">
+                            <div class="control">
+                                <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="column is-half">
+                    <div class="box">
+                        <h4 class="title is-5" th:text="#{deliveries.warehouse.documents}"></h4>
+                        <table class="table is-fullwidth is-narrow" th:if="${!delivery.documents.isEmpty()}">
+                            <thead>
+                            <tr>
+                                <th th:text="#{deliveries.document.type}"></th>
+                                <th th:text="#{deliveries.document.number}"></th>
+                                <th th:if="${isAdmin and not isSuperAdmin}" th:text="#{general.actions}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="doc : ${delivery.documents}">
+                                <td th:text="${doc.type.localizedName}"></td>
+                                <td>
+                                    <a th:href="${doc.viewUrl}" target="_blank" class="is-link" th:text="${doc.number}"></a>
+                                </td>
+                                <td th:if="${isAdmin and not isSuperAdmin}">
+                                    <a th:if="${doc.type.name() == 'InvoiceVat'}"
+                                       th:href="@{/dashboard/deliveries/sync/preview(deliveryId=${delivery.deliveryId}, invoiceId=${doc.id})}"
+                                       class="button is-small is-info" th:text="#{invoiceSync.syncButton}"></a>
+                                    <form th:if="${doc.type.name() == 'InvoiceVat'}"
+                                          th:action="@{/dashboard/deliveries/unlink-invoice}" method="post" style="display: inline;">
+                                        <input type="hidden" name="deliveryId" th:value="${delivery.deliveryId}"/>
+                                        <input type="hidden" name="invoiceId" th:value="${doc.id}"/>
+                                        <button type="submit" class="button is-small is-danger ml-1" th:text="#{invoiceSync.unlinkButton}"></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <p th:if="${delivery.documents.isEmpty()}" class="has-text-grey" th:text="#{deliveries.no.documents}"></p>
+                        <div class="mt-3" th:if="${isAdmin and not isSuperAdmin}">
+                            <div class="field has-addons">
+                                <div class="control">
+                                    <input type="text" id="invoiceIdInput" class="input is-small" th:placeholder="#{invoiceSync.invoiceId}"/>
+                                </div>
+                                <div class="control ml-2">
+                                    <button type="button" class="button is-small is-info" th:text="#{invoiceSync.linkByIdButton}" onclick="linkInvoiceById()"></button>
+                                </div>
+                                <div class="control ml-2">
+                                    <form th:action="@{/dashboard/deliveries/link-invoices}" method="post" style="margin: 0;">
+                                        <input type="hidden" name="deliveryId" th:value="${delivery.deliveryId}"/>
+                                        <button type="submit" class="button is-small is-primary" th:text="#{invoiceSync.linkInvoicesButton}"></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <form id="linkInvoiceByIdForm" th:action="@{/dashboard/deliveries/link-invoice-by-id}" method="post" style="display: none;">
+                                <input type="hidden" name="deliveryId" th:value="${delivery.deliveryId}"/>
+                                <input type="hidden" name="invoiceId" id="invoiceIdHidden"/>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 th:text="#{deliveries.items}"></h2>
+
+            <div class="box">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th th:text="#{general.name}"></th>
+                        <th th:text="#{deliveries.orderedQty}"></th>
+                        <th th:text="#{deliveries.receivedQty}"></th>
+                        <th th:text="#{deliveries.reservedQty}"></th>
+                        <th th:text="#{deliveries.availableQty}"></th>
+                        <th th:text="#{general.ean}"></th>
+                        <th th:text="#{general.manufacturer.code}"></th>
+                        <th th:text="#{general.net.cost}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${delivery.items}">
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.orderedQty}"></td>
+                        <td th:text="${item.receivedQty}"></td>
+                        <td th:text="${item.reservedQty}"></td>
+                        <td th:text="${item.availableQty}"></td>
+                        <td th:text="${item.ean}"></td>
+                        <td>
+                            <a th:unless="${isSuperAdmin}"
+                               th:href="@{/dashboard/warehouse-documents/delivery-mfn-history(deliveryId=${delivery.deliveryId}, mfn=${item.mfn})}"
+                               th:text="${item.mfn}"></a>
+                            <span th:if="${isSuperAdmin}" th:text="${item.mfn}"></span>
+                        </td>
+                        <td th:text="${item.unitCost}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h2 th:text="#{deliveries.allocations}"></h2>
+
+            <form id="allocationsForm" th:action="@{/dashboard/deliveries/allocations}" th:object="${allocationsForm}" method="post" class="box"
+                  th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}">
+
+                <input type="hidden" th:field="*{storeId}"/>
+                <input type="hidden" th:field="*{deliveryId}"/>
+                <input type="hidden" th:field="*{provider}"/>
+                <input type="hidden" th:field="*{targetDeliveryId}" id="targetDeliveryId"/>
+                <input type="hidden" th:field="*{targetExternalDeliveryId}" id="targetExternalDeliveryId"/>
+                <input type="hidden" th:field="*{targetEstimatedDeliveryAt}" id="targetEstimatedDeliveryAtInput"/>
+
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                            <input type="checkbox" id="selectAllAllocations" onclick="toggleAllAllocations(this)"/>
+                        </th>
+                        <th></th>
+                        <th th:text="#{general.name}"></th>
+                        <th th:text="#{general.quantity}"></th>
+                        <th th:text="#{general.ean}"></th>
+                        <th th:text="#{general.manufacturer.code}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="allocation, stat : *{allocations}">
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].key.orderId}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].key.itemId}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].key.name}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].type}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].name}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].qty}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].ean}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].mfn}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].deliveryId}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].inAllocation}"/>
+                        <input type="hidden" th:field="*{allocations[__${stat.index}__].unitCost}"/>
+
+                        <td th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                            <input type="checkbox" th:field="*{allocations[__${stat.index}__].selected}"
+                                   class="allocation-checkbox"
+                                   th:disabled="${!allocation.inAllocation}"/>
+                        </td>
+                        <td>
+                            <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.name}" target="_blank"></a>
+                        </td>
+                        <td th:text="${allocation.name}"></td>
+                        <td th:text="${allocation.qty}"></td>
+                        <td th:text="${allocation.ean}"></td>
+                        <td th:text="${allocation.mfn}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="field" th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                    <div class="control">
+                        <div class="select is-small" >
+                            <select id="delivery-action-select">
+                                <option value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:if="${isAdmin}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${isAdmin and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${isAdmin}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                            </select>
+                        </div>
+                        <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>
+                    </div>
+                </div>
+
+            </form>
+
+            <div id="mergeDeliveryModal" class="modal">
+                <div class="modal-background" onclick="toggleMergeModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.merge.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleMergeModal(false)"></button>
+                    </header>
+                    <section class="modal-card-body">
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.merge.selectTarget}"></label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select id="mergeTargetSelect">
+                                        <option value="" th:text="#{deliveries.merge.selectDelivery}"></option>
+                                        <option th:each="target : ${mergeTargetDeliveries}"
+                                                th:value="${target.deliveryId}"
+                                                th:text="${target.deliveryId + ' (' + target.estimatedDeliveryAt + ')'}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <footer class="modal-card-foot">
+                        <button class="button is-primary" type="button" onclick="confirmMerge()" th:text="#{deliveries.merge.confirm}"></button>
+                        <button class="button" type="button" onclick="toggleMergeModal(false)" th:text="#{general.cancel}"></button>
+                    </footer>
+                </div>
+            </div>
+
+            <div id="splitDeliveryModal" class="modal">
+                <div class="modal-background" onclick="toggleSplitModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.split.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleSplitModal(false)"></button>
+                    </header>
+                    <section class="modal-card-body">
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.split.enterOrderNo}"></label>
+                            <div class="control">
+                                <input type="text" id="splitOrderNoInput" class="input" placeholder=""/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.split.estimatedDeliveryAt}"></label>
+                            <div class="control">
+                                <input type="date" id="splitEstimatedDeliveryAtInput" class="input"
+                                       th:value="${delivery.estimatedDeliveryAt}"/>
+                            </div>
+                        </div>
+                    </section>
+                    <footer class="modal-card-foot">
+                        <button class="button is-primary" type="button" onclick="confirmSplit()" th:text="#{deliveries.split.confirm}"></button>
+                        <button class="button" type="button" onclick="toggleSplitModal(false)" th:text="#{general.cancel}"></button>
+                    </footer>
+                </div>
+            </div>
+
+            <div id="confirmActionModal" class="modal">
+                <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{confirm.action.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleConfirmActionModal(false)"></button>
+                    </header>
+                    <section class="modal-card-body">
+                        <p id="confirmActionMessage"></p>
+                    </section>
+                    <footer class="modal-card-foot">
+                        <button class="button is-primary" type="button" onclick="executeConfirmedAction()" th:text="#{confirm.yes.continue}"></button>
+                        <button class="button" type="button" onclick="toggleConfirmActionModal(false)" th:text="#{general.cancel}"></button>
+                    </footer>
+                </div>
+            </div>
+
+            <form th:if="${(isAdmin or isSuperAdmin) and delivery.allocations.isEmpty()}"
+                  th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/delete(storeId=${delivery.storeId})} : @{/dashboard/deliveries/delete}"
+                  method="post" class="box">
+                <input type="hidden" name="deliveryId" th:value="${delivery.deliveryId}"/>
+                <button type="button" class="button is-danger" onclick="confirmSave(this)" th:text="#{deliveries.deleteDelivery}"></button>
+            </form>
+
+    <script th:inline="javascript">
+        function linkInvoiceById() {
+            const invoiceId = document.getElementById('invoiceIdInput').value.trim();
+            if (!invoiceId) {
+                alert(/*[[#{invoiceSync.enterInvoiceId}]]*/ 'Please enter an invoice ID.');
+                return;
+            }
+            document.getElementById('invoiceIdHidden').value = invoiceId;
+            document.getElementById('linkInvoiceByIdForm').submit();
+        }
+
+        const actionMessages = {
+            'markSelectedAsReceived': /*[[#{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
+            'deleteSelectedAllocations': /*[[#{deliveries.confirm.deleteAllocation}]]*/ 'Are you sure you want to delete selected allocations?'
+        };
+
+        let pendingAction = null;
+
+        function toggleAllAllocations(source) {
+            const checkboxes = document.querySelectorAll('.allocation-checkbox:not(:disabled)');
+            checkboxes.forEach(checkbox => checkbox.checked = source.checked);
+        }
+
+        function handleDeliveryAction() {
+            const selectedAction = document.getElementById('delivery-action-select').value;
+            const selectedCheckboxes = document.querySelectorAll('.allocation-checkbox:checked');
+
+            if (selectedCheckboxes.length === 0) {
+                alert(/*[[#{deliveries.select.at.least.one}]]*/ 'Please select at least one item.');
+                return;
+            }
+
+            if (selectedAction === 'mergeSelectedAllocations') {
+                toggleMergeModal(true);
+            } else if (selectedAction === 'splitSelectedAllocations') {
+                toggleSplitModal(true);
+            } else {
+                pendingAction = selectedAction;
+                const message = actionMessages[selectedAction] || 'Are you sure?';
+                document.getElementById('confirmActionMessage').textContent = message;
+                toggleConfirmActionModal(true);
+            }
+        }
+
+        function toggleConfirmActionModal(show) {
+            const modal = document.getElementById('confirmActionModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function executeConfirmedAction() {
+            toggleConfirmActionModal(false);
+            if (pendingAction) {
+                submitDeliveryAllocationsForm(pendingAction);
+                pendingAction = null;
+            }
+        }
+
+        function submitDeliveryAllocationsForm(action) {
+            const form = document.getElementById('allocationsForm');
+            const selectedAction = action || document.getElementById('delivery-action-select').value;
+
+            const baseUrl = form.dataset.baseUrl;
+            form.action = baseUrl + '/' + selectedAction;
+            form.submit();
+        }
+
+        function toggleMergeModal(show) {
+            const modal = document.getElementById('mergeDeliveryModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function confirmMerge() {
+            const targetSelect = document.getElementById('mergeTargetSelect');
+            const targetDeliveryId = targetSelect.value;
+
+            if (!targetDeliveryId) {
+                alert(/*[[#{deliveries.select.target.delivery}]]*/ 'Please select a target delivery.');
+                return;
+            }
+
+            const form = document.getElementById('allocationsForm');
+            const targetInput = document.getElementById('targetDeliveryId');
+            targetInput.value = targetDeliveryId;
+
+            const baseUrl = form.dataset.baseUrl;
+            form.action = baseUrl + '/mergeSelectedAllocations';
+            form.submit();
+        }
+
+        function toggleSplitModal(show) {
+            const modal = document.getElementById('splitDeliveryModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+            if (show) {
+                document.getElementById('splitOrderNoInput').value = '';
+                document.getElementById('splitOrderNoInput').focus();
+            }
+        }
+
+        function confirmSplit() {
+            const orderNoInput = document.getElementById('splitOrderNoInput');
+            const targetOrderNo = orderNoInput.value.trim();
+
+            if (!targetOrderNo) {
+                alert(/*[[#{deliveries.split.enterOrderNoAlert}]]*/ 'Please enter an order number.');
+                return;
+            }
+
+            const form = document.getElementById('allocationsForm');
+            document.getElementById('targetExternalDeliveryId').value = targetOrderNo;
+            document.getElementById('targetEstimatedDeliveryAtInput').value = document.getElementById('splitEstimatedDeliveryAtInput').value;
+
+            const baseUrl = form.dataset.baseUrl;
+            form.action = baseUrl + '/splitSelectedAllocations';
+            form.submit();
+        }
+    </script>
+
+        </div>
+    </section>
+
+
+</div>
+</body>
+</html>

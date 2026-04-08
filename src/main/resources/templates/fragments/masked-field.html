@@ -1,0 +1,4 @@
+<span th:fragment="masked(val)">
+    <span th:if="${val != null}" th:with="len=${#strings.length(val)}"
+          th:text="${len > 3 ? val.substring(0, 3) + #strings.repeat('*', len - 3) : #strings.repeat('*', len)}"></span>
+</span>

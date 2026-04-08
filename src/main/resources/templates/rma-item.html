@@ -1,0 +1,115 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <div class="box">
+                <h3 class="title is-3" th:text="#{rma.item.edit}"></h3>
+
+                <form th:object="${rmaItem}" method="post" th:action="@{/dashboard/rma/{rmaId}/items/{rmaItemId}/save(rmaId=${rmaId},rmaItemId=${rmaItem.rmaItemId})}">
+                    <input type="hidden" th:field="*{rmaId}" />
+                    <input type="hidden" th:field="*{rmaItemId}" />
+                    <input type="hidden" th:field="*{itemId}" />
+                    <input type="hidden" th:field="*{tax}" />
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.item.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{name}" disabled />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.quantity}"></label>
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{quantity}" disabled />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.desired.resolution}">Desired Resolution</label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select th:field="*{desiredResolution}" disabled>
+                                    <option th:each="r : ${rmaResolutionsTypes}"
+                                            th:value="${r}"
+                                            th:text="${r}">
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.actual.resolution}">Actual Resolution</label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select th:field="*{actualResolution}" readonly disabled>
+                                    <option th:each="r : ${rmaResolutionsTypes}"
+                                            th:value="${r}"
+                                            th:text="${r}">
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.serial.no}">Serial No</label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{serialNo}" th:disabled="${isClosed}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.reason}">Reason</label>
+                        <div class="control">
+                            <textarea class="textarea" th:field="*{reason}" th:disabled="${isClosed}">
+                            </textarea>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.comment}"></label>
+                        <div class="control">
+                            <textarea class="textarea" th:field="*{comment}" th:disabled="${isClosed}">
+                            </textarea>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{rma.status}"></label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select th:field="*{status}" disabled>
+                                    <option th:each="s : ${rmaStatusTypes}" th:value="${s}" th:text="${s}">
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped mt-5">
+                        <div class="control">
+                            <button class="button is-primary" type="submit" th:disabled="${isClosed}" th:text="#{general.save}"></button>
+                        </div>
+                        <div class="control">
+                            <a class="button" th:href="@{/dashboard/rma/{rmaId}(rmaId=${rmaId})}" th:text="#{general.cancel}"></a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" th:text="#{store.payments.configuration}"></h1>
+
+            <div class="box">
+                <h2 class="subtitle" th:text="#{store.checkout.settings}"></h2>
+                <form th:action="@{/dashboard/store/payments/checkout/edit}" th:object="${form}" method="post">
+                    <input type="hidden" th:field="*{store.storeId}"/>
+                    <div class="field">
+                        <label class="label" th:text="#{store.payments.successUrl}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.checkoutSettings.successUrl}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.payments.cancelUrl}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.checkoutSettings.cancelUrl}" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.payments.numberOfAcceptedPricelist}"></label>
+                        <div class="control">
+                            <input class="input" type="number" th:field="*{store.checkoutSettings.numberOfAcceptedPricelists}" />
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{store.payments.currency}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{store.checkoutSettings.currency}" />
+                        </div>
+                    </div>
+                    <fieldset class="box">
+                        <legend class="label" th:text="#{store.delivery.options}"></legend>
+                        <table class="table is-fullwidth is-striped">
+                            <thead>
+                            <tr>
+                                <th th:text="#{store.delivery.option.name}"></th>
+                                <th th:text="#{store.delivery.option.description}"></th>
+                                <th th:text="#{store.delivery.option.price}"></th>
+                                <th th:text="#{store.delivery.option.shipmentType}"></th>
+                            </tr>
+                            </thead>
+                            <tbody th:each="option, iterStat : ${form.store.checkoutSettings.deliveryOptions}">
+                            <tr>
+                                <td>
+                                    <input type="hidden" th:field="*{store.checkoutSettings.deliveryOptions[__${iterStat.index}__].id}" />
+                                    <input class="input" type="text" th:field="*{store.checkoutSettings.deliveryOptions[__${iterStat.index}__].name}" th:placeholder="#{store.delivery.option.name}" />
+                                </td>
+                                <td>
+                                    <input class="input" type="text" th:field="*{store.checkoutSettings.deliveryOptions[__${iterStat.index}__].description}" th:placeholder="#{store.delivery.option.description}" />
+                                </td>
+                                <td>
+                                    <input class="input" type="number" step="0.01" th:field="*{store.checkoutSettings.deliveryOptions[__${iterStat.index}__].price}" th:placeholder="#{store.delivery.option.price}" />
+                                </td>
+                                <td>
+                                    <div class="select">
+                                        <select th:field="*{store.checkoutSettings.deliveryOptions[__${iterStat.index}__].type}">
+                                            <option th:each="st : ${shipmentTypes}" th:value="${st}" th:text="${st.localizedName}"></option>
+                                        </select>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </fieldset>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.payments.provider}, ${form.providerConfiguration}, 'payments', ${form.store.storeId})}"></div>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

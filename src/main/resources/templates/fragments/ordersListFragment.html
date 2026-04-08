@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div class="box" th:fragment="box(title, orders)">
+        <h3 th:text="${title}"></h3>
+
+        <table class="table is-fullwidth is-striped is-hoverable">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Email</th>
+                    <th>Data wysyłki</th>
+                    <th>Status zamówienia</th>
+                    <th>Typ dokumentu płatniczego</th>
+                    <th>Status dokumentu płatniczego</th>
+                    <th>Status opinii</th>
+                    <th>Pozostało do zapłaty</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="order : ${orders}">
+                    <td>
+                        <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.orderId}"></a>
+                    </td>
+                    <td th:text="${order.billingDetails?.email}"></td>
+                    <td th:text="${order.estimatedShippingAt}"></td>
+                    <td th:text="${order.status.localizedName}"></td>
+                    <td th:text="${order.receiptType.localizedName}"></td>
+                    <td>
+                        <span th:if="${order.invoiced}" th:text="#{document.status.issued}"></span>
+                        <span th:unless="${order.invoiced}" th:text="#{document.status.toBeIssued}"></span>
+                    </td>
+                    <td th:text="${order.review?.status?.localizedName ?: '-'}"></td>
+                    <td th:text="${order.unpaidAmount}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
