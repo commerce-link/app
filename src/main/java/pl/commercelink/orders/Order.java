@@ -167,6 +167,11 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean isB2B() {
+        return billingDetails != null && billingDetails.hasTaxId();
+    }
+
+    @DynamoDBIgnore
     public Optional<DocumentType> getNextInvoiceToIssue() {
         return getNextDocumentToIssue().filter(DocumentType::isB2BInvoice);
     }
@@ -183,7 +188,7 @@ public class Order {
             return Optional.of(DocumentType.InvoiceFinal);
         }
 
-        DocumentType type = billingDetails.hasTaxId()
+        DocumentType type = isB2B()
                 ? DocumentType.InvoiceVat
                 : DocumentType.Receipt;
 
@@ -197,7 +202,7 @@ public class Order {
             return op.get().getType();
         }
 
-        return getNextDocumentToIssue().orElseGet(() -> billingDetails.hasTaxId() ? DocumentType.InvoiceVat : DocumentType.Receipt);
+        return getNextDocumentToIssue().orElseGet(() -> isB2B() ? DocumentType.InvoiceVat : DocumentType.Receipt);
     }
 
     @DynamoDBIgnore

@@ -187,14 +187,12 @@ class OrderNotificationsService {
             return false;
         }
 
-        boolean isB2C = order.getBillingDetails() == null || !order.getBillingDetails().hasTaxId();
-
         OrderShippingEmailNotification msg = new OrderShippingEmailNotification(
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
-                isB2C,
-                !isB2C
+                !order.isB2B(),
+                order.isB2B()
         );
 
         for (Shipment shipment : shipments) {

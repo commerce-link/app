@@ -284,7 +284,9 @@ public class OrdersController extends BaseController {
 
         Store store = storesRepository.findById(order.getStoreId());
 
-        List<DocumentType> manualDocumentTypes = Arrays.asList(DocumentType.Receipt, DocumentType.InvoicePersonal);
+        List<DocumentType> manualDocumentTypes = order.isB2B()
+                ? Arrays.asList(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal)
+                : Arrays.asList(DocumentType.Receipt, DocumentType.InvoicePersonal);
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
