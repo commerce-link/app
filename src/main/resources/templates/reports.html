@@ -35,9 +35,25 @@
                 </div>
 
                 <div class="column is-half">
-                    <h3 th:text="#{report.number.of.orders}"></h3>
+                    <h3 th:text="#{reports.number.of.orders.own}"></h3>
                     <div class="box is-flex is-flex-direction-column is-justify-content-center">
                         <canvas id="numberOfOrdersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns is-multiline mb-5">
+                <div class="column is-half">
+                    <h3 th:text="#{reports.sales.volume.marketplace}"></h3>
+                    <div class="box is-flex is-flex-direction-column is-justify-content-center">
+                        <canvas id="salesVolumeMarketplaceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="column is-half">
+                    <h3 th:text="#{reports.number.of.orders.marketplace}"></h3>
+                    <div class="box is-flex is-flex-direction-column is-justify-content-center">
+                        <canvas id="numberOfOrdersMarketplaceChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -71,118 +87,107 @@
     </section>
 
     <script th:inline="javascript">
-        const totalNumberOfOrders = [[${report.totalNumberOfOrders}]];
-        const totalPrice = [[${report.totalPrice}]];
-        const totalCost = [[${report.totalCost}]];
-        const totalProfit = [[${report.totalProfit}]];
-
+        const reportOwn = {
+            totalNumberOfOrders: [[${reportOwn.totalNumberOfOrders}]],
+            totalPrice: [[${reportOwn.totalPrice}]],
+            totalCost: [[${reportOwn.totalCost}]],
+            totalProfit: [[${reportOwn.totalProfit}]],
+            totalDeliveries: [[${reportOwn.totalDeliveries}]],
+            totalShippingCost: [[${reportOwn.totalShippingCost}]],
+            totalPaymentCost: [[${reportOwn.totalPaymentCost}]]
+        };
+        const reportMarketplace = {
+            totalNumberOfOrders: [[${reportMarketplace.totalNumberOfOrders}]],
+            totalPrice: [[${reportMarketplace.totalPrice}]],
+            totalCost: [[${reportMarketplace.totalCost}]],
+            totalProfit: [[${reportMarketplace.totalProfit}]]
+        };
         const providerLabels = [[${providerNames}]];
         const providerSales = [[${providerSales}]];
 
-        const totalDeliveries = [[${report.totalDeliveries}]];
-        const totalShippingCost = [[${report.totalShippingCost}]];
-        const totalPaymentCost = [[${report.totalPaymentCost}]];
+        const t = {
+            numberOfOrders: [[#{report.number.of.orders}]],
+            totalNumberOfOrders: [[#{reports.total.number.of.orders}]],
+            amount: [[#{'reports.amount'}]],
+            totalPrice: [[#{'reports.total.price'}]],
+            totalCost: [[#{'reports.total.cost'}]],
+            totalProfit: [[#{'reports.total.profit'}]],
+            totalShippingCost: [[#{'reports.total.shipping.cost'}]],
+            totalPaymentCost: [[#{'reports.total.payment.cost'}]],
+            totalDeliveries: [[#{'reports.total.deliveries'}]]
+        };
 
-        new Chart(document.getElementById('numberOfOrdersChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: [ [[#{reports.total.number.of.orders}]] ],  // fixed quoting
-                datasets: [{
-                    label: [[#{report.number.of.orders}]],
-                    data: [totalNumberOfOrders],
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    barThickness: 150
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
+        const COLORS = {
+            teal: '75, 192, 192',
+            blue: '54, 162, 235',
+            yellow: '255, 206, 86',
+            purple: '153, 102, 255',
+            orange: '255, 159, 64'
+        };
+        const salesVolumeColors = [COLORS.blue, COLORS.yellow, COLORS.teal];
+
+        function createBarChart(canvasId, { labels, datasetLabel, data, color, barThickness }) {
+            const rgba = (c, a) => Array.isArray(c) ? c.map(x => `rgba(${x}, ${a})`) : `rgba(${c}, ${a})`;
+            const dataset = {
+                label: datasetLabel,
+                data,
+                backgroundColor: rgba(color, 0.6),
+                borderColor: rgba(color, 1),
+                borderWidth: 1
+            };
+            if (barThickness) dataset.barThickness = barThickness;
+            new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [dataset] },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        const salesVolumeLabels = [t.totalPrice, t.totalCost, t.totalProfit];
+        const orderCountLabels = [t.totalNumberOfOrders];
+
+        createBarChart('numberOfOrdersChart', {
+            labels: orderCountLabels,
+            datasetLabel: t.numberOfOrders,
+            data: [reportOwn.totalNumberOfOrders],
+            color: COLORS.teal,
+            barThickness: 150
         });
 
-        new Chart(document.getElementById('numberOfOrdersByProviderChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: providerLabels,
-                datasets: [{
-                    label: [[#{report.number.of.orders}]],
-                    data: providerSales,
-                    backgroundColor: 'rgba(153, 102, 255, 0.6)',
-                    borderColor: 'rgba(153, 102, 255, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
+        createBarChart('numberOfOrdersMarketplaceChart', {
+            labels: orderCountLabels,
+            datasetLabel: t.numberOfOrders,
+            data: [reportMarketplace.totalNumberOfOrders],
+            color: COLORS.teal,
+            barThickness: 150
         });
 
-        new Chart(document.getElementById('salesVolumeChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: [
-                    [[#{'reports.total.price'}]],
-                    [[#{'reports.total.cost'}]],
-                    [[#{'reports.total.profit'}]]
-                ],
-                datasets: [{
-                    label: [[#{'reports.amount'}]],
-                    data: [totalPrice, totalCost, totalProfit],
-                    backgroundColor: [
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(255, 206, 86, 0.6)',
-                        'rgba(75, 192, 192, 0.6)'
-                    ],
-                    borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
+        createBarChart('salesVolumeChart', {
+            labels: salesVolumeLabels,
+            datasetLabel: t.amount,
+            data: [reportOwn.totalPrice, reportOwn.totalCost, reportOwn.totalProfit],
+            color: salesVolumeColors
         });
 
-        new Chart(document.getElementById('deliveryCostsChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: [
-                    [[#{'reports.total.shipping.cost'}]],
-                    [[#{'reports.total.payment.cost'}]]
-                ],
-                datasets: [{
-                    label: [[#{'reports.total.deliveries'}]] + ': ' + totalDeliveries,
-                    data: [totalShippingCost, totalPaymentCost],
-                    backgroundColor: [
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(153, 102, 255, 0.6)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(153, 102, 255, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
+        createBarChart('salesVolumeMarketplaceChart', {
+            labels: salesVolumeLabels,
+            datasetLabel: t.amount,
+            data: [reportMarketplace.totalPrice, reportMarketplace.totalCost, reportMarketplace.totalProfit],
+            color: salesVolumeColors
+        });
+
+        createBarChart('numberOfOrdersByProviderChart', {
+            labels: providerLabels,
+            datasetLabel: t.numberOfOrders,
+            data: providerSales,
+            color: COLORS.purple
+        });
+
+        createBarChart('deliveryCostsChart', {
+            labels: [t.totalShippingCost, t.totalPaymentCost],
+            datasetLabel: t.totalDeliveries + ': ' + reportOwn.totalDeliveries,
+            data: [reportOwn.totalShippingCost, reportOwn.totalPaymentCost],
+            color: [COLORS.orange, COLORS.purple]
         });
     </script>
 </div>

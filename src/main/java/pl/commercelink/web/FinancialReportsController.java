@@ -40,13 +40,14 @@ public class FinancialReportsController {
             dateTo = dateFrom.withDayOfMonth(dateFrom.lengthOfMonth());
         }
 
-        FinancialReport report = financialReportGenerator.generate(getStoreId(), dateFrom, dateTo);
+        FinancialReports reports = financialReportGenerator.generate(getStoreId(), dateFrom, dateTo);
 
-        Map<String, Integer> salesVolumeByProvider = report.getSalesVolumeByProvider();
+        Map<String, Integer> salesVolumeByProvider = reports.ownSources().getSalesVolumeByProvider();
         List<String> providerNames = new ArrayList<>(salesVolumeByProvider.keySet());
         List<Integer> providerSales = new ArrayList<>(salesVolumeByProvider.values());
 
-        model.addAttribute("report", report);
+        model.addAttribute("reportOwn", reports.ownSources());
+        model.addAttribute("reportMarketplace", reports.marketplace());
         model.addAttribute("providerNames", providerNames);
         model.addAttribute("providerSales", providerSales);
         model.addAttribute("dateFrom", dateFrom);

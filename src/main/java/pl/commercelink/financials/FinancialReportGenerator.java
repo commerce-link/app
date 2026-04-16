@@ -21,7 +21,7 @@ public class FinancialReportGenerator {
     @Autowired
     private DeliveriesRepository deliveriesRepository;
 
-    public FinancialReport generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
+    public FinancialReports generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         List<OrderIndexEntry> pastOrders = ordersRepository.findAllPastOrders(dateFrom, dateTo, storeId);
         List<Entry> entries = pastOrders.stream()
                 .map(o -> {
@@ -30,9 +30,19 @@ public class FinancialReportGenerator {
 
                     return new Entry(order, orderItems);
                 })
-                .collect(Collectors.toList());
+                .toList();
         var deliveries = deliveriesRepository.findAll(storeId, dateFrom.atStartOfDay(), dateTo.atTime(23, 59, 59));
 
+        List<Entry> ownEntries = entries.stream().filter(e -> !e.getOrder().isMarketplaceOrder()).toList();
+        List<Entry> marketplaceEntries = entries.stream().filter(e -> e.getOrder().isMarketplaceOrder()).toList();
+
+        FinancialReport ownReport = buildReport(dateFrom, dateTo, ownEntries, deliveries);
+        FinancialReport marketplaceReport = buildReport(dateFrom, dateTo, marketplaceEntries, deliveries);
+
+        return new FinancialReports(ownReport, marketplaceReport);
+    }
+
+    private FinancialReport buildReport(LocalDate dateFrom, LocalDate dateTo, List<Entry> entries, List<Delivery> deliveries) {
         int totalNumberOfOrders = entries.size();
         double totalPrice = calculateTotalPriceNet(entries);
         double totalCost = calculateTotalCostNet(entries);
