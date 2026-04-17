@@ -82,6 +82,10 @@
                 <a class="button is-link"
                    th:href="@{'/dashboard/reports/googleOfflineConversionsExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
                    th:text="#{reports.orders.google.offline.conversions}"></a>
+
+                <a class="button is-link"
+                   th:href="@{'/dashboard/reports/stockLedgerExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
+                   th:text="#{reports.stock.ledger.export}"></a>
             </div>
         </div>
     </section>

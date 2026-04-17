@@ -28,6 +28,9 @@ public class FinancialReportsController {
     private GoogleOfflineConversionsExport googleOfflineConversionsExport;
 
     @Autowired
+    private StockLedgerExport stockLedgerExport;
+
+    @Autowired
     private FinancialReportGenerator financialReportGenerator;
 
     @GetMapping("/dashboard/reports")
@@ -72,6 +75,16 @@ public class FinancialReportsController {
         response.setContentType("text/csv");
         response.setHeader("Content-Disposition", "attachment; filename=\"google-offline-conversions.csv\"");
         response.getWriter().write(csv);
+    }
+
+    @GetMapping("/dashboard/reports/stockLedgerExport")
+    public void stockLedgerExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
+        byte[] csv = stockLedgerExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"stock-ledger-" + dateFrom + "_" + dateTo + ".csv\"");
+        response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+        response.getOutputStream().write(csv);
     }
 
     private String getStoreId() {

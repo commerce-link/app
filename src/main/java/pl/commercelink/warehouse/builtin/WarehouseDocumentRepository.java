@@ -70,6 +70,35 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
         return queryWithPagination(queryExpression, page, pageSize, WarehouseDocument.class);
     }
 
+    List<WarehouseDocument> findAllBeforeDate(String storeId, LocalDateTime dateTo) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":dateTo", new AttributeValue().withS(dateTo.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+
+        DynamoDBQueryExpression<WarehouseDocument> queryExpression = new DynamoDBQueryExpression<WarehouseDocument>()
+                .withIndexName("CreatedAtIndex")
+                .withConsistentRead(false)
+                .withKeyConditionExpression("storeId = :storeId AND createdAt < :dateTo")
+                .withExpressionAttributeValues(eav);
+
+        return new ArrayList<>(dynamoDBMapper.query(WarehouseDocument.class, queryExpression));
+    }
+
+    List<WarehouseDocument> findAllInDateRange(String storeId, LocalDateTime dateFrom, LocalDateTime dateTo) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":dateFrom", new AttributeValue().withS(dateFrom.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+        eav.put(":dateTo", new AttributeValue().withS(dateTo.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+
+        DynamoDBQueryExpression<WarehouseDocument> queryExpression = new DynamoDBQueryExpression<WarehouseDocument>()
+                .withIndexName("CreatedAtIndex")
+                .withConsistentRead(false)
+                .withKeyConditionExpression("storeId = :storeId AND createdAt BETWEEN :dateFrom AND :dateTo")
+                .withExpressionAttributeValues(eav);
+
+        return new ArrayList<>(dynamoDBMapper.query(WarehouseDocument.class, queryExpression));
+    }
+
     List<WarehouseDocument> findByDeliveryId(String storeId, String deliveryId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
