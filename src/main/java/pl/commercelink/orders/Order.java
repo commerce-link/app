@@ -125,7 +125,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isSettled() {
-        return isDelivered() && isFullyPaid() && isInvoiced();
+        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration();
     }
 
     @DynamoDBIgnore
