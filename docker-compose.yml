@@ -1,0 +1,38 @@
+# docker-compose.yml - Local development infrastructure for CommerceLink
+#
+# Usage: docker compose up -d
+# Verify: curl http://localhost:4566/_localstack/health
+#         aws dynamodb list-tables --endpoint-url http://localhost:8000
+
+services:
+  commercelink-localstack:
+    image: localstack/localstack:4.14.0
+    ports:
+      - "4566:4566"
+    environment:
+      # Explicitly list services to prevent DynamoDB from starting in LocalStack
+      # DynamoDB runs in its own container below for free persistence
+      - SERVICES=s3,sqs,ses,secretsmanager,ssm,scheduler,events
+      - AWS_DEFAULT_REGION=eu-central-1
+    volumes:
+      # Bootstrap script runs automatically when LocalStack is ready
+      - ./localstack-init:/etc/localstack/init/ready.d
+      # Named volume for persisted state
+      - commercelink-localstack-data:/var/lib/localstack
+
+  commercelink-dynamodb:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /data"
+    volumes:
+      - ./.dynamodb-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/8000) 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  commercelink-localstack-data:
