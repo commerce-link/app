@@ -58,16 +58,31 @@ docker run -d -p 4566:4566 --name localstack localstack/localstack
 
 ## Additional Configuration
 
+## Maven Profiles
+
+| Profile | Activation | Description |
+|---------|-----------|-------------|
+| `full` | Default (`activeByDefault`) | All dependencies including supplier adapters |
+| `dev` | `-Pdev` | Core only, no private adapters — for local development |
+
 ## Running the Application
 
 1. **Build the Project:**
    ```sh
    mvn clean install
    ```
+   Or for local dev without adapters:
+   ```sh
+   mvn clean install -Pdev
+   ```
 
 2. **Run the Application:**
    ```sh
    mvn spring-boot:run
+   ```
+   Or with dev profile:
+   ```sh
+   mvn spring-boot:run -Pdev
    ```
 
 3. **Access the Application:**

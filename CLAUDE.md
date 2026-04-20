@@ -10,10 +10,17 @@ The project is being modularized: integrations are extracted into separate libra
 
 ```bash
 mvn clean compile            # Build
+mvn clean compile -Pdev      # Build (core only, no adapters)
 mvn spring-boot:run          # Run
+mvn spring-boot:run -Pdev    # Run (core only, no adapters)
 mvn test -Dtest=ClassName    # Run specific test class
 mvn test -Dtest=ClassName#methodName  # Run specific test method
 ```
+
+### Maven Profiles
+
+- **`full`** (default) — includes all dependencies including private supplier adapters
+- **`dev`** (`-Pdev`) — core dependencies only, no private adapters. Use for local development when adapter repos aren't built locally.
 
 ### Local Infrastructure
 
