@@ -108,7 +108,7 @@
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
-            <artifactId>marketplace-empik</artifactId>
+            <artifactId>marketplace-ceneo</artifactId>
             <version>0.1.0</version>
         </dependency>
         <dependency>
