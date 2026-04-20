@@ -41,4 +41,8 @@ src/main/resources/application-prod.properties
 
 update.env
 
+### Developers temp directory
 /temp/
+
+### Local dynamodb data
+/.dynamodb-data/

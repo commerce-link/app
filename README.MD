@@ -7,54 +7,39 @@
 - Maven
 - Docker
 - AWS CLI
-- DynamoDb (Local)
 
-## Installing Local DynamoDB
+## AWS CLI Configuration
 
-1. **Download DynamoDB Local from official AWS :**
-   Download the DynamoDB Local .jar file from the [official AWS website](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html).
-
-2. **Run DynamoDB Local:**
-   ```sh
-   java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar -sharedDb
-   ```
-
-3. **Run Schema Migration:**
-   Open the `DynamoDbSchema.java` file in your favorite IDE and run its `main` method. This will set up the necessary tables.
-
-4. **Verify Installation:**
-   Open a new terminal and run:
-   ```sh
-   aws dynamodb list-tables --endpoint-url http://localhost:8000
-   ```
-
-Ensure these directories exist before running the application.
-
-## Local AWS Infrastructure Setup with LocalStack
-1. **Start LocalStack:**
-```shell
-docker run -d -p 4566:4566 --name localstack localstack/localstack
+Configure AWS CLI for local services:
+```sh
+aws configure set aws_access_key_id test
+aws configure set aws_secret_access_key test
+aws configure set default.region eu-central-1
 ```
-2. **Configure AWS CLI to Use LocalStack:**
-   ```sh
-   aws configure set aws_access_key_id test
-   aws configure set aws_secret_access_key test
-   aws configure set default.region eu-central-1
-   ```
-3. Create S3 buckets locally using AWS CLI
-   ```sh
-   aws --endpoint-url=http://localhost:4566 s3 mb s3://feeds
-   aws --endpoint-url=http://localhost:4566 s3 mb s3://pim
-   aws --endpoint-url=http://localhost:4566 s3 mb s3://pricelists
-   aws --endpoint-url=http://localhost:4566 s3 mb s3://stores
-   aws --endpoint-url=http://localhost:4566 s3 mb s3://datalake
-   ```
-4. Upload Local Feed Data to S3 
-   Upload feed files from local directories to LocalStack S3:
-    ```sh
-   aws --endpoint-url=http://localhost:4566 s3 sync ../product-catalogue/feeds/ s3://commercelink-feeds/
-   ```
-5. Local SQS queues being automatically created by the application when it starts, so no manual setup is needed for SQS.
+
+## Local Infrastructure
+
+All local services (DynamoDB, S3, SQS, etc.) run via Docker Compose:
+
+```sh
+docker compose up
+```
+
+DynamoDB data is persisted in `.dynamodb-data/` within the repo directory.
+
+**To reset the database** (useful when troubleshooting schema migrations):
+1. Stop the container: `docker compose down`
+2. Delete `.dynamodb-data/shared-local-instance.db`
+3. Start again: `docker compose up`
+
+**After first start, run schema migration:**
+Open `DynamoDbSchema.java` in your IDE and run its `main` method to create tables.
+
+**Verify:**
+```sh
+aws dynamodb list-tables --endpoint-url http://localhost:8000
+curl http://localhost:4566/_localstack/health
+```
 
 ## Additional Configuration
 
