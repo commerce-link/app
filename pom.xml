@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.04.13</version>
+    <version>2026.04.14</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -105,6 +105,11 @@
             <groupId>pl.commercelink</groupId>
             <artifactId>marketplace-empik</artifactId>
             <version>0.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
+            <artifactId>marketplace-empik</artifactId>
+            <version>0.1.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
