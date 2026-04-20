@@ -33,9 +33,12 @@ nul
 tmpclaude-*
 
 .claude/settings.local.json
+/.serena/
 
 ### Should never go into repository ###
 src/main/resources/application-local.properties
 src/main/resources/application-prod.properties
 
 update.env
+
+/temp/
