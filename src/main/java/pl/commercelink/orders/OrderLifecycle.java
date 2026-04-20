@@ -109,19 +109,8 @@ public class OrderLifecycle {
             }
         }
 
-        if (order.isInReviewForMoreThan(3)) {
-            OrderReview review = order.getReview();
-
-            if (order.isSettled()) {
-                review.setStatus(OrderReviewStatus.NoResponse);
-                order.setStatus(OrderStatus.Completed);
-            }
-        }
-
-        if (order.getReview().hasOneOfStatuses(OrderReviewStatus.NotApplicable, OrderReviewStatus.NoResponse, OrderReviewStatus.Positive, OrderReviewStatus.Negative)) {
-            if (order.isSettled()) {
-                order.setStatus(OrderStatus.Completed);
-            }
+        if (order.isSettled()) {
+            order.setStatus(OrderStatus.Completed);
         }
 
         // Save the updated order back to the database

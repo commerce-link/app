@@ -125,7 +125,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isSettled() {
-        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration();
+        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration() && !isAwaitingReview();
     }
 
     @DynamoDBIgnore
@@ -136,11 +136,8 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isInReviewForMoreThan(int days) {
-        return review != null &&
-                review.getStatus() == OrderReviewStatus.InProgress &&
-                review.getRequestedAt() != null &&
-                review.getRequestedAt().isBefore(LocalDate.now().minusDays(days));
+    public boolean isAwaitingReview() {
+        return review != null && review.getStatus() == OrderReviewStatus.ToBeCollected;
     }
 
     @DynamoDBIgnore
