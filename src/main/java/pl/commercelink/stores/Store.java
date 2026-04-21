@@ -45,15 +45,15 @@ public class Store {
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private List<ShippingDetails> shippingDetails = new LinkedList<>();
-    @DynamoDBAttribute(attributeName = "checkoutSettings")
+    @DynamoDBAttribute(attributeName = "checkout")
     private CheckoutSettings checkoutSettings;
-    @DynamoDBAttribute(attributeName = "rmaSettings")
+    @DynamoDBAttribute(attributeName = "rma")
     private RMASettings rmaSettings;
     @DynamoDBAttribute(attributeName = "warehouse")
     private WarehouseConfiguration warehouseConfiguration;
-    @DynamoDBAttribute(attributeName = "reportingConfiguration")
+    @DynamoDBAttribute(attributeName = "reporting")
     private ReportingConfiguration reportingConfiguration;
-    @DynamoDBAttribute(attributeName = "shippingConfiguration")
+    @DynamoDBAttribute(attributeName = "shipping")
     private ShippingConfiguration shippingConfiguration;
 
     public Store() {
