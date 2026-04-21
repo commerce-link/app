@@ -29,7 +29,7 @@ public class Product {
     // indexed attributes
     @DynamoDBAttribute(attributeName = "ean")
     private String ean;
-    @DynamoDBAttribute(attributeName = "manufacturerCode")
+    @DynamoDBAttribute(attributeName = "mfn")
     private String manufacturerCode;
     @DynamoDBAttribute(attributeName = "brand")
     private String brand;

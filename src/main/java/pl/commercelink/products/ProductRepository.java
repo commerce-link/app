@@ -185,7 +185,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
             eav.put(key, new AttributeValue().withS(mfnCodes.get(i)));
         }
         if (!mfnPlaceholders.isEmpty()) {
-            conditions.add("manufacturerCode IN (" + String.join(", ", mfnPlaceholders) + ")");
+            conditions.add("mfn IN (" + String.join(", ", mfnPlaceholders) + ")");
         }
 
         if (conditions.isEmpty()) {
@@ -238,7 +238,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
         if (StringUtils.isNotBlank(mfn)) {
             if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("manufacturerCode = :mfn");
+            filterExpression.append("mfn = :mfn");
             eav.put(":mfn", new AttributeValue().withS(mfn));
         }
 
