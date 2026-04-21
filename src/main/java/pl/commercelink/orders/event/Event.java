@@ -13,7 +13,7 @@ public class Event {
     private EventType type;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
-    @DynamoDBAttribute(attributeName = "date")
+    @DynamoDBAttribute(attributeName = "createdAt")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
