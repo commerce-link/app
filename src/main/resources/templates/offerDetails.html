@@ -112,16 +112,16 @@
                             <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].name}" />
                         </td>
                         <td style="min-width: 180px;">
-                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].manufacturerCode}" />
+                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].mfn}" />
                         </td>
                         <td style="min-width: 140px;">
                             <input class="input" type="number" th:field="*{basketItems[__${offerItem.sequenceNumber}__].qty}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
                         <td style="min-width: 140px;">
-                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].price}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitPrice}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
                         <td style="min-width: 140px;">
-                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].cost}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitCost}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
                         <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.costRangeDistribution}"></td>
                         <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.qtyDistribution}"></td>

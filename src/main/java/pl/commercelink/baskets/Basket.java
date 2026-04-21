@@ -114,8 +114,8 @@ public class Basket {
     public void setBasketItems(List<BasketItem> basketItems) {
         this.basketItems = basketItems.stream()
                 .peek(i -> {
-                    var unifiedMfn = UnifiedProductIdentifiers.unifyMfn(i.getManufacturerCode());
-                    i.setManufacturerCode(unifiedMfn);
+                    var unifiedMfn = UnifiedProductIdentifiers.unifyMfn(i.getMfn());
+                    i.setMfn(unifiedMfn);
                 }).collect(Collectors.toList());
     }
 

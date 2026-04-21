@@ -21,17 +21,17 @@ public class BasketItem {
     private  String id;
     @DynamoDBAttribute(attributeName = "name")
     private  String name;
-    @DynamoDBAttribute(attributeName = "manufacturerCode")
-    private  String manufacturerCode;
+    @DynamoDBAttribute(attributeName = "mfn")
+    private String mfn;
     @DynamoDBAttribute(attributeName = "category")
     @DynamoDBTypeConvertedEnum
     private  ProductCategory category;
     @DynamoDBAttribute(attributeName = "qty")
-    private  long qty;// --
-    @DynamoDBAttribute(attributeName = "price")
-    private double price;
-    @DynamoDBAttribute(attributeName = "cost")
-    private double cost;
+    private  long qty;
+    @DynamoDBAttribute(attributeName = "unitPrice")
+    private double unitPrice;
+    @DynamoDBAttribute(attributeName = "unitCost")
+    private double unitCost;
     @DynamoDBAttribute(attributeName = "catalogId")
     private  String catalogId;
     @DynamoDBAttribute(attributeName = "estimatedDeliveryDays")
@@ -42,16 +42,16 @@ public class BasketItem {
     public BasketItem() {
     }
 
-    public BasketItem(String id, String name, String manufacturerCode,
-                      ProductCategory category, double price, double cost, long qty,
+    public BasketItem(String id, String name, String mfn,
+                      ProductCategory category, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
-        this.manufacturerCode = manufacturerCode;
+        this.mfn = mfn;
         this.category = category;
         this.qty = qty;
-        this.price = price;
-        this.cost = cost;
+        this.unitPrice = unitPrice;
+        this.unitCost = unitCost;
         this.catalogId = catalogId;
         this.estimatedDeliveryDays = estimatedDeliveryDays;
         this.consolidated = consolidated;
@@ -59,7 +59,7 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return isNotBlank(name) && isNotBlank(manufacturerCode) && category != null && qty > 0 && price >= 0;
+        return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
     }
 
     @DynamoDBIgnore
@@ -84,16 +84,24 @@ public class BasketItem {
         return category;
     }
 
-    public double getPrice() {
-        return price;
+    public double getUnitPrice() {
+        return unitPrice;
+    }
+
+    public void setUnitPrice(double unitPrice) {
+        this.unitPrice = unitPrice;
     }
 
     public long getQty() {
         return qty;
     }
 
-    public String getManufacturerCode() {
-        return this.manufacturerCode;
+    public String getMfn() {
+        return mfn;
+    }
+
+    public void setMfn(String mfn) {
+        this.mfn = mfn;
     }
 
     public String getCatalogId() {
@@ -108,10 +116,6 @@ public class BasketItem {
         this.name = name;
     }
 
-    public void setManufacturerCode(String manufacturerCode) {
-        this.manufacturerCode = manufacturerCode;
-    }
-
     public void setCategory(ProductCategory category) {
         this.category = category;
     }
@@ -120,20 +124,16 @@ public class BasketItem {
         this.qty = qty;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
-    }
-
     public void setCatalogId(String catalogId) {
         this.catalogId = catalogId;
     }
 
-    public double getCost() {
-        return cost;
+    public double getUnitCost() {
+        return unitCost;
     }
 
-    public void setCost(double cost) {
-        this.cost = cost;
+    public void setUnitCost(double unitCost) {
+        this.unitCost = unitCost;
     }
 
     public int getEstimatedDeliveryDays() {
@@ -159,7 +159,7 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public boolean isShippingItem() {
-        return SHIPPING_MFN_CODE.equals(this.manufacturerCode);
+        return SHIPPING_MFN_CODE.equals(mfn);
     }
 
     public static BasketItem shipping(String name, double shippingPrice) {
@@ -231,12 +231,12 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public double getTotalPrice() {
-        return price * qty;
+        return unitPrice * qty;
     }
 
     @DynamoDBIgnore
     public double getTotalCost() {
-        return cost * qty;
+        return unitCost * qty;
     }
 
 }

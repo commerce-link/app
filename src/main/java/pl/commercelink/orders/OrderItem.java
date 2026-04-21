@@ -235,8 +235,8 @@ public class OrderItem extends Item {
                 basketItem.getCategory(),
                 basketItem.getName(),
                 (int) basketItem.getQty(),
-                basketItem.getPrice(),
-                basketItem.getManufacturerCode(),
+                basketItem.getUnitPrice(),
+                basketItem.getMfn(),
                 basketItem.isConsolidated()
         );
     }

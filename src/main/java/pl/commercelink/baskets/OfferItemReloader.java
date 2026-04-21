@@ -110,28 +110,28 @@ public class OfferItemReloader {
                     if (op.isPresent()) {
                         AvailabilityAndPrice availability = op.get();
 
-                        i.setManufacturerCode(availability.getManufacturerCode());
-                        i.setPrice((double) availability.getPrice());
+                        i.setMfn(availability.getManufacturerCode());
+                        i.setUnitPrice((double) availability.getPrice());
                     }
                 });
     }
 
     private void updateCosts(InventoryView inventory, List<BasketItem> basketItems) {
         basketItems.stream()
-                .filter(i -> isNotBlank(i.getManufacturerCode()))
-                .filter(i -> i.getCost() == 0)
+                .filter(i -> isNotBlank(i.getMfn()))
+                .filter(i -> i.getUnitCost() == 0)
                 .forEach(basketItem -> {
                     MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
                     if (matchedInventory.hasAnyOffers()) {
                         basketItem.setEstimatedDeliveryDays(matchedInventory.getEstimatedDeliveryDays());
-                        basketItem.setCost(matchedInventory.getMedianPrice().grossValue());
+                        basketItem.setUnitCost(matchedInventory.getMedianPrice().grossValue());
                     }
                 });
     }
 
     private void updateEstimatedDeliveryDates(InventoryView inventory, List<BasketItem> basketItems) {
         basketItems.stream()
-                .filter(i -> isNotBlank(i.getManufacturerCode()))
+                .filter(i -> isNotBlank(i.getMfn()))
                 .forEach(basketItem -> {
                     MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
                     if (matchedInventory.hasAnyOffers()) {

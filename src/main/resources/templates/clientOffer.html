@@ -82,7 +82,7 @@
                                     <td th:text="${pcl.singular(item.category)}"></td>
                                     <td th:text="${item.name}"></td>
                                     <td th:text="${item.qty}"></td>
-                                    <td th:text="${item.price}" th:if="${offer.showPrices}"></td>
+                                    <td th:text="${item.unitPrice}" th:if="${offer.showPrices}"></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -97,9 +97,9 @@
                                 <div class="mb-2">
                                     <strong th:text="${item.qty} + ' x ' + ${item.name}"></strong>
                                     <div class="is-size-7" th:text="#{catalog.category} + ': ' + ${pcl.singular(item.category)}"></div>
-                                    <div class="is-size-7" th:text="#{offers.per.unit} + ': ' + ${#numbers.formatDecimal(item.price, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
+                                    <div class="is-size-7" th:text="#{offers.per.unit} + ': ' + ${#numbers.formatDecimal(item.unitPrice, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
                                 </div>
-                                <div class="has-text-weight-bold" th:text="${#numbers.formatDecimal(item.price * item.qty, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
+                                <div class="has-text-weight-bold" th:text="${#numbers.formatDecimal(item.unitPrice * item.qty, 1, 'COMMA', 2, 'POINT')} + ' PLN'"></div>
                                 <hr class="my-2" />
                             </div>
                             <div th:if="${!offer.showPrices}">

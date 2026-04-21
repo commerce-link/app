@@ -21,9 +21,9 @@
                 <tr th:each="item : ${basketItems}">
                     <td th:text="${item.category}"></td>
                     <td th:text="${item.name}"></td>
-                    <td th:text="${item.manufacturerCode}"></td>
+                    <td th:text="${item.mfn}"></td>
                     <td th:text="${item.qty}"></td>
-                    <td th:text="${item.price}"></td>
+                    <td th:text="${item.unitPrice}"></td>
                 </tr>
                 </tbody>
             </table>

@@ -111,8 +111,8 @@ public class Checkout {
             lineItems.add(consolidateLineItem(invoicingConfiguration.getPositionsConsolidationPrefix(), consolidatedItems));
         }
         nonConsolidatedItems.stream()
-                .sorted(Comparator.comparing(BasketItem::getPrice).reversed())
-                .map(item -> new PaymentLineItem(item.getName(), null, (int) (item.getPrice() * 100), (int) item.getQty()))
+                .sorted(Comparator.comparing(BasketItem::getUnitPrice).reversed())
+                .map(item -> new PaymentLineItem(item.getName(), null, (int) (item.getUnitPrice() * 100), (int) item.getQty()))
                 .forEach(lineItems::add);
 
         return lineItems;
