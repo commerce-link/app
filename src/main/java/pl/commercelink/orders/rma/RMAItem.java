@@ -46,9 +46,9 @@ public class RMAItem implements Delivered {
     private String ean;
     @DynamoDBAttribute(attributeName = "mfn")
     private String mfn;
-    @DynamoDBAttribute(attributeName = "price")
+    @DynamoDBAttribute(attributeName = "unitPrice")
     private double price;
-    @DynamoDBAttribute(attributeName = "cost")
+    @DynamoDBAttribute(attributeName = "unitCost")
     private double cost;
     @DynamoDBAttribute(attributeName = "tax")
     private double tax = DEFAULT_VAT_RATE;
