@@ -357,7 +357,7 @@ public class DynamoDbSchema {
 
     public static CreateTableRequest warehouseDocumentsSequencesTableSchema() {
         return new CreateTableRequest()
-                .withTableName("WarehouseDocumentsSequences")
+                .withTableName("WarehouseDocumentSequences")
                 .withKeySchema(
                         new KeySchemaElement("storeId", KeyType.HASH),
                         new KeySchemaElement("sequenceKey", KeyType.RANGE)
