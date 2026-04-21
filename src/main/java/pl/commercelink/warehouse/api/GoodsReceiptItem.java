@@ -31,7 +31,7 @@ public class GoodsReceiptItem {
         return new GoodsReceiptItem(
                 rmaItem.getDeliveryId(),
                 rmaItem.getEan(),
-                rmaItem.getManufacturerCode(),
+                rmaItem.getMfn(),
                 rmaItem.getName(),
                 ProductCategory.Other,
                 rmaItem.getQty(),

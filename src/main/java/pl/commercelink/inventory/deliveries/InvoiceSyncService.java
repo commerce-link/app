@@ -149,8 +149,8 @@ public class InvoiceSyncService {
 
     private void updateRMAItems(String deliveryId, Map<String, Double> costsByMfn) {
         for (RMAItem item : rmaItemsRepository.findByDeliveryId(deliveryId)) {
-            if (costsByMfn.containsKey(item.getManufacturerCode())) {
-                item.setCost(costsByMfn.get(item.getManufacturerCode()));
+            if (costsByMfn.containsKey(item.getMfn())) {
+                item.setCost(costsByMfn.get(item.getMfn()));
                 rmaItemsRepository.save(item);
             }
         }

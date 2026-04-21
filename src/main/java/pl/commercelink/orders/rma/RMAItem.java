@@ -44,8 +44,8 @@ public class RMAItem implements Delivered {
     private String deliveryId;
     @DynamoDBAttribute(attributeName = "ean")
     private String ean;
-    @DynamoDBAttribute(attributeName = "manufacturerCode")
-    private String manufacturerCode;
+    @DynamoDBAttribute(attributeName = "mfn")
+    private String mfn;
     @DynamoDBAttribute(attributeName = "price")
     private double price;
     @DynamoDBAttribute(attributeName = "cost")
@@ -76,7 +76,7 @@ public class RMAItem implements Delivered {
         this.name = orderItem.getName();
         this.deliveryId = orderItem.getDeliveryId();
         this.ean = orderItem.getEan();
-        this.manufacturerCode = orderItem.getManufacturerCode();
+        this.mfn = orderItem.getManufacturerCode();
         this.price = orderItem.getPrice();
         this.cost = orderItem.getCost();
         this.tax = orderItem.getTax();
@@ -97,7 +97,7 @@ public class RMAItem implements Delivered {
         this.name = source.getName();
         this.deliveryId = source.deliveryId;
         this.ean = source.getEan();
-        this.manufacturerCode = source.getManufacturerCode();
+        this.mfn = source.getMfn();
         this.price = source.getPrice();
         this.cost = source.getCost();
         this.tax = source.getTax();
@@ -241,12 +241,12 @@ public class RMAItem implements Delivered {
         this.ean = ean;
     }
 
-    public String getManufacturerCode() {
-        return manufacturerCode;
+    public String getMfn() {
+        return mfn;
     }
 
-    public void setManufacturerCode(String manufacturerCode) {
-        this.manufacturerCode = manufacturerCode;
+    public void setMfn(String mfn) {
+        this.mfn = mfn;
     }
 
     public double getPrice() {
