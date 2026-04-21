@@ -126,7 +126,7 @@ public class DynamoDbSchema {
 
     public static CreateTableRequest warehouseTableSchema() {
         return new CreateTableRequest()
-                .withTableName("Warehouse")
+                .withTableName("WarehouseItems")
                 .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), // Partition key
                         new KeySchemaElement("itemId", KeyType.RANGE)) // Sort key
                 .withAttributeDefinitions(

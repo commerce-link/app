@@ -15,7 +15,7 @@ import java.util.UUID;
 
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
-@DynamoDBTable(tableName = "Warehouse")
+@DynamoDBTable(tableName = "WarehouseItems")
 public class WarehouseItem extends Item {
 
     @DynamoDBHashKey(attributeName = "storeId")
