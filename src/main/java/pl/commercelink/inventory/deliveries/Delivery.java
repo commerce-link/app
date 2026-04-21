@@ -60,7 +60,7 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "shipments")
     private List<Shipment> shipments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "events")
-    private List<Event> deliveryEvents = new LinkedList<>();
+    private List<Event> events = new LinkedList<>();
 
     @DynamoDBAttribute(attributeName = "documents")
     private List<Document> documents = new LinkedList<>();
@@ -298,17 +298,17 @@ public class Delivery {
     }
 
     public void addEvent(Event deliveryEvent) {
-        this.deliveryEvents.add(deliveryEvent);
+        this.events.add(deliveryEvent);
     }
 
-    public List<Event> getDeliveryEvents() {
-        return deliveryEvents.stream()
+    public List<Event> getEvents() {
+        return events.stream()
                 .sorted(Comparator.comparing(Event::getCreatedAt))
                 .collect(Collectors.toList());
     }
 
-    public void setDeliveryEvents(List<Event> deliveryEvents) {
-        this.deliveryEvents = deliveryEvents;
+    public void setEvents(List<Event> events) {
+        this.events = events;
     }
 
     public boolean isManaged() {

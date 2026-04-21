@@ -36,7 +36,7 @@ public class RMA {
     @DynamoDBAttribute(attributeName = "emailNotificationsEnabled")
     private boolean emailNotificationsEnabled;
     @DynamoDBAttribute(attributeName = "events")
-    private List<Event> rmaEvents = new LinkedList<>();
+    private List<Event> events = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "createdAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -157,23 +157,23 @@ public class RMA {
         this.emailNotificationsEnabled = emailNotificationsEnabled;
     }
 
-    public List<Event> getRmaEvents() {
-        return rmaEvents.stream()
+    public List<Event> getEvents() {
+        return events.stream()
                 .sorted(Comparator.comparing(Event::getCreatedAt))
                 .collect(Collectors.toList());
     }
 
-    public void setRmaEvents(List<Event> rmaEvents) {
-        this.rmaEvents = rmaEvents;
+    public void setEvents(List<Event> events) {
+        this.events = events;
     }
 
     public void addEvent(Event event) {
-        this.rmaEvents.add(event);
+        this.events.add(event);
     }
 
     @DynamoDBIgnore
     public boolean hasEvent(Event other) {
-        return rmaEvents.stream().anyMatch(e -> e.isSameAs(other));
+        return events.stream().anyMatch(e -> e.isSameAs(other));
     }
 
     public LocalDateTime getCreatedAt() {
