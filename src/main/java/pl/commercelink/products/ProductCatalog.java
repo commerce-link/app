@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@DynamoDBTable(tableName = "Catalog")
+@DynamoDBTable(tableName = "Catalogs")
 public class ProductCatalog implements DeletionProtection {
 
     @DynamoDBHashKey(attributeName = "storeId")

@@ -92,7 +92,7 @@ public class DynamoDbSchema {
 
     public static CreateTableRequest productCatalogTableSchema() {
         return new CreateTableRequest()
-                .withTableName("Catalog")
+                .withTableName("Catalogs")
                 .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), // Partition key
                         new KeySchemaElement("catalogId", KeyType.RANGE)) // Sort key
                 .withAttributeDefinitions(
