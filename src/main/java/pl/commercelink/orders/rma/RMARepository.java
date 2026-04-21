@@ -32,7 +32,8 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
 
     public List<RMA> searchRMAEntries(String storeId, RMAFilter filter, int page, int pageSize) {
         if (isNotBlank(filter.getRmaId())) {
-            return Collections.singletonList(findById(storeId, filter.getRmaId()));
+            RMA rma = findById(storeId, filter.getRmaId());
+            return rma != null ? Collections.singletonList(rma) : Collections.emptyList();
         } else {
             Map<String, AttributeValue> eav = new HashMap<>();
             Map<String, String> expressionAttributeNames = new HashMap<>();
