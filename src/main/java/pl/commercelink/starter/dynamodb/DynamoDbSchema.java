@@ -186,7 +186,7 @@ public class DynamoDbSchema {
 
     public static CreateTableRequest deliveryTableSchema() {
         return new CreateTableRequest()
-                .withTableName("DeliveriesV2")
+                .withTableName("Deliveries")
                 .withKeySchema(
                         new KeySchemaElement("storeId", KeyType.HASH),
                         new KeySchemaElement("deliveryId", KeyType.RANGE)

@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@DynamoDBTable(tableName = "DeliveriesV2")
+@DynamoDBTable(tableName = "Deliveries")
 public class Delivery {
 
     @DynamoDBHashKey(attributeName = "storeId")
