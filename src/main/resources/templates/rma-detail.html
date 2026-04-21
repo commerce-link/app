@@ -226,7 +226,7 @@
                         <td style="min-width: 80px;" th:text="${item.desiredResolution}"></td>
                         <td style="min-width: 80px;" th:text="${item.actualResolution}"></td>
                         <td style="min-width: 120px;" th:text="${item.name}"></td>
-                        <td style="min-width: 80px;" th:text="${item.quantity}"></td>
+                        <td style="min-width: 80px;" th:text="${item.qty}"></td>
                         <td style="min-width: 120px;" th:text="${item.shortenedDeliveryId}"></td>
                         <td style="min-width: 120px;" th:text="${item.ean}"></td>
                         <td style="min-width: 120px;" th:text="${item.manufacturerCode}"></td>
@@ -596,7 +596,7 @@
             }
 
             const selectedRow = selectedItems[0].closest('tr');
-            const qtyInput = selectedRow.querySelector('input[name*=".quantity"]');
+            const qtyInput = selectedRow.querySelector('input[name*=".qty"]');
             const rmaItemIdInput = selectedRow.querySelector('input[name*=".rmaItemId"]');
             const qty = parseInt(qtyInput.value);
             const rmaItemId = rmaItemIdInput.value;

@@ -106,7 +106,7 @@
                                     <div class="field">
                                         <label class="label" th:text="#{rma.quantity}"></label>
                                         <div class="control">
-                                            <input class="input rma-item-quantity" type="number" min="1" th:attr="max=${orderItem.qty}" th:field="*{draftRmaItems[__${i.index}__].quantity}" disabled>
+                                            <input class="input rma-item-quantity" type="number" min="1" th:attr="max=${orderItem.qty}" th:field="*{draftRmaItems[__${i.index}__].qty}" disabled>
                                         </div>
                                     </div>
                                 </div>

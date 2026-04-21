@@ -32,7 +32,7 @@ public class OrdersRMAManager {
             OrderItem originalItem = findOrderItemById(rmaItem.getItemId(), orderItems);
 
             OrderItem itemToProcess;
-            if (originalItem.getQty() > rmaItem.getQuantity()) {
+            if (originalItem.getQty() > rmaItem.getQty()) {
                 itemToProcess = splitOrderItem(rmaItem, originalItem);
                 newOrderItems.add(itemToProcess);
             } else {
@@ -63,7 +63,7 @@ public class OrdersRMAManager {
             OrderItem originalItem = findOrderItemById(rmaItem.getItemId(), orderItems);
 
             OrderItem itemToProcess;
-            if (originalItem.getQty() > rmaItem.getQuantity()) {
+            if (originalItem.getQty() > rmaItem.getQty()) {
                 itemToProcess = splitOrderItem(rmaItem, originalItem);
                 newOrderItems.add(itemToProcess);
             } else {
@@ -81,12 +81,12 @@ public class OrdersRMAManager {
     }
 
     private OrderItem splitOrderItem(RMAItem rmaItem, OrderItem originalItem) {
-        int remainingQty = originalItem.getQty() - rmaItem.getQuantity();
+        int remainingQty = originalItem.getQty() - rmaItem.getQty();
 
         originalItem.setQty(remainingQty);
         originalItem.removeSerialNumbers(rmaItem.getSerialNo());
 
-        OrderItem splitItem = originalItem.copyWithNewQty(rmaItem.getQuantity());
+        OrderItem splitItem = originalItem.copyWithNewQty(rmaItem.getQty());
         splitItem.setSerialNo(rmaItem.getSerialNo());
         return splitItem;
     }
@@ -103,7 +103,7 @@ public class OrdersRMAManager {
                 orderId,
                 orderItem.getCategory(),
                 orderItem.getName(),
-                rmaItem.getQuantity(),
+                rmaItem.getQty(),
                 0,
                 orderItem.getSku(),
                 orderItem.isConsolidated()

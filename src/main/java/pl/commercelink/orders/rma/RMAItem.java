@@ -31,8 +31,8 @@ public class RMAItem implements Delivered {
     private RMAResolutionType actualResolution;
     @DynamoDBAttribute(attributeName = "reason")
     private String reason;
-    @DynamoDBAttribute(attributeName = "quantity")
-    private int quantity = 1;
+    @DynamoDBAttribute(attributeName = "qty")
+    private int qty = 1;
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum
     private RMAItemStatus status = RMAItemStatus.New;
@@ -70,7 +70,7 @@ public class RMAItem implements Delivered {
         this.itemId = source.getItemId();
         this.desiredResolution = source.getDesiredResolution();
         this.reason = source.getReason();
-        this.quantity = source.getQuantity();
+        this.qty = source.getQty();
         this.status = RMAItemStatus.New;
 
         this.name = orderItem.getName();
@@ -91,7 +91,7 @@ public class RMAItem implements Delivered {
         this.desiredResolution = source.getDesiredResolution();
         this.actualResolution = source.getActualResolution();
         this.reason = source.getReason();
-        this.quantity = qty;
+        this.qty = qty;
         this.status = source.getStatus();
 
         this.name = source.getName();
@@ -107,7 +107,7 @@ public class RMAItem implements Delivered {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return isNotBlank(itemId) && desiredResolution != null && quantity > 0;
+        return isNotBlank(itemId) && desiredResolution != null && qty > 0;
     }
 
     public String getRmaId() {
@@ -158,12 +158,12 @@ public class RMAItem implements Delivered {
         this.reason = reason;
     }
 
-    public int getQuantity() {
-        return quantity;
+    public int getQty() {
+        return qty;
     }
 
-    public void setQuantity(int quantity) {
-        this.quantity = quantity;
+    public void setQty(int qty) {
+        this.qty = qty;
     }
 
     public RMAItemStatus getStatus() {
@@ -180,7 +180,7 @@ public class RMAItem implements Delivered {
 
     @DynamoDBIgnore
     public double getTotalPrice() {
-        return this.price * this.quantity;
+        return this.price * this.qty;
     }
 
     @DynamoDBIgnore

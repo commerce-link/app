@@ -34,7 +34,7 @@ public class GoodsReceiptItem {
                 rmaItem.getManufacturerCode(),
                 rmaItem.getName(),
                 ProductCategory.Other,
-                rmaItem.getQuantity(),
+                rmaItem.getQty(),
                 rmaItem.getCost(),
                 rmaItem.getTax(),
                 rmaItem.getSerialNo()

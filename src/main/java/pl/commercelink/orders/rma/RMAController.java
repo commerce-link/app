@@ -276,7 +276,7 @@ public class RMAController {
         RMAItem source = new RMAItem();
         source.setRmaId(rmaId);
         source.setItemId(orderItemId);
-        source.setQuantity(quantity);
+        source.setQty(quantity);
         source.setDesiredResolution(RMAResolutionType.valueOf(desiredResolution));
         source.setReason(reason);
 
@@ -435,14 +435,14 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
-        int originalQty = original.getQuantity();
+        int originalQty = original.getQty();
 
         if (qty1 < 1 || qty2 < 1 || qty1 + qty2 != originalQty) {
             redirectAttributes.addFlashAttribute("errorMessage", "Invalid split quantities.");
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
-        original.setQuantity(qty1);
+        original.setQty(qty1);
         rmaItemsRepository.save(original);
 
         RMAItem item2 = original.copyWithNewQty(qty2);
