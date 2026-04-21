@@ -39,8 +39,8 @@ public class Store {
     private List<Integration> integrations = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "apiKey")
     private String apiKey;
-    @DynamoDBAttribute(attributeName = "fulfillment")
-    private FulfillmentSettings fulfillmentSettings;
+    @DynamoDBAttribute(attributeName = "fulfilment")
+    private FulfilmentSettings fulfilmentSettings;
     @DynamoDBAttribute(attributeName = "billingDetails")
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
@@ -246,12 +246,12 @@ public class Store {
         this.apiKey = apiKey;
     }
 
-    public FulfillmentSettings getFulfillmentSettings() {
-        return fulfillmentSettings;
+    public FulfilmentSettings getFulfilmentSettings() {
+        return fulfilmentSettings;
     }
 
-    public void setFulfillmentSettings(FulfillmentSettings fulfillmentSettings) {
-        this.fulfillmentSettings = fulfillmentSettings;
+    public void setFulfilmentSettings(FulfilmentSettings fulfilmentSettings) {
+        this.fulfilmentSettings = fulfilmentSettings;
     }
 
     public BillingDetails getBillingDetails() {
@@ -329,15 +329,15 @@ public class Store {
 
     @DynamoDBIgnore
     public FulfilmentType getDefaultFulfilmentType() {
-        return Optional.ofNullable(fulfillmentSettings)
-                .map(FulfillmentSettings::getDefaultFulfilmentType)
+        return Optional.ofNullable(fulfilmentSettings)
+                .map(FulfilmentSettings::getDefaultFulfilmentType)
                 .orElse(FulfilmentType.WarehouseFulfilment);
     }
 
     @DynamoDBIgnore
     public List<ProductCategory> getEnabledProductCategories() {
-        List<ProductGroup> enabledProductGroups = Optional.ofNullable(fulfillmentSettings)
-                .map(FulfillmentSettings::getEnabledProductGroups)
+        List<ProductGroup> enabledProductGroups = Optional.ofNullable(fulfilmentSettings)
+                .map(FulfilmentSettings::getEnabledProductGroups)
                 .orElse(Collections.emptyList());
 
         return ProductCategory.values(enabledProductGroups);
@@ -345,8 +345,8 @@ public class Store {
 
     @DynamoDBIgnore
     public List<String> getEnabledProviders() {
-        return  Optional.ofNullable(fulfillmentSettings)
-                .map(FulfillmentSettings::getEnabledProviders)
+        return  Optional.ofNullable(fulfilmentSettings)
+                .map(FulfilmentSettings::getEnabledProviders)
                 .orElse(Collections.emptyList());
     }
 

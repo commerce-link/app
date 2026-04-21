@@ -2,7 +2,7 @@ package pl.commercelink.orders;
 
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.stores.FulfillmentSettings;
+import pl.commercelink.stores.FulfilmentSettings;
 import pl.commercelink.stores.Store;
 
 public class DeliveryDays {
@@ -18,21 +18,21 @@ public class DeliveryDays {
     }
 
     public static DeliveryDays calculate(Store store, Basket basket) {
-        FulfillmentSettings fulfillmentSettings = store.getFulfillmentSettings();
+        FulfilmentSettings fulfilmentSettings = store.getFulfilmentSettings();
 
-        int estimatedAssemblyDate = fulfillmentSettings.getOrderAssemblyDays();
+        int estimatedAssemblyDate = fulfilmentSettings.getOrderAssemblyDays();
         for (BasketItem item : basket.getBasketItemsForProducts()) {
             estimatedAssemblyDate = Math.max(estimatedAssemblyDate, item.getEstimatedDeliveryDays());
         }
 
-        int estimatedRealizationDays = fulfillmentSettings.getOrderRealizationDays();
+        int estimatedRealizationDays = fulfilmentSettings.getOrderRealizationDays();
         for (BasketItem item : basket.getBasketItemsForServices()) {
             estimatedRealizationDays = Math.max(estimatedRealizationDays, item.getEstimatedDeliveryDays());
         }
 
         return new DeliveryDays(
                 estimatedAssemblyDate,
-                fulfillmentSettings.getOrderRealizationDays(),
+                fulfilmentSettings.getOrderRealizationDays(),
                 estimatedRealizationDays
         );
     }

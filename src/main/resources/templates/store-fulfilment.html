@@ -9,9 +9,9 @@
     <section class="section">
         <div class="container">
 
-            <h1 class="title" th:text="#{store.fulfillment.settings}"></h1>
+            <h1 class="title" th:text="#{store.fulfilment.settings}"></h1>
 
-            <form th:action="@{/dashboard/store/fulfillment}" th:object="${form}" method="post">
+            <form th:action="@{/dashboard/store/fulfilment}" th:object="${form}" method="post">
 
                 <input type="hidden" th:field="*{store.storeId}"/>
 
@@ -20,7 +20,7 @@
                     <div class="field">
                         <label class="label" th:text="#{store.order.assembly.days}"></label>
                         <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfillmentSettings.orderAssemblyDays}"
+                            <input class="input" type="text" th:field="*{store.fulfilmentSettings.orderAssemblyDays}"
                                    th:placeholder="#{store.order.assembly.days}" />
                         </div>
                     </div>
@@ -28,24 +28,24 @@
                     <div class="field">
                         <label class="label" th:text="#{store.order.realization.days}"></label>
                         <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfillmentSettings.orderRealizationDays}"
+                            <input class="input" type="text" th:field="*{store.fulfilmentSettings.orderRealizationDays}"
                                    th:placeholder="#{store.order.realization.days}" />
                         </div>
                     </div>
 
                     <div class="field">
                         <label class="checkbox">
-                            <input type="checkbox" th:field="*{store.fulfillmentSettings.automatedFulfilment}">
-                            <strong th:text="#{store.enable.automated.fulfillment}"></strong>
+                            <input type="checkbox" th:field="*{store.fulfilmentSettings.automatedFulfilment}">
+                            <strong th:text="#{store.enable.automated.fulfilment}"></strong>
                         </label>
-                        <p th:text="#{store.enable.automated.fulfillment.description}"></p>
+                        <p th:text="#{store.enable.automated.fulfilment.description}"></p>
                     </div>
 
                     <div class="field">
-                        <label class="label" th:text="#{store.fulfillment.default.type}"></label>
+                        <label class="label" th:text="#{store.fulfilment.default.type}"></label>
                         <div class="control">
                             <div class="select">
-                                <select th:field="*{store.fulfillmentSettings.defaultFulfilmentType}">
+                                <select th:field="*{store.fulfilmentSettings.defaultFulfilmentType}">
                                     <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
                                 </select>
                             </div>
@@ -58,7 +58,7 @@
                             <label class="checkbox">
                                 <input type="checkbox"
                                        th:value="${type}"
-                                       th:field="*{store.fulfillmentSettings.enabledProductGroups}" />
+                                       th:field="*{store.fulfilmentSettings.enabledProductGroups}" />
                                 <span th:text="${pgl.name(type)}"></span>
                             </label>
                         </div>
@@ -70,7 +70,7 @@
                             <label class="checkbox">
                                 <input type="checkbox"
                                        th:value="${type}"
-                                       th:field="*{store.fulfillmentSettings.enabledProviders}" />
+                                       th:field="*{store.fulfilmentSettings.enabledProviders}" />
                                 <span th:text="${type}"></span>
                             </label>
                         </div>

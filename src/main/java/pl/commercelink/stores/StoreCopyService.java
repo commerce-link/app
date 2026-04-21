@@ -65,7 +65,7 @@ public class StoreCopyService {
         }
 
         target.setInvoicingConfiguration(source.getInvoicingConfiguration());
-        target.setFulfillmentSettings(source.getFulfillmentSettings());
+        target.setFulfilmentSettings(source.getFulfilmentSettings());
         target.setCheckoutSettings(source.getCheckoutSettings());
         target.setRmaSettings(source.getRmaSettings());
         if (source.getWarehouseConfiguration() != null) {

@@ -347,26 +347,26 @@ public class StoreController {
         return "store-notification";
     }
 
-    @GetMapping("/dashboard/store/fulfillment")
+    @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeFulfillmentSettings(Model model) {
-        return renderStoreFulfillmentSettings(getStoreId(), model);
+    public String storeFulfilmentSettings(Model model) {
+        return renderStoreFulfilmentSettings(getStoreId(), model);
     }
 
-    @GetMapping("/dashboard/store/{storeId}/fulfillment")
+    @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreFulfillmentSettings(@PathVariable String storeId, Model model) {
-        return renderStoreFulfillmentSettings(storeId, model);
+    public String superAdminStoreFulfilmentSettings(@PathVariable String storeId, Model model) {
+        return renderStoreFulfilmentSettings(storeId, model);
     }
 
-    private String renderStoreFulfillmentSettings(String storeId, Model model) {
+    private String renderStoreFulfilmentSettings(String storeId, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
             return "error";
         }
-        if (store.getFulfillmentSettings() == null) {
-            store.setFulfillmentSettings(new FulfillmentSettings());
+        if (store.getFulfilmentSettings() == null) {
+            store.setFulfilmentSettings(new FulfilmentSettings());
         }
 
         StoreForm form = new StoreForm(store);
@@ -376,7 +376,7 @@ public class StoreController {
         model.addAttribute("productGroupTypes", ProductGroup.values());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
 
-        return "store-fulfillment";
+        return "store-fulfilment";
     }
 
     @GetMapping("/dashboard/store/payments")
@@ -622,18 +622,18 @@ public class StoreController {
                 : "redirect:/dashboard/store/notification";
     }
 
-    @PostMapping("/dashboard/store/fulfillment")
+    @PostMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreFulfillmentSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
+    public String updateStoreFulfilmentSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setFulfillmentSettings(form.getStore().getFulfillmentSettings());
+        existingStore.setFulfilmentSettings(form.getStore().getFulfilmentSettings());
 
         storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfillment.settings.update.success", null, locale));
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
 
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/fulfillment", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/fulfillment";
+                ? String.format("redirect:/dashboard/store/%s/fulfilment", form.getStore().getStoreId())
+                : "redirect:/dashboard/store/fulfilment";
     }
 
     @PostMapping("/dashboard/store/payments/checkout/edit")
@@ -698,7 +698,7 @@ public class StoreController {
         existingStore.setRmaSettings(rmaSettings);
 
         storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfillment.settings.update.success", null, locale));
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
 
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/rma", form.getStore().getStoreId())
