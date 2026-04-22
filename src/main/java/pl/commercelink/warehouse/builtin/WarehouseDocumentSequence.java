@@ -6,7 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 
 @DynamoDBTable(tableName = "WarehouseDocumentSequences")
-public class WarehouseDocumentsSequence {
+public class WarehouseDocumentSequence {
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -17,10 +17,10 @@ public class WarehouseDocumentsSequence {
     @DynamoDBAttribute(attributeName = "currentValue")
     private long currentValue;
 
-    public WarehouseDocumentsSequence() {
+    public WarehouseDocumentSequence() {
     }
 
-    public WarehouseDocumentsSequence(String storeId, String sequenceKey, long currentValue) {
+    public WarehouseDocumentSequence(String storeId, String sequenceKey, long currentValue) {
         this.storeId = storeId;
         this.sequenceKey = sequenceKey;
         this.currentValue = currentValue;

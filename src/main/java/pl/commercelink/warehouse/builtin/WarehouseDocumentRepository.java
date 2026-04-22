@@ -124,7 +124,7 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
             long nextValue = currentValue + 1;
 
             WarehouseDocument document = documentFactory.apply(sequenceKey + "/" + String.format("%06d", nextValue));
-            WarehouseDocumentsSequence sequence = new WarehouseDocumentsSequence(storeId, sequenceKey, nextValue);
+            WarehouseDocumentSequence sequence = new WarehouseDocumentSequence(storeId, sequenceKey, nextValue);
 
             try {
                 executeTransaction(document, sequence, currentValue);
@@ -137,11 +137,11 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
     }
 
     private long getCurrentSequenceValue(String storeId, String sequenceKey) {
-        WarehouseDocumentsSequence sequence = dynamoDBMapper.load(WarehouseDocumentsSequence.class, storeId, sequenceKey);
+        WarehouseDocumentSequence sequence = dynamoDBMapper.load(WarehouseDocumentSequence.class, storeId, sequenceKey);
         return sequence == null ? 0 : sequence.getCurrentValue();
     }
 
-    private void executeTransaction(WarehouseDocument document, WarehouseDocumentsSequence sequence, long expectedSequenceValue) {
+    private void executeTransaction(WarehouseDocument document, WarehouseDocumentSequence sequence, long expectedSequenceValue) {
         TransactionWriteRequest request = new TransactionWriteRequest();
         request.addPut(sequence, buildSequenceCondition(expectedSequenceValue));
         request.addPut(document, buildDocumentCondition());
