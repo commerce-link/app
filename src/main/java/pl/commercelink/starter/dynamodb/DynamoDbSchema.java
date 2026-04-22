@@ -32,7 +32,6 @@ public class DynamoDbSchema {
         dynamoDB.createTable(warehouseDocumentItemsTableSchema());
         dynamoDB.createTable(orderEventsTableSchema());
         addExternalOrderIdIndexForOrderSchema(dynamoDB); // not created yet
-        addPimIdIndexForProductsSchema(dynamoDB);
         addBasketCreatedAtIndexForBasketSchema(dynamoDB);
         recreateStoreIdOrderedAtIndex(dynamoDB);
     }
@@ -49,7 +48,7 @@ public class DynamoDbSchema {
 
     public static CreateTableRequest productsV2TableSchema() {
         return new CreateTableRequest()
-                .withTableName("ProductsV2")
+                .withTableName("Products")
                 .withKeySchema(new KeySchemaElement("categoryId", KeyType.HASH), // Partition key
                         new KeySchemaElement("productId", KeyType.RANGE)) // Sort key
                 .withAttributeDefinitions(
@@ -68,27 +67,6 @@ public class DynamoDbSchema {
                                 .withNonKeyAttributes("productId"))
                         );
     }
-
-    public static void addPimIdIndexForProductsSchema(AmazonDynamoDB dynamoDB) {
-        UpdateTableRequest updateTableRequest = new UpdateTableRequest()
-                .withTableName("Products")
-                .withAttributeDefinitions(
-                        new AttributeDefinition("pimId", ScalarAttributeType.S)
-                )
-                .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-                        .withCreate(new CreateGlobalSecondaryIndexAction()
-                                .withIndexName("PimIdIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("pimId", KeyType.HASH)
-                                )
-                                .withProjection(new Projection()
-                                        .withProjectionType(ProjectionType.INCLUDE)
-                                        .withNonKeyAttributes("productId"))
-                        ));
-
-        dynamoDB.updateTable(updateTableRequest);
-    }
-
 
     public static CreateTableRequest productCatalogTableSchema() {
         return new CreateTableRequest()

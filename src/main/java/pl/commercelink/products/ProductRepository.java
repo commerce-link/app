@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Component
 public class ProductRepository extends DynamoDbRepository<Product> {
 
-    private static final String TABLE = "ProductsV2";
+    private static final String TABLE = "Products";
 
     public ProductRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);

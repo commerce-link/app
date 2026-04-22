@@ -14,7 +14,7 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 import static pl.commercelink.taxonomy.BrandMapper.unifyBrand;
 
-@DynamoDBTable(tableName = "ProductsV2")
+@DynamoDBTable(tableName = "Products")
 public class Product {
 
     @DynamoDBHashKey(attributeName = "categoryId")
