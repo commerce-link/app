@@ -12,20 +12,20 @@ import java.time.LocalDateTime;
 public class WarehouseDocument {
 
     @DynamoDBHashKey(attributeName = "storeId")
-    @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"OrderIdIndex", "RmaIdIndex", "DeliveryIdIndex", "TypeIndex", "CreatedAtIndex"}, attributeName = "storeId")
+    @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"DeliveryIdIndex", "CreatedAtIndex"}, attributeName = "storeId")
     private String storeId;
 
     @DynamoDBRangeKey(attributeName = "documentNo")
     private String documentNo;
 
-    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "TypeIndex", attributeName = "type")
+    @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private DocumentType type;
 
-    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "OrderIdIndex", attributeName = "orderId")
+    @DynamoDBAttribute(attributeName = "orderId")
     private String orderId;
 
-    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "RmaIdIndex", attributeName = "rmaId")
+    @DynamoDBAttribute(attributeName = "rmaId")
     private String rmaId;
 
     @DynamoDBIndexRangeKey(globalSecondaryIndexName = "DeliveryIdIndex", attributeName = "deliveryId")
