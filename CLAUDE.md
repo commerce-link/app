@@ -135,22 +135,23 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | Table | Entity | Keys |
 |-------|--------|------|
 | Orders | `Order` | hash: storeId, range: orderId |
-| OrderItems | `OrderItem` | hash: storeId, range: orderId+itemId |
+| OrderItems | `OrderItem` | hash: orderId, range: itemId |
 | OrderEvents | `OrderEvent` | Event tracking per order |
-| ProductsV2 | `Product` | Product data |
-| Catalog | `ProductCatalog` | Category definitions |
-| PIM | `PIMIndexEntry` | Product information management (served by external PIM microservice) |
+| Products | `Product` | Product data |
+| Catalogs | `ProductCatalog` | Category definitions |
 | Baskets | `Basket` | Shopping carts |
 | Stores | `Store` | Tenant configuration |
-| DeliveriesV2 | `Delivery` | Supplier deliveries |
+| Deliveries | `Delivery` | Supplier deliveries |
 | RMA | `RMA` | Return merchandise |
 | RMAItems | `RMAItem` | RMA line items |
 | RMACenters | `RMACenter` | Return centers |
-| Warehouse | `WarehouseItem` | Warehouse stock |
+| WarehouseItems | `WarehouseItem` | Warehouse stock |
 | WarehouseDocuments | `WarehouseDocument` | Warehouse documents |
 | WarehouseDocumentItems | `WarehouseDocumentItem` | Document line items |
-| WarehouseDocumentsSequences | `WarehouseDocumentsSequence` | Document numbering |
+| WarehouseDocumentSequences | `WarehouseDocumentSequence` | Document numbering |
 | EmailTemplates | `EmailTemplate` | Notification templates |
+
+Product information lives in the external PIM microservice — the main app no longer owns a `PIM` DynamoDB table; it consumes the index via `/PIM/Index`.
 
 ### Inventory Suppliers
 
