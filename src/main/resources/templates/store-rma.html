@@ -20,7 +20,7 @@
                         <label class="label" th:text="#{store.default.carrier.type}"></label>
                         <div class="control">
                             <div class="select">
-                                <select th:field="*{store.rmaSettings.carrier.name}">
+                                <select th:field="*{store.rmaConfiguration.carrier.name}">
                                     <option value="" th:text="#{general.select}"></option>
                                     <option th:each="type : ${carrierTypes}" th:value="${type.name}" th:text="${type.displayName}"></option>
                                 </select>

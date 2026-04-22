@@ -34,21 +34,21 @@ public class Store {
     @DynamoDBAttribute(attributeName = "bankAccounts")
     private List<BankAccount> bankAccounts = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "clientNotifications")
-    private ClientNotificationsConfig clientNotificationsConfig;
+    private ClientNotificationsConfiguration clientNotificationsConfiguration;
     @DynamoDBAttribute(attributeName = "integrations")
     private List<Integration> integrations = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "apiKey")
     private String apiKey;
     @DynamoDBAttribute(attributeName = "fulfilment")
-    private FulfilmentSettings fulfilmentSettings;
+    private FulfilmentConfiguration fulfilmentConfiguration;
     @DynamoDBAttribute(attributeName = "billingDetails")
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private List<ShippingDetails> shippingDetails = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "checkout")
-    private CheckoutSettings checkoutSettings;
+    private CheckoutConfiguration checkoutConfiguration;
     @DynamoDBAttribute(attributeName = "rma")
-    private RMASettings rmaSettings;
+    private RMAConfiguration rmaConfiguration;
     @DynamoDBAttribute(attributeName = "warehouse")
     private WarehouseConfiguration warehouseConfiguration;
     @DynamoDBAttribute(attributeName = "reporting")
@@ -222,12 +222,12 @@ public class Store {
         this.invoicingConfiguration = invoicingConfiguration;
     }
 
-    public ClientNotificationsConfig getClientNotificationsConfig() {
-        return clientNotificationsConfig;
+    public ClientNotificationsConfiguration getClientNotificationsConfiguration() {
+        return clientNotificationsConfiguration;
     }
 
-    public void setClientNotificationsConfig(ClientNotificationsConfig clientNotificationsConfig) {
-        this.clientNotificationsConfig = clientNotificationsConfig;
+    public void setClientNotificationsConfiguration(ClientNotificationsConfiguration clientNotificationsConfiguration) {
+        this.clientNotificationsConfiguration = clientNotificationsConfiguration;
     }
 
     public List<Integration> getIntegrations() {
@@ -246,12 +246,12 @@ public class Store {
         this.apiKey = apiKey;
     }
 
-    public FulfilmentSettings getFulfilmentSettings() {
-        return fulfilmentSettings;
+    public FulfilmentConfiguration getFulfilmentConfiguration() {
+        return fulfilmentConfiguration;
     }
 
-    public void setFulfilmentSettings(FulfilmentSettings fulfilmentSettings) {
-        this.fulfilmentSettings = fulfilmentSettings;
+    public void setFulfilmentConfiguration(FulfilmentConfiguration fulfilmentConfiguration) {
+        this.fulfilmentConfiguration = fulfilmentConfiguration;
     }
 
     public BillingDetails getBillingDetails() {
@@ -270,20 +270,20 @@ public class Store {
         this.shippingDetails = shippingDetails;
     }
 
-    public CheckoutSettings getCheckoutSettings() {
-        return checkoutSettings;
+    public CheckoutConfiguration getCheckoutConfiguration() {
+        return checkoutConfiguration;
     }
 
-    public void setCheckoutSettings(CheckoutSettings checkoutSettings) {
-        this.checkoutSettings = checkoutSettings;
+    public void setCheckoutConfiguration(CheckoutConfiguration checkoutConfiguration) {
+        this.checkoutConfiguration = checkoutConfiguration;
     }
 
-    public RMASettings getRmaSettings() {
-        return rmaSettings;
+    public RMAConfiguration getRmaConfiguration() {
+        return rmaConfiguration;
     }
 
-    public void setRmaSettings(RMASettings rmaSettings) {
-        this.rmaSettings = rmaSettings;
+    public void setRmaConfiguration(RMAConfiguration rmaConfiguration) {
+        this.rmaConfiguration = rmaConfiguration;
     }
 
     public WarehouseConfiguration getWarehouseConfiguration() {
@@ -329,15 +329,15 @@ public class Store {
 
     @DynamoDBIgnore
     public FulfilmentType getDefaultFulfilmentType() {
-        return Optional.ofNullable(fulfilmentSettings)
-                .map(FulfilmentSettings::getDefaultFulfilmentType)
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getDefaultFulfilmentType)
                 .orElse(FulfilmentType.WarehouseFulfilment);
     }
 
     @DynamoDBIgnore
     public List<ProductCategory> getEnabledProductCategories() {
-        List<ProductGroup> enabledProductGroups = Optional.ofNullable(fulfilmentSettings)
-                .map(FulfilmentSettings::getEnabledProductGroups)
+        List<ProductGroup> enabledProductGroups = Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getEnabledProductGroups)
                 .orElse(Collections.emptyList());
 
         return ProductCategory.values(enabledProductGroups);
@@ -345,8 +345,8 @@ public class Store {
 
     @DynamoDBIgnore
     public List<String> getEnabledProviders() {
-        return  Optional.ofNullable(fulfilmentSettings)
-                .map(FulfilmentSettings::getEnabledProviders)
+        return  Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getEnabledProviders)
                 .orElse(Collections.emptyList());
     }
 

@@ -176,7 +176,7 @@ public class OfferController {
         model.addAttribute("pricelistId", pricelist.getPricelistId());
         model.addAttribute("availabilityAndPrices", pricelist.getAvailabilityAndPrices());
         model.addAttribute("availableCategories", pricelist.getAvailableCategories());
-        model.addAttribute("deliveryOptions", store.getCheckoutSettings().getDeliveryOptions());
+        model.addAttribute("deliveryOptions", store.getCheckoutConfiguration().getDeliveryOptions());
 
         return "offerDetails";
     }

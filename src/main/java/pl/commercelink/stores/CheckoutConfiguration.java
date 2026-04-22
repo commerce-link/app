@@ -7,7 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 @DynamoDBDocument
-public class CheckoutSettings {
+public class CheckoutConfiguration {
 
     @DynamoDBAttribute(attributeName = "successUrl")
     private String successUrl = "http://localhost:8080/success/";

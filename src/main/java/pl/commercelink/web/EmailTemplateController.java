@@ -8,7 +8,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.stores.ClientNotificationsConfig;
+import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.templates.EmailAttachment;
@@ -88,16 +88,16 @@ public class EmailTemplateController {
     private String renderEmailTemplates(String storeId, String selectedType, boolean isSuperAdmin, Model model) {
         Store store = storesRepository.findById(storeId);
         List<EmailTemplate> emailTemplates = new LinkedList<>();
-        ClientNotificationsConfig clientNotificationsConfig = store.getClientNotificationsConfig();
+        ClientNotificationsConfiguration clientNotificationsConfiguration = store.getClientNotificationsConfiguration();
 
-        if (clientNotificationsConfig == null) {
-            clientNotificationsConfig = new ClientNotificationsConfig();
-            store.setClientNotificationsConfig(clientNotificationsConfig);
+        if (clientNotificationsConfiguration == null) {
+            clientNotificationsConfiguration = new ClientNotificationsConfiguration();
+            store.setClientNotificationsConfiguration(clientNotificationsConfiguration);
         }
 
         for (EmailNotificationType type : EmailNotificationType.values()) {
-            String templateName = store.getClientNotificationsConfig().getTemplateName(type);
-            if (store.getClientNotificationsConfig().supports(type)) {
+            String templateName = store.getClientNotificationsConfiguration().getTemplateName(type);
+            if (store.getClientNotificationsConfiguration().supports(type)) {
                 EmailTemplate emailTemplate = emailTemplatesRepository.findByTemplateName(storeId, templateName);
                 // If store template is not found, fallback to default template
                 if (emailTemplate == null) {
@@ -138,7 +138,7 @@ public class EmailTemplateController {
                 existingStoreTemplate.setType(notificationType);
 
                 // Update store configuration
-                store.getClientNotificationsConfig().enableNotification(existingStoreTemplate.getType(), notificationType.getTemplateName());
+                store.getClientNotificationsConfiguration().enableNotification(existingStoreTemplate.getType(), notificationType.getTemplateName());
             }
 
             existingStoreTemplate.setSubject(templateInput.getSubject());
@@ -160,12 +160,12 @@ public class EmailTemplateController {
         EmailNotificationType notificationType = EmailNotificationType.valueOf(type);
         Store store = storesRepository.findById(storeId);
 
-        if (store.getClientNotificationsConfig() == null) {
-            store.setClientNotificationsConfig(new ClientNotificationsConfig());
+        if (store.getClientNotificationsConfiguration() == null) {
+            store.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
         }
 
         // Assign default template if not yet configured
-        store.getClientNotificationsConfig().enableNotification(notificationType, notificationType.getTemplateName());
+        store.getClientNotificationsConfiguration().enableNotification(notificationType, notificationType.getTemplateName());
 
         storesRepository.save(store);
     }
@@ -174,7 +174,7 @@ public class EmailTemplateController {
         EmailNotificationType notificationType = EmailNotificationType.valueOf(type);
 
         Store store = storesRepository.findById(storeId);
-        store.getClientNotificationsConfig().disableNotification(notificationType);
+        store.getClientNotificationsConfiguration().disableNotification(notificationType);
         storesRepository.save(store);
     }
 

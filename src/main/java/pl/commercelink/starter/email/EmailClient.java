@@ -3,7 +3,7 @@ package pl.commercelink.starter.email;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.stores.ClientNotificationsConfig;
+import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.templates.EmailTemplate;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.*;
@@ -40,7 +40,7 @@ public class EmailClient {
             return false;
         }
 
-        ClientNotificationsConfig notificationsConfig = configProvider.getConfig(storeId);
+        ClientNotificationsConfiguration notificationsConfig = configProvider.getConfig(storeId);
         String templateName = notificationsConfig.getTemplateName(type);
         String replyToEmail = notificationsConfig.getReplyToEmail() != null ? notificationsConfig.getReplyToEmail() : defaultSenderEmail;
 

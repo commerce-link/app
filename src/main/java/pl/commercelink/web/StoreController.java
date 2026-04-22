@@ -337,8 +337,8 @@ public class StoreController {
             return "error";
         }
 
-        if (store.getClientNotificationsConfig() == null) {
-            store.setClientNotificationsConfig(new ClientNotificationsConfig());
+        if (store.getClientNotificationsConfiguration() == null) {
+            store.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
         }
 
         StoreForm form = new StoreForm(store);
@@ -349,24 +349,24 @@ public class StoreController {
 
     @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeFulfilmentSettings(Model model) {
-        return renderStoreFulfilmentSettings(getStoreId(), model);
+    public String storeFulfilmentConfiguration(Model model) {
+        return renderStoreFulfilmentConfiguration(getStoreId(), model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreFulfilmentSettings(@PathVariable String storeId, Model model) {
-        return renderStoreFulfilmentSettings(storeId, model);
+    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId, Model model) {
+        return renderStoreFulfilmentConfiguration(storeId, model);
     }
 
-    private String renderStoreFulfilmentSettings(String storeId, Model model) {
+    private String renderStoreFulfilmentConfiguration(String storeId, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
             return "error";
         }
-        if (store.getFulfilmentSettings() == null) {
-            store.setFulfilmentSettings(new FulfilmentSettings());
+        if (store.getFulfilmentConfiguration() == null) {
+            store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         }
 
         StoreForm form = new StoreForm(store);
@@ -398,8 +398,8 @@ public class StoreController {
             return "error";
         }
 
-        store.getCheckoutSettings().getDeliveryOptions().add(new DeliveryOption());
-        store.getCheckoutSettings().getDeliveryOptions().add(new DeliveryOption());
+        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
+        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
 
         StoreForm form = new StoreForm(store);
         form.setProviderConfiguration(paymentProviderFactory.loadConfigurationForUI(store));
@@ -494,8 +494,8 @@ public class StoreController {
             model.addAttribute("error", "Store not found");
             return "error";
         }
-        if (store.getRmaSettings() == null) {
-            store.setRmaSettings(new RMASettings());
+        if (store.getRmaConfiguration() == null) {
+            store.setRmaConfiguration(new RMAConfiguration());
         }
 
         StoreForm form = new StoreForm(store);
@@ -605,14 +605,14 @@ public class StoreController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreNotification(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        if (existingStore.getClientNotificationsConfig() == null) {
-            existingStore.setClientNotificationsConfig(new ClientNotificationsConfig());
+        if (existingStore.getClientNotificationsConfiguration() == null) {
+            existingStore.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
         }
 
-        ClientNotificationsConfig clientNotificationsConfig = form.getStore().getClientNotificationsConfig();
-        if (clientNotificationsConfig != null) {
-            clientNotificationsConfig.setSupportedTemplates(existingStore.getClientNotificationsConfig().getSupportedTemplates());
-            existingStore.setClientNotificationsConfig(clientNotificationsConfig);
+        ClientNotificationsConfiguration clientNotificationsConfiguration = form.getStore().getClientNotificationsConfiguration();
+        if (clientNotificationsConfiguration != null) {
+            clientNotificationsConfiguration.setSupportedTemplates(existingStore.getClientNotificationsConfiguration().getSupportedTemplates());
+            existingStore.setClientNotificationsConfiguration(clientNotificationsConfiguration);
         }
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.notification.update.success",null , locale));
@@ -624,9 +624,9 @@ public class StoreController {
 
     @PostMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreFulfilmentSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
+    public String updateStoreFulfilmentConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setFulfilmentSettings(form.getStore().getFulfilmentSettings());
+        existingStore.setFulfilmentConfiguration(form.getStore().getFulfilmentConfiguration());
 
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
@@ -638,11 +638,11 @@ public class StoreController {
 
     @PostMapping("/dashboard/store/payments/checkout/edit")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreCheckoutSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
+    public String updateStoreCheckoutConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        CheckoutSettings checkoutSettings = form.getStore().getCheckoutSettings();
-        checkoutSettings.getDeliveryOptions().removeIf(o -> !o.isComplete());
-        existingStore.setCheckoutSettings(checkoutSettings);
+        CheckoutConfiguration checkoutConfiguration = form.getStore().getCheckoutConfiguration();
+        checkoutConfiguration.getDeliveryOptions().removeIf(o -> !o.isComplete());
+        existingStore.setCheckoutConfiguration(checkoutConfiguration);
 
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.checkout.settings.update.success", null, locale));
@@ -684,18 +684,18 @@ public class StoreController {
     public String updateStoreReturnSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
 
-        String selectedCarrierName = form.getStore().getRmaSettings().getCarrier() != null
-                ? form.getStore().getRmaSettings().getCarrier().getName()
+        String selectedCarrierName = form.getStore().getRmaConfiguration().getCarrier() != null
+                ? form.getStore().getRmaConfiguration().getCarrier().getName()
                 : null;
 
-        RMASettings rmaSettings = new RMASettings();
+        RMAConfiguration rmaConfiguration = new RMAConfiguration();
         if (selectedCarrierName != null && existingStore.getShippingConfiguration() != null) {
             existingStore.getShippingConfiguration().getAuthorizedCarriers().stream()
                     .filter(c -> c.getName().equals(selectedCarrierName))
                     .findFirst()
-                    .ifPresent(rmaSettings::setCarrier);
+                    .ifPresent(rmaConfiguration::setCarrier);
         }
-        existingStore.setRmaSettings(rmaSettings);
+        existingStore.setRmaConfiguration(rmaConfiguration);
 
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));

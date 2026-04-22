@@ -220,7 +220,7 @@ public class Basket {
     @DynamoDBIgnore
     public Optional<DeliveryOption> resolveDeliveryOption(Store store) {
         if (deliveryOptionId == null) return Optional.empty();
-        return Optional.of(store.getCheckoutSettings().findDeliveryOption(deliveryOptionId));
+        return Optional.of(store.getCheckoutConfiguration().findDeliveryOption(deliveryOptionId));
     }
 
     @DynamoDBIgnore

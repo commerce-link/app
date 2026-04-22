@@ -30,7 +30,7 @@ public class RMAShippingService {
     public RMAShipmentResult createReturnShipment(RMAShipmentRequest request, Store store) {
         validateStoreReturnConfiguration(store);
 
-        AuthorizedCarrier ac = store.getRmaSettings().getCarrier();
+        AuthorizedCarrier ac = store.getRmaConfiguration().getCarrier();
         Carrier carrier = new Carrier(ac.getId(), ac.getName(), ac.getDisplayName());
 
         PackageTemplate packageTemplate = store.getPackageTemplate(request.getPackageTemplateId());
@@ -52,7 +52,7 @@ public class RMAShippingService {
     }
 
     public void validateStoreReturnConfiguration(Store store) {
-        if (store.getRmaSettings() == null || store.getRmaSettings().getCarrier() == null) {
+        if (store.getRmaConfiguration() == null || store.getRmaConfiguration().getCarrier() == null) {
             throw new InvalidReturnConfigurationException(
                     "Store return settings not configured. Contact store administrator."
             );

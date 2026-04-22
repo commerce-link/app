@@ -11,7 +11,7 @@ import pl.commercelink.products.ProductGroupListConverter;
 import java.util.List;
 
 @DynamoDBDocument
-public class FulfilmentSettings {
+public class FulfilmentConfiguration {
 
     @DynamoDBAttribute(attributeName = "orderAssemblyDays")
     private int orderAssemblyDays;
@@ -28,7 +28,7 @@ public class FulfilmentSettings {
     @DynamoDBAttribute(attributeName = "enabledProviders")
     private List<String> enabledProviders;
 
-    public FulfilmentSettings() {
+    public FulfilmentConfiguration() {
     }
 
     public int getOrderRealizationDays() {

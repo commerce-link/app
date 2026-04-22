@@ -18,7 +18,7 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.stores.CheckoutSettings;
+import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -49,7 +49,7 @@ public class Checkout {
 
     public CheckoutResponse create(String storeId, CheckoutRequest req) {
         Store store = storesRepository.findById(storeId);
-        CheckoutSettings checkoutSettings = store.getCheckoutSettings();
+        CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         if (req.getBillingDetails() == null || !req.getBillingDetails().isProperlyFilled()) {
             throw new IllegalStateException("Billing details are not properly filled.");
@@ -61,7 +61,7 @@ public class Checkout {
 
         List<CatalogProcessingResult> results = new ArrayList<>();
         for (String catalogId : req.getCatalogIds()) {
-            results.add(processCatalog(req, store, checkoutSettings, catalogId));
+            results.add(processCatalog(req, store, checkoutConfiguration, catalogId));
         }
 
         Basket basket = createBasket(req, store, results);
@@ -79,15 +79,15 @@ public class Checkout {
     }
 
     private String createPaymentLink(Store store, Basket basket, String cancelUrlOverride) {
-        CheckoutSettings checkoutSettings = store.getCheckoutSettings();
+        CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         PaymentRequest paymentRequest = new PaymentRequest(
                 store.getName(),
                 basket.getBasketId(),
                 basket.getBillingDetails().getEmail(),
-                checkoutSettings.getCurrency(),
-                checkoutSettings.getSuccessUrl(),
-                cancelUrlOverride != null ? cancelUrlOverride : checkoutSettings.getCancelUrl(),
+                checkoutConfiguration.getCurrency(),
+                checkoutConfiguration.getSuccessUrl(),
+                cancelUrlOverride != null ? cancelUrlOverride : checkoutConfiguration.getCancelUrl(),
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
 
@@ -159,10 +159,10 @@ public class Checkout {
         return basket;
     }
 
-    private CatalogProcessingResult processCatalog(CheckoutRequest req, Store store, CheckoutSettings checkoutSettings, String catalogId) {
+    private CatalogProcessingResult processCatalog(CheckoutRequest req, Store store, CheckoutConfiguration checkoutConfiguration, String catalogId) {
         ProductCatalog productCatalog = productCatalogRepository.findById(store.getStoreId(), catalogId);
 
-        Pricelist incompletePricelist = pricelistRepository.findTopNPricelist(catalogId, checkoutSettings.getNumberOfAcceptedPricelists()).stream()
+        Pricelist incompletePricelist = pricelistRepository.findTopNPricelist(catalogId, checkoutConfiguration.getNumberOfAcceptedPricelists()).stream()
                 .filter(p -> p.getPricelistId().equals(req.getPricelistId(catalogId)))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Pricelist not found for catalog: " + catalogId));

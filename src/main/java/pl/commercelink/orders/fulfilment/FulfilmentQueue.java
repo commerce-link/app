@@ -28,7 +28,7 @@ public class FulfilmentQueue {
     public List<OrderIndexEntry> pickFulfilmentGroup(List<String> excludedOrderIds, Predicate<Order> extraFilter) {
         List<Store> stores = storesRepository.findAll();
         List<OrderIndexEntry> oldestOrderPerStore = stores.stream()
-                .filter(store -> store.getFulfilmentSettings() != null && store.getFulfilmentSettings().isAutomatedFulfilment())
+                .filter(store -> store.getFulfilmentConfiguration() != null && store.getFulfilmentConfiguration().isAutomatedFulfilment())
                 .map(Store::getStoreId)
                 .map(storeId -> findOldestOrder(storeId, excludedOrderIds, 10, null, extraFilter))
                 .filter(Objects::nonNull)

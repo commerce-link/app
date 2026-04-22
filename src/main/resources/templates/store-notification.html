@@ -22,7 +22,7 @@
                     <div class="field">
                         <label class="label" th:text="#{store.sender.name}"></label>
                         <div class="control">
-                            <input class="input" type="text" th:field="*{store.clientNotificationsConfig.senderName}"
+                            <input class="input" type="text" th:field="*{store.clientNotificationsConfiguration.senderName}"
                                    th:placeholder="#{store.sender.name}" />
                         </div>
                     </div>
@@ -30,7 +30,7 @@
                     <div class="field">
                         <label class="label" th:text="#{store.reply.to.email}"></label>
                         <div class="control">
-                            <input class="input" type="text" th:field="*{store.clientNotificationsConfig.replyToEmail}"
+                            <input class="input" type="text" th:field="*{store.clientNotificationsConfiguration.replyToEmail}"
                                    th:placeholder="#{store.reply.to.email}" />
                         </div>
                     </div>
@@ -39,7 +39,7 @@
                         <label class="label" th:text="#{store.enabled.templates}"></label>
                         <div class="content">
                             <ul>
-                                <li th:each="entry : *{store.clientNotificationsConfig.supportedTemplates}"
+                                <li th:each="entry : *{store.clientNotificationsConfiguration.supportedTemplates}"
                                     th:text="${entry.key}"></li>
                             </ul>
                         </div>

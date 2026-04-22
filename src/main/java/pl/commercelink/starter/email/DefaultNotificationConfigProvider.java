@@ -2,7 +2,7 @@ package pl.commercelink.starter.email;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.stores.ClientNotificationsConfig;
+import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -20,13 +20,13 @@ public class DefaultNotificationConfigProvider implements NotificationConfigProv
     }
 
     @Override
-    public ClientNotificationsConfig getConfig(String storeId) {
-        return getStore(storeId).getClientNotificationsConfig();
+    public ClientNotificationsConfiguration getConfig(String storeId) {
+        return getStore(storeId).getClientNotificationsConfiguration();
     }
 
     @Override
     public boolean supports(String storeId, EmailNotificationType type) {
-        ClientNotificationsConfig config = getConfig(storeId);
+        ClientNotificationsConfiguration config = getConfig(storeId);
         return config != null && config.supports(type);
     }
 }

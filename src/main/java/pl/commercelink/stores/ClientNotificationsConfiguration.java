@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @DynamoDBDocument
-public class ClientNotificationsConfig {
+public class ClientNotificationsConfiguration {
 
     @DynamoDBAttribute(attributeName = "senderName")
     private String senderName;
@@ -17,7 +17,7 @@ public class ClientNotificationsConfig {
     @DynamoDBAttribute(attributeName = "supportedTemplates")
     private Map<String, String> supportedTemplates = new HashMap<>();
 
-    public ClientNotificationsConfig() {
+    public ClientNotificationsConfiguration() {
     }
 
     public boolean supports(EmailNotificationType type) {

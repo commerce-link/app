@@ -32,7 +32,7 @@
                          class="template-form"
                          style="display: none;">
 
-                        <div th:if="${#maps.containsKey(store.clientNotificationsConfig.supportedTemplates, type.name())}">
+                        <div th:if="${#maps.containsKey(store.clientNotificationsConfiguration.supportedTemplates, type.name())}">
                             <input type="hidden" th:field="*{emailTemplates[__${iterStat.index}__].storeId}" />
                             <input type="hidden" th:field="*{emailTemplates[__${iterStat.index}__].type}" />
 
@@ -125,7 +125,7 @@
 
                         </div>
 
-                        <div th:if="${!#maps.containsKey(store.clientNotificationsConfig.supportedTemplates, type.name())}">
+                        <div th:if="${!#maps.containsKey(store.clientNotificationsConfiguration.supportedTemplates, type.name())}">
                             <button class="button is-small is-link"
                                     type="button"
                                     th:attr="data-type=${type.name()}, data-base-path=${basePath}"

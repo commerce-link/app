@@ -65,9 +65,9 @@ public class StoreCopyService {
         }
 
         target.setInvoicingConfiguration(source.getInvoicingConfiguration());
-        target.setFulfilmentSettings(source.getFulfilmentSettings());
-        target.setCheckoutSettings(source.getCheckoutSettings());
-        target.setRmaSettings(source.getRmaSettings());
+        target.setFulfilmentConfiguration(source.getFulfilmentConfiguration());
+        target.setCheckoutConfiguration(source.getCheckoutConfiguration());
+        target.setRmaConfiguration(source.getRmaConfiguration());
         if (source.getWarehouseConfiguration() != null) {
             WarehouseConfiguration warehouseConfig = new WarehouseConfiguration();
             warehouseConfig.setWarehouseId(source.getWarehouseConfiguration().getWarehouseId());
@@ -80,7 +80,7 @@ public class StoreCopyService {
             target.setShippingConfiguration(shippingConfig);
         }
 
-        target.setClientNotificationsConfig(source.getClientNotificationsConfig());
+        target.setClientNotificationsConfiguration(source.getClientNotificationsConfiguration());
 
         target.setApiKey(null);
         target.setBankAccounts(new LinkedList<>());
@@ -182,11 +182,11 @@ public class StoreCopyService {
     }
 
     private void copyEmailTemplates(Store sourceStore, String newStoreId) {
-        if (sourceStore.getClientNotificationsConfig() == null) {
+        if (sourceStore.getClientNotificationsConfiguration() == null) {
             return;
         }
 
-        Map<String, String> supportedTemplates = sourceStore.getClientNotificationsConfig().getSupportedTemplates();
+        Map<String, String> supportedTemplates = sourceStore.getClientNotificationsConfiguration().getSupportedTemplates();
         if (supportedTemplates == null || supportedTemplates.isEmpty()) {
             return;
         }

@@ -4,12 +4,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 
 @DynamoDBDocument
-public class RMASettings {
+public class RMAConfiguration {
 
     @DynamoDBAttribute(attributeName = "carrier")
     private AuthorizedCarrier carrier;
 
-    public RMASettings() {
+    public RMAConfiguration() {
     }
 
     public AuthorizedCarrier getCarrier() {
