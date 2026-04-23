@@ -44,5 +44,6 @@ update.env
 ### Developers temp directory
 /temp/
 
-### Local dynamodb data
+### Local infrastructure data
 /.dynamodb-data/
+/.ministack-data/

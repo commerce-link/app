@@ -74,11 +74,21 @@ aws configure set default.region eu-central-1
 
 ## Local Infrastructure
 
-All local services (DynamoDB, S3, SQS, etc.) run via Docker Compose:
+Local AWS services (S3, SQS, SES, Cognito, etc.) are simulated by
+[Ministack](https://ministack.org/). DynamoDB runs in a separate container on
+port 8000.
 
 ```sh
 docker compose up
 ```
+
+On first start, the bootstrap script (`localstack-init/01-bootstrap.sh`)
+automatically creates S3 buckets, SQS queues, and a Cognito user pool with a
+default admin user (`admin@commercelink.local` / `Admin123!`).
+
+The generated Cognito credentials (pool ID, client ID, client secret) are
+written to `.ministack-data/.cognito.env` and picked up automatically by
+`application-local.properties` via `spring.config.import`.
 
 DynamoDB data is persisted in `.dynamodb-data/` within the repo directory.
 
