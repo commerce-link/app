@@ -29,9 +29,6 @@ public class DynamoDbSchema {
         dynamoDB.createTable(warehouseDocumentsSequencesTableSchema());
         dynamoDB.createTable(warehouseDocumentItemsV2TableSchema());
         dynamoDB.createTable(orderEventsTableSchema());
-        addExternalOrderIdIndexForOrderSchema(dynamoDB); // not created yet
-        addBasketCreatedAtIndexForBasketSchema(dynamoDB);
-        recreateStoreIdOrderedAtIndex(dynamoDB);
     }
 
     public static CreateTableRequest storeTableSchema() {
@@ -86,18 +83,30 @@ public class DynamoDbSchema {
                 .withAttributeDefinitions(
                         new AttributeDefinition("storeId", ScalarAttributeType.S),
                         new AttributeDefinition("orderId", ScalarAttributeType.S),
-                        new AttributeDefinition("orderedAt", ScalarAttributeType.S)
+                        new AttributeDefinition("orderedAt", ScalarAttributeType.S),
+                        new AttributeDefinition("externalOrderId", ScalarAttributeType.S)
                 )
                 .withBillingMode(BillingMode.PAY_PER_REQUEST) // On-demand mode
-                .withGlobalSecondaryIndexes(new GlobalSecondaryIndex()
-                        .withIndexName("StoreIdOrderedAtIndex")
-                        .withKeySchema(
-                                new KeySchemaElement("storeId", KeyType.HASH),
-                                new KeySchemaElement("orderedAt", KeyType.RANGE)
-                        )
-                        .withProjection(new Projection()
-                                .withProjectionType(ProjectionType.INCLUDE)
-                                .withNonKeyAttributes("orderId", "status", "email", "fulfilmentType")));
+                .withGlobalSecondaryIndexes(
+                        new GlobalSecondaryIndex()
+                                .withIndexName("StoreIdOrderedAtIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("orderedAt", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection()
+                                        .withProjectionType(ProjectionType.INCLUDE)
+                                        .withNonKeyAttributes("orderId", "status", "email", "fulfilmentType")),
+                        new GlobalSecondaryIndex()
+                                .withIndexName("ExternalOrderIdIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("externalOrderId", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection()
+                                        .withProjectionType(ProjectionType.INCLUDE)
+                                        .withNonKeyAttributes("orderId"))
+                );
     }
 
     public static CreateTableRequest warehouseTableSchema() {
@@ -119,9 +128,20 @@ public class DynamoDbSchema {
                         new KeySchemaElement("basketId", KeyType.RANGE))
                 .withAttributeDefinitions(
                         new AttributeDefinition("storeId", ScalarAttributeType.S),
-                        new AttributeDefinition("basketId", ScalarAttributeType.S)
+                        new AttributeDefinition("basketId", ScalarAttributeType.S),
+                        new AttributeDefinition("createdAt", ScalarAttributeType.S)
                 )
-                .withBillingMode(BillingMode.PAY_PER_REQUEST);
+                .withBillingMode(BillingMode.PAY_PER_REQUEST)
+                .withGlobalSecondaryIndexes(new GlobalSecondaryIndex()
+                        .withIndexName("BasketCreatedAtIndex")
+                        .withKeySchema(
+                                new KeySchemaElement("storeId", KeyType.HASH),
+                                new KeySchemaElement("createdAt", KeyType.RANGE)
+                        )
+                        .withProjection(new Projection()
+                                .withProjectionType(ProjectionType.INCLUDE)
+                                .withNonKeyAttributes("basketId", "name", "type", "expiresAt"))
+                );
     }
 
     public static CreateTableRequest orderItemsSchema() {
@@ -138,28 +158,6 @@ public class DynamoDbSchema {
                 .withBillingMode(BillingMode.PAY_PER_REQUEST);
     }
 
-    public static void addExternalOrderIdIndexForOrderSchema(AmazonDynamoDB dynamoDB) {
-        UpdateTableRequest updateTableRequest = new UpdateTableRequest()
-                .withTableName("Orders")
-                .withAttributeDefinitions(
-                        new AttributeDefinition("externalOrderId", ScalarAttributeType.S),
-                        new AttributeDefinition("storeId", ScalarAttributeType.S)
-                )
-                .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-                        .withCreate(new CreateGlobalSecondaryIndexAction()
-                                .withIndexName("ExternalOrderIdIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("storeId", KeyType.HASH),
-                                        new KeySchemaElement("externalOrderId", KeyType.RANGE)
-                                )
-                                .withProjection(new Projection()
-                                        .withProjectionType(ProjectionType.INCLUDE)
-                                        .withNonKeyAttributes("orderId"))
-                        ));
-
-        dynamoDB.updateTable(updateTableRequest);
-    }
-
     public static CreateTableRequest deliveryTableSchema() {
         return new CreateTableRequest()
                 .withTableName("Deliveries")
@@ -172,28 +170,6 @@ public class DynamoDbSchema {
                         new AttributeDefinition("deliveryId", ScalarAttributeType.S)
                 )
                 .withBillingMode(BillingMode.PAY_PER_REQUEST);
-    }
-
-    public static void addBasketCreatedAtIndexForBasketSchema(AmazonDynamoDB dynamoDB) {
-        UpdateTableRequest updateTableRequest = new UpdateTableRequest()
-                .withTableName("Baskets")
-                .withAttributeDefinitions(
-                        new AttributeDefinition("storeId", ScalarAttributeType.S),
-                        new AttributeDefinition("createdAt", ScalarAttributeType.S)
-                )
-                .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-                        .withCreate(new CreateGlobalSecondaryIndexAction()
-                                .withIndexName("BasketCreatedAtIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("storeId", KeyType.HASH),
-                                        new KeySchemaElement("createdAt", KeyType.RANGE)
-                                )
-                                .withProjection(new Projection()
-                                        .withProjectionType(ProjectionType.INCLUDE)
-                                        .withNonKeyAttributes("basketId", "name", "type", "expiresAt"))
-                        ));
-
-        dynamoDB.updateTable(updateTableRequest);
     }
 
     public static CreateTableRequest emailTemplatesTableSchema() {
@@ -250,53 +226,6 @@ public class DynamoDbSchema {
                         new AttributeDefinition("rmaCenterId", ScalarAttributeType.S)
                 )
                 .withBillingMode(BillingMode.PAY_PER_REQUEST);
-    }
-
-    public static void recreateStoreIdOrderedAtIndex(AmazonDynamoDB dynamoDBClient) {
-        final String tableName = "Orders";
-        final String indexName = "StoreIdOrderedAtIndex";
-
-        try {
-            UpdateTableRequest deleteIndexRequest = new UpdateTableRequest()
-                    .withTableName(tableName)
-                    .withGlobalSecondaryIndexUpdates(
-                            new GlobalSecondaryIndexUpdate()
-                                    .withDelete(new DeleteGlobalSecondaryIndexAction().withIndexName(indexName))
-                    );
-            dynamoDBClient.updateTable(deleteIndexRequest);
-
-            boolean deleted = false;
-            while (!deleted) {
-                Thread.sleep(5000);
-                TableDescription tableDescription = dynamoDBClient.describeTable(tableName).getTable();
-                deleted = tableDescription.getGlobalSecondaryIndexes() == null ||
-                        tableDescription.getGlobalSecondaryIndexes().stream()
-                                .noneMatch(gsi -> gsi.getIndexName().equals(indexName));
-            }
-
-            UpdateTableRequest recreateIndexRequest = new UpdateTableRequest()
-                    .withTableName(tableName)
-                    .withAttributeDefinitions(
-                            new AttributeDefinition("storeId", ScalarAttributeType.S),
-                            new AttributeDefinition("orderedAt", ScalarAttributeType.S)
-                    )
-                    .withGlobalSecondaryIndexUpdates(
-                            new GlobalSecondaryIndexUpdate()
-                                    .withCreate(new CreateGlobalSecondaryIndexAction()
-                                            .withIndexName(indexName)
-                                            .withKeySchema(
-                                                    new KeySchemaElement("storeId", KeyType.HASH),
-                                                    new KeySchemaElement("orderedAt", KeyType.RANGE)
-                                            )
-                                            .withProjection(new Projection()
-                                                    .withProjectionType(ProjectionType.INCLUDE)
-                                                    .withNonKeyAttributes("orderId", "status", "email", "fulfilmentType"))
-                                    )
-                    );
-            dynamoDBClient.updateTable(recreateIndexRequest);
-        } catch (InterruptedException e) {
-            throw new RuntimeException();
-        }
     }
 
     public static CreateTableRequest warehouseDocumentsSequencesTableSchema() {
