@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.model.*;
 
+import java.util.Map;
+
 public class DynamoDbSchema {
 
     public static void main(String[] args) {
@@ -29,6 +31,8 @@ public class DynamoDbSchema {
         dynamoDB.createTable(warehouseDocumentsSequencesTableSchema());
         dynamoDB.createTable(warehouseDocumentItemsV2TableSchema());
         dynamoDB.createTable(orderEventsTableSchema());
+
+        seedData(dynamoDB);
     }
 
     public static CreateTableRequest storeTableSchema() {
@@ -226,6 +230,170 @@ public class DynamoDbSchema {
                         new AttributeDefinition("rmaCenterId", ScalarAttributeType.S)
                 )
                 .withBillingMode(BillingMode.PAY_PER_REQUEST);
+    }
+
+    public static void seedData(AmazonDynamoDB dynamoDB) {
+        // Hardcoded in bootstrap script for local env
+        String storeId = "4s9msnc2u8";
+
+        // Store with basic configuration
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("Stores")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "name", new AttributeValue("Demo Store"),
+                        "checkoutConfiguration", new AttributeValue().withM(Map.of(
+                                "currency", new AttributeValue("pln"),
+                                "successUrl", new AttributeValue("http://localhost:8080/success/"),
+                                "cancelUrl", new AttributeValue("http://localhost:8080/cancel")
+                        )),
+                        "fulfilmentConfiguration", new AttributeValue().withM(Map.of(
+                                "orderAssemblyDays", new AttributeValue().withN("2"),
+                                "orderRealizationDays", new AttributeValue().withN("5"),
+                                "automatedFulfilment", new AttributeValue().withBOOL(false),
+                                "defaultFulfilmentType", new AttributeValue("WarehouseFulfilment")
+                        )),
+                        "billingDetails", new AttributeValue().withM(Map.of(
+                                "companyName", new AttributeValue("Demo Store Sp. z o.o."),
+                                "taxId", new AttributeValue("1234567890"),
+                                "streetAndNumber", new AttributeValue("ul. Testowa 1"),
+                                "postalCode", new AttributeValue("00-001"),
+                                "city", new AttributeValue("Warszawa"),
+                                "country", new AttributeValue("PL")
+                        ))
+                )));
+
+        // Order 1: New order
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("Orders")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "orderId", new AttributeValue("ORD-001"),
+                        "email", new AttributeValue("jan.kowalski@example.com"),
+                        "totalPrice", new AttributeValue().withN("2499.99"),
+                        "orderedAt", new AttributeValue("2026-04-22T10:30:00"),
+                        "status", new AttributeValue("New"),
+                        "fulfilmentType", new AttributeValue("WarehouseFulfilment"),
+                        "billingDetails", new AttributeValue().withM(Map.of(
+                                "name", new AttributeValue("Jan"),
+                                "surname", new AttributeValue("Kowalski"),
+                                "email", new AttributeValue("jan.kowalski@example.com"),
+                                "streetAndNumber", new AttributeValue("ul. Mokotowska 15/3"),
+                                "postalCode", new AttributeValue("00-640"),
+                                "city", new AttributeValue("Warszawa"),
+                                "country", new AttributeValue("PL")
+                        ))
+                )));
+
+        // Order 2: In assembly
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("Orders")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "orderId", new AttributeValue("ORD-002"),
+                        "email", new AttributeValue("anna.nowak@example.com"),
+                        "totalPrice", new AttributeValue().withN("849.00"),
+                        "orderedAt", new AttributeValue("2026-04-21T14:15:00"),
+                        "status", new AttributeValue("Assembly"),
+                        "fulfilmentType", new AttributeValue("WarehouseFulfilment"),
+                        "billingDetails", new AttributeValue().withM(Map.of(
+                                "name", new AttributeValue("Anna"),
+                                "surname", new AttributeValue("Nowak"),
+                                "email", new AttributeValue("anna.nowak@example.com"),
+                                "streetAndNumber", new AttributeValue("ul. Floriańska 8"),
+                                "postalCode", new AttributeValue("31-021"),
+                                "city", new AttributeValue("Kraków"),
+                                "country", new AttributeValue("PL")
+                        ))
+                )));
+
+        // Order items for ORD-001
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("OrderItems")
+                .withItem(Map.of(
+                        "orderId", new AttributeValue("ORD-001"),
+                        "itemId", new AttributeValue("ITEM-001"),
+                        "name", new AttributeValue("Laptop Dell Latitude 5540"),
+                        "ean", new AttributeValue("5901234567890"),
+                        "mfn", new AttributeValue("LAT5540-i5-16"),
+                        "qty", new AttributeValue().withN("1"),
+                        "unitPrice", new AttributeValue().withN("2499.99"),
+                        "unitCost", new AttributeValue().withN("2100.00"),
+                        "tax", new AttributeValue().withN("23"),
+                        "status", new AttributeValue("New")
+                )));
+
+        // Order items for ORD-002
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("OrderItems")
+                .withItem(Map.of(
+                        "orderId", new AttributeValue("ORD-002"),
+                        "itemId", new AttributeValue("ITEM-002"),
+                        "name", new AttributeValue("Monitor LG 27UL850"),
+                        "ean", new AttributeValue("8801234567890"),
+                        "mfn", new AttributeValue("27UL850-W"),
+                        "qty", new AttributeValue().withN("1"),
+                        "unitPrice", new AttributeValue().withN("849.00"),
+                        "unitCost", new AttributeValue().withN("720.00"),
+                        "tax", new AttributeValue().withN("23"),
+                        "status", new AttributeValue("Allocation")
+                )));
+
+        // Warehouse items
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("WarehouseItems")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "itemId", new AttributeValue("WH-001"),
+                        "name", new AttributeValue("Laptop Dell Latitude 5540"),
+                        "ean", new AttributeValue("5901234567890"),
+                        "mfn", new AttributeValue("LAT5540-i5-16"),
+                        "qty", new AttributeValue().withN("3"),
+                        "unitCost", new AttributeValue().withN("2100.00"),
+                        "tax", new AttributeValue().withN("23"),
+                        "status", new AttributeValue("Delivered")
+                )));
+
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("WarehouseItems")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "itemId", new AttributeValue("WH-002"),
+                        "name", new AttributeValue("Monitor LG 27UL850"),
+                        "ean", new AttributeValue("8801234567890"),
+                        "mfn", new AttributeValue("27UL850-W"),
+                        "qty", new AttributeValue().withN("5"),
+                        "unitCost", new AttributeValue().withN("720.00"),
+                        "tax", new AttributeValue().withN("23"),
+                        "status", new AttributeValue("Delivered")
+                )));
+
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("WarehouseItems")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "itemId", new AttributeValue("WH-003"),
+                        "name", new AttributeValue("Klawiatura Logitech MX Keys"),
+                        "ean", new AttributeValue("5099206085800"),
+                        "mfn", new AttributeValue("920-009415"),
+                        "qty", new AttributeValue().withN("12"),
+                        "unitCost", new AttributeValue().withN("380.00"),
+                        "tax", new AttributeValue().withN("23"),
+                        "status", new AttributeValue("Delivered")
+                )));
+
+        // Basket (offer)
+        dynamoDB.putItem(new PutItemRequest()
+                .withTableName("Baskets")
+                .withItem(Map.of(
+                        "storeId", new AttributeValue(storeId),
+                        "basketId", new AttributeValue("BSK-001"),
+                        "name", new AttributeValue("Oferta sprzętowa - Firma XYZ"),
+                        "type", new AttributeValue("Offer"),
+                        "createdAt", new AttributeValue("2026-04-20T09:00:00"),
+                        "showPrices", new AttributeValue().withBOOL(true),
+                        "fulfilmentType", new AttributeValue("WarehouseFulfilment")
+                )));
     }
 
     public static CreateTableRequest warehouseDocumentsSequencesTableSchema() {
