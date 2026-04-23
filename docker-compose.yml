@@ -13,7 +13,7 @@ services:
       - AWS_DEFAULT_REGION=eu-central-1
     volumes:
       # Bootstrap script runs automatically when Ministack is ready
-      - ./localstack-init:/etc/localstack/init/ready.d
+      - ./local-init:/etc/localstack/init/ready.d
       # Bind mount so .cognito.env is written to the host for the Spring app
       - ./.ministack-data:/var/lib/localstack
 

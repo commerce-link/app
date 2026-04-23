@@ -82,13 +82,13 @@ port 8000.
 docker compose up
 ```
 
-On first start, the bootstrap script (`localstack-init/01-bootstrap.sh`)
+On first start, the bootstrap script (`local-init/01-bootstrap.sh`)
 automatically creates S3 buckets, SQS queues, and a Cognito user pool with a
 default admin user (`admin@commercelink.local` / `Admin123!`).
 
 The generated Cognito credentials (pool ID, client ID, client secret) are
 written to `.ministack-data/.cognito.env` and picked up automatically by
-`application-local.properties` via `spring.config.import`.
+`application-localdev.properties` via `spring.config.import`.
 
 DynamoDB data is persisted in `.dynamodb-data/` within the repo directory.
 
@@ -125,11 +125,12 @@ curl http://localhost:4566/_localstack/health
 
 2. **Run the Application:**
    ```sh
-   mvn spring-boot:run -Pdev
+   mvn spring-boot:run -Pdev -Dspring-boot.run.profiles=localdev
    ```
 
 3. **Access the Application:**
    Open your browser and go to `http://localhost:8080`.
+   Login as admin user: `admin@commercelink.local` / `Admin123!`
 
 ## Troubleshooting
 
