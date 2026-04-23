@@ -112,21 +112,21 @@ class WarehouseDocumentsController {
 
     @GetMapping("/dashboard/warehouse-documents/details")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    String documentDetails(@RequestParam String documentNo, Model model) {
-        return showDocumentDetails(getStoreId(), documentNo, model);
+    String documentDetails(@RequestParam String documentId, Model model) {
+        return showDocumentDetails(getStoreId(), documentId, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/warehouse-documents/details")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     String documentDetailsForSuperAdmin(
             @PathVariable String storeId,
-            @RequestParam String documentNo,
+            @RequestParam String documentId,
             Model model
     ) {
-        return showDocumentDetails(storeId, documentNo, model);
+        return showDocumentDetails(storeId, documentId, model);
     }
 
-    private String showDocumentDetails(String storeId, String documentNo, Model model) {
+    private String showDocumentDetails(String storeId, String documentId, Model model) {
         Store store = storesRepository.findById(storeId);
         String redirectUrl = isSuperAdmin()
                 ? "redirect:/dashboard/store/" + storeId + "/warehouse-documents"
@@ -136,13 +136,13 @@ class WarehouseDocumentsController {
             return redirectUrl;
         }
 
-        WarehouseDocument document = warehouseDocumentRepository.findByDocumentNo(storeId, documentNo);
+        WarehouseDocument document = warehouseDocumentRepository.findByDocumentId(storeId, documentId);
 
         if (document == null) {
             return redirectUrl;
         }
 
-        List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentNo(documentNo);
+        List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentId(documentId);
 
         model.addAttribute("document", document);
         model.addAttribute("items", items);
@@ -159,7 +159,7 @@ class WarehouseDocumentsController {
     @GetMapping("/dashboard/warehouse-documents/delivery-mfn-history")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn, Model model) {
-        model.addAttribute("rows", warehouseDocumentMfnHistoryService.getMfnHistory(deliveryId, mfn));
+        model.addAttribute("rows", warehouseDocumentMfnHistoryService.getMfnHistory(getStoreId(), deliveryId, mfn));
         model.addAttribute("deliveryId", deliveryId);
         model.addAttribute("mfn", mfn);
         return "warehouse-document-mfn-history";

@@ -70,7 +70,7 @@ public class StockLedgerService {
             DocumentType type = document.getType();
             if (type == null || !isStockMovement(type)) continue;
 
-            List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentNo(document.getDocumentNo());
+            List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentId(document.getDocumentId());
             for (WarehouseDocumentItem item : items) {
                 if (item.getMfn() == null || item.getMfn().isBlank()) continue;
 

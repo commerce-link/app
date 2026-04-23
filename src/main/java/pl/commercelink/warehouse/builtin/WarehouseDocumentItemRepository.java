@@ -21,12 +21,12 @@ class WarehouseDocumentItemRepository extends DynamoDbRepository<WarehouseDocume
         dynamoDBMapper.batchSave(items);
     }
 
-    List<WarehouseDocumentItem> findByDocumentNo(String documentNo) {
+    List<WarehouseDocumentItem> findByDocumentId(String documentId) {
         Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":documentNo", new AttributeValue().withS(documentNo));
+        eav.put(":documentId", new AttributeValue().withS(documentId));
 
         DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = new DynamoDBQueryExpression<WarehouseDocumentItem>()
-                .withKeyConditionExpression("documentNo = :documentNo")
+                .withKeyConditionExpression("documentId = :documentId")
                 .withExpressionAttributeValues(eav);
 
         return dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression);
@@ -40,19 +40,6 @@ class WarehouseDocumentItemRepository extends DynamoDbRepository<WarehouseDocume
                 .withIndexName("DeliveryIdIndex")
                 .withConsistentRead(false)
                 .withKeyConditionExpression("deliveryId = :deliveryId")
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression);
-    }
-
-    List<WarehouseDocumentItem> findByMfn(String mfn) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":mfn", new AttributeValue().withS(mfn));
-
-        DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = new DynamoDBQueryExpression<WarehouseDocumentItem>()
-                .withIndexName("MfnIndex")
-                .withConsistentRead(false)
-                .withKeyConditionExpression("mfn = :mfn")
                 .withExpressionAttributeValues(eav);
 
         return dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression);

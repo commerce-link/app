@@ -7,25 +7,29 @@ import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-@DynamoDBTable(tableName = "WarehouseDocuments")
+@DynamoDBTable(tableName = "WarehouseDocumentsV2")
 public class WarehouseDocument {
 
     @DynamoDBHashKey(attributeName = "storeId")
-    @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"DeliveryIdIndex", "CreatedAtIndex"}, attributeName = "storeId")
+    @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"DeliveryIdIndex", "CreatedAtIndex", "OrderIdIndex", "RMAIdIndex"}, attributeName = "storeId")
     private String storeId;
 
-    @DynamoDBRangeKey(attributeName = "documentNo")
+    @DynamoDBRangeKey(attributeName = "documentId")
+    private String documentId;
+
+    @DynamoDBAttribute(attributeName = "documentNo")
     private String documentNo;
 
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private DocumentType type;
 
-    @DynamoDBAttribute(attributeName = "orderId")
+    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "OrderIdIndex", attributeName = "orderId")
     private String orderId;
 
-    @DynamoDBAttribute(attributeName = "rmaId")
+    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "RMAIdIndex", attributeName = "rmaId")
     private String rmaId;
 
     @DynamoDBIndexRangeKey(globalSecondaryIndexName = "DeliveryIdIndex", attributeName = "deliveryId")
@@ -33,9 +37,6 @@ public class WarehouseDocument {
 
     @DynamoDBAttribute(attributeName = "warehouseId")
     private String warehouseId;
-
-    @DynamoDBAttribute(attributeName = "sourceDocumentNo")
-    private String sourceDocumentNo;
 
     @DynamoDBAttribute(attributeName = "issuer")
     private IssuerDetails issuer;
@@ -63,12 +64,27 @@ public class WarehouseDocument {
     public WarehouseDocument() {
     }
 
+    public WarehouseDocument(String storeId, String documentNo, DocumentType type) {
+        this.documentId = UUID.randomUUID().toString();
+        this.storeId = storeId;
+        this.documentNo = documentNo;
+        this.type = type;
+    }
+
     public String getStoreId() {
         return storeId;
     }
 
     public void setStoreId(String storeId) {
         this.storeId = storeId;
+    }
+
+    public String getDocumentId() {
+        return documentId;
+    }
+
+    public void setDocumentId(String documentId) {
+        this.documentId = documentId;
     }
 
     public String getDocumentNo() {
@@ -127,14 +143,6 @@ public class WarehouseDocument {
 
     public void setWarehouseId(String warehouseId) {
         this.warehouseId = warehouseId;
-    }
-
-    public String getSourceDocumentNo() {
-        return sourceDocumentNo;
-    }
-
-    public void setSourceDocumentNo(String sourceDocumentNo) {
-        this.sourceDocumentNo = sourceDocumentNo;
     }
 
     public IssuerDetails getIssuer() {

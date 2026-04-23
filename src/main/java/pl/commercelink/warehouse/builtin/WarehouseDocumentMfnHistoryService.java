@@ -12,12 +12,17 @@ import java.util.List;
 class WarehouseDocumentMfnHistoryService {
 
     private final WarehouseDocumentItemRepository warehouseDocumentItemRepository;
+    private final WarehouseDocumentRepository warehouseDocumentRepository;
 
-    WarehouseDocumentMfnHistoryService(WarehouseDocumentItemRepository warehouseDocumentItemRepository) {
+    WarehouseDocumentMfnHistoryService(
+            WarehouseDocumentItemRepository warehouseDocumentItemRepository,
+            WarehouseDocumentRepository warehouseDocumentRepository
+    ) {
         this.warehouseDocumentItemRepository = warehouseDocumentItemRepository;
+        this.warehouseDocumentRepository = warehouseDocumentRepository;
     }
 
-    List<MfnHistoryRow> getMfnHistory(String deliveryId, String mfn) {
+    List<MfnHistoryRow> getMfnHistory(String storeId, String deliveryId, String mfn) {
         List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDeliveryId(deliveryId).stream()
                 .filter(item -> mfn.equals(item.getMfn()))
                 .sorted(Comparator.comparing(WarehouseDocumentItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
@@ -28,10 +33,12 @@ class WarehouseDocumentMfnHistoryService {
         for (WarehouseDocumentItem item : items) {
             int stockChange = item.getDocumentType().isReceiptType() ? item.getQty() : -item.getQty();
             runningStock += stockChange;
-            rows.add(new MfnHistoryRow(item.getDocumentNo(), item.getDocumentType(), item.getCreatedAt(), item.getQty(), stockChange, runningStock));
+            WarehouseDocument document = warehouseDocumentRepository.findByDocumentId(storeId, item.getDocumentId());
+            String documentNo = document != null ? document.getDocumentNo() : item.getDocumentId();
+            rows.add(new MfnHistoryRow(item.getDocumentId(), documentNo, item.getDocumentType(), item.getCreatedAt(), item.getQty(), stockChange, runningStock));
         }
         return rows;
     }
 
-    record MfnHistoryRow(String documentNo, DocumentType documentType, LocalDateTime createdAt, int qty, int stockChange, int stockAfter) {}
+    record MfnHistoryRow(String documentId, String documentNo, DocumentType documentType, LocalDateTime createdAt, int qty, int stockChange, int stockAfter) {}
 }

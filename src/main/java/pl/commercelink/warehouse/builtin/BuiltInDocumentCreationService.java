@@ -38,17 +38,14 @@ class BuiltInDocumentCreationService {
                 documentNo -> buildDocument(documentNo, request)
         )
                 .map(doc -> {
-                    saveDocumentItems(doc.getDocumentNo(), doc.getCreatedAt(), request.getType(), request.getItems());
-                    return OperationResult.success(new Document(doc.getDocumentNo(), doc.getDocumentNo(), null, request.getType()));
+                    saveDocumentItems(doc.getDocumentId(), doc.getCreatedAt(), request.getType(), request.getItems());
+                    return OperationResult.success(new Document(doc.getDocumentId(), doc.getDocumentNo(), null, request.getType()));
                 })
                 .orElseGet(() -> OperationResult.failure("Failed to create document after " + MAX_RETRIES + " attempts due to concurrent access"));
     }
 
     private WarehouseDocument buildDocument(String documentNo, DocumentCreationRequest request) {
-        WarehouseDocument document = new WarehouseDocument();
-        document.setStoreId(request.getStoreId());
-        document.setDocumentNo(documentNo);
-        document.setType(request.getType());
+        WarehouseDocument document = new WarehouseDocument(request.getStoreId(), documentNo, request.getType());
         document.setCreatedAt(LocalDateTime.now());
         document.setWarehouseId(request.getWarehouseId());
         document.setIssuer(request.getIssuer());
@@ -77,12 +74,12 @@ class BuiltInDocumentCreationService {
         return document;
     }
 
-    private void saveDocumentItems(String documentNo, LocalDateTime createdAt, DocumentType type, List<DocumentLineItem> items) {
+    private void saveDocumentItems(String documentId, LocalDateTime createdAt, DocumentType type, List<DocumentLineItem> items) {
         List<WarehouseDocumentItem> documentItems = new ArrayList<>();
         for (DocumentLineItem item : items) {
             ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), null);
             documentItems.add(new WarehouseDocumentItem(
-                    documentNo,
+                    documentId,
                     type,
                     createdAt,
                     item.getDeliveryId(),

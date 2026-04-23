@@ -88,7 +88,7 @@
                             <td th:if="${isSuperAdmin}" th:text="${doc.storeId}"></td>
                             <td th:text="${doc.warehouseId}"></td>
                             <td>
-                                <a th:href="@{${detailPath + '/warehouse-documents/details'}(documentNo=${doc.documentNo})}">
+                                <a th:href="@{${detailPath + '/warehouse-documents/details'}(documentId=${doc.documentId})}">
                                     <span th:text="${doc.documentNo}"></span>
                                 </a>
                             </td>

@@ -22,8 +22,8 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
         super(amazonDynamoDB);
     }
 
-    WarehouseDocument findByDocumentNo(String storeId, String documentNo) {
-        return dynamoDBMapper.load(WarehouseDocument.class, storeId, documentNo);
+    WarehouseDocument findByDocumentId(String storeId, String documentId) {
+        return dynamoDBMapper.load(WarehouseDocument.class, storeId, documentId);
     }
 
     List<WarehouseDocument> search(String storeId, DocumentType type, LocalDateTime dateFrom,
@@ -163,6 +163,6 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
 
     private DynamoDBTransactionWriteExpression buildDocumentCondition() {
         return new DynamoDBTransactionWriteExpression()
-                .withConditionExpression("attribute_not_exists(documentNo)");
+                .withConditionExpression("attribute_not_exists(documentId)");
     }
 }

@@ -62,7 +62,7 @@ public class Document {
         }
 
         if (type.isWarehouseDocument()) {
-            return "/dashboard/warehouse-documents/details?documentNo=" + number;
+            return "/dashboard/warehouse-documents/details?documentId=" + id;
         }
 
         return null;

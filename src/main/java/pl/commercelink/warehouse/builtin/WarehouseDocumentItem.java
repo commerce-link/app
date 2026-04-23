@@ -7,11 +7,11 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@DynamoDBTable(tableName = "WarehouseDocumentItems")
+@DynamoDBTable(tableName = "WarehouseDocumentItemsV2")
 public class WarehouseDocumentItem {
 
-    @DynamoDBHashKey(attributeName = "documentNo")
-    private String documentNo;
+    @DynamoDBHashKey(attributeName = "documentId")
+    private String documentId;
 
     @DynamoDBRangeKey(attributeName = "itemId")
     private String itemId;
@@ -22,7 +22,7 @@ public class WarehouseDocumentItem {
     @DynamoDBAttribute(attributeName = "ean")
     private String ean;
 
-    @DynamoDBIndexHashKey(globalSecondaryIndexName = "MfnIndex", attributeName = "mfn")
+    @DynamoDBAttribute(attributeName = "mfn")
     private String mfn;
 
     @DynamoDBAttribute(attributeName = "name")
@@ -45,9 +45,9 @@ public class WarehouseDocumentItem {
     public WarehouseDocumentItem() {
     }
 
-    public WarehouseDocumentItem(String documentNo, DocumentType documentType, LocalDateTime createdAt, String deliveryId, String ean, String mfn, String name, int qty, double unitPrice) {
+    public WarehouseDocumentItem(String documentId, DocumentType documentType, LocalDateTime createdAt, String deliveryId, String ean, String mfn, String name, int qty, double unitPrice) {
         this.itemId = UUID.randomUUID().toString();
-        this.documentNo = documentNo;
+        this.documentId = documentId;
         this.documentType = documentType;
         this.createdAt = createdAt;
         this.deliveryId = deliveryId;
@@ -58,12 +58,12 @@ public class WarehouseDocumentItem {
         this.unitPrice = unitPrice;
     }
 
-    public String getDocumentNo() {
-        return documentNo;
+    public String getDocumentId() {
+        return documentId;
     }
 
-    public void setDocumentNo(String documentNo) {
-        this.documentNo = documentNo;
+    public void setDocumentId(String documentId) {
+        this.documentId = documentId;
     }
 
     public String getItemId() {

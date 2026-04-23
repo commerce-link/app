@@ -45,7 +45,7 @@
                     <tbody>
                     <tr th:each="row : ${rows}">
                         <td>
-                            <a th:href="@{/dashboard/warehouse-documents/details(documentNo=${row.documentNo()})}"
+                            <a th:href="@{/dashboard/warehouse-documents/details(documentId=${row.documentId()})}"
                                th:text="${row.documentNo()}"></a>
                         </td>
                         <td>

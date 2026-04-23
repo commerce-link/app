@@ -25,11 +25,9 @@ public class DynamoDbSchema {
         dynamoDB.createTable(rmaItemsTableSchema());
         dynamoDB.createTable(rmaCentersTableSchema());
 
-        dynamoDB.createTable(warehouseDocumentsTableSchema());
+        dynamoDB.createTable(warehouseDocumentsV2TableSchema());
         dynamoDB.createTable(warehouseDocumentsSequencesTableSchema());
-
-
-        dynamoDB.createTable(warehouseDocumentItemsTableSchema());
+        dynamoDB.createTable(warehouseDocumentItemsV2TableSchema());
         dynamoDB.createTable(orderEventsTableSchema());
         addExternalOrderIdIndexForOrderSchema(dynamoDB); // not created yet
         addBasketCreatedAtIndexForBasketSchema(dynamoDB);
@@ -301,38 +299,6 @@ public class DynamoDbSchema {
         }
     }
 
-    public static CreateTableRequest warehouseDocumentsTableSchema() {
-        return new CreateTableRequest()
-                .withTableName("WarehouseDocuments")
-                .withKeySchema(
-                        new KeySchemaElement("storeId", KeyType.HASH),
-                        new KeySchemaElement("documentNo", KeyType.RANGE)
-                )
-                .withAttributeDefinitions(
-                        new AttributeDefinition("storeId", ScalarAttributeType.S),
-                        new AttributeDefinition("documentNo", ScalarAttributeType.S),
-                        new AttributeDefinition("deliveryId", ScalarAttributeType.S),
-                        new AttributeDefinition("createdAt", ScalarAttributeType.S)
-                )
-                .withBillingMode(BillingMode.PAY_PER_REQUEST)
-                .withGlobalSecondaryIndexes(
-                        new GlobalSecondaryIndex()
-                                .withIndexName("DeliveryIdIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("storeId", KeyType.HASH),
-                                        new KeySchemaElement("deliveryId", KeyType.RANGE)
-                                )
-                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL)),
-                        new GlobalSecondaryIndex()
-                                .withIndexName("CreatedAtIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("storeId", KeyType.HASH),
-                                        new KeySchemaElement("createdAt", KeyType.RANGE)
-                                )
-                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL))
-                );
-    }
-
     public static CreateTableRequest warehouseDocumentsSequencesTableSchema() {
         return new CreateTableRequest()
                 .withTableName("WarehouseDocumentSequences")
@@ -369,18 +335,65 @@ public class DynamoDbSchema {
                         .withProjection(new Projection().withProjectionType(ProjectionType.ALL)));
     }
 
-    public static CreateTableRequest warehouseDocumentItemsTableSchema() {
+    public static CreateTableRequest warehouseDocumentsV2TableSchema() {
         return new CreateTableRequest()
-                .withTableName("WarehouseDocumentItems")
+                .withTableName("WarehouseDocumentsV2")
                 .withKeySchema(
-                        new KeySchemaElement("documentNo", KeyType.HASH),
+                        new KeySchemaElement("storeId", KeyType.HASH),
+                        new KeySchemaElement("documentId", KeyType.RANGE)
+                )
+                .withAttributeDefinitions(
+                        new AttributeDefinition("storeId", ScalarAttributeType.S),
+                        new AttributeDefinition("documentId", ScalarAttributeType.S),
+                        new AttributeDefinition("deliveryId", ScalarAttributeType.S),
+                        new AttributeDefinition("orderId", ScalarAttributeType.S),
+                        new AttributeDefinition("rmaId", ScalarAttributeType.S),
+                        new AttributeDefinition("createdAt", ScalarAttributeType.S)
+                )
+                .withBillingMode(BillingMode.PAY_PER_REQUEST)
+                .withGlobalSecondaryIndexes(
+                        new GlobalSecondaryIndex()
+                                .withIndexName("DeliveryIdIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("deliveryId", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL)),
+                        new GlobalSecondaryIndex()
+                                .withIndexName("CreatedAtIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("createdAt", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL)),
+                        new GlobalSecondaryIndex()
+                                .withIndexName("OrderIdIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("orderId", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL)),
+                        new GlobalSecondaryIndex()
+                                .withIndexName("RMAIdIndex")
+                                .withKeySchema(
+                                        new KeySchemaElement("storeId", KeyType.HASH),
+                                        new KeySchemaElement("rmaId", KeyType.RANGE)
+                                )
+                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL))
+                );
+    }
+
+    public static CreateTableRequest warehouseDocumentItemsV2TableSchema() {
+        return new CreateTableRequest()
+                .withTableName("WarehouseDocumentItemsV2")
+                .withKeySchema(
+                        new KeySchemaElement("documentId", KeyType.HASH),
                         new KeySchemaElement("itemId", KeyType.RANGE)
                 )
                 .withAttributeDefinitions(
-                        new AttributeDefinition("documentNo", ScalarAttributeType.S),
+                        new AttributeDefinition("documentId", ScalarAttributeType.S),
                         new AttributeDefinition("itemId", ScalarAttributeType.S),
-                        new AttributeDefinition("deliveryId", ScalarAttributeType.S),
-                        new AttributeDefinition("mfn", ScalarAttributeType.S)
+                        new AttributeDefinition("deliveryId", ScalarAttributeType.S)
                 )
                 .withBillingMode(BillingMode.PAY_PER_REQUEST)
                 .withGlobalSecondaryIndexes(
@@ -388,12 +401,6 @@ public class DynamoDbSchema {
                                 .withIndexName("DeliveryIdIndex")
                                 .withKeySchema(
                                         new KeySchemaElement("deliveryId", KeyType.HASH)
-                                )
-                                .withProjection(new Projection().withProjectionType(ProjectionType.ALL)),
-                        new GlobalSecondaryIndex()
-                                .withIndexName("MfnIndex")
-                                .withKeySchema(
-                                        new KeySchemaElement("mfn", KeyType.HASH)
                                 )
                                 .withProjection(new Projection().withProjectionType(ProjectionType.ALL))
                 );
