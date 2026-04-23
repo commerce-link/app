@@ -5,20 +5,17 @@
 #         aws dynamodb list-tables --endpoint-url http://localhost:8000
 
 services:
-  commercelink-localstack:
-    image: localstack/localstack:4.14.0
+  commercelink-ministack:
+    image: ministackorg/ministack
     ports:
       - "4566:4566"
     environment:
-      # Explicitly list services to prevent DynamoDB from starting in LocalStack
-      # DynamoDB runs in its own container below for free persistence
-      - SERVICES=s3,sqs,ses,secretsmanager,ssm,scheduler,events
       - AWS_DEFAULT_REGION=eu-central-1
     volumes:
-      # Bootstrap script runs automatically when LocalStack is ready
+      # Bootstrap script runs automatically when Ministack is ready
       - ./localstack-init:/etc/localstack/init/ready.d
-      # Named volume for persisted state
-      - commercelink-localstack-data:/var/lib/localstack
+      # Bind mount so .cognito.env is written to the host for the Spring app
+      - ./.ministack-data:/var/lib/localstack
 
   commercelink-dynamodb:
     image: amazon/dynamodb-local:latest
@@ -34,5 +31,3 @@ services:
       retries: 3
       start_period: 5s
 
-volumes:
-  commercelink-localstack-data:

@@ -32,6 +32,56 @@ awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
 awslocal sqs create-queue --queue-name pim-fetch-queue
 
-echo "=== LocalStack bootstrap complete ==="
+# Cognito User Pool + App Client for local OAuth2 login
+POOL_ID=$(awslocal cognito-idp create-user-pool \
+  --pool-name commercelink-local \
+  --auto-verified-attributes email \
+  --query 'UserPool.Id' --output text)
+
+CLIENT_ID=$(awslocal cognito-idp create-user-pool-client \
+  --user-pool-id "$POOL_ID" \
+  --client-name commercelink-app \
+  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+  --allowed-o-auth-flows code \
+  --allowed-o-auth-scopes openid email profile \
+  --allowed-o-auth-flows-user-pool-client \
+  --callback-urls '["http://localhost:8080/login/oauth2/code/cognito"]' \
+  --logout-urls '["http://localhost:8080/logout-success"]' \
+  --generate-secret \
+  --query 'UserPoolClient.ClientId' --output text)
+
+CLIENT_SECRET=$(awslocal cognito-idp describe-user-pool-client \
+  --user-pool-id "$POOL_ID" \
+  --client-id "$CLIENT_ID" \
+  --query 'UserPoolClient.ClientSecret' --output text)
+
+# Create a default admin user for local development
+awslocal cognito-idp admin-create-user \
+  --user-pool-id "$POOL_ID" \
+  --username admin@commercelink.local \
+  --user-attributes Name=email,Value=admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Admin Name=custom:role,Value=SUPER_ADMIN Name=custom:storeId,Value=4s9msnc2u8 \
+  --temporary-password Admin123!
+
+awslocal cognito-idp admin-set-user-password \
+  --user-pool-id "$POOL_ID" \
+  --username admin@commercelink.local \
+  --password Admin123! \
+  --permanent
+
+# Write generated values to shared volume so the Spring app can pick them up
+cat > /var/lib/localstack/.cognito.env <<EOF
+COGNITO_USER_POOL_ID=$POOL_ID
+COGNITO_CLIENT_ID=$CLIENT_ID
+COGNITO_CLIENT_SECRET=$CLIENT_SECRET
+EOF
+
+echo ""
+echo "=== Cognito local setup ==="
+echo "User Pool ID:    $POOL_ID"
+echo "Client ID:       $CLIENT_ID"
+echo "Client Secret:   $CLIENT_SECRET"
+echo "Admin user:      admin@commercelink.local / Admin123!"
+
+echo "=== Bootstrap complete ==="
 awslocal s3 ls
 awslocal sqs list-queues
