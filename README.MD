@@ -82,7 +82,7 @@ port 8000.
 docker compose up
 ```
 
-On first start, the bootstrap script (`local-init/01-bootstrap.sh`)
+On first start, the bootstrap script (`resources/local-init/01-bootstrap.sh`)
 automatically creates S3 buckets, SQS queues, and a Cognito user pool with a
 default admin user (`admin@commercelink.local` / `Admin123!`).
 
