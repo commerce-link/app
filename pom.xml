@@ -58,22 +58,17 @@
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
+            <artifactId>commercelink-starter</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
             <artifactId>pim-api</artifactId>
             <version>0.1.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
-            <artifactId>pim-commercelink</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>pl.commercelink</groupId>
             <artifactId>supplier-api</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>pl.commercelink</groupId>
-            <artifactId>commercelink-starter</artifactId>
             <version>0.1.0</version>
         </dependency>
         <dependency>
@@ -309,6 +304,11 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>pim-commercelink</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-abgroup</artifactId>
