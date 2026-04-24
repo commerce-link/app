@@ -1,13 +1,13 @@
 package pl.commercelink.inventory.supplier;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryRepository;
 
 
 @Component
-@ConditionalOnExpression("'${application.env}' == 'prod' or '${application.env}' == 'localdev'")
+@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 public class SqsFeedLoaderEventListener {
 
     private final SupplierRegistry supplierRegistry;
@@ -39,10 +39,6 @@ public class SqsFeedLoaderEventListener {
         private String supplierName;
 
         public FeedLoaderEventPayload() {
-        }
-
-        public FeedLoaderEventPayload(String supplierName) {
-            this.supplierName = supplierName;
         }
 
         public String getSupplierName() {
