@@ -90,17 +90,9 @@ The generated Cognito credentials (pool ID, client ID, client secret) are
 written to `.ministack-data/.cognito.env` and picked up automatically by
 `application-localdev.properties` via `spring.config.import`.
 
-DynamoDB data is persisted in `.dynamodb-data/` within the repo directory.
-
-**To reset the database** (useful when troubleshooting schema migrations):
-
-1. Stop the container: `docker compose down`
-2. Delete `.dynamodb-data/shared-local-instance.db`
-3. Start again: `docker compose up`
-
-**After first start, run schema migration:**
-Open `DynamoDbSchema.java` in your IDE and run its `main` method to create
-tables.
+DynamoDB runs in-memory — data is automatically reset on `docker compose down`.
+Tables and seed data are created automatically on startup by the
+`commercelink-dynamodb-migrate` service.
 
 **Verify:**
 

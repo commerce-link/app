@@ -59,7 +59,7 @@ CLIENT_SECRET=$(awslocal cognito-idp describe-user-pool-client \
 awslocal cognito-idp admin-create-user \
   --user-pool-id "$POOL_ID" \
   --username admin@commercelink.local \
-  --user-attributes Name=email,Value=admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Admin Name=custom:role,Value=SUPER_ADMIN Name=custom:storeId,Value=4s9msnc2u8 \
+  --user-attributes Name=email,Value=admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Admin Name=custom:role,Value=SUPER_ADMIN Name=custom:storeId,Value=uma2dqukxr \
   --temporary-password Admin123!
 
 awslocal cognito-idp admin-set-user-password \
