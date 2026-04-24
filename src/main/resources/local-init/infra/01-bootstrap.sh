@@ -14,10 +14,10 @@ awslocal s3 mb s3://pim             # additional bucket used for PIM data
 
 # S3 Data Sync
 # These directories should exist at the repo level alongside docker-compose
-awslocal s3 sync /local/seed/datalake s3://datalake/ --exclude ".gitkeep"
-awslocal s3 sync /local/seed/feeds s3://feeds/ --exclude ".gitkeep"
-awslocal s3 sync /local/seed/pim s3://pim/ --exclude ".gitkeep"
-awslocal s3 sync /local/seed/pricelists s3://pricelists/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/datalake s3://datalake/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/feeds s3://feeds/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/pim s3://pim/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/pricelists s3://pricelists/ --exclude ".gitkeep"
 
 # SQS Queues
 # Spring Cloud AWS SQS auto-creates queues that are referenced by @SqsListener when the app starts

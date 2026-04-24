@@ -15,7 +15,7 @@ services:
       # Bootstrap script runs automatically when Ministack is ready
       - ./src/main/resources/local-init/infra:/etc/localstack/init/ready.d
       # Seed data synced to S3 buckets on startup
-      - ./local/seed:/local/seed:ro
+      - ./src/main/resources/local-init/s3:/local/s3:ro
       # Bind mount so .cognito.env is written to the host for the Spring app
       - ./.ministack-data:/var/lib/localstack
 
