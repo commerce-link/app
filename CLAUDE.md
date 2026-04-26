@@ -27,7 +27,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Run `main` in `starter/dynamodb/DynamoDbSchema.java` to create tables.
+**Schema Migration**: Tables are created via scripts in `src/main/resources/local-init/dynamodb/`.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -218,7 +218,7 @@ Environment switching: `application.env=localhost` uses local DynamoDB and files
 | Application | `Application.java`                                                                                    |
 | Security | `starter/security/config/WebSecurityConfiguration.java`                                               |
 | DynamoDB config | `starter/autoconfigure/DynamoDBConfig.java`                                                           |
-| Schema migration | `starter/dynamodb/DynamoDbSchema.java`                                                                |
+| Schema migration | `src/main/resources/local-init/dynamodb/`                                                                |
 | Orders API | `web/OrdersController.java`                                                                           |
 | Order lifecycle | `orders/OrderLifecycle.java`                                                                          |
 | Fulfilment | `orders/fulfilment/AutomatedOrderFulfilment.java`                                                     |

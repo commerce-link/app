@@ -14,10 +14,10 @@ awslocal s3 mb s3://pim             # additional bucket used for PIM data
 
 # S3 Data Sync
 # These directories should exist at the repo level alongside docker-compose
-# awslocal s3 sync ./datalake s3://datalake/
-# awslocal s3 sync ./feeds s3://feeds/
-# awslocal s3 sync ./pim s3://pim/
-# awslocal s3 sync ./pricelists s3://pricelists/
+awslocal s3 sync /local/s3/datalake s3://datalake/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/feeds s3://feeds/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/pim s3://pim/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/pricelists s3://pricelists/ --exclude ".gitkeep"
 
 # SQS Queues
 # Spring Cloud AWS SQS auto-creates queues that are referenced by @SqsListener when the app starts
@@ -59,7 +59,7 @@ CLIENT_SECRET=$(awslocal cognito-idp describe-user-pool-client \
 awslocal cognito-idp admin-create-user \
   --user-pool-id "$POOL_ID" \
   --username admin@commercelink.local \
-  --user-attributes Name=email,Value=admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Admin Name=custom:role,Value=SUPER_ADMIN Name=custom:storeId,Value=4s9msnc2u8 \
+  --user-attributes Name=email,Value=admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Admin Name=custom:role,Value=SUPER_ADMIN Name=custom:storeId,Value=uma2dqukxr \
   --temporary-password Admin123!
 
 awslocal cognito-idp admin-set-user-password \

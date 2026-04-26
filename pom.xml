@@ -433,6 +433,13 @@
         </profile>
         <profile>
             <id>dev</id>
+            <dependencies>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>supplier-acme</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
+            </dependencies>
         </profile>
     </profiles>
 
