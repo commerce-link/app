@@ -30,9 +30,15 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager) {
 
-        PimCatalogDescriptor descriptor = ServiceLoader.load(PimCatalogDescriptor.class)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No PimCatalogDescriptor found on classpath"));
+        Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
+
+        if (descriptorOpt.isEmpty()) {
+            System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
+            this.catalog = new EmptyPimCatalog();
+            return;
+        }
+
+        PimCatalogDescriptor descriptor = descriptorOpt.get();
 
         Map<String, String> configuration = new HashMap<>();
         if (secretsManager.exists(descriptor.name())) {

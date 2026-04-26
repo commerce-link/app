@@ -117,8 +117,9 @@ curl http://localhost:4566/_localstack/health
 
 2. **Run the Application:**
    ```sh
-   mvn spring-boot:run -Pdev -Dspring-boot.run.profiles=localdev
+   mvn spring-boot:run -Pdev "-Dspring-boot.run.profiles=localdev"
    ```
+   The quotes around the `-D` argument are required on PowerShell (Windows) and harmless on bash, so the same command works on both.
 
 3. **Access the Application:**
    Open your browser and go to `http://localhost:8080`.
