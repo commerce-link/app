@@ -7,7 +7,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@DynamoDBTable(tableName = "WarehouseDocumentItemsV2")
+@DynamoDBTable(tableName = "WarehouseDocumentItems")
 public class WarehouseDocumentItem {
 
     @DynamoDBHashKey(attributeName = "documentId")

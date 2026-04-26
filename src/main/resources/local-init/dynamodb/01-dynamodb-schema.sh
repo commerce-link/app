@@ -103,7 +103,7 @@ create_table RMACenters \
     AttributeName=rmaCenterId,AttributeType=S \
   --key-schema AttributeName=storeId,KeyType=HASH AttributeName=rmaCenterId,KeyType=RANGE
 
-create_table WarehouseDocumentsV2 \
+create_table WarehouseDocuments \
   --attribute-definitions \
     AttributeName=storeId,AttributeType=S \
     AttributeName=documentId,AttributeType=S \
@@ -124,7 +124,7 @@ create_table WarehouseDocumentSequences \
     AttributeName=sequenceKey,AttributeType=S \
   --key-schema AttributeName=storeId,KeyType=HASH AttributeName=sequenceKey,KeyType=RANGE
 
-create_table WarehouseDocumentItemsV2 \
+create_table WarehouseDocumentItems \
   --attribute-definitions \
     AttributeName=documentId,AttributeType=S \
     AttributeName=itemId,AttributeType=S \
