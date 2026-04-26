@@ -55,7 +55,7 @@ CLIENT_SECRET=$(awslocal cognito-idp describe-user-pool-client \
   --client-id "$CLIENT_ID" \
   --query 'UserPoolClient.ClientSecret' --output text)
 
-# Create a default admin user for local development
+# Create default users for local development
 awslocal cognito-idp admin-create-user \
   --user-pool-id "$POOL_ID" \
   --username admin@commercelink.local \
@@ -66,6 +66,30 @@ awslocal cognito-idp admin-set-user-password \
   --user-pool-id "$POOL_ID" \
   --username admin@commercelink.local \
   --password Admin123! \
+  --permanent
+
+awslocal cognito-idp admin-create-user \
+  --user-pool-id "$POOL_ID" \
+  --username store-admin@commercelink.local \
+  --user-attributes Name=email,Value=store-admin@commercelink.local Name=email_verified,Value=true Name=name,Value=Store\ Admin Name=custom:role,Value=ADMIN Name=custom:storeId,Value=uma2dqukxr \
+  --temporary-password Admin123!
+
+awslocal cognito-idp admin-set-user-password \
+  --user-pool-id "$POOL_ID" \
+  --username store-admin@commercelink.local \
+  --password Admin123! \
+  --permanent
+
+awslocal cognito-idp admin-create-user \
+  --user-pool-id "$POOL_ID" \
+  --username store-user@commercelink.local \
+  --user-attributes Name=email,Value=store-user@commercelink.local Name=email_verified,Value=true Name=name,Value=Store\ User Name=custom:role,Value=USER Name=custom:storeId,Value=uma2dqukxr \
+  --temporary-password User123!
+
+awslocal cognito-idp admin-set-user-password \
+  --user-pool-id "$POOL_ID" \
+  --username store-user@commercelink.local \
+  --password User123! \
   --permanent
 
 # Write generated values to shared volume so the Spring app can pick them up
@@ -80,7 +104,9 @@ echo "=== Cognito local setup ==="
 echo "User Pool ID:    $POOL_ID"
 echo "Client ID:       $CLIENT_ID"
 echo "Client Secret:   $CLIENT_SECRET"
-echo "Admin user:      admin@commercelink.local / Admin123!"
+echo "SUPER_ADMIN:     admin@commercelink.local / Admin123!"
+echo "ADMIN:           store-admin@commercelink.local / Admin123! (store: uma2dqukxr)"
+echo "USER:            store-user@commercelink.local / User123! (store: uma2dqukxr)"
 
 echo "=== Bootstrap complete ==="
 awslocal s3 ls

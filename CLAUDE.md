@@ -27,7 +27,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Tables are created via scripts in `src/main/resources/local-init/dynamodb/`.
+**Schema Migration**: Tables and seed data are provisioned by shell scripts in `src/main/resources/local-init/dynamodb/` (`01-dynamodb-schema.sh` creates tables, `02-dynamodb-seed.sh` inserts seed rows). They run automatically as the `commercelink-dynamodb-migrate` and `commercelink-dynamodb-seed` services in `docker-compose.yml`. There is no Java-based migration code — schema changes go in these shell scripts.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -96,7 +96,7 @@ All extracted integrations follow this pattern:
 | Subpackage | Key Classes |
 |------------|-------------|
 | `autoconfigure/` | `DynamoDBConfig`, `S3Config`, `SqsConfig`, `SesConfig`, `SecretsManagerConfig`, `SchedulerConfig`, `CacheConfig`, `SentryConfig` |
-| `dynamodb/` | `DynamoDbRepository<T>` (base), `DynamoDbSchema`, converters, `Metadata` |
+| `dynamodb/` | `DynamoDbRepository<T>` (base), converters, `Metadata` (table provisioning lives in shell scripts under `src/main/resources/local-init/dynamodb/`, not in Java) |
 | `security/` | `WebSecurityConfiguration`, `CognitoOAuthConfig`, `StoreAccessInterceptor`, `CustomOAuth2UserService`, `UserRole` |
 | `email/` | `EmailClient` (SES), `EmailNotification`, `EmailAttachmentBuilder` |
 | `rest/` | `RestApi`, `RestApiWithRetry`, `OAuth2AuthorizationService` |
@@ -218,7 +218,7 @@ Environment switching: `application.env=localhost` uses local DynamoDB and files
 | Application | `Application.java`                                                                                    |
 | Security | `starter/security/config/WebSecurityConfiguration.java`                                               |
 | DynamoDB config | `starter/autoconfigure/DynamoDBConfig.java`                                                           |
-| Schema migration | `src/main/resources/local-init/dynamodb/`                                                                |
+| Schema migration | `src/main/resources/local-init/dynamodb/01-dynamodb-schema.sh` (tables), `02-dynamodb-seed.sh` (seed data) |
 | Orders API | `web/OrdersController.java`                                                                           |
 | Order lifecycle | `orders/OrderLifecycle.java`                                                                          |
 | Fulfilment | `orders/fulfilment/AutomatedOrderFulfilment.java`                                                     |

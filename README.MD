@@ -83,8 +83,14 @@ docker compose up
 ```
 
 On first start, the bootstrap script (`resources/local-init/01-bootstrap.sh`)
-automatically creates S3 buckets, SQS queues, and a Cognito user pool with a
-default admin user (`admin@commercelink.local` / `Admin123!`).
+automatically creates S3 buckets, SQS queues, and a Cognito user pool with
+three default users (all linked to the seeded demo store `uma2dqukxr`):
+
+| Email                              | Password    | Role          |
+|------------------------------------|-------------|---------------|
+| `admin@commercelink.local`         | `Admin123!` | `SUPER_ADMIN` |
+| `store-admin@commercelink.local`   | `Admin123!` | `ADMIN`       |
+| `store-user@commercelink.local`    | `User123!`  | `USER`        |
 
 The generated Cognito credentials (pool ID, client ID, client secret) are
 written to `.ministack-data/.cognito.env` and picked up automatically by
@@ -122,8 +128,7 @@ curl http://localhost:4566/_localstack/health
    The quotes around the `-D` argument are required on PowerShell (Windows) and harmless on bash, so the same command works on both.
 
 3. **Access the Application:**
-   Open your browser and go to `http://localhost:8080`.
-   Login as admin user: `admin@commercelink.local` / `Admin123!`
+   Open your browser and go to `http://localhost:8080` and log in with one of the seeded users listed in [Local Infrastructure](#local-infrastructure).
 
 ## Troubleshooting
 
