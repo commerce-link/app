@@ -171,6 +171,9 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
     }
 
     List<WarehouseItem> findAllAvailableByMfns(String storeId, Collection<String> mfns) {
+        if (mfns == null || mfns.isEmpty()) {
+            return List.of();
+        }
         Map<String, AttributeValue> eav = new HashMap<>();
         Map<String, String> ean = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
@@ -201,6 +204,9 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
     }
 
     List<WarehouseItem> findAllByMfns(String storeId, Collection<String> mfns) {
+        if (mfns == null || mfns.isEmpty()) {
+            return List.of();
+        }
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
 
