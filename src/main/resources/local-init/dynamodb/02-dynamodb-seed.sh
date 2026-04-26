@@ -17,12 +17,13 @@ STORE_ID="uma2dqukxr"
 ddb put-item --table-name Stores --item '{
   "storeId": {"S": "'"$STORE_ID"'"},
   "name": {"S": "Demo Store"},
-  "checkoutConfiguration": {"M": {
+  "checkout": {"M": {
     "currency": {"S": "pln"},
     "successUrl": {"S": "http://localhost:8080/success/"},
-    "cancelUrl": {"S": "http://localhost:8080/cancel"}
+    "cancelUrl": {"S": "http://localhost:8080/cancel"},
+    "deliveryOptions": {"L": []}
   }},
-  "fulfilmentConfiguration": {"M": {
+  "fulfilment": {"M": {
     "orderAssemblyDays": {"N": "2"},
     "orderRealizationDays": {"N": "5"},
     "automatedFulfilment": {"BOOL": false},
@@ -35,7 +36,14 @@ ddb put-item --table-name Stores --item '{
     "postalCode": {"S": "00-001"},
     "city": {"S": "Warszawa"},
     "country": {"S": "PL"}
-  }}
+  }},
+  "invoicing": {"M": {}},
+  "rma": {"M": {}},
+  "warehouse": {"M": {}},
+  "reporting": {"M": {}},
+  "shipping": {"M": {}},
+  "branding": {"M": {}},
+  "clientNotifications": {"M": {}}
 }'
 
 echo "=== DynamoDB seed complete ==="

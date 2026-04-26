@@ -7,12 +7,13 @@
         <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
                 <tr>
-                    <th>Order ID</th>
+                    <th>Nr zamówienia</th>
                     <th>Email</th>
+                    <th>Data zamówienia</th>
                     <th>Data wysyłki</th>
                     <th>Status zamówienia</th>
-                    <th>Typ dokumentu płatniczego</th>
-                    <th>Status dokumentu płatniczego</th>
+                    <th>Dokument magazynowy</th>
+                    <th>Dokument rozliczeniowy</th>
                     <th>Status opinii</th>
                     <th>Pozostało do zapłaty</th>
                 </tr>
@@ -20,15 +21,23 @@
             <tbody>
                 <tr th:each="order : ${orders}">
                     <td>
-                        <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.orderId}"></a>
+                        <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.shortenedOrderId}"></a>
                     </td>
                     <td th:text="${order.billingDetails?.email}"></td>
+                    <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
                     <td th:text="${order.estimatedShippingAt}"></td>
                     <td th:text="${order.status.localizedName}"></td>
-                    <td th:text="${order.receiptType.localizedName}"></td>
-                    <td>
-                        <span th:if="${order.invoiced}" th:text="#{document.status.issued}"></span>
-                        <span th:unless="${order.invoiced}" th:text="#{document.status.toBeIssued}"></span>
+                    <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
+                        <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().type.localizedName + ' ' + goodsIssue.get().number}"></a>
+                        <span th:unless="${goodsIssue.isPresent()}">-</span>
+                    </td>
+                    <td th:with="closing=${order.closingDocument},pending=${order.nextDocumentToIssue}">
+                        <th:block th:if="${closing.isPresent()}">
+                            <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${closing.get().type.localizedName + ' ' + closing.get().number}"></a>
+                            <span th:if="${closing.get().viewUrl == null}" th:text="${closing.get().type.localizedName + ' ' + closing.get().number}"></span>
+                        </th:block>
+                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${pending.get().localizedName + ' — do wystawienia'}"></span>
+                        <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
                     </td>
                     <td th:text="${order.review?.status?.localizedName ?: '-'}"></td>
                     <td th:text="${order.unpaidAmount}"></td>
