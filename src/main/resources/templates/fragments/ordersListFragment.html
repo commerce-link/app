@@ -28,7 +28,7 @@
                     <td th:text="${order.estimatedShippingAt}"></td>
                     <td th:text="${order.status.localizedName}"></td>
                     <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
-                        <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().type.localizedName + ' ' + goodsIssue.get().number}"></a>
+                        <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
                         <span th:unless="${goodsIssue.isPresent()}">-</span>
                     </td>
                     <td th:with="closing=${order.closingDocument},pending=${order.nextDocumentToIssue}">
