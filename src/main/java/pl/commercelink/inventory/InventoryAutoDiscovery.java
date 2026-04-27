@@ -136,18 +136,23 @@ class InventoryAutoDiscovery {
         Map<Boolean, List<InventoryItem>> priceGroupedItems = inventoryItems.stream()
                 .collect(Collectors.groupingBy(i -> i.netPrice() > splitPrice));
 
-        // filter out groups with just one item
-        List<List<InventoryItem>> priceGroupedItemsFiltered = priceGroupedItems.values()
-                .stream()
-                .filter(g -> g.size() > 1)
-                .toList();
+        List<InventoryItem> lowestPricedGroup = priceGroupedItems.getOrDefault(false, Collections.emptyList());
+        List<InventoryItem> highestPricedGroup = priceGroupedItems.getOrDefault(true, Collections.emptyList());
 
-        if (priceGroupedItemsFiltered.size() == 1) {
-            return Collections.singletonList(createMatchedInventoryFromPriceGroup(priceGroupedItemsFiltered.getFirst()));
+        boolean lowestUsable = lowestPricedGroup.size() > 1;
+        boolean highestUsable = highestPricedGroup.size() > 1;
+
+        if (!lowestUsable && !highestUsable) {
+            return Collections.singletonList(matchedInventory);
         }
 
-        List<InventoryItem> lowestPricedGroup = priceGroupedItemsFiltered.get(0);
-        List<InventoryItem> highestPricedGroup = priceGroupedItemsFiltered.get(1);
+        if (lowestUsable && !highestUsable) {
+            return Collections.singletonList(createMatchedInventoryFromPriceGroup(lowestPricedGroup));
+        }
+
+        if (!lowestUsable) {
+            return Collections.singletonList(createMatchedInventoryFromPriceGroup(highestPricedGroup));
+        }
 
         return processPriceGroups(lowestPricedGroup, highestPricedGroup);
     }
