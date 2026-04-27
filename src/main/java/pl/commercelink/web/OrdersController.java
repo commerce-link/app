@@ -298,7 +298,9 @@ public class OrdersController extends BaseController {
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);
         model.addAttribute("orderFinancials", new OrderFinancials(order, orderItems));
-        model.addAttribute("orderStatuses", OrderStatus.values());
+        model.addAttribute("orderStatuses", Arrays.stream(OrderStatus.values())
+                .filter(status -> status != OrderStatus.Completed || order.getStatus() == OrderStatus.Completed)
+                .collect(Collectors.toList()));
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
         model.addAttribute("paymentSources", PaymentSource.values());
@@ -396,6 +398,11 @@ public class OrdersController extends BaseController {
 
         if (!existingOrder.canTransitionToDelivered(updatedOrder.getStatus())) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.delivered.requires.shipment.data", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        if (updatedOrder.getStatus() == OrderStatus.Completed) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.completed.cannot.be.set.manually", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
 
