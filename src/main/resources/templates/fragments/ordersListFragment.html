@@ -9,6 +9,7 @@
                 <tr>
                     <th>Nr zamówienia</th>
                     <th>Email</th>
+                    <th th:text="#{order.source}"></th>
                     <th>Data zamówienia</th>
                     <th>Data wysyłki</th>
                     <th>Status zamówienia</th>
@@ -24,6 +25,7 @@
                         <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.shortenedOrderId}"></a>
                     </td>
                     <td th:text="${order.billingDetails?.email}"></td>
+                    <td th:text="${order.source?.type ?: '-'}"></td>
                     <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
                     <td th:text="${order.estimatedShippingAt}"></td>
                     <td th:text="${order.status.localizedName}"></td>
