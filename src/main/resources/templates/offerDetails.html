@@ -12,68 +12,113 @@
         <input type="hidden" th:field="*{storeId}" />
         <input type="hidden" th:field="*{type}" />
 
-        <div class="field">
-            <h4 th:text="#{offers.id}"></h4>
-            <div class="control">
-                <input class="input" type="text" th:field="*{basketId}" placeholder="Offer ID" readonly>
-            </div>
-        </div>
+        <div class="columns">
+            <div class="column">
+                <fieldset class="box">
+                    <legend class="label" th:text="#{offers.details}"></legend>
+                    <input type="hidden" th:field="*{basketId}" />
 
-        <div class="field">
-            <h4 th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.name} : #{offers.template} + ' ' + #{offers.name}"></h4>
-            <div class="control">
-                <input class="input" type="text" th:field="*{name}" th:placeholder="#{offers.name.placeholder}" required>
-            </div>
-        </div>
+                    <div class="field">
+                        <label class="label" th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.name} : #{offers.template} + ' ' + #{offers.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{name}" th:placeholder="#{offers.name.placeholder}" required>
+                        </div>
+                    </div>
 
-        <div class="field">
-            <h4 th:text="#{offers.fulfilment.type}"></h4>
-            <div class="select">
-                <select th:field="*{fulfilmentType}">
-                    <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
-                </select>
-            </div>
-        </div>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.fulfilment.type}"></label>
+                        <div class="select">
+                            <select th:field="*{fulfilmentType}">
+                                <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
+                            </select>
+                        </div>
+                    </div>
 
-        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
-            <h4 th:text="#{offers.expired.at}"></h4>
-            <div class="control">
-                <input type="datetime-local" name="expiresAt"
-                       th:value="${#temporals.format(offer.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
-                       class="input is-small">
-            </div>
-        </div>
+                    <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                        <label class="label" th:text="#{offers.delivery.option}"></label>
+                        <div class="select">
+                            <select th:field="*{deliveryOptionId}">
+                                <option value="" th:text="'— ' + #{general.select} + ' —'"></option>
+                                <option th:each="opt : ${deliveryOptions}" th:value="${opt.id}" th:text="${opt.name} + ' (' + ${opt.price} + ' PLN)'"></option>
+                            </select>
+                        </div>
+                    </div>
 
-        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer && mode == 'EDIT'}">
-            <h4 th:text="#{offers.link.for.client}"></h4>
-            <div class="control is-flex" style="gap: 8px; align-items: center;">
-                <input class="input"
-                       type="text"
-                       id="offerLinkInput"
-                       th:value="${offer.createOfferUrl(backofficeDomain)}"
-                       readonly
-                       style="text-decoration: underline; cursor: pointer;"
-                       onclick="openOfferLink()" />
-                <button class="button is-small is-info" type="button"
-                        onclick="copyOfferLink()" th:text="#{general.copy}"></button>
-            </div>
-        </div>
+                    <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                        <label class="label" th:text="#{offers.expired.at}"></label>
+                        <div class="control">
+                            <input type="datetime-local" name="expiresAt"
+                                   th:value="${#temporals.format(offer.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
+                                   class="input is-small">
+                        </div>
+                    </div>
 
-        <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
-            <h4 th:text="#{offers.delivery.option}"></h4>
-            <div class="select">
-                <select th:field="*{deliveryOptionId}">
-                    <option value="" th:text="'— ' + #{general.select} + ' —'"></option>
-                    <option th:each="opt : ${deliveryOptions}" th:value="${opt.id}" th:text="${opt.name} + ' (' + ${opt.price} + ' PLN)'"></option>
-                </select>
-            </div>
-        </div>
+                    <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer && mode == 'EDIT'}">
+                        <label class="label" th:text="#{offers.link.for.client}"></label>
+                        <div class="control is-flex" style="gap: 8px; align-items: center;">
+                            <input class="input"
+                                   type="text"
+                                   id="offerLinkInput"
+                                   th:value="${offer.createOfferUrl(backofficeDomain)}"
+                                   readonly
+                                   style="text-decoration: underline; cursor: pointer;"
+                                   onclick="openOfferLink()" />
+                            <button class="button is-small is-info" type="button"
+                                    onclick="copyOfferLink()" th:text="#{general.copy}"></button>
+                        </div>
+                    </div>
 
-        <div class="field">
-            <label class="checkbox">
-                <input type="checkbox" th:field="*{showPrices}" />
-                <span th:text="#{offers.show.prices}"></span>
-            </label>
+                    <div class="field" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                        <label class="label" th:text="#{offers.contact.gclid.label}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{gclid}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{showPrices}" />
+                            <span th:text="#{offers.show.prices}"></span>
+                        </label>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div class="column" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                <fieldset class="box">
+                    <legend class="label" th:text="#{offers.contact.section}"></legend>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.contact.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{contactDetails.name}">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.contact.surname}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{contactDetails.surname}">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.contact.company}"></label>
+                        <div class="control">
+                            <input class="input" type="text" th:field="*{contactDetails.companyName}">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.contact.email}"></label>
+                        <div class="control">
+                            <input class="input" type="email" th:field="*{contactDetails.email}">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" th:text="#{offers.contact.phone}"></label>
+                        <div class="control">
+                            <input class="input" type="tel" th:field="*{contactDetails.phone}">
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
         </div>
 
         <h4 th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.items} : #{offers.template} + ' ' + #{offers.items}"></h4>
@@ -185,13 +230,19 @@
                     <button class="button is-warning" type="button" onclick="submitForm('createProformaInvoice')" th:text="#{offers.createProformaInvoice}"></button>
                 </div>
                 <div class="control" th:if="${mode == 'EDIT'}">
-                    <button class="button is-warning" type="button" onclick="submitForm('copy')" th:text="#{offers.duplicate}"></button>
+                    <button class="button is-warning" type="button" onclick="submitForm('copy')"
+                            th:text="#{offers.duplicate}"></button>
+                </div>
+                <div class="control"
+                     th:if="${mode == 'EDIT' && offer.contactDetails != null && offer.contactDetails.isProperlyFilled()}">
+                    <button class="button is-warning" type="button" onclick="submitForm('copyWithContact')"
+                            th:text="#{offers.duplicate.with.contact}"></button>
                 </div>
             </div>
             <div class="control" th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}">
                 <button class="button is-primary" type="submit" onclick="submitForm('save')" th:text="#{offers.save.template}"></button>
                 <a class="button is-primary"
-                   th:href="@{/dashboard/offer/new/from-template(templateId=${offer.basketId})}"
+                   th:href="@{/dashboard/offer/new(intent='template',sourceId=${offer.basketId})}"
                    th:text="#{offers.manual.button}">
                 </a>
             </div>
@@ -255,6 +306,8 @@
                 form.action = `/dashboard/offer/${offerId}/createProformaInvoice`;
             } else if (actionType === 'copy') {
                 form.action = `/dashboard/offer/${offerId}/copy`;
+            } else if (actionType === 'copyWithContact') {
+                form.action = `/dashboard/offer/${offerId}/copy?withContact=true`;
             } else if (actionType === 'createOrder') {
                 window.location.href = `/dashboard/orders/new/from-basket?basketId=${offerId}`;
                 return;

@@ -593,6 +593,7 @@ public class Order {
                     OrderReviewStatus.ToBeCollected, basket.getFulfilmentType(), basket.getTotalPrice(),
                     basket.getBillingDetails(), basket.getShippingDetails(), basket.getSource()
             );
+            order.setGclid(basket.getGclid());
         }
 
         public Builder(Order original) {

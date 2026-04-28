@@ -107,7 +107,7 @@ public class OfferController {
         return "offers";
     }
 
-    @GetMapping("/dashboard/offer/new")
+    @GetMapping("/dashboard/offer/new/csv")
     public String showOfferImportSelection(Model model) {
         OfferCreationDto form = new OfferCreationDto();
         form.setType("CSV");
@@ -115,26 +115,45 @@ public class OfferController {
         return "newOffer_from_csv";
     }
 
-    @GetMapping("/dashboard/offer/new/manual")
-    public String createOfferManually(@ModelAttribute("catalogId") String catalogId, Model model) {
-        return showEditOfferForm(model, offerBuilder().build(), catalogId, Mode.CREATE, false);
+    @GetMapping("/dashboard/offer/new")
+    public String showContactDetailsForm(@RequestParam String intent,
+                                         @RequestParam(required = false) String sourceId,
+                                         Model model) {
+        model.addAttribute("contactDetails", new ContactDetails());
+        model.addAttribute("intent", intent);
+        model.addAttribute("sourceId", sourceId);
+        return "offerContact";
     }
 
-    @GetMapping("/dashboard/offer/new/from-template")
-    public String createOfferFromTemplate(@RequestParam String templateId, @ModelAttribute("catalogId") String catalogId, Model model) {
-        return showEditOfferForm(model, copyOf(templateId), catalogId, Mode.CREATE, true);
+    @PostMapping("/dashboard/offer/new")
+    public String createOfferWithContact(@ModelAttribute("contactDetails") ContactDetails contactDetails,
+                                         @RequestParam String intent,
+                                         @RequestParam(required = false) String sourceId,
+                                         @RequestParam(required = false) String gclid,
+                                         RedirectAttributes redirectAttributes,
+                                         Locale locale) {
+        if (!contactDetails.isProperlyFilled()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("offers.contact.invalid", null, locale));
+            return "redirect:/dashboard/offer/new?intent=" + intent
+                    + (sourceId != null ? "&sourceId=" + sourceId : "");
+        }
+
+        Basket basket = switch (intent) {
+            case "manual" -> offerBuilder().build();
+            case "copy", "template" -> copyOf(sourceId);
+            default -> throw new IllegalArgumentException("Unknown intent: " + intent);
+        };
+        basket.setContactDetails(contactDetails);
+        basket.setGclid(gclid);
+        save(basket);
+        return "redirect:/dashboard/offer/" + basket.getBasketId();
     }
 
     @GetMapping("/dashboard/offer/{offerId}")
     public String showOfferDetails(@PathVariable String offerId, @ModelAttribute("catalogId") String catalogId, Model model) {
-        Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), offerId);
-
-        if (existingBasketOpt.isEmpty() && isNotBlank(catalogId)) {
-            Basket offer = offerBuilder().withBasketId(offerId).build();
-            return showEditOfferForm(model, offer, catalogId, Mode.EDIT, false);
-        }
-
-        return showEditOfferForm(model, existingBasketOpt.get(), catalogId, Mode.EDIT, false);
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+        return showEditOfferForm(model, basket, catalogId, Mode.EDIT, basket.hasType(BasketType.OfferTemplate));
     }
 
     private String showEditOfferForm(Model model, Basket basket, String catalogId, Mode mode, boolean recalculate) {
@@ -143,6 +162,9 @@ public class OfferController {
         Store store = storesRepository.findById(getStoreId());
         if (Mode.CREATE == mode) {
             basket.setFulfilmentType(store.getDefaultFulfilmentType());
+        }
+        if (basket.getContactDetails() == null) {
+            basket.setContactDetails(new ContactDetails());
         }
 
         Pricelist pricelist = Pricelist.empty();
@@ -182,30 +204,19 @@ public class OfferController {
     }
 
     @PostMapping("/dashboard/offer/{offerId}")
-    public String createOrUpdateOffer(@PathVariable String offerId, @ModelAttribute Basket basket) {
-        Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), offerId);
-        if (existingBasketOpt.isPresent()) {
-            Basket existingBasket = existingBasketOpt.get();
-            existingBasket.setName(basket.getName());
-            existingBasket.setFulfilmentType(basket.getFulfilmentType());
-            existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
-            existingBasket.setComment(basket.getComment());
-            existingBasket.setShowPrices(basket.isShowPrices());
-            existingBasket.setExpiresAt(basket.getExpiresAt());
-            existingBasket.setDeliveryOptionId(basket.getDeliveryOptionId());
+    public String updateOffer(@PathVariable String offerId, @ModelAttribute Basket basket) {
+        Basket existingBasket = basketsRepository.findById(getStoreId(), offerId).get();
+        existingBasket.setName(basket.getName());
+        existingBasket.setFulfilmentType(basket.getFulfilmentType());
+        existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
+        existingBasket.setComment(basket.getComment());
+        existingBasket.setShowPrices(basket.isShowPrices());
+        existingBasket.setExpiresAt(basket.getExpiresAt());
+        existingBasket.setDeliveryOptionId(basket.getDeliveryOptionId());
+        existingBasket.setContactDetails(basket.getContactDetails());
+        existingBasket.setGclid(basket.getGclid());
 
-            save(existingBasket);
-        } else {
-            save(offerBuilder()
-                    .withBasketId(offerId)
-                    .withName(basket.getName())
-                    .withFulfilmentType(basket.getFulfilmentType())
-                    .withShowPrices(basket.isShowPrices())
-                    .withBasketItems(basket.getBasketItems())
-                    .withDeliveryOptionId(basket.getDeliveryOptionId())
-                    .build());
-        }
-
+        save(existingBasket);
         return "redirect:/dashboard/offer/" + offerId;
     }
 
@@ -218,7 +229,7 @@ public class OfferController {
                 .withBasketItems(basket.getBasketItems()).build();
         save(templateBasket);
 
-        return "redirect:/dashboard/template/" + templateBasket.getBasketId();
+        return "redirect:/dashboard/offer/" + templateBasket.getBasketId();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/delete")
@@ -241,9 +252,17 @@ public class OfferController {
     }
 
     @PostMapping("/dashboard/offer/{offerId}/copy")
-    public String duplicateOffer(@PathVariable String offerId, Model model) {
-        Basket basket = save(copyOf(offerId));
-        return "redirect:/dashboard/offer/" + basket.getBasketId();
+    public String duplicateOffer(@PathVariable String offerId,
+                                 @RequestParam(defaultValue = "false") boolean withContact) {
+        if (!withContact) {
+            return "redirect:/dashboard/offer/new?intent=copy&sourceId=" + offerId;
+        }
+        Basket source = basketsRepository.findById(getStoreId(), offerId).get();
+        Basket copy = source.deepCopy(" - Copy", BasketType.Offer);
+        copy.setContactDetails(source.getContactDetails());
+        copy.setGclid(source.getGclid());
+        save(copy);
+        return "redirect:/dashboard/offer/" + copy.getBasketId();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/recalculate")
@@ -283,7 +302,7 @@ public class OfferController {
                                             @RequestParam("category") String category,
                                             @RequestParam("itemLabel") String itemLabel,
                                             @RequestParam("itemName") String itemName) {
-        Basket basket = getOrCreateBasket(offerId);
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
         Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
@@ -303,7 +322,7 @@ public class OfferController {
     public String addOfferItemFromInventory(@PathVariable String offerId,
                                             @RequestParam(required = false) String itemEan,
                                             @RequestParam(required = false) String itemManufacturerCode) {
-        Basket basket = getOrCreateBasket(offerId);
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
@@ -327,18 +346,7 @@ public class OfferController {
         return "redirect:/dashboard/offer/" + offerId;
     }
 
-    @GetMapping("/dashboard/template/{templateId}")
-    public String updateTemplate(@PathVariable String templateId, @ModelAttribute("catalogId") String catalogId, Model model) {
-        Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), templateId);
-        if (!existingBasketOpt.isPresent()) {
-            model.addAttribute("error", "Template not found");
-            return "error";
-        }
-        Basket template = existingBasketOpt.get();
-        return showEditOfferForm(model, template, catalogId, Mode.EDIT, true);
-    }
-
-    @GetMapping("/dashboard/basket/view/{basketId}")
+@GetMapping("/dashboard/basket/view/{basketId}")
     public String viewBasket(@PathVariable String basketId, Model model) {
         Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), basketId);
         if (!existingBasketOpt.isPresent()) {
@@ -367,10 +375,16 @@ public class OfferController {
         return "basketView";
     }
 
-    @PostMapping("/dashboard/offers/new/create")
+    @PostMapping("/dashboard/offer/new/csv")
     public String createOfferFromImport(@ModelAttribute OfferCreationDto dto,
                                         RedirectAttributes redirectAttributes,
                                         Locale locale) {
+
+        if (dto.getContactDetails() == null || !dto.getContactDetails().isProperlyFilled()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("offers.contact.invalid", null, locale));
+            return "redirect:/dashboard/offer/new/csv";
+        }
 
         try {
             dto.setStoreId(getStoreId());
@@ -380,13 +394,14 @@ public class OfferController {
             if (basketItems.isEmpty()) {
                 redirectAttributes.addFlashAttribute("errorMessage",
                         messageSource.getMessage("offers.invalid.csv.format", null, locale));
-                return "redirect:/dashboard/offer/new";
+                return "redirect:/dashboard/offer/new/csv";
             }
 
-            // Create a new offer basket
             Basket offer = offerBuilder()
                     .withName(dto.getOfferName())
                     .withBasketItems(basketItems)
+                    .withContactDetails(dto.getContactDetails())
+                    .withGclid(dto.getGclid())
                     .build();
 
             save(offer);
@@ -394,7 +409,7 @@ public class OfferController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("offers.csv.processing.error", null, locale) + ": " + e.getMessage());
-            return "redirect:/dashboard/offer/new";
+            return "redirect:/dashboard/offer/new/csv";
         }
     }
 
@@ -416,13 +431,6 @@ public class OfferController {
         basketsRepository.save(basket);
 
         return basket;
-    }
-
-    private Basket getOrCreateBasket(String basketId) {
-        return basketsRepository.findById(getStoreId(), basketId).orElseGet(() -> offerBuilder()
-                .withBasketId(basketId)
-                .withName("Offer " + basketId.substring(0, 6))
-                .build());
     }
 
     private Basket.Builder offerBuilder() {

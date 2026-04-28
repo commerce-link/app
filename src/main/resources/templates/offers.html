@@ -91,7 +91,7 @@
                                 <div class="buttons">
                                     <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}"
                                        class="button is-small is-info"
-                                       th:href="@{/dashboard/offer/new/from-template(templateId=${offer.basketId})}"
+                                       th:href="@{/dashboard/offer/new(intent='template',sourceId=${offer.basketId})}"
                                        th:text="#{offers.manual.button}">
                                     </a>
 
@@ -131,7 +131,7 @@
                             <div class="card-content">
                                 <h4 class="title is-6" th:text="#{offers.import.sources.title}">Import from Sources</h4>
                                 <p class="subtitle is-7" th:text="#{offers.import.sources.description}">Create offers from external sources</p>
-                                <a href="/dashboard/offer/new" class="button is-primary is-fullwidth" th:text="#{offers.import.sources.button}">Import Offer</a>
+                                <a href="/dashboard/offer/new/csv" class="button is-primary is-fullwidth" th:text="#{offers.import.sources.button}">Import Offer</a>
                             </div>
                         </div>
                     </div>
@@ -140,7 +140,7 @@
                             <div class="card-content">
                                 <h4 class="title is-6" th:text="#{offers.manual.title}">Create Manual Offer</h4>
                                 <p class="subtitle is-7" th:text="#{offers.manual.description}">Start with empty offer</p>
-                                <a href="/dashboard/offer/new/manual" class="button is-link is-fullwidth" th:text="#{offers.manual.button}">Create Offer</a>
+                                <a href="/dashboard/offer/new?intent=manual" class="button is-link is-fullwidth" th:text="#{offers.manual.button}">Create Offer</a>
                             </div>
                         </div>
                     </div>

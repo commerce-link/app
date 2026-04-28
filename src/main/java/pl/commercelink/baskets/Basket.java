@@ -1,15 +1,15 @@
 package pl.commercelink.baskets;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
+import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
 import java.util.LinkedList;
@@ -33,6 +33,8 @@ public class Basket {
     private String name;
     @DynamoDBAttribute(attributeName = "affiliateId")
     private String affiliateId ;
+    @DynamoDBAttribute(attributeName = "gclid")
+    private String gclid;
     @DynamoDBAttribute(attributeName = "source")
     private OrderSource source;
     @DynamoDBAttribute(attributeName = "basketItems")
@@ -44,6 +46,8 @@ public class Basket {
     @DynamoDBAttribute(attributeName = "expiresAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime expiresAt;
+    @DynamoDBAttribute(attributeName = "contactDetails")
+    private ContactDetails contactDetails;
     @DynamoDBAttribute(attributeName = "billingDetails")
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
@@ -163,6 +167,14 @@ public class Basket {
 
     public void setDeliveryOptionId(String deliveryOptionId) { this.deliveryOptionId = deliveryOptionId; }
 
+    public ContactDetails getContactDetails() { return contactDetails; }
+
+    public void setContactDetails(ContactDetails contactDetails) { this.contactDetails = contactDetails; }
+
+    public String getGclid() { return gclid; }
+
+    public void setGclid(String gclid) { this.gclid = gclid; }
+
     public FulfilmentType getFulfilmentType() {
         return fulfilmentType;
     }
@@ -197,6 +209,8 @@ public class Basket {
         copy.setShowPrices(showPrices);
         copy.setComment(comment);
         copy.setDeliveryOptionId(deliveryOptionId);
+        copy.setContactDetails(null);
+        copy.setGclid(null);
         return copy;
     }
 
@@ -302,6 +316,16 @@ public class Basket {
 
         public Builder withDeliveryOptionId(String deliveryOptionId) {
             this.basket.setDeliveryOptionId(deliveryOptionId);
+            return this;
+        }
+
+        public Builder withContactDetails(ContactDetails contactDetails) {
+            this.basket.setContactDetails(contactDetails);
+            return this;
+        }
+
+        public Builder withGclid(String gclid) {
+            this.basket.setGclid(gclid);
             return this;
         }
 

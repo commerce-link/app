@@ -6,7 +6,7 @@
 
 <div layout:fragment="content" class="container">
 
-    <form th:action="@{/dashboard/offers/new/create}" th:object="${form}" enctype="multipart/form-data" method="post" class="box">
+    <form th:action="@{/dashboard/offer/new/csv}" th:object="${form}" enctype="multipart/form-data" method="post" class="box">
         <h2 class="title is-4" th:text="#{offers.create.from.source}"></h2>
         <div class="field">
             <label class="label" for="orderReferenceType" th:text="#{client.order.reference.type}"></label>
@@ -28,6 +28,50 @@
                 <input class="input" type="text" id="offerName" th:field="*{offerName}" required>
             </div>
         </div>
+
+        <fieldset class="box">
+            <legend class="label" th:text="#{offers.contact.title}"></legend>
+            <p class="help" th:text="#{offers.contact.subtitle}"></p>
+
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.name}"></label>
+                <div class="control">
+                    <input class="input" type="text" th:field="*{contactDetails.name}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.surname}"></label>
+                <div class="control">
+                    <input class="input" type="text" th:field="*{contactDetails.surname}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.company}"></label>
+                <div class="control">
+                    <input class="input" type="text" th:field="*{contactDetails.companyName}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.email}"></label>
+                <div class="control">
+                    <input class="input" type="email" th:field="*{contactDetails.email}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.phone}"></label>
+                <div class="control">
+                    <input class="input" type="tel" th:field="*{contactDetails.phone}">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" th:text="#{offers.contact.gclid}"></label>
+                <div class="control">
+                    <input class="input" type="text" th:field="*{gclid}">
+                </div>
+                <p class="help" th:text="#{offers.contact.gclid.help}"></p>
+            </div>
+            <p class="help" th:text="#{offers.contact.requirement}"></p>
+        </fieldset>
 
         <div class="field">
             <div class="control" style="margin-top: 20px">

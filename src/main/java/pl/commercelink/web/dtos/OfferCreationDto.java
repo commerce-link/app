@@ -1,8 +1,7 @@
 package pl.commercelink.web.dtos;
 
 import org.springframework.web.multipart.MultipartFile;
-import pl.commercelink.orders.*;
-import pl.commercelink.orders.imports.OrderReferenceType;
+import pl.commercelink.baskets.ContactDetails;
 
 public class OfferCreationDto {
 
@@ -10,6 +9,8 @@ public class OfferCreationDto {
     private MultipartFile csvFile;
     private String offerName;
     private String type;
+    private ContactDetails contactDetails = new ContactDetails();
+    private String gclid;
 
     public MultipartFile getCsvFile() {
         return csvFile;
@@ -41,5 +42,21 @@ public class OfferCreationDto {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public ContactDetails getContactDetails() {
+        return contactDetails;
+    }
+
+    public void setContactDetails(ContactDetails contactDetails) {
+        this.contactDetails = contactDetails;
+    }
+
+    public String getGclid() {
+        return gclid;
+    }
+
+    public void setGclid(String gclid) {
+        this.gclid = gclid;
     }
 }
