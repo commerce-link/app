@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.04.38</version>
+    <version>2026.04.39</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -382,6 +382,11 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-senetic</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>supplier-wave</artifactId>
                     <version>0.1.0</version>
                 </dependency>
                 <dependency>
