@@ -130,6 +130,7 @@ public class OfferController {
                                          @RequestParam String intent,
                                          @RequestParam(required = false) String sourceId,
                                          @RequestParam(required = false) String gclid,
+                                         @RequestParam(required = false) String offerName,
                                          RedirectAttributes redirectAttributes,
                                          Locale locale) {
         if (!contactDetails.isProperlyFilled()) {
@@ -144,6 +145,7 @@ public class OfferController {
             case "copy", "template" -> copyOf(sourceId);
             default -> throw new IllegalArgumentException("Unknown intent: " + intent);
         };
+        basket.setName(offerName);
         basket.setContactDetails(contactDetails);
         basket.setGclid(gclid);
         save(basket);
