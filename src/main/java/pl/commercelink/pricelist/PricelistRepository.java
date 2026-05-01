@@ -66,7 +66,9 @@ public class PricelistRepository {
     }
 
     public String findNewestPricelistId(String catalogId) {
-        return extractPricelistId(fileStorage.findNewest(bucketName, catalogId + "/").getLeft());
+        return fileStorage.findNewestFileName(bucketName, catalogId + "/")
+                .map(PricelistRepository::extractPricelistId)
+                .orElse(null);
     }
 
     @Cacheable(value = "newestPricelistId", key = "#catalogId")
