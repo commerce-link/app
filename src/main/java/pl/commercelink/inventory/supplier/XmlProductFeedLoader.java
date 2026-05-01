@@ -41,9 +41,7 @@ public class XmlProductFeedLoader {
 
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
-        try {
-            Reader reader = inventoryRepository.read(supplierName, "xml");
-
+        try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
             XMLInputFactory xif = XMLInputFactory.newFactory();
             XMLStreamReader xsr = xif.createXMLStreamReader(reader);
 
@@ -52,25 +50,26 @@ public class XmlProductFeedLoader {
 
             List<InventoryItem> res = new LinkedList<>();
 
-            while (xsr.hasNext()) {
-                if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
-                    V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
+            try {
+                while (xsr.hasNext()) {
+                    if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
+                        V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
 
-                    ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                    InventoryItem inventoryItem = dataCorrection.run(parsed.item());
-                    Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
+                        ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
+                        InventoryItem inventoryItem = dataCorrection.run(parsed.item());
+                        Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
 
-                    if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
-                        taxonomyCache.add(taxonomy);
-                        res.add(inventoryItem);
+                        if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
+                            taxonomyCache.add(taxonomy);
+                            res.add(inventoryItem);
+                        }
+                    } else {
+                        xsr.next();
                     }
-                } else {
-                    xsr.next();
                 }
+            } finally {
+                xsr.close();
             }
-
-            xsr.close();
-            reader.close();
 
             return dataCleanup.run(res);
 
