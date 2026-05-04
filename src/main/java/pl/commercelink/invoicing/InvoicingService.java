@@ -110,6 +110,10 @@ public class InvoicingService {
             op = createInvoice(store, order, documentType.toInvoiceKind(), sellDate, orderItems, invoicingConfiguration, send);
         }
 
+        if (op.hasError()) {
+            return op;
+        }
+
         order.addDocument(new Document(op.getInvoiceId(), op.getInvoiceNo(), op.getInvoiceUrl(), documentType));
         ordersRepository.save(order);
 
