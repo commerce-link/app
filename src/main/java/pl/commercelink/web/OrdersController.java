@@ -30,9 +30,12 @@ import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.api.ShippingException;
+import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderItemsForm;
 
@@ -84,6 +87,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+
+    @Autowired
+    private GoodsOutEventPublisher goodsOutEventPublisher;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -313,6 +319,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("isNewOrder", order.getStatus() == OrderStatus.New);
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
+        model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
@@ -387,6 +394,25 @@ public class OrdersController extends BaseController {
 
         invoiceCreationEventPublisher.publish(order, send);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("invoice.generation.started", null, locale));
+
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/goods-out")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String issueGoodsOut(@PathVariable String orderId, Locale locale, RedirectAttributes redirectAttributes) {
+        Order order = ordersRepository.findById(getStoreId(), orderId);
+
+        if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.goods.issue.already.exists", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        String createdBy = CustomSecurityContext.getLoggedInUser()
+                .map(CustomUser::getName)
+                .orElse("System");
+        goodsOutEventPublisher.publish(order, createdBy);
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("goods.issue.generation.started", null, locale));
 
         return "redirect:/dashboard/orders/" + orderId;
     }

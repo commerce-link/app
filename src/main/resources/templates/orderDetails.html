@@ -619,6 +619,11 @@
                     <div class="control">
                         <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or !canAddDocumentManually}" onclick="toggleReceiptModal(true)" th:text="#{general.add}"></button>
                     </div>
+                    <div class="control" th:if="${hasWarehouseDocumentsEnabled}">
+                        <form th:action="@{/dashboard/orders/{orderId}/goods-out(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
+                            <button class="button is-link is-small" type="submit" th:disabled="${isCompletedOrder or hasWarehouseDocument}" th:text="#{order.action.create.goods.issue}" onclick="confirmSave(this)"></button>
+                        </form>
+                    </div>
                     <div class="control">
                         <form th:action="@{/dashboard/orders/{orderId}/invoicing(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
                             <button class="button is-link is-small" type="submit" th:disabled="${isCompletedOrder}" th:text="#{order.action.create.invoice}" onclick="confirmSave(this)"></button>
