@@ -132,7 +132,7 @@ public class MarketplaceOrderImporter {
         try {
             return PaymentSource.valueOf(paymentType);
         } catch (IllegalArgumentException e) {
-            return PaymentSource.DirectDebit;
+            return PaymentSource.BankTransfer;
         }
     }
 }

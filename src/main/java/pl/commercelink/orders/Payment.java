@@ -3,7 +3,12 @@ package pl.commercelink.orders;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
+import org.springframework.format.annotation.DateTimeFormat;
+import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
+
+import java.time.LocalDate;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -20,6 +25,12 @@ public class Payment {
     private double amount;
     @DynamoDBAttribute(attributeName = "processingFee")
     private double processingFee;
+    @DynamoDBAttribute(attributeName = "bankTransactionNo")
+    private String bankTransactionNo;
+    @DynamoDBAttribute(attributeName = "bankTransactionDate")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateConverter.class)
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate bankTransactionDate;
 
     public Payment() {
     }
@@ -75,6 +86,22 @@ public class Payment {
 
     public void setProcessingFee(double processingFee) {
         this.processingFee = processingFee;
+    }
+
+    public String getBankTransactionNo() {
+        return bankTransactionNo;
+    }
+
+    public void setBankTransactionNo(String bankTransactionNo) {
+        this.bankTransactionNo = bankTransactionNo;
+    }
+
+    public LocalDate getBankTransactionDate() {
+        return bankTransactionDate;
+    }
+
+    public void setBankTransactionDate(LocalDate bankTransactionDate) {
+        this.bankTransactionDate = bankTransactionDate;
     }
 
     @DynamoDBIgnore

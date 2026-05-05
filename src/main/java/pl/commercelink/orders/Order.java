@@ -501,7 +501,7 @@ public class Order {
         if (op.isPresent()) {
             op.get().setAmount(unpaidAmount);
         } else {
-            payments.add(new Payment("", "", PaymentSource.DirectDebit, unpaidAmount, 0));
+            payments.add(new Payment("", "", PaymentSource.BankTransfer, unpaidAmount, 0));
         }
     }
 
@@ -584,7 +584,7 @@ public class Order {
             order.addShipment(shipment);
 
             // payment
-            order.addPayment(new Payment(PaymentSource.DirectDebit));
+            order.addPayment(new Payment(PaymentSource.BankTransfer));
         }
 
         public Builder(Store store, Basket basket) {

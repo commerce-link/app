@@ -36,6 +36,7 @@ import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
+import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderItemsForm;
 
@@ -311,6 +312,10 @@ public class OrdersController extends BaseController {
         model.addAttribute("receiptTypes", manualDocumentTypes);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("paymentStatuses", PaymentStatus.values());
+        model.addAttribute("pendingPayment", order.getPayments().stream()
+                .filter(Payment::isUnsettled)
+                .findFirst()
+                .orElse(null));
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("categories", store.getEnabledProductCategories());
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
@@ -592,6 +597,48 @@ public class OrdersController extends BaseController {
 
             existingOrder.setPayments(payments);
         }
+        return save(existingOrder);
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/addPayment")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String addPayment(@PathVariable String orderId,
+                             @ModelAttribute AddPaymentForm form,
+                             RedirectAttributes redirectAttributes,
+                             Locale locale) {
+        Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
+
+        if (form.getBankAmount() <= 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        if (form.getProcessingFee() < 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.fee.invalid", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        double amount = form.getBankAmount() + form.getProcessingFee();
+
+        Payment target = existingOrder.getPayments().stream()
+                .filter(Payment::isUnsettled)
+                .findFirst()
+                .orElseGet(() -> {
+                    Payment p = new Payment();
+                    existingOrder.addPayment(p);
+                    return p;
+                });
+
+        target.setSource(form.getSource());
+        target.setReferenceNo(form.getReferenceNo());
+        target.setName(form.getName());
+        target.setAmount(amount);
+        target.setProcessingFee(form.getProcessingFee());
+        target.setBankTransactionNo(form.getBankTransactionNo());
+        target.setBankTransactionDate(form.getBankTransactionDate());
+
         return save(existingOrder);
     }
 
