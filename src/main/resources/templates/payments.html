@@ -85,15 +85,30 @@
                     <td th:text="${order.latestPayment.referenceNo}"></td>
                     <td th:text="${order.latestPayment.source}"></td>
                     <td>
-                        <form th:action="@{/dashboard/orders/{orderId}/markAsPaid(orderId=${order.orderId})}" method="post" onsubmit="event.preventDefault();">
-                            <button type="submit" class="button is-small is-primary" onclick="confirmSave(this)" th:text="#{payments.mark.paid}"></button>
-                        </form>
+                        <button type="button" class="button is-small is-primary"
+                                th:with="pp=${order.pendingPayment}"
+                                th:data-order-id="${order.orderId}"
+                                th:data-unpaid="${order.unpaidAmount}"
+                                th:data-pending-source="${pp != null ? pp.source : ''}"
+                                th:data-pending-name="${pp != null ? pp.name : ''}"
+                                th:data-pending-ref="${pp != null ? pp.referenceNo : ''}"
+                                th:data-pending-fee="${pp != null ? pp.processingFee : 0}"
+                                th:data-pending-bank-trx-no="${pp != null ? pp.bankTransactionNo : ''}"
+                                th:data-pending-bank-trx-date="${pp != null ? pp.bankTransactionDate : ''}"
+                                onclick="openPaymentModalForOrderFromButton(this)"
+                                th:text="#{order.payment.action.add}"></button>
                     </td>
                 </tr>
                 </tbody>
             </table>
         </div>
     </section>
+
+    <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
+            formAction='',
+            expectedAmount=0,
+            pendingPayment=${null},
+            paymentSources=${paymentSources})}"></div>
 
 </div>
 

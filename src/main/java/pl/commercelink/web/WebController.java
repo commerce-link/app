@@ -19,6 +19,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PastOrderFilter;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
@@ -133,6 +134,7 @@ public class WebController {
         model.addAttribute("unpaidOrdersAmountGross", unpaidOrdersAmountGross);
         model.addAttribute("unpaidDeliveries", unpaidDeliveries);
         model.addAttribute("unpaidDeliveriesAmountNet", unpaidDeliveriesAmountNet);
+        model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("unpaidDeliveriesAmountGross", unpaidDeliveriesAmountGross);
 
         return "payments";

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Reusable "register payment" modal.
+  Caller passes:
+    - formAction       : URL the form posts to (use empty string when JS sets it dynamically)
+    - expectedAmount   : double, kwota oczekiwana (unpaidAmount); 0 when unknown at render time
+    - pendingPayment   : Payment or null; pre-fills source/name/refNo/bankTrx fields when present
+    - paymentSources   : iterable of PaymentSource enum values
+-->
+<div th:fragment="addPaymentModal(formAction, expectedAmount, pendingPayment, paymentSources)">
+
+    <div id="addPaymentModal" class="modal">
+        <div class="modal-background" onclick="toggleAddPaymentModal(false)"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.payment.action.add.title}"></p>
+                <button type="button" class="delete" aria-label="close" onclick="toggleAddPaymentModal(false)"></button>
+            </header>
+
+            <form th:action="${formAction}" method="post">
+                <section class="modal-card-body">
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.expected.amount}"></label>
+                        <div class="control">
+                            <input class="input" type="text" readonly
+                                   id="addPaymentExpected"
+                                   th:data-value="${expectedAmount}"
+                                   th:value="${#numbers.formatDecimal(expectedAmount, 1, 2)}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.bank.amount}"></label>
+                        <div class="control">
+                            <input class="input" type="number" step="0.01" required
+                                   id="addPaymentBankAmount"
+                                   name="bankAmount"
+                                   th:placeholder="#{order.payment.bank.amount.placeholder}"
+                                   oninput="onAddPaymentBankAmountInput()"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.processing.fee}"></label>
+                        <div class="control">
+                            <input class="input" type="number" step="0.01" min="0"
+                                   id="addPaymentProcessingFee"
+                                   name="processingFee"
+                                   th:value="${pendingPayment != null and pendingPayment.processingFee > 0} ? ${pendingPayment.processingFee} : '0'"
+                                   th:placeholder="#{order.payment.processing.fee.placeholder}"
+                                   oninput="onAddPaymentFeeInput()"/>
+                        </div>
+                        <div class="control mt-2">
+                            <label class="checkbox">
+                                <input type="checkbox"
+                                       id="addPaymentFeeAutofill"
+                                       onchange="onAddPaymentFeeAutofillToggle()"/>
+                                <span th:text="#{order.payment.fee.autofill}"></span>
+                            </label>
+                            <p class="help" th:text="#{order.payment.fee.autofill.help}"></p>
+                        </div>
+                        <div class="control mt-2">
+                            <label class="checkbox">
+                                <input type="checkbox"
+                                       id="addPaymentFeeIncluded"
+                                       name="feeIncluded"
+                                       value="true"
+                                       onchange="renderAddPaymentHint()"/>
+                                <span th:text="#{order.payment.fee.included}"></span>
+                            </label>
+                            <p class="help" th:text="#{order.payment.fee.included.help}"></p>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <p class="help has-text-grey" id="addPaymentComputed"></p>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.source}"></label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select name="source" required>
+                                    <option th:each="source : ${paymentSources}"
+                                            th:value="${source}"
+                                            th:text="${source}"
+                                            th:selected="${pendingPayment != null and pendingPayment.source == source}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.reference.no}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="referenceNo"
+                                   th:value="${pendingPayment != null} ? ${pendingPayment.referenceNo} : ''"
+                                   th:placeholder="#{order.payment.reference.no.placeholder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{payments.source.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="name"
+                                   th:value="${pendingPayment != null} ? ${pendingPayment.name} : ''"
+                                   th:placeholder="#{payments.source.name.placeholder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.bank.transaction.no}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="bankTransactionNo"
+                                   th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionNo} : ''"
+                                   th:placeholder="#{order.payment.bank.transaction.no.placeholder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.payment.bank.transaction.date}"></label>
+                        <div class="control">
+                            <input class="input" type="date" name="bankTransactionDate"
+                                   th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionDate} : ''"/>
+                        </div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    <button class="button" type="button" onclick="toggleAddPaymentModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleAddPaymentModal(show) {
+            const modal = document.getElementById('addPaymentModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function getAddPaymentExpected() {
+            const el = document.getElementById('addPaymentExpected');
+            return el ? (parseFloat(el.dataset.value || '0') || 0) : 0;
+        }
+
+        function onAddPaymentBankAmountInput() {
+            const autofillEl = document.getElementById('addPaymentFeeAutofill');
+            if (autofillEl && autofillEl.checked) {
+                applyAddPaymentFeeAutofill();
+            }
+            renderAddPaymentHint();
+        }
+
+        function onAddPaymentFeeInput() {
+            const autofillEl = document.getElementById('addPaymentFeeAutofill');
+            if (autofillEl) autofillEl.checked = false;
+            renderAddPaymentHint();
+        }
+
+        function onAddPaymentFeeAutofillToggle() {
+            const autofillEl = document.getElementById('addPaymentFeeAutofill');
+            if (autofillEl && autofillEl.checked) {
+                applyAddPaymentFeeAutofill();
+            }
+            renderAddPaymentHint();
+        }
+
+        function applyAddPaymentFeeAutofill() {
+            const bankEl = document.getElementById('addPaymentBankAmount');
+            const feeEl = document.getElementById('addPaymentProcessingFee');
+            if (!bankEl || !feeEl) return;
+            const expected = getAddPaymentExpected();
+            const bank = parseFloat(bankEl.value) || 0;
+            const fee = Math.max(0, expected - bank);
+            feeEl.value = fee.toFixed(2);
+        }
+
+        function renderAddPaymentHint() {
+            const bankEl = document.getElementById('addPaymentBankAmount');
+            const feeEl = document.getElementById('addPaymentProcessingFee');
+            const hintEl = document.getElementById('addPaymentComputed');
+            const includedEl = document.getElementById('addPaymentFeeIncluded');
+            if (!bankEl || !feeEl || !hintEl) return;
+
+            const bank = parseFloat(bankEl.value) || 0;
+            const fee = parseFloat(feeEl.value) || 0;
+            const feeIncluded = includedEl ? includedEl.checked : false;
+
+            if (bank <= 0) {
+                hintEl.textContent = '';
+                return;
+            }
+
+            const expected = getAddPaymentExpected();
+            const amount = feeIncluded ? bank : bank + fee;
+            const diff = expected - amount;
+            let status = '';
+            if (Math.abs(diff) < 0.005) {
+                status = ' (pełna wpłata)';
+            } else if (diff > 0) {
+                status = ` (niedopłata ${diff.toFixed(2)})`;
+            } else {
+                status = ` (nadpłata ${Math.abs(diff).toFixed(2)})`;
+            }
+            hintEl.textContent = `amount = ${amount.toFixed(2)}, fee = ${fee.toFixed(2)}${status}`;
+        }
+
+        function openPaymentModalForOrder(orderId, expected, pending) {
+            const modal = document.getElementById('addPaymentModal');
+            if (!modal) return;
+            const form = modal.querySelector('form');
+            if (form) form.action = '/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment';
+
+            const expectedEl = document.getElementById('addPaymentExpected');
+            if (expectedEl) {
+                const value = parseFloat(expected) || 0;
+                expectedEl.dataset.value = value;
+                expectedEl.value = value.toFixed(2);
+            }
+
+            const bank = document.getElementById('addPaymentBankAmount');
+            if (bank) bank.value = '';
+            const fee = document.getElementById('addPaymentProcessingFee');
+            if (fee) fee.value = '0';
+            const autofill = document.getElementById('addPaymentFeeAutofill');
+            if (autofill) autofill.checked = false;
+            const included = document.getElementById('addPaymentFeeIncluded');
+            if (included) included.checked = false;
+
+            ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
+                const el = modal.querySelector('input[name="' + n + '"]');
+                if (el) el.value = '';
+            });
+
+            const sourceSelect = modal.querySelector('select[name="source"]');
+            if (sourceSelect && sourceSelect.options.length > 0) {
+                sourceSelect.selectedIndex = 0;
+            }
+
+            if (pending) {
+                if (sourceSelect && pending.source) {
+                    sourceSelect.value = pending.source;
+                }
+                ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
+                    const el = modal.querySelector('input[name="' + n + '"]');
+                    if (el && pending[n]) el.value = pending[n];
+                });
+                if (fee) {
+                    const pendingFee = parseFloat(pending.processingFee) || 0;
+                    if (pendingFee > 0) fee.value = pendingFee.toFixed(2);
+                }
+            }
+
+            renderAddPaymentHint();
+            toggleAddPaymentModal(true);
+        }
+
+        function openPaymentModalForOrderFromButton(btn) {
+            const pending = {
+                source: btn.dataset.pendingSource || '',
+                name: btn.dataset.pendingName || '',
+                referenceNo: btn.dataset.pendingRef || '',
+                processingFee: btn.dataset.pendingFee || 0,
+                bankTransactionNo: btn.dataset.pendingBankTrxNo || '',
+                bankTransactionDate: btn.dataset.pendingBankTrxDate || ''
+            };
+            openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pending);
+        }
+    </script>
+</div>
+
+</body>
+</html>

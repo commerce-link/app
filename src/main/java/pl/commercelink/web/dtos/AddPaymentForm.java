@@ -9,6 +9,7 @@ public class AddPaymentForm {
 
     private double bankAmount;
     private double processingFee;
+    private boolean feeIncluded;
     private PaymentSource source;
     private String referenceNo;
     private String name;
@@ -30,6 +31,14 @@ public class AddPaymentForm {
 
     public void setProcessingFee(double processingFee) {
         this.processingFee = processingFee;
+    }
+
+    public boolean isFeeIncluded() {
+        return feeIncluded;
+    }
+
+    public void setFeeIncluded(boolean feeIncluded) {
+        this.feeIncluded = feeIncluded;
     }
 
     public PaymentSource getSource() {

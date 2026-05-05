@@ -7,11 +7,11 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
+import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -284,6 +284,11 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public Payment getPendingPayment() {
+        return payments.stream().filter(Payment::isUnsettled).findFirst().orElse(null);
+    }
+
+    @DynamoDBIgnore
     public void increaseTotalPrice(double amount) {
         this.totalPrice += amount;
     }
@@ -486,23 +491,6 @@ public class Order {
 
     public void setAffiliateId(String affiliateId) {
         this.affiliateId = affiliateId;
-    }
-
-    @DynamoDBIgnore
-    public void markAsPaid() {
-        double paidAmount = payments.stream().mapToDouble(Payment::getAmount).sum();
-        double unpaidAmount = totalPrice - paidAmount;
-
-        Optional<Payment> op = payments
-                .stream()
-                .filter(Payment::isUnsettled)
-                .findFirst();
-
-        if (op.isPresent()) {
-            op.get().setAmount(unpaidAmount);
-        } else {
-            payments.add(new Payment("", "", PaymentSource.BankTransfer, unpaidAmount, 0));
-        }
     }
 
     public FulfilmentType getFulfilmentType() {

@@ -620,7 +620,9 @@ public class OrdersController extends BaseController {
             return "redirect:/dashboard/orders/" + orderId;
         }
 
-        double amount = form.getBankAmount() + form.getProcessingFee();
+        double amount = form.isFeeIncluded()
+                ? form.getBankAmount()
+                : form.getBankAmount() + form.getProcessingFee();
 
         Payment target = existingOrder.getPayments().stream()
                 .filter(Payment::isUnsettled)
@@ -666,15 +668,6 @@ public class OrdersController extends BaseController {
         Order order = ordersRepository.findById(getStoreId(), orderId);
         order.addDocument(document);
         return save(order);
-    }
-
-    @PostMapping("/dashboard/orders/{orderId}/markAsPaid")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String markOrderAsPaid(@PathVariable String orderId) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
-        order.markAsPaid();
-        ordersRepository.save(order);
-        return "redirect:/dashboard/payments";
     }
 
     @PostMapping("/dashboard/orders/{orderId}/cancelShipment")
