@@ -50,6 +50,19 @@
                             </div>
                         </div>
                         <div class="field">
+                            <label class="label" th:text="#{deliveries.cost}"></label>
+                            <div class="control">
+                                <span th:if="${delivery.tax > 1.0}"
+                                      th:text="#{deliveries.cost.formula(
+                                          ${#numbers.formatDecimal(delivery.totalCost, 1, 2)},
+                                          ${#numbers.formatDecimal(delivery.totalCostGross - delivery.totalCost, 1, 2)},
+                                          ${#numbers.formatDecimal(delivery.totalCostGross, 1, 2)}
+                                      )}"></span>
+                                <span th:unless="${delivery.tax > 1.0}"
+                                      th:text="#{deliveries.cost.reverseCharge(${#numbers.formatDecimal(delivery.totalCost, 1, 2)})}"></span>
+                            </div>
+                        </div>
+                        <div class="field">
                             <label class="label" th:text="#{deliveries.paymentTerms}"></label>
                             <div class="control">
                                 <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
@@ -75,6 +88,13 @@
                             <div class="control">
                                 <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
                                 <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentCost}"></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{deliveries.tax}"></label>
+                            <div class="control">
+                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
+                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.tax}"></span>
                             </div>
                         </div>
 

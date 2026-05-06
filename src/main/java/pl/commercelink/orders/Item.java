@@ -307,6 +307,13 @@ public abstract class Item implements Delivered {
         this.cost = cost;
     }
 
+    @DynamoDBIgnore
+    public double updateCost(double newCost) {
+        double delta = (newCost - this.cost) * getQty();
+        this.cost = newCost;
+        return delta;
+    }
+
     public double getTax() {
         return tax;
     }

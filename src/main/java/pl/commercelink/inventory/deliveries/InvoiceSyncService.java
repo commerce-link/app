@@ -95,27 +95,27 @@ public class InvoiceSyncService {
                 costsByMfn,
                 invoice.seller()
         );
-        warehouse.invoiceSyncHandler(storeId).sync(syncRequest);
+        double allocationsCostDelta = warehouse.invoiceSyncHandler(storeId).sync(syncRequest);
 
         if (!costsByMfn.isEmpty()) {
-            updateOrderItems(preview.getDeliveryId(), costsByMfn);
+            allocationsCostDelta += updateOrderItems(preview.getDeliveryId(), costsByMfn);
             updateRMAItems(preview.getDeliveryId(), costsByMfn);
         }
 
-        updateDelivery(storeId, preview, preview.getDeliveryId(), positionById, invoice);
+        updateDelivery(storeId, preview, preview.getDeliveryId(), positionById, invoice, allocationsCostDelta);
     }
 
-    private void updateDelivery(String storeId, InvoiceSyncPreview preview, String deliveryId, Map<String, InvoicePosition> positionById, Invoice invoice) {
+    private void updateDelivery(String storeId, InvoiceSyncPreview preview, String deliveryId, Map<String, InvoicePosition> positionById, Invoice invoice, double allocationsCostDelta) {
         var delivery = deliveriesRepository.findById(storeId, deliveryId);
 
         if (preview.getPaymentCostPositionId() != null && !preview.getPaymentCostPositionId().isBlank()) {
             InvoicePosition position = positionById.get(preview.getPaymentCostPositionId());
-            delivery.setPaymentCost(position.totalPrice().netValue());
+            delivery.updatePaymentCost(position.totalPrice().netValue());
         }
 
         if (preview.getShippingCostPositionId() != null && !preview.getShippingCostPositionId().isBlank()) {
             InvoicePosition position = positionById.get(preview.getShippingCostPositionId());
-            delivery.setShippingCost(position.totalPrice().netValue());
+            delivery.updateShippingCost(position.totalPrice().netValue());
         }
 
         if (invoice.paid()) {
@@ -134,17 +134,24 @@ public class InvoiceSyncService {
             delivery.setProvider(shortcut);
         }
 
+        delivery.increaseTotalCost(allocationsCostDelta);
+
         delivery.setSynced(true);
         deliveriesRepository.save(delivery);
     }
 
-    private void updateOrderItems(String deliveryId, Map<String, Double> costsByMfn) {
+    private double updateOrderItems(String deliveryId, Map<String, Double> costsByMfn) {
+        double delta = 0;
         for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
             if (!item.isReturned() && costsByMfn.containsKey(item.getManufacturerCode())) {
-                item.setCost(costsByMfn.get(item.getManufacturerCode()));
+                double itemDelta = item.updateCost(costsByMfn.get(item.getManufacturerCode()));
+                if (!item.isReplacedOrReturned()) {
+                    delta += itemDelta;
+                }
                 orderItemsRepository.save(item);
             }
         }
+        return delta;
     }
 
     private void updateRMAItems(String deliveryId, Map<String, Double> costsByMfn) {

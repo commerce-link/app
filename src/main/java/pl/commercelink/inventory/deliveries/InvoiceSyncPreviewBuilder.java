@@ -58,6 +58,8 @@ public class InvoiceSyncPreviewBuilder {
         preview.setInvoiceNumber(invoice.number());
         preview.setInvoicePriceNet(invoice.amount().netValue());
         preview.setInvoicePriceGross(invoice.amount().grossValue());
+        preview.setDeliveryTotalCostNet(delivery.getTotalCost());
+        preview.setDeliveryTotalCostGross(delivery.getTotalCostGross());
         preview.setCurrency(invoice.currency());
         preview.setExchangeRate(invoice.exchangeRate());
         preview.setViewUrl(invoice.viewUrl());

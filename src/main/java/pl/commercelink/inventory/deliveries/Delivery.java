@@ -14,6 +14,10 @@ import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.invoicing.api.Price;
 
+import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -57,6 +61,11 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "paymentTerms")
     private int paymentTerms;
 
+    @DynamoDBAttribute(attributeName = "totalCost")
+    private double totalCost;
+    @DynamoDBAttribute(attributeName = "tax")
+    private double tax = DEFAULT_VAT_RATE;
+
     @DynamoDBAttribute(attributeName = "shipments")
     private List<Shipment> shipments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "events")
@@ -92,13 +101,15 @@ public class Delivery {
         this.orderedAt = LocalDateTime.now();
     }
 
-    public Delivery(String storeId, String externalDeliveryId, String provider, PaymentStatus paymentStatus, LocalDate estimatedDeliveryAt, double shippingCost, double paymentCost, int paymentTerms) {
+    public Delivery(String storeId, String externalDeliveryId, String provider, PaymentStatus paymentStatus, LocalDate estimatedDeliveryAt, double shippingCost, double paymentCost, int paymentTerms, double tax) {
         this(storeId, externalDeliveryId, provider, paymentStatus);
 
         this.estimatedDeliveryAt = estimatedDeliveryAt;
         this.shippingCost = shippingCost;
         this.paymentCost = paymentCost;
         this.paymentTerms = paymentTerms;
+        this.tax = tax;
+        this.totalCost = paymentCost + shippingCost;
     }
 
     public void add(Allocation allocation) {
@@ -164,6 +175,11 @@ public class Delivery {
     @DynamoDBIgnore
     public Price getUnpaidAmount() {
         return Price.fromNet(allocations.stream().mapToDouble(Allocation::getTotalCost).sum() + paymentCost + shippingCost);
+    }
+
+    @DynamoDBIgnore
+    public double getTotalCostGross() {
+        return Price.fromNet(totalCost, tax).grossValue();
     }
 
     @DynamoDBIgnore
@@ -281,6 +297,12 @@ public class Delivery {
         this.shippingCost = shippingCost;
     }
 
+    @DynamoDBIgnore
+    public void updateShippingCost(double newShippingCost) {
+        this.totalCost = scale(this.totalCost + (newShippingCost - this.shippingCost));
+        this.shippingCost = newShippingCost;
+    }
+
     public int getPaymentTerms() {
         return paymentTerms;
     }
@@ -295,6 +317,48 @@ public class Delivery {
 
     public void setPaymentCost(double paymentCost) {
         this.paymentCost = paymentCost;
+    }
+
+    @DynamoDBIgnore
+    public void updatePaymentCost(double newPaymentCost) {
+        this.totalCost = scale(this.totalCost + (newPaymentCost - this.paymentCost));
+        this.paymentCost = newPaymentCost;
+    }
+
+    public double getTotalCost() {
+        return totalCost;
+    }
+
+    public void setTotalCost(double totalCost) {
+        this.totalCost = totalCost;
+    }
+
+    @DynamoDBIgnore
+    public void increaseTotalCost(double amount) {
+        this.totalCost = scale(this.totalCost + amount);
+    }
+
+    @DynamoDBIgnore
+    public void decreaseTotalCost(double amount) {
+        this.totalCost = scale(this.totalCost - amount);
+    }
+
+    @DynamoDBIgnore
+    public void recomputeTotalCost(List<Allocation> allocations) {
+        double allocationsCost = allocations.stream().mapToDouble(Allocation::getTotalCost).sum();
+        this.totalCost = scale(allocationsCost + paymentCost + shippingCost);
+    }
+
+    private static double scale(double value) {
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    public double getTax() {
+        return tax;
+    }
+
+    public void setTax(double tax) {
+        this.tax = tax;
     }
 
     public void addEvent(Event deliveryEvent) {

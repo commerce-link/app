@@ -26,17 +26,19 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
     }
 
     @Override
-    public void sync(InvoiceSyncRequest request) {
+    public double sync(InvoiceSyncRequest request) {
         Map<String, Double> costsByMfn = request.costsByMfn();
 
         if (request.counterparty() != null) {
             updateGoodsReceiptCounterparty(request);
         }
 
-        if (!costsByMfn.isEmpty()) {
-            updateWarehouseDocumentItems(request.deliveryId(), costsByMfn);
-            updateWarehouseItems(request.deliveryId(), costsByMfn);
+        if (costsByMfn.isEmpty()) {
+            return 0;
         }
+
+        updateWarehouseDocumentItems(request.deliveryId(), costsByMfn);
+        return updateWarehouseItems(request.deliveryId(), costsByMfn);
     }
 
     private void updateGoodsReceiptCounterparty(InvoiceSyncRequest request) {
@@ -58,12 +60,14 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
         }
     }
 
-    private void updateWarehouseItems(String deliveryId, Map<String, Double> costsByMfn) {
+    private double updateWarehouseItems(String deliveryId, Map<String, Double> costsByMfn) {
+        double delta = 0;
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
             if (costsByMfn.containsKey(item.getManufacturerCode())) {
-                item.setCost(costsByMfn.get(item.getManufacturerCode()));
+                delta += item.updateCost(costsByMfn.get(item.getManufacturerCode()));
                 warehouseRepository.save(item);
             }
         }
+        return delta;
     }
 }

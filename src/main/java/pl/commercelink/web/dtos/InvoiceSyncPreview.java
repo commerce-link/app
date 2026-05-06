@@ -13,6 +13,8 @@ public class InvoiceSyncPreview {
     private double exchangeRate;
     private double invoicePriceNet;
     private double invoicePriceGross;
+    private double deliveryTotalCostNet;
+    private double deliveryTotalCostGross;
     private String viewUrl;
     private double shippingCost;
     private double paymentCost;
@@ -94,6 +96,30 @@ public class InvoiceSyncPreview {
 
     public void setInvoicePriceGross(double invoicePriceGross) {
         this.invoicePriceGross = invoicePriceGross;
+    }
+
+    public double getDeliveryTotalCostNet() {
+        return deliveryTotalCostNet;
+    }
+
+    public void setDeliveryTotalCostNet(double deliveryTotalCostNet) {
+        this.deliveryTotalCostNet = deliveryTotalCostNet;
+    }
+
+    public double getDeliveryTotalCostGross() {
+        return deliveryTotalCostGross;
+    }
+
+    public void setDeliveryTotalCostGross(double deliveryTotalCostGross) {
+        this.deliveryTotalCostGross = deliveryTotalCostGross;
+    }
+
+    public boolean isPriceNetDiffers() {
+        return Math.abs(invoicePriceNet - deliveryTotalCostNet) >= 0.01;
+    }
+
+    public boolean isPriceGrossDiffers() {
+        return Math.abs(invoicePriceGross - deliveryTotalCostGross) >= 0.01;
     }
 
     public String getViewUrl() {

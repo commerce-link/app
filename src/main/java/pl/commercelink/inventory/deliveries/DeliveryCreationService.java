@@ -31,6 +31,12 @@ public class DeliveryCreationService {
 
         if (form.hasDeliveryDetails()) {
             var delivery = createDelivery(storeId, form, isSuperAdmin);
+
+            double allocationsCost = form.getItems().stream()
+                    .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
+                    .sum();
+            delivery.increaseTotalCost(allocationsCost);
+
             deliveriesRepository.save(delivery);
 
             orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
@@ -51,7 +57,8 @@ public class DeliveryCreationService {
                 form.getEstimatedDeliveryAt(),
                 form.getShippingCost(),
                 form.getPaymentCost(),
-                form.getPaymentTerms()
+                form.getPaymentTerms(),
+                form.getTax()
         );
         delivery.setManaged(isSuperAdmin);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));

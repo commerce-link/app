@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 public class DeliveryCreationForm {
 
@@ -23,6 +24,7 @@ public class DeliveryCreationForm {
     private LocalDate estimatedDeliveryAt;
     private double shippingCost;
     private double paymentCost;
+    private double tax = DEFAULT_VAT_RATE;
     private int paymentTerms;
     private boolean removeUnselected;
 
@@ -92,6 +94,14 @@ public class DeliveryCreationForm {
 
     public void setPaymentCost(double paymentCost) {
         this.paymentCost = paymentCost;
+    }
+
+    public double getTax() {
+        return tax;
+    }
+
+    public void setTax(double tax) {
+        this.tax = tax;
     }
 
     public int getPaymentTerms() {

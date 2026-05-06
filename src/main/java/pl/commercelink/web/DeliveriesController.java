@@ -13,8 +13,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PaymentStatus;
-import pl.commercelink.orders.event.Event;
-import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
@@ -23,7 +21,6 @@ import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 
@@ -71,6 +68,9 @@ public class DeliveriesController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
+
+    @Autowired
+    private DeliveryTaxResolver deliveryTaxResolver;
 
     private static final int DELIVERY_PAGE_SIZE = 25;
 
@@ -156,9 +156,7 @@ public class DeliveriesController {
     }
 
     private String deleteAllocations(String storeId, DeliveryAllocationsForm form) {
-        form.getSelectedAllocations().forEach(allocation ->
-                deliveriesManager.deleteAllocation(storeId, allocation)
-        );
+        deliveriesManager.deleteAllocations(storeId, form.getDeliveryId(), form.getSelectedAllocations());
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
     }
 
@@ -182,6 +180,7 @@ public class DeliveriesController {
 
         deliveriesManager.reassignAllocations(
                 storeId,
+                form.getDeliveryId(),
                 form.getTargetDeliveryId(),
                 form.getSelectedOrderAllocations(),
                 form.getSelectedWarehouseAllocations()
@@ -290,6 +289,7 @@ public class DeliveriesController {
         form.setProvider(provider);
         form.setItems(groupAndUnify(delivery.getAllocations()));
         form.setPaymentStatus(PaymentStatus.New);
+        form.setTax(deliveryTaxResolver.resolveFor(provider));
 
         for (DeliveryItem item : form.getItems()) {
             for (Allocation allocation : item.getAllocations()) {
@@ -357,29 +357,11 @@ public class DeliveriesController {
     @PostMapping("/dashboard/deliveries/details")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     public String updateDelivery(@ModelAttribute Delivery updatedDelivery) {
-        var existingDelivery = deliveriesQueryService.fetchDeliveryWithAllocations(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId());
-
-        boolean isDeliveryDelayed = updatedDelivery.getEstimatedDeliveryAt() != null &&
-                updatedDelivery.getEstimatedDeliveryAt().isAfter(existingDelivery.getEstimatedDeliveryAt());
-
-        existingDelivery.setEstimatedDeliveryAt(updatedDelivery.getEstimatedDeliveryAt());
-        existingDelivery.setShippingCost(updatedDelivery.getShippingCost());
-        existingDelivery.setPaymentCost(updatedDelivery.getPaymentCost());
-
-        existingDelivery.setPaymentTerms(updatedDelivery.getPaymentTerms());
-
-        existingDelivery.addEvent(new Event(EventType.action, "DELIVERY_UPDATED", LocalDateTime.now()));
-
-        if (isDeliveryDelayed) {
-            deliveriesManager.updateAssociatedOrdersForDeliveryChange(updatedDelivery.getStoreId(), existingDelivery);
-            existingDelivery.addEvent(new Event(EventType.action, "DELIVERY_DELAYED", LocalDateTime.now()));
-        }
-
-        deliveriesRepository.save(existingDelivery);
+        deliveriesManager.updateDelivery(updatedDelivery);
 
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", existingDelivery.getStoreId(), existingDelivery.getDeliveryId())
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + existingDelivery.getDeliveryId();
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + updatedDelivery.getDeliveryId();
     }
 
     @PostMapping("/dashboard/deliveries/link-invoices")

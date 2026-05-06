@@ -81,7 +81,8 @@
                             <th th:text="#{deliveries.order.no}"></th>
                             <th th:text="#{deliveries.external.order.no}"></th>
                             <th th:text="#{deliveries.estimated.delivery}"></th>
-                            <th th:text="#{general.actions}"></th>
+                            <th th:text="#{deliveries.list.cost.net}"></th>
+                            <th th:text="#{deliveries.list.cost.gross}"></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -95,11 +96,8 @@
                             </td>
                             <td th:text="${delivery.externalDeliveryId}"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>
-                            <td>
-                                <a th:href="@{${detailPath + '/deliveries/details'}(deliveryId=${delivery.deliveryId})}"
-                                   class="button is-small is-info"
-                                   th:text="#{deliveries.action.edit.delivery.link}"></a>
-                            </td>
+                            <td th:text="${#numbers.formatDecimal(delivery.totalCost, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(delivery.totalCostGross, 1, 2)}"></td>
                         </tr>
                         </tbody>
                     </table>

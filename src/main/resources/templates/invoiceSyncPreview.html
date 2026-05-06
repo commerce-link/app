@@ -16,32 +16,50 @@
                     <div class="box">
                         <h4 class="title is-5" th:text="#{invoiceSync.invoiceDetails}"></h4>
                         <table class="table is-fullwidth is-narrow">
+                            <colgroup>
+                                <col style="width: 35%"/>
+                                <col style="width: 25%"/>
+                                <col style="width: 10%"/>
+                                <col style="width: 30%"/>
+                            </colgroup>
                             <tbody>
                             <tr>
                                 <th th:text="#{invoiceSync.invoiceNumber}"></th>
-                                <td>
+                                <td colspan="3">
                                     <a th:href="${preview.viewUrl}" target="_blank" th:text="${preview.invoiceNumber}"></a>
                                 </td>
                             </tr>
                             <tr>
                                 <th th:text="#{invoiceSync.orderNo}"></th>
-                                <td th:text="${preview.externalDeliveryId}"></td>
+                                <td colspan="3" th:text="${preview.externalDeliveryId}"></td>
                             </tr>
                             <tr>
                                 <th th:text="#{invoiceSync.priceNet}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></td>
+                                <td th:unless="${preview.priceNetDiffers}" colspan="3"
+                                    th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></td>
+                                <td th:if="${preview.priceNetDiffers}"
+                                    th:text="${#numbers.formatDecimal(preview.deliveryTotalCostNet, 1, 2)} + ' PLN'"></td>
+                                <td th:if="${preview.priceNetDiffers}" class="has-text-centered">&rarr;</td>
+                                <td th:if="${preview.priceNetDiffers}"
+                                    th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></td>
                             </tr>
                             <tr>
                                 <th th:text="#{invoiceSync.priceGross}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></td>
+                                <td th:unless="${preview.priceGrossDiffers}" colspan="3"
+                                    th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></td>
+                                <td th:if="${preview.priceGrossDiffers}"
+                                    th:text="${#numbers.formatDecimal(preview.deliveryTotalCostGross, 1, 2)} + ' PLN'"></td>
+                                <td th:if="${preview.priceGrossDiffers}" class="has-text-centered">&rarr;</td>
+                                <td th:if="${preview.priceGrossDiffers}"
+                                    th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></td>
                             </tr>
                             <tr>
                                 <th th:text="#{invoiceSync.currency}"></th>
-                                <td th:text="${preview.currency}"></td>
+                                <td colspan="3" th:text="${preview.currency}"></td>
                             </tr>
                             <tr>
                                 <th th:text="#{invoiceSync.exchangeRate}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.exchangeRate, 1, 4)}"></td>
+                                <td colspan="3" th:text="${#numbers.formatDecimal(preview.exchangeRate, 1, 4)}"></td>
                             </tr>
                             </tbody>
                         </table>
