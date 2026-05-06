@@ -174,7 +174,7 @@ public class Delivery {
 
     @DynamoDBIgnore
     public Price getUnpaidAmount() {
-        return Price.fromNet(allocations.stream().mapToDouble(Allocation::getTotalCost).sum() + paymentCost + shippingCost);
+        return Price.fromNet(totalCost, tax);
     }
 
     @DynamoDBIgnore

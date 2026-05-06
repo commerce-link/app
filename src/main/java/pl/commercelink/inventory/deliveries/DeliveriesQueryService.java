@@ -36,17 +36,6 @@ public class DeliveriesQueryService {
         return delivery;
     }
 
-    public List<Delivery> fetchActiveDeliveriesWithAllocations(String storeId) {
-        var deliveries = deliveriesRepository.findAllActiveDeliveries(storeId);
-        for (var delivery : deliveries) {
-            delivery.setAllocations(fetchAllocations(storeId, delivery.getDeliveryId()));
-            if (delivery.hasExternalDocument(DocumentType.GoodsReceipt)) {
-                enrichWithReceivedAllocations(storeId, delivery);
-            }
-        }
-        return deliveries;
-    }
-
     private List<Allocation> fetchAllocations(String storeId, String deliveryId) {
         List<Allocation> entries = new LinkedList<>();
         entries.addAll(orderAllocationsManager.fetchAll(storeId, deliveryId));

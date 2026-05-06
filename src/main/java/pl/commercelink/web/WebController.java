@@ -12,7 +12,7 @@ import pl.commercelink.web.dtos.InventoryItemView;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.deliveries.DeliveriesQueryService;
+import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.Order;
@@ -50,7 +50,7 @@ public class WebController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private DeliveriesQueryService deliveriesQueryService;
+    private DeliveriesRepository deliveriesRepository;
 
     @Autowired
     private TaxonomyCache taxonomyCache;
@@ -101,7 +101,7 @@ public class WebController {
     @PreAuthorize("hasRole('ADMIN')")
     public String payments(Model model) {
 
-        List<Delivery> unpaidDeliveries = deliveriesQueryService.fetchActiveDeliveriesWithAllocations(getStoreId())
+        List<Delivery> unpaidDeliveries = deliveriesRepository.findAllActiveDeliveries(getStoreId())
                 .stream()
                 .filter(Delivery::isWaitingForPayment)
                 .sorted(Comparator.comparing(Delivery::getPaymentDueDate))
