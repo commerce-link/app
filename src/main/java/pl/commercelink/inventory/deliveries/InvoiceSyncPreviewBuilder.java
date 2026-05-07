@@ -8,7 +8,6 @@ import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
 import pl.commercelink.invoicing.api.InvoicePosition;
 import pl.commercelink.invoicing.api.InvoiceDirection;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
@@ -73,8 +72,7 @@ public class InvoiceSyncPreviewBuilder {
         preview.setDeliveryProvider(delivery.getProvider());
         preview.setInvoicePaid(invoice.paid());
         preview.setInvoicePaymentToDate(invoice.paymentToDate() != null ? invoice.paymentToDate().toString() : null);
-        preview.setDeliveryPaymentStatus(delivery.getPaymentStatus() != null ? delivery.getPaymentStatus().getLocalizedName() : null);
-        preview.setDeliveryPaid(delivery.getPaymentStatus() == PaymentStatus.Paid);
+        preview.setDeliveryPaid(delivery.isPaid());
         preview.setDeliveryPaymentDueDate(delivery.getPaymentDueDate() != null ? delivery.getPaymentDueDate().toString() : null);
 
         return preview;

@@ -2,7 +2,6 @@ package pl.commercelink.inventory.deliveries;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.LinkedList;
@@ -40,7 +39,7 @@ public class DeliveriesPlanningService {
 
         return allocationsByProvider.entrySet().stream()
                 .map(entry -> {
-                    var delivery = new Delivery(storeId, null, entry.getKey(), PaymentStatus.New);
+                    var delivery = new Delivery(storeId, null, entry.getKey());
                     delivery.setAllocations(entry.getValue());
                     delivery.setItems(groupAndUnify(entry.getValue()));
                     return delivery;

@@ -37,16 +37,18 @@
                             <label class="label" th:text="#{deliveries.statuses}"></label>
                             <div class="control">
                                 <span class="tag"
-                                      th:classappend="${delivery.paymentStatus.name() == 'Paid'} ? 'is-success' :
-                                                      (${delivery.paymentStatus.name() == 'Unpaid'} ? 'is-warning' : '')"
-                                      th:text="${delivery.paymentStatus.localizedName}"></span>
+                                      th:classappend="${delivery.paid} ? 'is-success' :
+                                                      (${delivery.overpaid} ? 'is-danger' :
+                                                       (${delivery.underpaid} ? 'is-warning' : 'is-light'))"
+                                      th:text="${delivery.paid} ? #{deliveries.status.paid} :
+                                               (${delivery.overpaid} ? #{deliveries.status.overpaid} :
+                                                (${delivery.underpaid} ? #{deliveries.status.underpaid} : #{deliveries.status.unpaid}))"></span>
                                 <span class="tag ml-1"
                                       th:classappend="${delivery.invoiced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.invoiced} ? #{deliveries.status.invoiced} : #{deliveries.status.not.invoiced}"></span>
                                 <span class="tag ml-1"
                                       th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
-                                <input type="hidden" th:field="*{paymentStatus}"/>
                             </div>
                         </div>
                         <div class="field">

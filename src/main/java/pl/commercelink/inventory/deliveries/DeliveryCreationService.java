@@ -3,8 +3,6 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
-import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
@@ -26,7 +24,12 @@ public class DeliveryCreationService {
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
 
-    public void run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+    public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+
+        if (form.isRemoveUnselected()) {
+            removeUnselectedAllocations(storeId, form.getItems());
+        }
+
         if (form.hasPricesInForeignCurrency()) {
             form.applyExchangeRate(new ExchangeRates().getCurrentSellRates().get(form.getSourceCurrency()));
         }
@@ -39,19 +42,15 @@ public class DeliveryCreationService {
                     .sum();
             delivery.increaseTotalCost(allocationsCost);
 
-            if (delivery.getPaymentStatus() == PaymentStatus.Paid) {
-                delivery.addPayment(Payment.bankTransfer(null, null, delivery.getTotalCostGross()));
-            }
-
             deliveriesRepository.save(delivery);
 
             orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
             warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+
+            return delivery.getDeliveryId();
         }
 
-        if (form.isRemoveUnselected()) {
-            removeUnselectedAllocations(storeId, form.getItems());
-        }
+        return null;
     }
 
     private Delivery createDelivery(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
@@ -59,7 +58,6 @@ public class DeliveryCreationService {
                 storeId,
                 form.getExternalDeliveryId(),
                 form.getProvider(),
-                form.getPaymentStatus(),
                 form.getEstimatedDeliveryAt(),
                 form.getShippingCost(),
                 form.getPaymentCost(),

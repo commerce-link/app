@@ -27,7 +27,6 @@ public class InvoiceSyncPreview {
 
     private boolean invoicePaid;
     private String invoicePaymentToDate;
-    private String deliveryPaymentStatus;
     private boolean deliveryPaid;
     private String deliveryPaymentDueDate;
 
@@ -208,14 +207,6 @@ public class InvoiceSyncPreview {
 
     public void setInvoicePaymentToDate(String invoicePaymentToDate) {
         this.invoicePaymentToDate = invoicePaymentToDate;
-    }
-
-    public String getDeliveryPaymentStatus() {
-        return deliveryPaymentStatus;
-    }
-
-    public void setDeliveryPaymentStatus(String deliveryPaymentStatus) {
-        this.deliveryPaymentStatus = deliveryPaymentStatus;
     }
 
     public boolean isDeliveryPaid() {

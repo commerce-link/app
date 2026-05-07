@@ -101,11 +101,7 @@ public class WebController {
     @PreAuthorize("hasRole('ADMIN')")
     public String payments(Model model) {
 
-        List<Delivery> unpaidDeliveries = deliveriesRepository.findAllActiveDeliveries(getStoreId())
-                .stream()
-                .filter(Delivery::isWaitingForPayment)
-                .sorted(Comparator.comparing(Delivery::getPaymentDueDate))
-                .collect(Collectors.toList());
+        List<Delivery> unpaidDeliveries = deliveriesRepository.findUnpaidDeliveries(getStoreId());
 
         double unpaidDeliveriesAmountNet = unpaidDeliveries.stream()
                 .mapToDouble(Delivery::getTotalCost)

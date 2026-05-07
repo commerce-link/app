@@ -13,7 +13,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
@@ -121,7 +120,6 @@ public class DeliveriesController {
     public String markDeliveryAsPaid(@RequestParam String deliveryId) {
         var delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         delivery.addPayment(Payment.bankTransfer(null, null, delivery.getUnpaidAmount()));
-        delivery.setPaymentStatus(PaymentStatus.Paid);
         deliveriesRepository.save(delivery);
         return "redirect:/dashboard/payments";
     }
@@ -290,7 +288,6 @@ public class DeliveriesController {
         form.setStoreId(storeId);
         form.setProvider(provider);
         form.setItems(groupAndUnify(delivery.getAllocations()));
-        form.setPaymentStatus(PaymentStatus.New);
         form.setTax(deliveryTaxResolver.resolveFor(provider));
 
         for (DeliveryItem item : form.getItems()) {
@@ -322,7 +319,14 @@ public class DeliveriesController {
 
     private String processDelivery(String storeId, DeliveryCreationForm form) {
         form.setStoreId(storeId);
-        deliveryCreationService.run(storeId, form, isSuperAdmin());
+
+        String createdDeliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin());
+
+        if (createdDeliveryId != null) {
+            return isSuperAdmin()
+                    ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, createdDeliveryId)
+                    : "redirect:/dashboard/deliveries/details?deliveryId=" + createdDeliveryId;
+        }
 
         return isSuperAdmin()
                 ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"

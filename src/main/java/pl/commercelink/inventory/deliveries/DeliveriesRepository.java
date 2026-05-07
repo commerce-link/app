@@ -6,7 +6,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
-import pl.commercelink.orders.PaymentStatus;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -44,20 +43,22 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         return dynamoDBMapper.query(Delivery.class, queryExpression);
     }
 
-    public List<Delivery> findAllActiveDeliveries(String storeId) {
+    public List<Delivery> findUnpaidDeliveries(String storeId) {
         Delivery deliveryKey = new Delivery();
         deliveryKey.setStoreId(storeId);
 
         Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
-        expressionAttributeValues.put(":paid", new AttributeValue().withS(PaymentStatus.Paid.toString()));
-        expressionAttributeValues.put(":null", new AttributeValue().withNULL(true));
+        expressionAttributeValues.put(":true", new AttributeValue().withN("1"));
 
         DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
                 .withHashKeyValues(deliveryKey)
-                .withFilterExpression("paymentStatus <> :paid OR attribute_not_exists(receivedAt) OR receivedAt = :null")
+                .withFilterExpression("attribute_not_exists(paid) OR paid <> :true")
                 .withExpressionAttributeValues(expressionAttributeValues);
 
-        return dynamoDBMapper.query(Delivery.class, queryExpression);
+        return dynamoDBMapper.query(Delivery.class, queryExpression)
+                .stream()
+                .sorted(Comparator.comparing(Delivery::getPaymentDueDate))
+                .collect(Collectors.toList());
     }
 
     public List<Delivery> searchActiveDeliveries(String storeId, DeliveryFilter filter, int page, int pageSize) {

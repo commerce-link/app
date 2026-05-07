@@ -13,7 +13,6 @@ import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.stores.Store;
@@ -52,8 +51,8 @@ public class InvoiceSyncService {
         Store store = storesRepository.findById(storeId);
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
 
-        for (Delivery delivery : deliveriesRepository.findAllActiveDeliveries(storeId)) {
-            if (!delivery.isInvoiced() || !delivery.isWaitingForPayment()) {
+        for (Delivery delivery : deliveriesRepository.findUnpaidDeliveries(storeId)) {
+            if (!delivery.isInvoiced() || !delivery.isWaitingForPayment() || !delivery.getPayments().isEmpty()) {
                 continue;
             }
 
@@ -67,10 +66,7 @@ public class InvoiceSyncService {
 
             Invoice invoice = invoicingProvider.fetchInvoiceById(invoiceDocument.get().getId(), InvoiceDirection.Purchase);
             if (invoice.paid()) {
-                delivery.setPaymentStatus(PaymentStatus.Paid);
-                if (delivery.getPayments().isEmpty()) {
-                    delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
-                }
+                delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
                 deliveriesRepository.save(delivery);
             }
         }
@@ -122,13 +118,10 @@ public class InvoiceSyncService {
             delivery.updateShippingCost(position.totalPrice().netValue());
         }
 
-        if (invoice.paid()) {
-            delivery.setPaymentStatus(PaymentStatus.Paid);
-            if (delivery.getPayments().isEmpty()) {
-                delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
-            }
-        } else {
-            delivery.setPaymentStatus(PaymentStatus.Unpaid);
+        if (invoice.paid() && delivery.getPayments().isEmpty()) {
+            delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+        } else if (!invoice.paid() && !delivery.getPayments().isEmpty()) {
+            delivery.clearPayments();
         }
 
         if (invoice.paymentToDate() != null) {

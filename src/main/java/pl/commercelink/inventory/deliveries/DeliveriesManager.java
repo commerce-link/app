@@ -89,7 +89,6 @@ public class DeliveriesManager {
                 storeId,
                 externalDeliveryId,
                 source.getProvider(),
-                source.getPaymentStatus(),
                 estimatedDeliveryAt,
                 0,
                 0,

@@ -311,7 +311,6 @@ public class OrdersController extends BaseController {
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
         model.addAttribute("paymentSources", PaymentSource.values());
-        model.addAttribute("paymentStatuses", PaymentStatus.values());
         model.addAttribute("pendingPayment", order.getPayments().stream()
                 .filter(Payment::isUnsettled)
                 .findFirst()

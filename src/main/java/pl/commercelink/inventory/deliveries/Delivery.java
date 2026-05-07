@@ -7,7 +7,6 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -51,9 +50,6 @@ public class Delivery {
 
     @DynamoDBAttribute(attributeName = "provider")
     private String provider;
-    @DynamoDBAttribute(attributeName = "paymentStatus")
-    @DynamoDBTypeConvertedEnum
-    private PaymentStatus paymentStatus;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -83,6 +79,8 @@ public class Delivery {
     private boolean invoiced;
     @DynamoDBAttribute(attributeName = "synced")
     private boolean synced;
+    @DynamoDBAttribute(attributeName = "paid")
+    private boolean paid;
 
     // calculated on the fly based on current items distribution
     @DynamoDBIgnore
@@ -95,17 +93,16 @@ public class Delivery {
 
     }
 
-    public Delivery(String storeId, String externalDeliveryId, String provider, PaymentStatus paymentStatus) {
+    public Delivery(String storeId, String externalDeliveryId, String provider) {
         this.storeId = storeId;
         this.deliveryId = UUID.randomUUID().toString();
         this.externalDeliveryId = externalDeliveryId;
         this.provider = provider;
-        this.paymentStatus = paymentStatus;
         this.orderedAt = LocalDateTime.now();
     }
 
-    public Delivery(String storeId, String externalDeliveryId, String provider, PaymentStatus paymentStatus, LocalDate estimatedDeliveryAt, double shippingCost, double paymentCost, int paymentTerms, double tax) {
-        this(storeId, externalDeliveryId, provider, paymentStatus);
+    public Delivery(String storeId, String externalDeliveryId, String provider, LocalDate estimatedDeliveryAt, double shippingCost, double paymentCost, int paymentTerms, double tax) {
+        this(storeId, externalDeliveryId, provider);
 
         this.estimatedDeliveryAt = estimatedDeliveryAt;
         this.shippingCost = shippingCost;
@@ -131,7 +128,7 @@ public class Delivery {
 
     @DynamoDBIgnore
     public boolean isWaitingForPayment() {
-        return paymentStatus != PaymentStatus.Paid;
+        return !isFullyPaid();
     }
 
     @DynamoDBIgnore
@@ -211,11 +208,24 @@ public class Delivery {
         } else {
             payments.add(splitOff);
         }
+
+        source.recomputePaid();
+        recomputePaid();
     }
 
     @DynamoDBIgnore
     public boolean isFullyPaid() {
-        return getUnpaidAmount() <= 0;
+        return getPaidAmount() > 0 && getUnpaidAmount() == 0;
+    }
+
+    @DynamoDBIgnore
+    public boolean isUnderpaid() {
+        return getPaidAmount() > 0 && getUnpaidAmount() > 0;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOverpaid() {
+        return getUnpaidAmount() < 0;
     }
 
     @DynamoDBIgnore
@@ -233,6 +243,17 @@ public class Delivery {
 
     public void addPayment(Payment payment) {
         this.payments.add(payment);
+        recomputePaid();
+    }
+
+    public void clearPayments() {
+        this.payments.clear();
+        recomputePaid();
+    }
+
+    @DynamoDBIgnore
+    public void recomputePaid() {
+        this.paid = isFullyPaid();
     }
 
     @DynamoDBIgnore
@@ -331,12 +352,12 @@ public class Delivery {
         this.provider = provider;
     }
 
-    public PaymentStatus getPaymentStatus() {
-        return paymentStatus;
+    public boolean isPaid() {
+        return paid;
     }
 
-    public void setPaymentStatus(PaymentStatus paymentStatus) {
-        this.paymentStatus = paymentStatus;
+    public void setPaid(boolean paid) {
+        this.paid = paid;
     }
 
     public List<Shipment> getShipments() {
@@ -359,6 +380,7 @@ public class Delivery {
     public void updateShippingCost(double newShippingCost) {
         this.totalCost = scale(this.totalCost + (newShippingCost - this.shippingCost));
         this.shippingCost = newShippingCost;
+        recomputePaid();
     }
 
     public int getPaymentTerms() {
@@ -381,6 +403,7 @@ public class Delivery {
     public void updatePaymentCost(double newPaymentCost) {
         this.totalCost = scale(this.totalCost + (newPaymentCost - this.paymentCost));
         this.paymentCost = newPaymentCost;
+        recomputePaid();
     }
 
     public double getTotalCost() {
@@ -394,17 +417,20 @@ public class Delivery {
     @DynamoDBIgnore
     public void increaseTotalCost(double amount) {
         this.totalCost = scale(this.totalCost + amount);
+        recomputePaid();
     }
 
     @DynamoDBIgnore
     public void decreaseTotalCost(double amount) {
         this.totalCost = scale(this.totalCost - amount);
+        recomputePaid();
     }
 
     @DynamoDBIgnore
     public void recomputeTotalCost(List<Allocation> allocations) {
         double allocationsCost = allocations.stream().mapToDouble(Allocation::getTotalCost).sum();
         this.totalCost = scale(allocationsCost + paymentCost + shippingCost);
+        recomputePaid();
     }
 
     private static double scale(double value) {

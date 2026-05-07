@@ -28,25 +28,15 @@
                 <!-- Delivery Details -->
                 <div class="box mb-5">
                     <div class="columns is-vcentered mb-2">
-                        <div class="column is-3">
+                        <div class="column is-4">
                             <label class="label" th:text="#{general.delivery.id}">Order No</label>
                             <input class="input" type="text" th:field="*{externalDeliveryId}"/>
                         </div>
-                        <div class="column is-3">
-                            <label class="label" th:text="#{general.payment.status}">Payment Status</label>
-                            <div class="select is-fullwidth">
-                                <select th:field="*{paymentStatus}" required>
-                                    <option th:each="status : ${T(pl.commercelink.orders.PaymentStatus).values()}"
-                                            th:value="${status}"
-                                            th:text="${status}"></option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="column is-3">
+                        <div class="column is-4">
                             <label class="label" th:text="#{deliveries.estimated.delivery}">Est. Delivery</label>
                             <input class="input" type="date" th:field="*{estimatedDeliveryAt}"/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-4">
                             <label class="label" th:text="#{general.currency}">Currency</label>
                             <div class="select is-fullwidth">
                                 <select th:field="*{sourceCurrency}">

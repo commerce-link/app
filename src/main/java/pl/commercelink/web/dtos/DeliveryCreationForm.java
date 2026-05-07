@@ -2,7 +2,6 @@ package pl.commercelink.web.dtos;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
-import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.invoicing.api.Price;
 
 import java.time.LocalDate;
@@ -19,7 +18,6 @@ public class DeliveryCreationForm {
 
     private String externalDeliveryId;
     private String sourceCurrency = "PLN";
-    private PaymentStatus paymentStatus = PaymentStatus.New;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate estimatedDeliveryAt;
     private double shippingCost;
@@ -62,14 +60,6 @@ public class DeliveryCreationForm {
 
     public void setSourceCurrency(String sourceCurrency) {
         this.sourceCurrency = sourceCurrency;
-    }
-
-    public PaymentStatus getPaymentStatus() {
-        return paymentStatus;
-    }
-
-    public void setPaymentStatus(PaymentStatus paymentStatus) {
-        this.paymentStatus = paymentStatus;
     }
 
     public LocalDate getEstimatedDeliveryAt() {
