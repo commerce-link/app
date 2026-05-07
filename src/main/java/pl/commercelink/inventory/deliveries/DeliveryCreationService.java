@@ -3,6 +3,8 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
@@ -36,6 +38,10 @@ public class DeliveryCreationService {
                     .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
                     .sum();
             delivery.increaseTotalCost(allocationsCost);
+
+            if (delivery.getPaymentStatus() == PaymentStatus.Paid) {
+                delivery.addPayment(Payment.bankTransfer(null, null, delivery.getTotalCostGross()));
+            }
 
             deliveriesRepository.save(delivery);
 

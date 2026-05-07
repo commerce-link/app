@@ -5,13 +5,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
-import pl.commercelink.invoicing.api.InvoicePosition;
 import pl.commercelink.invoicing.api.InvoiceDirection;
+import pl.commercelink.invoicing.api.InvoicePosition;
+import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -67,6 +68,9 @@ public class InvoiceSyncService {
             Invoice invoice = invoicingProvider.fetchInvoiceById(invoiceDocument.get().getId(), InvoiceDirection.Purchase);
             if (invoice.paid()) {
                 delivery.setPaymentStatus(PaymentStatus.Paid);
+                if (delivery.getPayments().isEmpty()) {
+                    delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+                }
                 deliveriesRepository.save(delivery);
             }
         }
@@ -120,6 +124,9 @@ public class InvoiceSyncService {
 
         if (invoice.paid()) {
             delivery.setPaymentStatus(PaymentStatus.Paid);
+            if (delivery.getPayments().isEmpty()) {
+                delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+            }
         } else {
             delivery.setPaymentStatus(PaymentStatus.Unpaid);
         }

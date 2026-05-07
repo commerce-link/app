@@ -28,21 +28,6 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         return dynamoDBMapper.load(Delivery.class, storeId, deliveryId);
     }
 
-    public Delivery findByExternalDeliveryId(String storeId, String externalDeliveryId) {
-        Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
-        expressionAttributeValues.put(":storeId", new AttributeValue().withS(storeId));
-        expressionAttributeValues.put(":externalDeliveryId", new AttributeValue().withS(externalDeliveryId));
-
-        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
-                .withKeyConditionExpression("storeId = :storeId")
-                .withFilterExpression("externalDeliveryId = :externalDeliveryId")
-                .withExpressionAttributeValues(expressionAttributeValues)
-                .withConsistentRead(false);
-
-        List<Delivery> results = dynamoDBMapper.query(Delivery.class, queryExpression);
-        return results.isEmpty() ? null : results.get(0);
-    }
-
     public List<Delivery> findAll(String storeId, LocalDateTime from, LocalDateTime to) {
         Delivery deliveryKey = new Delivery();
         deliveryKey.setStoreId(storeId);

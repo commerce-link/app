@@ -12,6 +12,7 @@ import pl.commercelink.inventory.deliveries.*;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -119,7 +120,8 @@ public class DeliveriesController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String markDeliveryAsPaid(@RequestParam String deliveryId) {
         var delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
-        delivery.markAsPaid();
+        delivery.addPayment(Payment.bankTransfer(null, null, delivery.getUnpaidAmount()));
+        delivery.setPaymentStatus(PaymentStatus.Paid);
         deliveriesRepository.save(delivery);
         return "redirect:/dashboard/payments";
     }

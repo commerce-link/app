@@ -344,6 +344,35 @@
                 </div>
             </div>
 
+            <h2 th:text="#{order.payments}"></h2>
+
+            <div class="box">
+                <table class="table is-fullwidth">
+                    <thead>
+                    <tr>
+                        <th th:text="#{order.payment.source}"></th>
+                        <th th:text="#{payments.source.name}"></th>
+                        <th th:text="#{order.payment.amount}"></th>
+                        <th th:text="#{order.payment.processing.fee}"></th>
+                        <th th:text="#{order.payment.reference.no}"></th>
+                        <th th:text="#{order.payment.bank.transaction.no}"></th>
+                        <th th:text="#{order.payment.bank.transaction.date}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="payment : ${delivery.payments}">
+                        <td th:text="${payment.source}"></td>
+                        <td th:text="${payment.name}"></td>
+                        <td th:text="${payment.amount}"></td>
+                        <td th:text="${payment.processingFee}"></td>
+                        <td th:text="${payment.referenceNo}"></td>
+                        <td th:text="${payment.bankTransactionNo}"></td>
+                        <td th:text="${payment.bankTransactionDate}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <form th:if="${(isAdmin or isSuperAdmin) and delivery.allocations.isEmpty()}"
                   th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/delete(storeId=${delivery.storeId})} : @{/dashboard/deliveries/delete}"
                   method="post" class="box">

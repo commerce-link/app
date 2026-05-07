@@ -5,16 +5,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.starter.util.ConversionUtil;
-import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
-import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
+import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentStatus;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
-import pl.commercelink.invoicing.api.Price;
-
-import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
+import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
+import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
+import pl.commercelink.starter.util.ConversionUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,6 +24,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @DynamoDBTable(tableName = "Deliveries")
 public class Delivery {
@@ -66,6 +67,8 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "tax")
     private double tax = DEFAULT_VAT_RATE;
 
+    @DynamoDBAttribute(attributeName = "payments")
+    private List<Payment> payments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "shipments")
     private List<Shipment> shipments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "events")
@@ -121,11 +124,6 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
-    public void markAsPaid() {
-        this.paymentStatus = PaymentStatus.Paid;
-    }
-
-    @DynamoDBIgnore
     public void markAsReceived() {
         this.receivedAt = LocalDateTime.now();
         this.addEvent(new Event(EventType.action, "DELIVERY_RECEIVED", LocalDateTime.now()));
@@ -173,8 +171,68 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
-    public Price getUnpaidAmount() {
-        return Price.fromNet(totalCost, tax);
+    public boolean hasMultiplePayments() {
+        return payments.size() > 1;
+    }
+
+    @DynamoDBIgnore
+    public double getUnpaidAmount() {
+        return scale(getTotalCostGross() - getPaidAmount());
+    }
+
+    @DynamoDBIgnore
+    public double getPaidAmount() {
+        return payments.stream().mapToDouble(Payment::getAmount).sum();
+    }
+
+    @DynamoDBIgnore
+    public void transferPaymentFrom(Delivery source, double movedCost) {
+        if (source.payments.isEmpty()) {
+            return;
+        }
+
+        if (source.hasMultiplePayments()) {
+            throw new IllegalArgumentException("Delivery with multiple payments can't be merged. First, consolidate or remove payments.");
+        }
+
+        Payment sourcePayment = source.payments.getFirst();
+        Payment splitOff = sourcePayment.split(Price.fromNet(movedCost, source.tax).grossValue());
+
+        if (sourcePayment.getAmount() == 0 && sourcePayment.getProcessingFee() == 0) {
+            source.payments.clear();
+        }
+
+        Payment match = payments.stream()
+                .filter(p -> p.matches(splitOff))
+                .findFirst()
+                .orElse(null);
+        if (match != null) {
+            match.absorb(splitOff);
+        } else {
+            payments.add(splitOff);
+        }
+    }
+
+    @DynamoDBIgnore
+    public boolean isFullyPaid() {
+        return getUnpaidAmount() <= 0;
+    }
+
+    @DynamoDBIgnore
+    public Payment getPendingPayment() {
+        return payments.stream().filter(Payment::isUnsettled).findFirst().orElse(null);
+    }
+
+    public List<Payment> getPayments() {
+        return payments;
+    }
+
+    public void setPayments(List<Payment> payments) {
+        this.payments = payments;
+    }
+
+    public void addPayment(Payment payment) {
+        this.payments.add(payment);
     }
 
     @DynamoDBIgnore

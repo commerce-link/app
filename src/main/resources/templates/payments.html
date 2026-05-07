@@ -39,8 +39,8 @@
                             <span th:text="${delivery.shortenedDeliveryId}"></span>
                         </a>
                     </td>
-                    <td th:text="${delivery.unpaidAmount.netValue}"></td>
-                    <td th:text="${delivery.unpaidAmount.grossValue}"></td>
+                    <td th:text="${delivery.totalCost}"></td>
+                    <td th:text="${delivery.totalCostGross}"></td>
                     <td th:text="${delivery.orderedAt.toLocalDate}"></td>
                     <td th:text="${delivery.paymentDueDate}"></td>
                     <td>

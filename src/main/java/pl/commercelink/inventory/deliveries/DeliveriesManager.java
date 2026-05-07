@@ -66,20 +66,10 @@ public class DeliveriesManager {
             return;
         }
 
-        double totalMovedCost = Stream.concat(orderAllocations.stream(), warehouseAllocations.stream())
-                .mapToDouble(Allocation::getTotalCost)
-                .sum();
-
         Delivery source = deliveriesRepository.findById(storeId, sourceDeliveryId);
-        source.decreaseTotalCost(totalMovedCost);
-        deliveriesRepository.save(source);
-
         Delivery target = deliveriesRepository.findById(storeId, targetDeliveryId);
-        target.increaseTotalCost(totalMovedCost);
-        deliveriesRepository.save(target);
 
-        orderAllocationsManager.reassign(targetDeliveryId, orderAllocations);
-        warehouseAllocationsManager.reassign(storeId, targetDeliveryId, warehouseAllocations);
+        transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
     }
 
     public void splitAllocations(
@@ -90,25 +80,51 @@ public class DeliveriesManager {
             List<Allocation> orderAllocations,
             List<Allocation> warehouseAllocations
     ) {
-        if (deliveriesRepository.findByExternalDeliveryId(storeId, externalDeliveryId) != null) {
-            throw new IllegalArgumentException("Delivery with externalId " + externalDeliveryId + " already exists. Use merge to move allocations to an existing delivery.");
+        if (orderAllocations.isEmpty() && warehouseAllocations.isEmpty()) {
+            return;
         }
 
-        var sourceDelivery = deliveriesRepository.findById(storeId, deliveryId);
-        var targetDelivery = new Delivery(
+        var source = deliveriesRepository.findById(storeId, deliveryId);
+        var target = new Delivery(
                 storeId,
                 externalDeliveryId,
-                sourceDelivery.getProvider(),
-                sourceDelivery.getPaymentStatus(),
+                source.getProvider(),
+                source.getPaymentStatus(),
                 estimatedDeliveryAt,
-                sourceDelivery.getShippingCost(),
-                sourceDelivery.getPaymentCost(),
-                sourceDelivery.getPaymentTerms(),
-                sourceDelivery.getTax()
+                0,
+                0,
+                source.getPaymentTerms(),
+                source.getTax()
         );
-        deliveriesRepository.save(targetDelivery);
 
-        reassignAllocations(storeId, deliveryId, targetDelivery.getDeliveryId(), orderAllocations, warehouseAllocations);
+        transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
+    }
+
+    private void transferCostAndAllocations(
+            String storeId,
+            Delivery source,
+            Delivery target,
+            List<Allocation> orderAllocations,
+            List<Allocation> warehouseAllocations
+    ) {
+        double totalMovedCost = computeMovedCost(orderAllocations, warehouseAllocations);
+
+        source.decreaseTotalCost(totalMovedCost);
+        target.increaseTotalCost(totalMovedCost);
+
+        target.transferPaymentFrom(source, totalMovedCost);
+
+        deliveriesRepository.save(source);
+        deliveriesRepository.save(target);
+
+        orderAllocationsManager.reassign(target.getDeliveryId(), orderAllocations);
+        warehouseAllocationsManager.reassign(storeId, target.getDeliveryId(), warehouseAllocations);
+    }
+
+    private double computeMovedCost(List<Allocation> orderAllocations, List<Allocation> warehouseAllocations) {
+        return Stream.concat(orderAllocations.stream(), warehouseAllocations.stream())
+                .mapToDouble(Allocation::getTotalCost)
+                .sum();
     }
 
     public void updateDelivery(Delivery updatedDelivery) {
