@@ -13,7 +13,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -138,7 +137,7 @@ public class DeliveriesController {
                 ? "redirect:/dashboard/payments"
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
 
-        if (form.getBankAmount() <= 0) {
+        if (form.getBankAmount() == 0) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
             return redirectTarget;
@@ -160,7 +159,7 @@ public class DeliveriesController {
                 });
 
         target.setSource(form.getSource());
-        target.setDirection(PaymentDirection.Outgoing);
+        target.setDirection(form.getDirection());
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(form.getBankAmount());

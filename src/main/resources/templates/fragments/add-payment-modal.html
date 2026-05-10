@@ -89,6 +89,20 @@
                     </div>
 
                     <div class="field">
+                        <label class="label" th:text="#{order.payment.direction}"></label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select name="direction" id="addPaymentDirection" required>
+                                    <option th:each="dir : ${T(pl.commercelink.orders.PaymentDirection).values()}"
+                                            th:value="${dir}"
+                                            th:text="${dir.localizedName}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="help" th:text="#{order.payment.direction.help}"></p>
+                    </div>
+
+                    <div class="field">
                         <label class="label" th:text="#{order.payment.source}"></label>
                         <div class="control">
                             <div class="select is-fullwidth">
@@ -170,6 +184,8 @@
             });
             const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
             if (fromSurplusEl) fromSurplusEl.checked = false;
+            const directionEl = document.getElementById('addPaymentDirection');
+            if (directionEl) directionEl.value = mode === 'delivery' ? 'Outgoing' : 'Incoming';
         }
 
         function isAddPaymentDeliveryMode() {

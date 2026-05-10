@@ -1,6 +1,7 @@
 package pl.commercelink.web.dtos;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ public class AddPaymentForm {
     private double processingFee;
     private boolean feeIncluded;
     private PaymentSource source;
+    private PaymentDirection direction = PaymentDirection.Incoming;
     private String referenceNo;
     private String name;
     private String bankTransactionNo;
@@ -47,6 +49,14 @@ public class AddPaymentForm {
 
     public void setSource(PaymentSource source) {
         this.source = source;
+    }
+
+    public PaymentDirection getDirection() {
+        return direction;
+    }
+
+    public void setDirection(PaymentDirection direction) {
+        this.direction = direction;
     }
 
     public String getReferenceNo() {

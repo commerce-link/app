@@ -607,7 +607,7 @@ public class OrdersController extends BaseController {
                              Locale locale) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
 
-        if (form.getBankAmount() <= 0) {
+        if (form.getBankAmount() == 0) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
@@ -633,7 +633,7 @@ public class OrdersController extends BaseController {
                 });
 
         target.setSource(form.getSource());
-        target.setDirection(PaymentDirection.Incoming);
+        target.setDirection(form.getDirection());
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(amount);
