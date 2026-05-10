@@ -28,15 +28,15 @@
                 <!-- Delivery Details -->
                 <div class="box mb-5">
                     <div class="columns is-vcentered mb-2">
-                        <div class="column is-4">
+                        <div class="column is-2">
                             <label class="label" th:text="#{general.delivery.id}">Order No</label>
                             <input class="input" type="text" th:field="*{externalDeliveryId}"/>
                         </div>
-                        <div class="column is-4">
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.estimated.delivery}">Est. Delivery</label>
                             <input class="input" type="date" th:field="*{estimatedDeliveryAt}"/>
                         </div>
-                        <div class="column is-4">
+                        <div class="column is-1">
                             <label class="label" th:text="#{general.currency}">Currency</label>
                             <div class="select is-fullwidth">
                                 <select th:field="*{sourceCurrency}">
@@ -46,21 +46,19 @@
                                 </select>
                             </div>
                         </div>
-                    </div>
-                    <div class="columns is-vcentered">
-                        <div class="column is-3">
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.shippingCost}">Shipping</label>
                             <input class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.paymentCost}">Payment</label>
                             <input class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-1">
                             <label class="label" th:text="#{deliveries.tax}">VAT</label>
                             <input class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.paymentTerms}">Terms</label>
                             <input class="input" type="number" th:field="*{paymentTerms}" required/>
                         </div>

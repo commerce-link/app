@@ -22,6 +22,7 @@
             <table class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                 <tr>
+                    <th style="width: 150px;" th:text="#{payments.status}"></th>
                     <th style="width: 150px;" th:text="#{deliveries.provider}"></th>
                     <th style="width: 280px;" th:text="#{deliveries.order.no}"></th>
                     <th th:text="#{payments.amount.net}"></th>
@@ -33,6 +34,13 @@
                 </thead>
                 <tbody>
                 <tr th:each="delivery : ${unpaidDeliveries}">
+                    <td>
+                        <span class="tag"
+                              th:classappend="${delivery.overpaid} ? 'is-danger' :
+                                              (${delivery.underpaid} ? 'is-warning' : 'is-light')"
+                              th:text="${delivery.overpaid} ? #{deliveries.status.overpaid} :
+                                       (${delivery.underpaid} ? #{deliveries.status.underpaid} : #{deliveries.status.unpaid})"></span>
+                    </td>
                     <td th:text="${delivery.provider}"></td>
                     <td>
                         <a th:href="@{/dashboard/deliveries/details(deliveryId=${delivery.deliveryId})}">
@@ -44,9 +52,18 @@
                     <td th:text="${delivery.orderedAt.toLocalDate}"></td>
                     <td th:text="${delivery.paymentDueDate}"></td>
                     <td>
-                        <form th:action="@{/dashboard/deliveries/markAsPaid?deliveryId={deliveryId}(deliveryId=${delivery.deliveryId})}" method="post" th:id="'form-' + ${delivery.deliveryId}" onsubmit="event.preventDefault();">
-                            <button type="submit" class="button is-small is-primary" onclick="confirmSave(this)" th:text="#{payments.mark.paid}"></button>
-                        </form>
+                        <button type="button" class="button is-small is-primary"
+                                th:with="pp=${delivery.pendingPayment}"
+                                th:data-delivery-id="${delivery.deliveryId}"
+                                th:data-unpaid="${delivery.unpaidAmount}"
+                                th:data-pending-source="${pp != null ? pp.source : ''}"
+                                th:data-pending-name="${pp != null ? pp.name : ''}"
+                                th:data-pending-ref="${pp != null ? pp.referenceNo : ''}"
+                                th:data-pending-fee="${pp != null ? pp.fee : 0}"
+                                th:data-pending-bank-trx-no="${pp != null ? pp.bankTransactionNo : ''}"
+                                th:data-pending-bank-trx-date="${pp != null ? pp.bankTransactionDate : ''}"
+                                onclick="openPaymentModalForDeliveryFromButton(this)"
+                                th:text="#{order.payment.action.add}"></button>
                     </td>
                 </tr>
                 </tbody>
@@ -92,7 +109,7 @@
                                 th:data-pending-source="${pp != null ? pp.source : ''}"
                                 th:data-pending-name="${pp != null ? pp.name : ''}"
                                 th:data-pending-ref="${pp != null ? pp.referenceNo : ''}"
-                                th:data-pending-fee="${pp != null ? pp.processingFee : 0}"
+                                th:data-pending-fee="${pp != null ? pp.fee : 0}"
                                 th:data-pending-bank-trx-no="${pp != null ? pp.bankTransactionNo : ''}"
                                 th:data-pending-bank-trx-date="${pp != null ? pp.bankTransactionDate : ''}"
                                 onclick="openPaymentModalForOrderFromButton(this)"

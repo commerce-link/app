@@ -49,11 +49,11 @@
                             <input class="input" type="number" step="0.01" min="0"
                                    id="addPaymentProcessingFee"
                                    name="processingFee"
-                                   th:value="${pendingPayment != null and pendingPayment.processingFee > 0} ? ${pendingPayment.processingFee} : '0'"
+                                   th:value="${pendingPayment != null and pendingPayment.fee > 0} ? ${pendingPayment.fee} : '0'"
                                    th:placeholder="#{order.payment.processing.fee.placeholder}"
                                    oninput="onAddPaymentFeeInput()"/>
                         </div>
-                        <div class="control mt-2">
+                        <div class="control mt-2 payment-checkbox-order">
                             <label class="checkbox">
                                 <input type="checkbox"
                                        id="addPaymentFeeAutofill"
@@ -62,7 +62,7 @@
                             </label>
                             <p class="help" th:text="#{order.payment.fee.autofill.help}"></p>
                         </div>
-                        <div class="control mt-2">
+                        <div class="control mt-2 payment-checkbox-order">
                             <label class="checkbox">
                                 <input type="checkbox"
                                        id="addPaymentFeeIncluded"
@@ -72,6 +72,15 @@
                                 <span th:text="#{order.payment.fee.included}"></span>
                             </label>
                             <p class="help" th:text="#{order.payment.fee.included.help}"></p>
+                        </div>
+                        <div class="control mt-2 payment-checkbox-delivery">
+                            <label class="checkbox">
+                                <input type="checkbox"
+                                       id="addPaymentFeeFromSurplus"
+                                       onchange="onAddPaymentFeeFromSurplusToggle()"/>
+                                <span th:text="#{delivery.payment.fee.from.surplus}"></span>
+                            </label>
+                            <p class="help" th:text="#{delivery.payment.fee.from.surplus.help}"></p>
                         </div>
                     </div>
 
@@ -144,6 +153,35 @@
             modal.classList.toggle('is-active', show);
         }
 
+        function togglePaymentsEditModal(show) {
+            const modal = document.getElementById('paymentsEditModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function setPaymentModalMode(mode) {
+            const modal = document.getElementById('addPaymentModal');
+            if (modal) modal.dataset.mode = mode;
+            document.querySelectorAll('.payment-checkbox-order').forEach(el => {
+                el.style.display = mode === 'order' ? '' : 'none';
+            });
+            document.querySelectorAll('.payment-checkbox-delivery').forEach(el => {
+                el.style.display = mode === 'delivery' ? '' : 'none';
+            });
+            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplusEl) fromSurplusEl.checked = false;
+        }
+
+        function isAddPaymentDeliveryMode() {
+            const modal = document.getElementById('addPaymentModal');
+            return modal && modal.dataset.mode === 'delivery';
+        }
+
+        function openAddPaymentModalFromButton(btn) {
+            setPaymentModalMode(btn.dataset.mode || 'order');
+            toggleAddPaymentModal(true);
+        }
+
         function getAddPaymentExpected() {
             const el = document.getElementById('addPaymentExpected');
             return el ? (parseFloat(el.dataset.value || '0') || 0) : 0;
@@ -154,19 +192,37 @@
             if (autofillEl && autofillEl.checked) {
                 applyAddPaymentFeeAutofill();
             }
+            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplusEl && fromSurplusEl.checked) {
+                applyAddPaymentFeeFromSurplus();
+            }
             renderAddPaymentHint();
         }
 
         function onAddPaymentFeeInput() {
             const autofillEl = document.getElementById('addPaymentFeeAutofill');
             if (autofillEl) autofillEl.checked = false;
+            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplusEl) fromSurplusEl.checked = false;
             renderAddPaymentHint();
         }
 
         function onAddPaymentFeeAutofillToggle() {
             const autofillEl = document.getElementById('addPaymentFeeAutofill');
             if (autofillEl && autofillEl.checked) {
+                const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
+                if (fromSurplusEl) fromSurplusEl.checked = false;
                 applyAddPaymentFeeAutofill();
+            }
+            renderAddPaymentHint();
+        }
+
+        function onAddPaymentFeeFromSurplusToggle() {
+            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplusEl && fromSurplusEl.checked) {
+                const autofillEl = document.getElementById('addPaymentFeeAutofill');
+                if (autofillEl) autofillEl.checked = false;
+                applyAddPaymentFeeFromSurplus();
             }
             renderAddPaymentHint();
         }
@@ -181,6 +237,16 @@
             feeEl.value = fee.toFixed(2);
         }
 
+        function applyAddPaymentFeeFromSurplus() {
+            const bankEl = document.getElementById('addPaymentBankAmount');
+            const feeEl = document.getElementById('addPaymentProcessingFee');
+            if (!bankEl || !feeEl) return;
+            const expected = getAddPaymentExpected();
+            const bank = parseFloat(bankEl.value) || 0;
+            const fee = Math.max(0, bank - expected);
+            feeEl.value = fee.toFixed(2);
+        }
+
         function renderAddPaymentHint() {
             const bankEl = document.getElementById('addPaymentBankAmount');
             const feeEl = document.getElementById('addPaymentProcessingFee');
@@ -190,7 +256,6 @@
 
             const bank = parseFloat(bankEl.value) || 0;
             const fee = parseFloat(feeEl.value) || 0;
-            const feeIncluded = includedEl ? includedEl.checked : false;
 
             if (bank <= 0) {
                 hintEl.textContent = '';
@@ -198,8 +263,16 @@
             }
 
             const expected = getAddPaymentExpected();
-            const amount = feeIncluded ? bank : bank + fee;
-            const diff = expected - amount;
+            let amount, applied;
+            if (isAddPaymentDeliveryMode()) {
+                amount = bank;
+                applied = amount - fee;
+            } else {
+                const feeIncluded = includedEl ? includedEl.checked : false;
+                amount = feeIncluded ? bank : bank + fee;
+                applied = amount;
+            }
+            const diff = expected - applied;
             let status = '';
             if (Math.abs(diff) < 0.005) {
                 status = ' (pełna wpłata)';
@@ -214,6 +287,7 @@
         function openPaymentModalForOrder(orderId, expected, pending) {
             const modal = document.getElementById('addPaymentModal');
             if (!modal) return;
+            setPaymentModalMode('order');
             const form = modal.querySelector('form');
             if (form) form.action = '/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment';
 
@@ -232,6 +306,8 @@
             if (autofill) autofill.checked = false;
             const included = document.getElementById('addPaymentFeeIncluded');
             if (included) included.checked = false;
+            const fromSurplus = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplus) fromSurplus.checked = false;
 
             ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
                 const el = modal.querySelector('input[name="' + n + '"]');
@@ -252,7 +328,7 @@
                     if (el && pending[n]) el.value = pending[n];
                 });
                 if (fee) {
-                    const pendingFee = parseFloat(pending.processingFee) || 0;
+                    const pendingFee = parseFloat(pending.fee) || 0;
                     if (pendingFee > 0) fee.value = pendingFee.toFixed(2);
                 }
             }
@@ -266,11 +342,76 @@
                 source: btn.dataset.pendingSource || '',
                 name: btn.dataset.pendingName || '',
                 referenceNo: btn.dataset.pendingRef || '',
-                processingFee: btn.dataset.pendingFee || 0,
+                fee: btn.dataset.pendingFee || 0,
                 bankTransactionNo: btn.dataset.pendingBankTrxNo || '',
                 bankTransactionDate: btn.dataset.pendingBankTrxDate || ''
             };
             openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pending);
+        }
+
+        function openPaymentModalForDelivery(deliveryId, expected, pending) {
+            const modal = document.getElementById('addPaymentModal');
+            if (!modal) return;
+            setPaymentModalMode('delivery');
+            const form = modal.querySelector('form');
+            if (form) form.action = '/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment?redirectToPayments=true';
+
+            const expectedEl = document.getElementById('addPaymentExpected');
+            if (expectedEl) {
+                const value = parseFloat(expected) || 0;
+                expectedEl.dataset.value = value;
+                expectedEl.value = value.toFixed(2);
+            }
+
+            const bank = document.getElementById('addPaymentBankAmount');
+            if (bank) bank.value = '';
+            const fee = document.getElementById('addPaymentProcessingFee');
+            if (fee) fee.value = '0';
+            const autofill = document.getElementById('addPaymentFeeAutofill');
+            if (autofill) autofill.checked = false;
+            const included = document.getElementById('addPaymentFeeIncluded');
+            if (included) included.checked = false;
+            const fromSurplus = document.getElementById('addPaymentFeeFromSurplus');
+            if (fromSurplus) fromSurplus.checked = false;
+
+            ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
+                const el = modal.querySelector('input[name="' + n + '"]');
+                if (el) el.value = '';
+            });
+
+            const sourceSelect = modal.querySelector('select[name="source"]');
+            if (sourceSelect && sourceSelect.options.length > 0) {
+                sourceSelect.selectedIndex = 0;
+            }
+
+            if (pending) {
+                if (sourceSelect && pending.source) {
+                    sourceSelect.value = pending.source;
+                }
+                ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
+                    const el = modal.querySelector('input[name="' + n + '"]');
+                    if (el && pending[n]) el.value = pending[n];
+                });
+                if (fee) {
+                    const pendingFee = parseFloat(pending.fee) || 0;
+                    if (pendingFee > 0) fee.value = pendingFee.toFixed(2);
+                }
+            }
+
+            renderAddPaymentHint();
+            toggleAddPaymentModal(true);
+        }
+
+        function openPaymentModalForDeliveryFromButton(btn) {
+            const pending = {
+                source: btn.dataset.pendingSource || '',
+                name: btn.dataset.pendingName || '',
+                referenceNo: btn.dataset.pendingRef || '',
+                fee: btn.dataset.pendingFee || 0,
+                bankTransactionNo: btn.dataset.pendingBankTrxNo || '',
+                bankTransactionDate: btn.dataset.pendingBankTrxDate || ''
+            };
+            openPaymentModalForDelivery(btn.dataset.deliveryId, btn.dataset.unpaid, pending);
         }
     </script>
 </div>

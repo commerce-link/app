@@ -28,7 +28,7 @@ public class OrderFinancials {
         this.totalItemsCost = orderItems.stream().filter(i -> !i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalCost).sum();
         this.totalServicesPrice = orderItems.stream().filter(i -> i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalPrice).sum();
         this.totalServicesCost = orderItems.stream().filter(i -> i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalCost).sum();
-        this.totalProcessingFeesCost = order.getPayments().stream().mapToDouble(Payment::getProcessingFee).sum();
+        this.totalProcessingFeesCost = order.getPayments().stream().mapToDouble(Payment::getFee).sum();
 
         this.totalPrice = totalItemsPrice + totalServicesPrice;
         this.totalPriceNet = Price.fromGross(totalPrice).netValue();
@@ -39,7 +39,7 @@ public class OrderFinancials {
         this.totalProfit = totalPrice - totalCost;
         this.totalProfitNet = Price.fromGross(totalProfit).netValue();
 
-        this.paidAmount = order.getPayments().stream().mapToDouble(Payment::getAmount).sum();
+        this.paidAmount = order.getPayments().stream().mapToDouble(Payment::getAppliedAmount).sum();
         this.unpaidAmount = totalPrice - paidAmount;
     }
 

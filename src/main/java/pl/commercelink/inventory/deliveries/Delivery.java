@@ -179,7 +179,7 @@ public class Delivery {
 
     @DynamoDBIgnore
     public double getPaidAmount() {
-        return payments.stream().mapToDouble(Payment::getAmount).sum();
+        return payments.stream().mapToDouble(Payment::getAppliedAmount).sum();
     }
 
     @DynamoDBIgnore
@@ -195,7 +195,7 @@ public class Delivery {
         Payment sourcePayment = source.payments.getFirst();
         Payment splitOff = sourcePayment.split(Price.fromNet(movedCost, source.tax).grossValue());
 
-        if (sourcePayment.getAmount() == 0 && sourcePayment.getProcessingFee() == 0) {
+        if (sourcePayment.getAmount() == 0 && sourcePayment.getFee() == 0) {
             source.payments.clear();
         }
 

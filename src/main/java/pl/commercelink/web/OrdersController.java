@@ -633,10 +633,11 @@ public class OrdersController extends BaseController {
                 });
 
         target.setSource(form.getSource());
+        target.setDirection(PaymentDirection.Incoming);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(amount);
-        target.setProcessingFee(form.getProcessingFee());
+        target.setFee(form.getProcessingFee());
         target.setBankTransactionNo(form.getBankTransactionNo());
         target.setBankTransactionDate(form.getBankTransactionDate());
 

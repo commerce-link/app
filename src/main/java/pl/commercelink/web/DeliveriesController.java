@@ -13,8 +13,11 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
@@ -23,6 +26,10 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
+import org.springframework.context.MessageSource;
 
 import static pl.commercelink.inventory.deliveries.DeliveryItem.groupAndUnify;
 import static pl.commercelink.starter.security.CustomSecurityContext.getStoreId;
@@ -72,6 +79,9 @@ public class DeliveriesController {
     @Autowired
     private DeliveryTaxResolver deliveryTaxResolver;
 
+    @Autowired
+    private MessageSource messageSource;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -115,13 +125,68 @@ public class DeliveriesController {
         return "deliveries";
     }
 
-    @PostMapping("/dashboard/deliveries/markAsPaid")
+    @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String markDeliveryAsPaid(@RequestParam String deliveryId) {
-        var delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
-        delivery.addPayment(Payment.bankTransfer(null, null, delivery.getUnpaidAmount()));
+    public String addPayment(@PathVariable String deliveryId,
+                             @ModelAttribute AddPaymentForm form,
+                             @RequestParam(required = false, defaultValue = "false") boolean redirectToPayments,
+                             RedirectAttributes redirectAttributes,
+                             Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+
+        String redirectTarget = redirectToPayments
+                ? "redirect:/dashboard/payments"
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+
+        if (form.getBankAmount() <= 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
+            return redirectTarget;
+        }
+
+        if (form.getProcessingFee() < 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.fee.invalid", null, locale));
+            return redirectTarget;
+        }
+
+        Payment target = delivery.getPayments().stream()
+                .filter(Payment::isUnsettled)
+                .findFirst()
+                .orElseGet(() -> {
+                    Payment p = new Payment();
+                    delivery.addPayment(p);
+                    return p;
+                });
+
+        target.setSource(form.getSource());
+        target.setDirection(PaymentDirection.Outgoing);
+        target.setReferenceNo(form.getReferenceNo());
+        target.setName(form.getName());
+        target.setAmount(form.getBankAmount());
+        target.setFee(form.getProcessingFee());
+        target.setBankTransactionNo(form.getBankTransactionNo());
+        target.setBankTransactionDate(form.getBankTransactionDate());
+
+        delivery.recomputePaid();
         deliveriesRepository.save(delivery);
-        return "redirect:/dashboard/payments";
+        return redirectTarget;
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/updatePayments")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String updatePayments(@PathVariable String deliveryId, @ModelAttribute("delivery") Delivery updatedDelivery) {
+        Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (updatedDelivery.getPayments() != null) {
+            List<Payment> payments = updatedDelivery.getPayments().stream()
+                    .filter(Payment::isComplete)
+                    .collect(Collectors.toList());
+
+            existingDelivery.setPayments(payments);
+            existingDelivery.recomputePaid();
+        }
+        deliveriesRepository.save(existingDelivery);
+        return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/deliveries/markSelectedAsReceived")
@@ -357,6 +422,8 @@ public class DeliveriesController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
         model.addAttribute("supplierRegistry", supplierRegistry);
+        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("pendingPayment", delivery.getPendingPayment());
         return "deliveryDetails";
     }
 

@@ -765,123 +765,16 @@
         </div>
 
         <div class="column">
-            <h2 class="subtitle" th:text="#{order.payments}"></h2>
-            <div class="box">
-                <table class="table is-fullwidth">
-                    <thead>
-                    <tr>
-                        <th th:text="#{order.payment.source}"></th>
-                        <th th:text="#{payments.source.name}"></th>
-                        <th th:text="#{order.payment.amount}"></th>
-                        <th th:text="#{order.payment.processing.fee}"></th>
-                        <th th:text="#{order.payment.reference.no}"></th>
-                        <th th:text="#{order.payment.bank.transaction.no}"></th>
-                        <th th:text="#{order.payment.bank.transaction.date}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="payment : ${order.payments}">
-                        <td th:text="${payment.source}"></td>
-                        <td th:text="${payment.name}"></td>
-                        <td th:text="${payment.amount}"></td>
-                        <td th:text="${payment.processingFee}"></td>
-                        <td th:text="${payment.referenceNo}"></td>
-                        <td th:text="${payment.bankTransactionNo}"></td>
-                        <td th:text="${payment.bankTransactionDate}"></td>
-                    </tr>
-                    </tbody>
-                </table>
-
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary is-small"
-                                type="button"
-                                th:disabled="${isCompletedOrder}"
-                                onclick="toggleAddPaymentModal(true)"
-                                th:text="#{order.payment.action.add}"></button>
-                    </div>
-                    <div class="control">
-                        <button class="button is-small"
-                                type="button"
-                                th:disabled="${isCompletedOrder}"
-                                onclick="togglePaymentsModal(true)"
-                                th:text="#{general.edit}"></button>
-                    </div>
-                </div>
-            </div>
-
-            <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
-                    formAction=@{/dashboard/orders/{orderId}/addPayment(orderId=${order.orderId})},
+            <div th:replace="~{fragments/payments-section :: paymentsSection(
+                    payments=${order.payments},
+                    addPaymentAction=@{/dashboard/orders/{orderId}/addPayment(orderId=${order.orderId})},
+                    updatePaymentsAction=@{/dashboard/orders/{orderId}/updatePayments(orderId=${order.orderId})},
                     expectedAmount=${orderFinancials.unpaidAmount},
                     pendingPayment=${pendingPayment},
-                    paymentSources=${paymentSources})}"></div>
-
-            <div id="paymentsModal" class="modal">
-                <div class="modal-background" onclick="togglePaymentsModal(false)"></div>
-                <div class="modal-card" style="width: 60vw">
-                    <header class="modal-card-head">
-                        <p class="modal-card-title" th:text="#{order.payments}"></p>
-                        <button type="button" class="delete" aria-label="close" onclick="togglePaymentsModal(false)"></button>
-                    </header>
-
-                    <form th:action="@{/dashboard/orders/{orderId}/updatePayments(orderId=${order.orderId})}" th:object="${order}" method="post">
-                        <section class="modal-card-body">
-                            <table class="table is-fullwidth">
-                                <thead>
-                                <tr>
-                                    <th th:text="#{order.payment.source}"></th>
-                                    <th th:text="#{payments.source.name}"></th>
-                                    <th th:text="#{order.payment.amount}"></th>
-                                    <th th:text="#{order.payment.processing.fee}"></th>
-                                    <th th:text="#{order.payment.reference.no}"></th>
-                                    <th th:text="#{order.payment.bank.transaction.no}"></th>
-                                    <th th:text="#{order.payment.bank.transaction.date}"></th>
-                                </tr>
-                                </thead>
-                                <tbody id="editPaymentsBody">
-                                <tr th:each="payment, iterStat : ${order.payments}">
-                                    <td>
-                                        <div class="select">
-                                            <select th:field="*{payments[__${iterStat.index}__].source}">
-                                                <option th:each="source : ${paymentSources}" th:value="${source}" th:text="${source}"></option>
-                                            </select>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="text" th:field="*{payments[__${iterStat.index}__].name}"
-                                               th:placeholder="#{payments.source.name.placeholder}"/>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="number" step="0.01" th:field="*{payments[__${iterStat.index}__].amount}"
-                                               th:placeholder="#{order.payment.amount.placeholder}"/>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="number" step="0.01" th:field="*{payments[__${iterStat.index}__].processingFee}"
-                                               th:placeholder="#{order.payment.processing.fee.placeholder}"/>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="text" th:field="*{payments[__${iterStat.index}__].referenceNo}"
-                                               th:placeholder="#{order.payment.reference.no.placeholder}"/>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="text" th:field="*{payments[__${iterStat.index}__].bankTransactionNo}"
-                                               th:placeholder="#{order.payment.bank.transaction.no.placeholder}"/>
-                                    </td>
-                                    <td>
-                                        <input class="input" type="date" th:field="*{payments[__${iterStat.index}__].bankTransactionDate}"/>
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </section>
-
-                        <footer class="modal-card-foot">
-                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
-                            <button class="button" type="button" onclick="togglePaymentsModal(false)" th:text="#{general.cancel}"></button>
-                        </footer>
-                    </form>
-                </div>
-            </div>
+                    paymentSources=${paymentSources},
+                    addDisabled=${isCompletedOrder},
+                    editEnabled=true,
+                    mode='order')}"></div>
         </div>
     </div>
 
@@ -944,12 +837,7 @@
             modal.classList.toggle('is-active', show);
         }
 
-        function togglePaymentsModal(show) {
-            const modal = document.getElementById('paymentsModal');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
-        }
-
+        // Payments modal functions are defined inside fragments/payments-section.html
         // Add Payment modal functions are defined inside fragments/add-payment-modal.html
 
         function copyToClipboard(element) {
@@ -1063,7 +951,7 @@
                    type="number"
                    step="0.01"
                    value="0"
-                   name="payments[${index}].processingFee">
+                   name="payments[${index}].fee">
         </td>
 
         <td>

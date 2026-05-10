@@ -235,7 +235,7 @@ public class Order {
     @DynamoDBIgnore
     public double getPaidAmount() {
         return payments.stream()
-                .mapToDouble(Payment::getAmount)
+                .mapToDouble(Payment::getAppliedAmount)
                 .sum();
     }
 

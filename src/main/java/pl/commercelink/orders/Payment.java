@@ -20,10 +20,13 @@ public class Payment {
     @DynamoDBAttribute(attributeName = "source")
     @DynamoDBTypeConvertedEnum
     private PaymentSource source;
+    @DynamoDBAttribute(attributeName = "direction")
+    @DynamoDBTypeConvertedEnum
+    private PaymentDirection direction = PaymentDirection.Incoming;
     @DynamoDBAttribute(attributeName = "amount")
     private double amount;
-    @DynamoDBAttribute(attributeName = "processingFee")
-    private double processingFee;
+    @DynamoDBAttribute(attributeName = "fee")
+    private double fee;
     @DynamoDBAttribute(attributeName = "bankTransactionNo")
     private String bankTransactionNo;
     @DynamoDBAttribute(attributeName = "bankTransactionDate")
@@ -38,16 +41,17 @@ public class Payment {
         this.source = source;
     }
 
-    public Payment(String referenceNo, String name, PaymentSource source, double amount, double processingFee) {
-        this(referenceNo, name, source, amount, processingFee, null, null);
+    public Payment(String referenceNo, String name, PaymentSource source, double amount, double fee) {
+        this(referenceNo, name, source, PaymentDirection.Incoming, amount, fee, null, null);
     }
 
-    public Payment(String referenceNo, String name, PaymentSource source, double amount, double processingFee, String bankTransactionNo, LocalDate bankTransactionDate) {
+    public Payment(String referenceNo, String name, PaymentSource source, PaymentDirection direction, double amount, double fee, String bankTransactionNo, LocalDate bankTransactionDate) {
         this.referenceNo = referenceNo;
         this.name = name;
         this.source = source;
+        this.direction = direction;
         this.amount = amount;
-        this.processingFee = processingFee;
+        this.fee = fee;
         this.bankTransactionNo = bankTransactionNo;
         this.bankTransactionDate = bankTransactionDate;
     }
@@ -81,6 +85,14 @@ public class Payment {
         this.source = source;
     }
 
+    public PaymentDirection getDirection() {
+        return direction;
+    }
+
+    public void setDirection(PaymentDirection direction) {
+        this.direction = direction;
+    }
+
     public double getAmount() {
         return amount;
     }
@@ -89,12 +101,17 @@ public class Payment {
         this.amount = amount;
     }
 
-    public double getProcessingFee() {
-        return processingFee;
+    public double getFee() {
+        return fee;
     }
 
-    public void setProcessingFee(double processingFee) {
-        this.processingFee = processingFee;
+    public void setFee(double fee) {
+        this.fee = fee;
+    }
+
+    @DynamoDBIgnore
+    public double getAppliedAmount() {
+        return direction == PaymentDirection.Outgoing ? amount - fee : amount;
     }
 
     public String getBankTransactionNo() {
@@ -120,23 +137,23 @@ public class Payment {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return source != null && (isNotBlank(referenceNo) || amount != 0 || processingFee > 0);
+        return source != null && (isNotBlank(referenceNo) || amount != 0 || fee > 0);
     }
 
     @DynamoDBIgnore
     public Payment split(double movedAmount) {
-        double splitFee = amount > 0 ? round(processingFee * movedAmount / amount) : 0;
+        double splitFee = amount > 0 ? round(fee * movedAmount / amount) : 0;
 
         this.amount = round(amount - movedAmount);
-        this.processingFee = round(processingFee - splitFee);
+        this.fee = round(fee - splitFee);
 
-        return new Payment(referenceNo, name, source, movedAmount, splitFee, bankTransactionNo, bankTransactionDate);
+        return new Payment(referenceNo, name, source, direction, movedAmount, splitFee, bankTransactionNo, bankTransactionDate);
     }
 
     @DynamoDBIgnore
     public void absorb(Payment other) {
         this.amount = round(amount + other.amount);
-        this.processingFee = round(processingFee + other.processingFee);
+        this.fee = round(fee + other.fee);
     }
 
     @DynamoDBIgnore
