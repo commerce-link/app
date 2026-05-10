@@ -633,7 +633,7 @@ public class OrdersController extends BaseController {
                 });
 
         target.setSource(form.getSource());
-        target.setDirection(form.getDirection());
+        target.setDirection(form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(amount);

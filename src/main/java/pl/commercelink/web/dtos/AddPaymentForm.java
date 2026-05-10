@@ -12,7 +12,7 @@ public class AddPaymentForm {
     private double processingFee;
     private boolean feeIncluded;
     private PaymentSource source;
-    private PaymentDirection direction = PaymentDirection.Incoming;
+    private PaymentDirection direction;
     private String referenceNo;
     private String name;
     private String bankTransactionNo;

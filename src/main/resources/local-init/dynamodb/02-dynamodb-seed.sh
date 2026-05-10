@@ -92,8 +92,9 @@ ddb put-item --table-name Orders --item '{
   "payments": {"L": [
     {"M": {
       "source": {"S": "BankTransfer"},
+      "direction": {"S": "Incoming"},
       "amount": {"N": "0"},
-      "processingFee": {"N": "0"},
+      "fee": {"N": "0"},
       "referenceNo": {"S": ""},
       "name": {"S": ""}
     }}

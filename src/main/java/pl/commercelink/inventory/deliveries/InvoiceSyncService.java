@@ -66,7 +66,7 @@ public class InvoiceSyncService {
 
             Invoice invoice = invoicingProvider.fetchInvoiceById(invoiceDocument.get().getId(), InvoiceDirection.Purchase);
             if (invoice.paid()) {
-                delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+                delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
                 deliveriesRepository.save(delivery);
             }
         }
@@ -119,7 +119,7 @@ public class InvoiceSyncService {
         }
 
         if (invoice.paid() && delivery.getPayments().isEmpty()) {
-            delivery.addPayment(Payment.bankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+            delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
         } else if (!invoice.paid() && !delivery.getPayments().isEmpty()) {
             delivery.clearPayments();
         }

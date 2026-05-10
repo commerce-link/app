@@ -193,7 +193,14 @@ public class Delivery {
         }
 
         Payment sourcePayment = source.payments.getFirst();
-        Payment splitOff = sourcePayment.split(Price.fromNet(movedCost, source.tax).grossValue());
+        double movedCostGross = Price.fromNet(movedCost, source.tax).grossValue();
+        double originalCostGross = source.getTotalCostGross() + movedCostGross;
+
+        if (Math.abs(sourcePayment.getAppliedAmount() - originalCostGross) > 0.005) {
+            throw new IllegalArgumentException("Delivery with partial payment can't be split. First, settle the payment in full or remove it.");
+        }
+
+        Payment splitOff = sourcePayment.split(movedCostGross);
 
         if (sourcePayment.getAmount() == 0 && sourcePayment.getFee() == 0) {
             source.payments.clear();

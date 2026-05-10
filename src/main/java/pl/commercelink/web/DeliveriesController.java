@@ -13,6 +13,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -159,7 +160,7 @@ public class DeliveriesController {
                 });
 
         target.setSource(form.getSource());
-        target.setDirection(form.getDirection());
+        target.setDirection(form.getDirection() != null ? form.getDirection() : PaymentDirection.Outgoing);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(form.getBankAmount());

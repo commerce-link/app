@@ -60,6 +60,10 @@ public class Payment {
         return new Payment(referenceNo, name, PaymentSource.BankTransfer, amount, 0);
     }
 
+    public static Payment outgoingBankTransfer(String referenceNo, String name, double amount) {
+        return new Payment(referenceNo, name, PaymentSource.BankTransfer, PaymentDirection.Outgoing, amount, 0, null, null);
+    }
+
     // required by dynamodb
     public String getReferenceNo() {
         return referenceNo;
