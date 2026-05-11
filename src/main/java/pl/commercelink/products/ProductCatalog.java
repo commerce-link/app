@@ -98,6 +98,10 @@ public class ProductCatalog implements DeletionProtection {
             throw new RuntimeException("Cannot delete category definition with deletion protection");
         }
         categories.remove(categoryDefinition);
+        // otherwise dynamodb is not going to save the change
+        if (categories.isEmpty()) {
+            categories = null;
+        }
         return categoryDefinition;
     }
 
