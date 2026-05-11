@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.05.07</version>
+    <version>2026.05.08</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -54,7 +54,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>commercelink-commons</artifactId>
-            <version>0.1.0</version>
+            <version>0.1.1</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -327,6 +327,11 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-also</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>supplier-andaseat</artifactId>
                     <version>0.1.0</version>
                 </dependency>
                 <dependency>
