@@ -104,10 +104,10 @@ public class WebController {
         List<Delivery> unpaidDeliveries = deliveriesRepository.findUnpaidDeliveries(getStoreId());
 
         double unpaidDeliveriesAmountNet = unpaidDeliveries.stream()
-                .mapToDouble(Delivery::getTotalCost)
+                .mapToDouble(Delivery::getUnpaidAmountNet)
                 .sum();
         double unpaidDeliveriesAmountGross = unpaidDeliveries.stream()
-                .mapToDouble(Delivery::getTotalCostGross)
+                .mapToDouble(Delivery::getUnpaidAmountGross)
                 .sum();
 
         List<Order> unpaidOrders = ordersRepository.findAllActiveOrders(CustomSecurityContext.getStoreId())

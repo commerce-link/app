@@ -178,6 +178,16 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
+    public double getUnpaidAmountGross() {
+        return getUnpaidAmount();
+    }
+
+    @DynamoDBIgnore
+    public double getUnpaidAmountNet() {
+        return scale(Price.fromGross(getUnpaidAmount(), tax).netValue());
+    }
+
+    @DynamoDBIgnore
     public double getPaidAmount() {
         return payments.stream().mapToDouble(Payment::getAppliedAmount).sum();
     }
