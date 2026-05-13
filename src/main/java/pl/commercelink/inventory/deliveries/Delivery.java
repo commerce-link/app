@@ -193,22 +193,28 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
+    public void validateSplittablePayment() {
+        if (payments.isEmpty()) {
+            return;
+        }
+
+        if (hasMultiplePayments()) {
+            throw new IllegalArgumentException("Delivery with multiple payments can't be merged. First, consolidate or remove payments.");
+        }
+
+        if (!isFullyPaid()) {
+            throw new IllegalArgumentException("Delivery with partial payment can't be split. First, settle the payment in full or remove it.");
+        }
+    }
+
+    @DynamoDBIgnore
     public void transferPaymentFrom(Delivery source, double movedCost) {
         if (source.payments.isEmpty()) {
             return;
         }
 
-        if (source.hasMultiplePayments()) {
-            throw new IllegalArgumentException("Delivery with multiple payments can't be merged. First, consolidate or remove payments.");
-        }
-
         Payment sourcePayment = source.payments.getFirst();
         double movedCostGross = Price.fromNet(movedCost, source.tax).grossValue();
-        double originalCostGross = source.getTotalCostGross() + movedCostGross;
-
-        if (Math.abs(sourcePayment.getAppliedAmount() - originalCostGross) > 0.005) {
-            throw new IllegalArgumentException("Delivery with partial payment can't be split. First, settle the payment in full or remove it.");
-        }
 
         Payment splitOff = sourcePayment.split(movedCostGross);
 

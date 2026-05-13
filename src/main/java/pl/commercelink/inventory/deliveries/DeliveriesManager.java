@@ -108,6 +108,8 @@ public class DeliveriesManager {
     ) {
         double totalMovedCost = computeMovedCost(orderAllocations, warehouseAllocations);
 
+        source.validateSplittablePayment();
+
         source.decreaseTotalCost(totalMovedCost);
         target.increaseTotalCost(totalMovedCost);
 
