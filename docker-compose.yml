@@ -30,29 +30,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-
-  commercelink-dynamodb-migrate:
-    image: amazon/aws-cli:latest
-    depends_on:
-      commercelink-dynamodb:
-        condition: service_healthy
-    environment:
-      - AWS_ACCESS_KEY_ID=local
-      - AWS_SECRET_ACCESS_KEY=local
-      - AWS_DEFAULT_REGION=eu-central-1
-    volumes:
-      - ./src/main/resources/local-init/dynamodb/01-dynamodb-schema.sh:/migrate.sh:ro
-    entrypoint: ["/bin/bash", "/migrate.sh"]
-
-  commercelink-dynamodb-seed:
-    image: amazon/aws-cli:latest
-    depends_on:
-      commercelink-dynamodb-migrate:
-        condition: service_completed_successfully
-    environment:
-      - AWS_ACCESS_KEY_ID=local
-      - AWS_SECRET_ACCESS_KEY=local
-      - AWS_DEFAULT_REGION=eu-central-1
-    volumes:
-      - ./src/main/resources/local-init/dynamodb/02-dynamodb-seed.sh:/seed.sh:ro
-    entrypoint: ["/bin/bash", "/seed.sh"]

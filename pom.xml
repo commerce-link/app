@@ -69,7 +69,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>commercelink-starter</artifactId>
-            <version>0.1.0</version>
+            <version>0.1.1</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
