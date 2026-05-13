@@ -2,12 +2,18 @@ package pl.commercelink.warehouse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.RollingPriceAggregate;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductRecommendation;
+import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -30,50 +36,52 @@ public class StockLevels {
     @Autowired
     private RollingPriceAggregateRepository rollingPriceAggregateRepository;
 
-    public List<StockProductLevel> calculate(String storeId, boolean onlyMissingItems) {
-        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
+    @Autowired
+    private ProductRecommendationEngine recommendationEngine;
 
-        List<StockProductLevel> understockedItems = fetchStockProductLevelsForAllQualifiedProducts(storeId, priceAggregates);
-        for (StockProductLevel i : understockedItems) {
-            List<WarehouseItemView> items = warehouse.stockQueryService(storeId)
-                    .searchByMfns(storeId, Collections.singletonList(i.getManufacturerCode()));
-            i.calculateStock(items);
+    @Autowired
+    private Inventory inventory;
+
+    public List<StockProductLevel> calculate(String storeId, String catalogId, String categoryId, RestockScope scope, boolean onlyMissingItems) {
+        ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
+        if (catalog == null) {
+            return Collections.emptyList();
         }
 
-        return understockedItems.stream()
-                .filter(i -> !onlyMissingItems || i.isFullyMissing())
-                .sorted(Comparator.comparing(StockProductLevel::getCategory))
-                .collect(Collectors.toList());
-    }
+        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
 
-    private List<StockProductLevel> fetchStockProductLevelsForAllQualifiedProducts(String storeId, Map<String, RollingPriceAggregate> priceAggregates) {
+        List<CategoryDefinition> categories = catalog.getCategories().stream()
+                .filter(c -> categoryId == null || categoryId.isEmpty() || categoryId.equals(c.getCategoryId()))
+                .toList();
+
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
+
         List<StockProductLevel> stockProductLevels = new LinkedList<>();
 
-        for (ProductCatalog productCatalog : productCatalogRepository.findAll(storeId)) {
-            List<Product> products = productRepository.findAllProductsThatQualifiesForRestock(productCatalog);
+        for (CategoryDefinition category : categories) {
+            List<Product> products = resolveProducts(category, scope, enabledInventory);
 
             for (Product product : products) {
+                int expectedQty = scope == RestockScope.ExpectedStockQty ? product.getStockExpectedQty() : 1;
+                if (scope == RestockScope.ExpectedStockQty && expectedQty <= 0) {
+                    continue;
+                }
+
+                int restockPriceLowest = getRestockPriceLowest(product, priceAggregates);
+                int restockPriceHotDeal = getRestockPriceHotDeal(product, priceAggregates);
+                int restockPricePromo = getRestockPricePromo(product, priceAggregates);
+                int restockPriceStandard = getRestockPriceStandard(product, priceAggregates);
 
                 Optional<StockProductLevel> optional = stockProductLevels.stream()
                         .filter(s -> s.hasManufacturerCode(product.getManufacturerCode())).findFirst();
 
-                // Get restock prices with RollingPriceAggregate fallback
-                int restockPriceLowest = getRestockPriceLowest(product, priceAggregates);
-                int restockPricePromo = getRestockPricePromo(product, priceAggregates);
-                int restockPriceStandard = getRestockPriceStandard(product, priceAggregates);
-
                 if (optional.isPresent()) {
-                    StockProductLevel stockProductLevel = optional.get();
-
-                    int minRestockPricePromo = Math.min(stockProductLevel.getRestockPricePromo(), restockPricePromo);
-                    int minRestockPriceStandard = Math.min(stockProductLevel.getRestockPriceStandard(), restockPriceStandard);
-                    int minRestockPriceLowest = Math.min(stockProductLevel.getRestockPriceLowest(), restockPriceLowest);
-                    int expectedQuantity = Math.max(stockProductLevel.getExpectedQuantity(), product.getStockExpectedQty());
-
-                    stockProductLevel.setRestockPricePromo(minRestockPricePromo);
-                    stockProductLevel.setRestockPriceStandard(minRestockPriceStandard);
-                    stockProductLevel.setRestockPriceLowest(minRestockPriceLowest);
-                    stockProductLevel.setExpectedQuantity(expectedQuantity);
+                    StockProductLevel spl = optional.get();
+                    spl.setRestockPricePromo(Math.min(spl.getRestockPricePromo(), restockPricePromo));
+                    spl.setRestockPriceStandard(Math.min(spl.getRestockPriceStandard(), restockPriceStandard));
+                    spl.setRestockPriceLowest(Math.min(spl.getRestockPriceLowest(), restockPriceLowest));
+                    spl.setRestockPriceHotDeal(Math.min(spl.getRestockPriceHotDeal(), restockPriceHotDeal));
+                    spl.setExpectedQuantity(Math.max(spl.getExpectedQuantity(), expectedQty));
                 } else {
                     StockProductLevel spl = new StockProductLevel(
                             product.getCategory(),
@@ -81,16 +89,45 @@ public class StockLevels {
                             product.getName(),
                             restockPricePromo,
                             restockPriceStandard,
-                            product.getStockExpectedQty()
+                            expectedQty
                     );
                     spl.setRestockPriceLowest(restockPriceLowest);
+                    spl.setRestockPriceHotDeal(restockPriceHotDeal);
                     stockProductLevels.add(spl);
-
                 }
             }
         }
 
-        return stockProductLevels;
+        if (scope == RestockScope.ExpectedStockQty) {
+            for (StockProductLevel s : stockProductLevels) {
+                List<WarehouseItemView> items = warehouse.stockQueryService(storeId)
+                        .searchByMfns(storeId, Collections.singletonList(s.getManufacturerCode()));
+                s.calculateStock(items);
+            }
+            return stockProductLevels.stream()
+                    .filter(i -> !onlyMissingItems || i.isFullyMissing())
+                    .sorted(Comparator.comparing(StockProductLevel::getCategory))
+                    .collect(Collectors.toList());
+        }
+
+        return stockProductLevels.stream()
+                .sorted(Comparator.comparing(StockProductLevel::getCategory))
+                .collect(Collectors.toList());
+    }
+
+    private List<Product> resolveProducts(CategoryDefinition category, RestockScope scope, InventoryView enabledInventory) {
+        if (category.hasType(CategoryDefinitionType.Dynamic)) {
+            if (scope == RestockScope.ExpectedStockQty) {
+                return Collections.emptyList();
+            }
+            return recommendationEngine.getRecommendations(category, enabledInventory).stream()
+                    .filter(ProductRecommendation::hasPimId)
+                    .map(ProductRecommendation::toProduct)
+                    .collect(Collectors.toList());
+        }
+        return productRepository.findAll(category.getCategoryId()).stream()
+                .filter(p -> scope == RestockScope.WholeCatalog || p.getStockExpectedQty() > 0)
+                .collect(Collectors.toList());
     }
 
     private int getRestockPricePromo(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
@@ -113,6 +150,17 @@ public class StockLevels {
         if (product.getPimId() != null && !product.getPimId().isEmpty()) {
             RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
             if (aggregate != null && aggregate.isAtLowestPrice()) {
+                Price price = Price.fromNet(aggregate.getCurrentLowestPrice());
+                return (int) Math.round(price.grossValue());
+            }
+        }
+        return 0;
+    }
+
+    private int getRestockPriceHotDeal(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
+        if (product.getPimId() != null && !product.getPimId().isEmpty()) {
+            RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
+            if (aggregate != null && aggregate.isHotDeal()) {
                 Price price = Price.fromNet(aggregate.getCurrentLowestPrice());
                 return (int) Math.round(price.grossValue());
             }

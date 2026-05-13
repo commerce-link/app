@@ -11,6 +11,7 @@ public class StockProductLevel {
     private String manufacturerCode;
     private String name;
     private int restockPriceLowest;
+    private int restockPriceHotDeal;
     private int restockPricePromo;
     private int restockPriceStandard;
     private int expectedQuantity;
@@ -121,6 +122,14 @@ public class StockProductLevel {
 
     public void setRestockPriceLowest(int restockPriceLowest) {
         this.restockPriceLowest = restockPriceLowest;
+    }
+
+    public int getRestockPriceHotDeal() {
+        return restockPriceHotDeal;
+    }
+
+    public void setRestockPriceHotDeal(int restockPriceHotDeal) {
+        this.restockPriceHotDeal = restockPriceHotDeal;
     }
 
 }

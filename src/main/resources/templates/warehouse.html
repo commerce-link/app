@@ -87,7 +87,33 @@
             <div class="field is-grouped is-grouped-centered">
                 <div class="control">
                     <div class="select is-small is-fullwidth">
+                        <select id="restockCatalog" name="catalogId" required>
+                            <option value="" th:text="#{warehouse.restock.catalog}">Katalog</option>
+                            <option th:each="catalog : ${restockCatalogs}"
+                                    th:value="${catalog.catalogId}"
+                                    th:text="${catalog.name}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <div class="select is-small is-fullwidth">
+                        <select id="restockCategory" name="categoryId">
+                            <option value="" th:text="#{warehouse.restock.all.categories}">Wszystkie kategorie</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <div class="select is-small is-fullwidth">
+                        <select id="restockScope" name="scope" required>
+                            <option value="ExpectedStockQty" th:text="#{warehouse.restock.scope.expected}">Expected stock qty</option>
+                            <option value="WholeCatalog" th:text="#{warehouse.restock.scope.whole}">Cały katalog</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control">
+                    <div class="select is-small is-fullwidth">
                         <select id="restockOperation" name="restockPrice" required>
+                            <option value="HotDeal" th:text="#{warehouse.restock.hotdeal}">Hot deal</option>
                             <option value="Lowest" th:text="#{warehouse.restock.lowest}">Najniższa cena</option>
                             <option value="Promo" th:text="#{warehouse.restock.promo}">Promocyjna</option>
                             <option value="Standard" th:text="#{warehouse.restock.standard}">Standardowa</option>
@@ -105,16 +131,6 @@
                     <button type="submit" class="button is-primary is-small">
                         <span class="icon is-small"><i class="fas fa-sync-alt"></i></span>
                         <span th:text="#{general.execute}">Uzupełnij</span>
-                    </button>
-                </div>
-            </div>
-        </form>
-        <form action="/dashboard/warehouse/deal-hunter" method="post" class="mt-2">
-            <div class="field is-grouped is-grouped-centered">
-                <div class="control">
-                    <button type="submit" class="button is-warning is-small">
-                        <span class="icon is-small"><i class="fas fa-fire"></i></span>
-                        <span th:text="#{warehouse.deal.hunter}">Deal hunter</span>
                     </button>
                 </div>
             </div>
@@ -174,6 +190,28 @@
         // Clear filters button
         document.getElementById('clearFilters').addEventListener('click', function() {
             window.location.href = '/dashboard/warehouse?showAll=true';
+        });
+
+        const categoriesByCatalog = /*[[${restockCategoriesByCatalog}]]*/ {};
+        const catalogSelect = document.getElementById('restockCatalog');
+        const categorySelect = document.getElementById('restockCategory');
+        const allCategoriesLabel = categorySelect.options[0].textContent;
+
+        catalogSelect.addEventListener('change', function() {
+            const selected = this.value;
+            categorySelect.innerHTML = '';
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = allCategoriesLabel;
+            categorySelect.appendChild(allOpt);
+
+            const categories = categoriesByCatalog[selected] || [];
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                categorySelect.appendChild(opt);
+            });
         });
     </script>
 

@@ -17,7 +17,9 @@ import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.warehouse.DealHunter;
+import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.StockLevels;
 import pl.commercelink.warehouse.StockProductLevel;
 import pl.commercelink.starter.util.OperationResult;
@@ -50,7 +52,7 @@ class WarehouseController {
     private StockLevels stockLevels;
 
     @Autowired
-    private DealHunter dealHunter;
+    private ProductCatalogRepository productCatalogRepository;
 
     @Autowired
     private WarehouseGoodsOutService warehouseGoodsOutService;
@@ -131,9 +133,23 @@ class WarehouseController {
         model.addAttribute("inRMAItems", itemsByStatus.getOrDefault(FulfilmentStatus.InRMA, Collections.emptyList()));
         model.addAttribute("inExternalServiceItems", itemsByStatus.getOrDefault(FulfilmentStatus.InExternalService, Collections.emptyList()));
 
+        List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId()).stream()
+                .sorted(Comparator.comparing(ProductCatalog::getName))
+                .collect(Collectors.toList());
+
+        Map<String, List<Map<String, String>>> categoriesByCatalog = catalogs.stream()
+                .collect(Collectors.toMap(
+                        ProductCatalog::getCatalogId,
+                        c -> c.getCategories().stream()
+                                .map(cd -> Map.of("id", cd.getCategoryId(), "name", cd.getName()))
+                                .collect(Collectors.toList())
+                ));
+
         model.addAttribute("warehouseNetValue", warehouseNetValue);
         model.addAttribute("warehouseGrossValue", warehouseGrossValue);
         model.addAttribute("categories", allCategories);
+        model.addAttribute("restockCatalogs", catalogs);
+        model.addAttribute("restockCategoriesByCatalog", categoriesByCatalog);
         model.addAttribute("statuses", getFulfilmentStatuses(hasExternalWarehouse));
         model.addAttribute("selectedCategories", categories != null ? categories : Collections.emptyList());
         model.addAttribute("selectedStatuses", statusEnums.stream().map(FulfilmentStatus::name).collect(Collectors.toList()));
@@ -258,33 +274,27 @@ class WarehouseController {
 
     @PostMapping("/dashboard/warehouse/restock")
     @PreAuthorize("hasRole('ADMIN')")
-    String restock(@RequestParam String restockPrice, @RequestParam(required = false) boolean onlyMissingItems, Model model) {
-        List<StockProductLevel> stockProductLevels = stockLevels.calculate(getStoreId(), onlyMissingItems);
+    String restock(@RequestParam String catalogId,
+                   @RequestParam(required = false) String categoryId,
+                   @RequestParam RestockScope scope,
+                   @RequestParam String restockPrice,
+                   @RequestParam(required = false) boolean onlyMissingItems,
+                   Model model) {
+        List<StockProductLevel> stockProductLevels = stockLevels.calculate(getStoreId(), catalogId, categoryId, scope, onlyMissingItems);
 
         List<OrderItem> orderItems = stockProductLevels.stream()
-                .filter(StockProductLevel::qualifiesForRestock)
+                .filter(sl -> scope != RestockScope.ExpectedStockQty || sl.qualifiesForRestock())
                 .map(sl -> new OrderItem(
                         null,
                         sl.getCategory(),
                         sl.getName(),
-                        sl.getMissingQuantity(),
+                        scope == RestockScope.ExpectedStockQty ? sl.getMissingQuantity() : 1,
                         getRestockPrice(sl, restockPrice),
                         sl.getManufacturerCode(),
                         false
                 ))
+                .filter(orderItem -> scope != RestockScope.WholeCatalog || orderItem.getPrice() > 0)
                 .collect(Collectors.toList());
-
-        FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
-
-        model.addAttribute("form", fulfilmentForm);
-
-        return "fulfilment";
-    }
-
-    @PostMapping("/dashboard/warehouse/deal-hunter")
-    @PreAuthorize("hasRole('ADMIN')")
-    String dealHunter(Model model) {
-        List<OrderItem> orderItems = dealHunter.find(getStoreId());
 
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 
@@ -300,6 +310,8 @@ class WarehouseController {
             return sl.getRestockPriceStandard();
         } else if ("Lowest".equalsIgnoreCase(restockPrice)) {
             return sl.getRestockPriceLowest();
+        } else if ("HotDeal".equalsIgnoreCase(restockPrice)) {
+            return sl.getRestockPriceHotDeal();
         } else {
             // basically unlimited budget
             return 100000;
