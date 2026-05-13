@@ -321,6 +321,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("isCompletedOrder", order.getStatus() == OrderStatus.Completed || isSuperAdmin());
         model.addAttribute("isNewOrder", order.getStatus() == OrderStatus.New);
+        model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());

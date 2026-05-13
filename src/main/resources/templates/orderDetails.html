@@ -491,7 +491,7 @@
                         <button
                                 class="button is-link is-small"
                                 type="button"
-                                th:disabled="${isCompletedOrder}"
+                                th:disabled="${isCompletedOrder or !canOrderShipment}"
                                 th:text="#{order.action.shipment}"
                                 th:attr="data-href=@{/dashboard/orders/{orderId}/shipping(orderId=${order.orderId})}"
                                 onclick="if(!this.disabled) window.location.href=this.getAttribute('data-href')">
@@ -500,7 +500,7 @@
                                 class="button is-danger is-small"
                                 type="button"
                                 th:attr="data-order-id=${order.orderId}"
-                                th:disabled="${isCompletedOrder}"
+                                th:disabled="${isCompletedOrder or !canOrderShipment}"
                                 onclick="submitCancelForm(this.getAttribute('data-order-id'))">
                             <span th:text="#{order.shipment.cancel}"></span>
                         </button>
