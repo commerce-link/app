@@ -29,7 +29,7 @@ public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProvi
             return null;
         }
         Map<String, String> config = loadConfiguration(store, marketplaceName);
-        Map<String, Object> context = buildContext(store, descriptor, config);
+        Map<String, Object> context = buildContext(store, descriptor);
         return descriptor.create(config, context);
     }
 
