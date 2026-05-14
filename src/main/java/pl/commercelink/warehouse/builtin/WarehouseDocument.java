@@ -60,6 +60,8 @@ public class WarehouseDocument {
 
     @DynamoDBAttribute(attributeName = "note")
     private String note;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public WarehouseDocument() {
     }
@@ -199,5 +201,13 @@ public class WarehouseDocument {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

@@ -24,6 +24,8 @@ public class OrderEvent {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public OrderEvent() {
     }
@@ -74,5 +76,13 @@ public class OrderEvent {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

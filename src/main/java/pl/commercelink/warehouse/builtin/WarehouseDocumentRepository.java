@@ -144,7 +144,7 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
     private void executeTransaction(WarehouseDocument document, WarehouseDocumentSequence sequence, long expectedSequenceValue) {
         TransactionWriteRequest request = new TransactionWriteRequest();
         request.addPut(sequence, buildSequenceCondition(expectedSequenceValue));
-        request.addPut(document, buildDocumentCondition());
+        request.addPut(document);
         dynamoDBMapper.transactionWrite(request);
     }
 
@@ -159,10 +159,5 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
                     );
         }
         return expression;
-    }
-
-    private DynamoDBTransactionWriteExpression buildDocumentCondition() {
-        return new DynamoDBTransactionWriteExpression()
-                .withConditionExpression("attribute_not_exists(documentId)");
     }
 }

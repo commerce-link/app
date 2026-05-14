@@ -73,6 +73,8 @@ public class Product {
     private List<Metadata> metadata = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "marketplaces")
     private List<String> marketplaces = new LinkedList<>();
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public Product() {
     }
@@ -299,5 +301,13 @@ public class Product {
 
     public void setMarketplaces(List<String> marketplaces) {
         this.marketplaces = marketplaces;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.ShippingDetails;
 
 @DynamoDBTable(tableName = "RMACenters")
@@ -19,6 +20,8 @@ public class RMACenter {
     private String provider;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private ShippingDetails shippingDetails;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public RMACenter() {
     }
@@ -53,5 +56,13 @@ public class RMACenter {
 
     public void setShippingDetails(ShippingDetails shippingDetails) {
         this.shippingDetails = shippingDetails;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }
