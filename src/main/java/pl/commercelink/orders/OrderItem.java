@@ -27,6 +27,8 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     @DynamoDBIgnore
     private boolean selected;
@@ -196,6 +198,14 @@ public class OrderItem extends Item {
 
     public void setConsolidated(boolean consolidated) {
         this.consolidated = consolidated;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     @DynamoDBIgnore

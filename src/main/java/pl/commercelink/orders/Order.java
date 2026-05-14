@@ -81,6 +81,8 @@ public class Order {
     @DynamoDBAttribute(attributeName = "fulfilmentType")
     @DynamoDBTypeConvertedEnum
     private FulfilmentType fulfilmentType;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     // required by dynamodb
     public Order() {
@@ -544,6 +546,14 @@ public class Order {
     @DynamoDBIgnore
     public boolean isPersonalCollection() {
         return shipments.stream().anyMatch(shipment -> shipment.getType() == ShipmentType.PersonalCollection);
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public static class Builder {

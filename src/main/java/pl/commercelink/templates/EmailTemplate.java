@@ -26,6 +26,8 @@ public class EmailTemplate {
     private List<EmailAttachment> attachments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "bccAddresses")
     private List<String> bccAddresses = new LinkedList<>();
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public EmailTemplate() {
     }
@@ -89,5 +91,13 @@ public class EmailTemplate {
 
     public void setBccAddresses(List<String> bccAddresses) {
         this.bccAddresses = bccAddresses;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

@@ -81,6 +81,8 @@ public class Delivery {
     private boolean synced;
     @DynamoDBAttribute(attributeName = "paid")
     private boolean paid;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     // calculated on the fly based on current items distribution
     @DynamoDBIgnore
@@ -530,5 +532,13 @@ public class Delivery {
 
     public void setSynced(boolean synced) {
         this.synced = synced;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

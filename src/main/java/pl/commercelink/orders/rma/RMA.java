@@ -43,6 +43,8 @@ public class RMA {
     private LocalDateTime createdAt;
     @DynamoDBAttribute(attributeName = "media")
     private List<String> media = new LinkedList<>();
+    @DynamoDBVersionAttribute
+    private Long version;
 
     @DynamoDBIgnore
     private List<RMAItem> draftRmaItems = new LinkedList<>();
@@ -226,5 +228,13 @@ public class RMA {
     @DynamoDBIgnore
     public void decreaseShippingInsurance(double amount) {
         this.shippingInsurance -= amount;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }
