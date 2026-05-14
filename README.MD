@@ -41,9 +41,16 @@ The generated Cognito credentials (pool ID, client ID, client secret) are
 written to `.ministack-data/.cognito.env` and picked up automatically by
 `application-localdev.properties` via `spring.config.import`.
 
-DynamoDB runs in-memory — data is automatically reset on `docker compose down`.
-Tables and seed data are created automatically on startup by the
-`commercelink-dynamodb-migrate` service.
+DynamoDB Local in the default Compose file uses in-memory storage (`-inMemory`),
+so table data is cleared when the `commercelink-dynamodb` container is recreated
+(for example after `docker compose down`).
+
+**Schema and demo data:** when you start the Spring application with the
+`localdev` profile (see [Running the Application](#running-the-application)),
+[Mongock](https://docs.mongock.io/) runs against DynamoDB: `V001` creates
+tables, and `V002` inserts the demo store `uma2dqukxr` plus a sample order
+(and line items), matching the former `02-dynamodb-seed.sh` payload. Without
+`localdev`, only `V001` applies (no local seed).
 
 **Verify:**
 
@@ -82,4 +89,3 @@ curl http://localhost:4566/_localstack/health
 
 For further assistance, refer to the official documentation of each tool.
 
-```
