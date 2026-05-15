@@ -4,10 +4,12 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -20,13 +22,16 @@ public class ShipmentCancelService {
     private final OrdersRepository ordersRepository;
     private final OrderEventsRepository orderEventsRepository;
     private final ShippingProviderFactory shippingProviderFactory;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public ShipmentCancelService(StoresRepository storesRepository, OrdersRepository ordersRepository,
-                                 OrderEventsRepository orderEventsRepository, ShippingProviderFactory shippingProviderFactory) {
+                                 OrderEventsRepository orderEventsRepository, ShippingProviderFactory shippingProviderFactory,
+                                 OptimisticLockingExecutor optimisticLockingExecutor) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
         this.orderEventsRepository = orderEventsRepository;
         this.shippingProviderFactory = shippingProviderFactory;
+        this.optimisticLockingExecutor = optimisticLockingExecutor;
     }
 
     public void cancelShipping(String orderId, String storeId) {
@@ -45,8 +50,19 @@ public class ShipmentCancelService {
         ShippingProvider shippingProvider = shippingProviderFactory.get(store);
         shippingProvider.cancelShipment(shipment.getExternalId());
 
-        order.setShipments(Collections.singletonList(new Shipment(shipment.getType())));
+        ShipmentType cancelledType = shipment.getType();
+        String cancelledExternalId = shipment.getExternalId();
+        optimisticLockingExecutor.modifyAndSave(
+                () -> ordersRepository.findById(storeId, orderId),
+                fresh -> {
+                    boolean stillHasShipment = fresh.getShipments().stream()
+                            .anyMatch(s -> cancelledExternalId.equals(s.getExternalId()));
+                    if (stillHasShipment) {
+                        fresh.setShipments(Collections.singletonList(new Shipment(cancelledType)));
+                    }
+                },
+                ordersRepository::save
+        );
         orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
-        ordersRepository.save(order);
     }
 }

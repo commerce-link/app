@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,11 +24,14 @@ public class OfferItemReloader {
     private final Inventory inventory;
     private final PricelistRepository pricelistRepository;
     private final BasketsRepository basketsRepository;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
-    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, BasketsRepository basketsRepository) {
+    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, BasketsRepository basketsRepository,
+                      OptimisticLockingExecutor optimisticLockingExecutor) {
         this.inventory = inventory;
         this.pricelistRepository = pricelistRepository;
         this.basketsRepository = basketsRepository;
+        this.optimisticLockingExecutor = optimisticLockingExecutor;
     }
 
     public List<OfferItem> reload(String storeId, Basket basket) {
@@ -37,12 +41,18 @@ public class OfferItemReloader {
     public List<OfferItem> recalculate(String storeId, Basket basket) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
 
-        updatePrices(basket.getBasketItems());
-        updateCosts(enabledInventory, basket.getBasketItems());
-
-        List<OfferItem> sortedOfferItems = reload(enabledInventory, basket);
-        basketsRepository.save(basket);
-        return sortedOfferItems;
+        return optimisticLockingExecutor.modifyAndSaveReturning(
+                () -> basketsRepository.findById(storeId, basket.getBasketId()).orElseThrow(),
+                fresh -> {
+                    updatePrices(fresh.getBasketItems());
+                    updateCosts(enabledInventory, fresh.getBasketItems());
+                    List<OfferItem> sortedOfferItems = reload(enabledInventory, fresh);
+                    basket.setBasketItems(fresh.getBasketItems());
+                    basket.setVersion(fresh.getVersion());
+                    return sortedOfferItems;
+                },
+                basketsRepository::save
+        );
     }
 
     private List<OfferItem> reload(InventoryView inventory, Basket basket) {

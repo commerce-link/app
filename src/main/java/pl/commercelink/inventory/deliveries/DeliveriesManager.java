@@ -9,6 +9,7 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.time.LocalDate;
@@ -33,6 +34,8 @@ public class DeliveriesManager {
     private OrderAllocationsManager orderAllocationsManager;
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Autowired
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public void deleteAllocations(String storeId, String deliveryId, List<Allocation> allocations) {
         List<Allocation> active = allocations.stream().filter(Allocation::isInAllocation).toList();
@@ -153,20 +156,36 @@ public class DeliveriesManager {
         List<String> orderIds = orderItemsRepository.findByDeliveryIdAndStatuses(
                 delivery.getDeliveryId(), Collections.singletonList(FulfilmentStatus.Ordered));
 
-        orderIds.stream()
-                .map(orderId -> ordersRepository.findById(storeId, orderId))
-                .filter(order -> !order.hasStatus(OrderStatus.Completed))
-                .forEach(order -> {
-                    LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
-                    LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
-                            delivery.getEstimatedDeliveryAt()
-                    );
+        LocalDate newDeliveryAt = delivery.getEstimatedDeliveryAt();
+        for (String orderId : orderIds) {
+            LocalDate[] oldAssemblyHolder = new LocalDate[1];
+            LocalDate[] newAssemblyHolder = new LocalDate[1];
+            boolean[] savedHolder = new boolean[1];
 
-                    if (oldAssemblyDate != null && !Objects.equals(oldAssemblyDate, newAssemblyDate)) {
-                        notificationEventPublisher.publishAssemblyDateChanged(order, oldAssemblyDate);
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> ordersRepository.findById(storeId, orderId),
+                    fresh -> {
+                        savedHolder[0] = false;
+                        if (fresh.hasStatus(OrderStatus.Completed)) {
+                            return;
+                        }
+                        oldAssemblyHolder[0] = fresh.getEstimatedAssemblyAt();
+                        newAssemblyHolder[0] = fresh.updateEstimatedAssemblyAt(newDeliveryAt);
+                        savedHolder[0] = true;
+                    },
+                    order -> {
+                        if (savedHolder[0]) {
+                            ordersRepository.save(order);
+                        }
                     }
+            );
 
-                    ordersRepository.save(order);
-                });
+            if (savedHolder[0]
+                    && oldAssemblyHolder[0] != null
+                    && !Objects.equals(oldAssemblyHolder[0], newAssemblyHolder[0])) {
+                notificationEventPublisher.publishAssemblyDateChanged(
+                        ordersRepository.findById(storeId, orderId), oldAssemblyHolder[0]);
+            }
+        }
     }
 }

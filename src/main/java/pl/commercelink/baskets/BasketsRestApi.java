@@ -8,6 +8,7 @@ import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ObjectIdInvoiceNoDto;
@@ -28,6 +29,8 @@ public class BasketsRestApi {
     private InvoicingService invoicingService;
     @Autowired
     private PricelistRepository pricelistRepository;
+    @Autowired
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @GetMapping("/{basketId}")
     public ResponseEntity<Basket> getBasket(@PathVariable String storeId, @PathVariable String basketId) {
@@ -44,7 +47,8 @@ public class BasketsRestApi {
                 .withSource(new OrderSource("", OrderSourceType.WebStore))
                 .build();
 
-        processBasket(basket, req);
+        applyChanges(basket, req);
+        basketsRepository.save(basket);
 
         if (req.isSendInvoice()) {
             InvoicingService.OperationResult result = invoicingService.createProforma(basket, Locale.getDefault(), true);
@@ -58,15 +62,18 @@ public class BasketsRestApi {
     public ResponseEntity<Void> updateBasket(@PathVariable String storeId,
                                              @PathVariable String basketId,
                                              @RequestBody CheckoutRequest req) {
-        return basketsRepository.findById(storeId, basketId)
-                .map(basket -> {
-                    processBasket(basket, req);
-                    return ResponseEntity.ok().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
+        if (basketsRepository.findById(storeId, basketId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        optimisticLockingExecutor.modifyAndSave(
+                () -> basketsRepository.findById(storeId, basketId).orElseThrow(),
+                basket -> applyChanges(basket, req),
+                basketsRepository::save
+        );
+        return ResponseEntity.ok().build();
     }
 
-    private void processBasket(Basket basket, CheckoutRequest req) {
+    private void applyChanges(Basket basket, CheckoutRequest req) {
         List<BasketItem> items = req.toBasketItems(pricelistRepository);
 
         basket.setBasketItems(items);
@@ -79,7 +86,6 @@ public class BasketsRestApi {
         if(!Objects.isNull(req.getShippingDetails())){
             basket.setShippingDetails(req.getShippingDetails());
         }
-        basketsRepository.save(basket);
     }
 
     @DeleteMapping("/{basketId}")
