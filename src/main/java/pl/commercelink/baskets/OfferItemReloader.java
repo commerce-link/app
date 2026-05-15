@@ -40,7 +40,9 @@ public class OfferItemReloader {
         updatePrices(basket.getBasketItems());
         updateCosts(enabledInventory, basket.getBasketItems());
 
-        return reload(enabledInventory, basket);
+        List<OfferItem> sortedOfferItems = reload(enabledInventory, basket);
+        basketsRepository.save(basket);
+        return sortedOfferItems;
     }
 
     private List<OfferItem> reload(InventoryView inventory, Basket basket) {
@@ -53,7 +55,6 @@ public class OfferItemReloader {
                 .collect(Collectors.toList());
 
         basket.setBasketItems(newOrderedBasketItems);
-        basketsRepository.save(basket);
 
         return sortedOfferItems;
     }
