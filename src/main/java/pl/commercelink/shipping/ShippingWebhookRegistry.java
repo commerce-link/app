@@ -1,70 +1,94 @@
 package pl.commercelink.shipping;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.RouterFunctions;
+import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.event.OrderEvent;
+import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.provider.EventBindingRegistrar;
+import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.shipping.api.ShippingWebhookRequest;
 import pl.commercelink.shipping.api.ShippingWebhookResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.orders.event.EventType;
-import pl.commercelink.orders.event.OrderEvent;
-import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
-import pl.commercelink.web.dtos.StatusDto;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@RestController
-@RequestMapping("/Store/{storeId}/Webhooks/Shipping")
-public class ShippingWebhookController {
+@Configuration
+public class ShippingWebhookRegistry {
 
-    @Autowired
-    private StoresRepository storesRepository;
+    private final ShippingProviderFactory shippingProviderFactory;
+    private final StoresRepository storesRepository;
+    private final OrdersRepository ordersRepository;
+    private final OrderLifecycle orderLifecycle;
+    private final RMARepository rmaRepository;
+    private final GoodsOutEventPublisher goodsOutEventPublisher;
+    private final OrderEventsRepository orderEventsRepository;
+    private final RouterFunction<ServerResponse> routes;
 
-    @Autowired
-    private OrdersRepository ordersRepository;
+    ShippingWebhookRegistry(ShippingProviderFactory shippingProviderFactory,
+                            StoresRepository storesRepository,
+                            OrdersRepository ordersRepository,
+                            OrderLifecycle orderLifecycle,
+                            RMARepository rmaRepository,
+                            GoodsOutEventPublisher goodsOutEventPublisher,
+                            OrderEventsRepository orderEventsRepository,
+                            SqsAsyncClient sqsAsyncClient) {
+        this.shippingProviderFactory = shippingProviderFactory;
+        this.storesRepository = storesRepository;
+        this.ordersRepository = ordersRepository;
+        this.orderLifecycle = orderLifecycle;
+        this.rmaRepository = rmaRepository;
+        this.goodsOutEventPublisher = goodsOutEventPublisher;
+        this.orderEventsRepository = orderEventsRepository;
 
-    @Autowired
-    private OrderLifecycle orderLifecycle;
+        EventBindingRegistrar registrar = new EventBindingRegistrar(sqsAsyncClient);
+        RouterFunctions.Builder builder = RouterFunctions.route();
 
-    @Autowired
-    private RMARepository rmaRepository;
+        for (ShippingProviderDescriptor descriptor : shippingProviderFactory.availableProviders()) {
+            for (EventBinding<?> binding : descriptor.bindings()) {
+                registrar.register(
+                        binding,
+                        null,
+                        builder,
+                        "/Store/{storeId}/Webhooks/Shipping/",
+                        null,
+                        (event, storeId, headers) ->
+                                processShipping((String) event, headers, storeId, descriptor.name()));
+            }
+        }
+        this.routes = EventBindingRegistrar.buildOrEmpty(builder);
+    }
 
-    @Autowired
-    private GoodsOutEventPublisher goodsOutEventPublisher;
+    @Bean
+    RouterFunction<ServerResponse> shippingWebhookRoutes() {
+        return routes;
+    }
 
-    @Autowired
-    private OrderEventsRepository orderEventsRepository;
-
-    @Autowired
-    private ShippingProviderFactory shippingProviderFactory;
-
-    @PostMapping("/{providerName}")
-    @ResponseBody
-    public StatusDto receiveWebhook(
-            @PathVariable("storeId") String storeId,
-            @PathVariable("providerName") String providerName,
-            @RequestBody String payload,
-            @RequestHeader Map<String, String> headers
-    ) {
-        String normalizedName = providerName.toLowerCase();
-
+    private void processShipping(String payload, Map<String, String> headers,
+                                 String storeId, String providerName) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             throw new RuntimeException("Internal error.");
         }
 
-        ShippingProvider provider = shippingProviderFactory.get(store);
+        ShippingProvider provider = shippingProviderFactory.get(store, providerName);
         ShippingWebhookResult result = provider.processWebhook(new ShippingWebhookRequest(payload, headers));
 
         Optional<Order> order = findOrderByTrackingNo(storeId, result.trackingNo());
@@ -74,8 +98,6 @@ public class ShippingWebhookController {
             findRmaByTrackingNo(storeId, result.trackingNo())
                     .ifPresent(rma -> handleRmaShipmentStatusChange(rma, result));
         }
-
-        return new StatusDto("OK");
     }
 
     private void handleOrderShipmentStatusChange(Order order, ShippingWebhookResult result) {

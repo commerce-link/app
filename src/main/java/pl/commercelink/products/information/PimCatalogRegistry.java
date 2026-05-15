@@ -1,40 +1,48 @@
 package pl.commercelink.products.information;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.awspring.cloud.sqs.listener.SqsContainerOptions;
 import io.awspring.cloud.sqs.listener.SqsMessageListenerContainer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.RouterFunctions;
+import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.provider.api.EventBinding;
-import pl.commercelink.provider.api.EventBinding.QueueBinding;
 import pl.commercelink.starter.secrets.SecretsManager;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
-import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
 
 @Configuration
 public class PimCatalogRegistry {
 
     private final PimCatalog catalog;
     private final List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
+    private final RouterFunction<ServerResponse> webhookRoutes;
 
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager) {
+
+        RouterFunctions.Builder routesBuilder = RouterFunctions.route();
 
         Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
 
         if (descriptorOpt.isEmpty()) {
             System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
             this.catalog = new EmptyPimCatalog();
+            this.webhookRoutes = EventBindingRegistrar.buildOrEmpty(routesBuilder);
             return;
         }
 
@@ -57,45 +65,28 @@ public class PimCatalogRegistry {
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
 
-        ObjectMapper objectMapper = new ObjectMapper()
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
+        EventBindingRegistrar registrar = new EventBindingRegistrar(sqsAsyncClient);
         for (EventBinding<?> binding : descriptor.bindings()) {
-            if (binding instanceof QueueBinding<?> queueBinding) {
-                containers.add(createContainer(sqsAsyncClient, objectMapper, queueBinding));
-            }
+            registrar.register(
+                    binding,
+                    containers,
+                    routesBuilder,
+                    "",
+                    catalog::dispatch,
+                    (event, storeId, headers) -> catalog.dispatch(event));
         }
-    }
 
-    private <T> SqsMessageListenerContainer<Object> createContainer(
-            SqsAsyncClient sqsAsyncClient, ObjectMapper objectMapper, QueueBinding<T> binding) {
-        SqsContainerOptions options = SqsContainerOptions.builder()
-                .maxConcurrentMessages(1)
-                .maxMessagesPerPoll(1)
-                .pollTimeout(Duration.ofSeconds(20))
-                .build();
-        SqsMessageListenerContainer<Object> container = new SqsMessageListenerContainer<>(sqsAsyncClient, options);
-        container.setQueueNames(binding.queueName());
-        container.setMessageListener(message -> {
-            try {
-                Object payload = message.getPayload();
-                T event;
-                if (binding.eventType().isInstance(payload)) {
-                    event = binding.eventType().cast(payload);
-                } else {
-                    event = objectMapper.readValue((String) payload, binding.eventType());
-                }
-                catalog.dispatch(event);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to process event from " + binding.queueName(), e);
-            }
-        });
-        return container;
+        this.webhookRoutes = EventBindingRegistrar.buildOrEmpty(routesBuilder);
     }
 
     @Bean
     PimCatalog pimCatalog() {
         return catalog;
+    }
+
+    @Bean
+    RouterFunction<ServerResponse> pimWebhookRoutes() {
+        return webhookRoutes;
     }
 
     @PostConstruct
