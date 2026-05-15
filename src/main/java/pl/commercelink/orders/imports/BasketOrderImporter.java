@@ -64,11 +64,8 @@ public class BasketOrderImporter implements OrderImporter {
     }
 
     private void cleanUp(String storeId, ClientDataDto dto) {
-        Basket basket = new Basket();
-        basket.setStoreId(storeId);
-        basket.setBasketId(dto.getOrderReference());
-
-        basketsRepository.delete(basket);
+        basketsRepository.findById(storeId, dto.getOrderReference())
+                .ifPresent(basketsRepository::delete);
     }
 
 }
