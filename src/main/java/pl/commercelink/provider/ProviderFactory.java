@@ -52,13 +52,15 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     public T get(Store store) {
-        String providerName = store.getConfigurationValue(integrationType);
-        D descriptor = descriptors.get(providerName);
+        return get(store, store.getConfigurationValue(integrationType));
+    }
+
+    public T get(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
             return null;
         }
-        String configName = resolveCredentialName(descriptor);
-        Map<String, String> config = configurationManager.loadConfiguration(store, configName);
+        Map<String, String> config = loadConfiguration(store, providerName);
         Map<String, Object> context = buildContext(store, descriptor);
         return descriptor.create(config, context);
     }
