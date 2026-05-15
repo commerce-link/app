@@ -142,7 +142,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         do {
             ScanRequest scanRequest = new ScanRequest()
                     .withTableName(TABLE)
-                    .withProjectionExpression("categoryId, productId");
+                    .withProjectionExpression("categoryId, productId, version");
 
             if (lastEvaluatedKey != null) {
                 scanRequest.withExclusiveStartKey(lastEvaluatedKey);
@@ -153,6 +153,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                 Product product = new Product();
                 product.setCategoryId(item.get("categoryId").getS());
                 product.setProductId(item.get("productId").getS());
+                product.setVersion(Long.parseLong(item.get("version").getN()));
                 result.add(product);
             }
 
