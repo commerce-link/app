@@ -70,13 +70,13 @@ public class Checkout {
         return new CheckoutResponse(createPaymentLink(store, basket, null, req.getPaymentOptionId()));
     }
 
-    public CheckoutResponse create(String storeId, String basketId) {
+    public CheckoutResponse create(String storeId, String basketId, String paymentOptionId) {
         Store store = storesRepository.findById(storeId);
         Basket basket = basketsRepository.findById(storeId, basketId).orElseThrow(() -> new IllegalStateException("Basket not found"));
 
         String offerUrl = basket.createOfferUrl(appDomain);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, null));
+        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, paymentOptionId));
     }
 
     private PaymentLink createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {

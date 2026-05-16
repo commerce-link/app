@@ -17,12 +17,17 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.invoicing.api.SplitPaymentPolicy;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.payments.PaymentProviderFactory;
+import pl.commercelink.payments.api.PaymentProviderDescriptor;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.PaymentOptionView;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -31,6 +36,8 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 @Controller
 @RequestMapping("/store/{storeId}/individual/offer/{offerId}")
 public class ClientOfferController {
+
+    private static final String PAYMENT_PICKER_FLAG_VALUE = "all";
 
     @Autowired
     private BasketsRepository basketsRepository;
@@ -47,8 +54,14 @@ public class ClientOfferController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private PaymentProviderFactory paymentProviderFactory;
+
     @GetMapping("")
-    public String getOfferForClient(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId, Model model) {
+    public String getOfferForClient(@PathVariable("storeId") String storeId,
+                                    @PathVariable("offerId") String offerId,
+                                    @RequestParam(name = "payments", required = false) String payments,
+                                    Model model) {
         Optional<Basket> existingOfferOpt = basketsRepository.findById(storeId, offerId);
         if (!existingOfferOpt.isPresent()) {
             model.addAttribute("error", "Offer not found");
@@ -80,12 +93,39 @@ public class ClientOfferController {
         model.addAttribute("form", form);
         model.addAttribute("submitted",  existingOffer.getBillingDetails() != null && existingOffer.getShippingDetails() != null);
         model.addAttribute("isSplitPaymentRequired", isSplitPaymentRequired);
+        List<PaymentOptionView> paymentOptions = buildPaymentOptions(store);
+        model.addAttribute("paymentOptions", paymentOptions);
+        model.addAttribute("defaultPaymentOption", resolveDefaultPaymentOption(paymentOptions));
+        model.addAttribute("showPaymentPicker", PAYMENT_PICKER_FLAG_VALUE.equals(payments));
 
         return "clientOffer";
     }
 
+    private String resolveDefaultPaymentOption(List<PaymentOptionView> paymentOptions) {
+        return paymentOptions.stream()
+                .filter(PaymentOptionView::isDefault)
+                .map(PaymentOptionView::name)
+                .findFirst()
+                .orElseGet(() -> paymentOptions.isEmpty() ? null : paymentOptions.get(0).name());
+    }
+
+    private List<PaymentOptionView> buildPaymentOptions(Store store) {
+        return store.getPayments().stream()
+                .map(this::toPaymentOptionView)
+                .toList();
+    }
+
+    private PaymentOptionView toPaymentOptionView(PaymentIntegration integration) {
+        PaymentProviderDescriptor descriptor = paymentProviderFactory.getDescriptor(integration.getName());
+        String displayName = descriptor != null ? descriptor.displayName() : integration.getName();
+        return new PaymentOptionView(integration.getName(), displayName, integration.is_default());
+    }
+
     @PostMapping("/submit")
-    public String submitClientOfferForm(@PathVariable("storeId") String storeId, @PathVariable String offerId, @ModelAttribute ClientDataDto clientDataDto) {
+    public String submitClientOfferForm(@PathVariable("storeId") String storeId,
+                                        @PathVariable String offerId,
+                                        @RequestParam(name = "payments", required = false) String payments,
+                                        @ModelAttribute ClientDataDto clientDataDto) {
         Optional<Basket> basketOpt = basketsRepository.findById(storeId, offerId);
         Basket basket = basketOpt.get();
 
@@ -93,12 +133,14 @@ public class ClientOfferController {
         basket.setShippingDetails(clientDataDto.getShippingDetails());
 
         basketsRepository.save(basket);
-        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+        return redirectToOffer(storeId, offerId, payments);
     }
 
     @PostMapping("/checkout")
-    public ModelAndView createPaymentLink(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId) {
-        CheckoutResponse response = checkout.create(storeId, offerId);
+    public ModelAndView createPaymentLink(@PathVariable("storeId") String storeId,
+                                          @PathVariable("offerId") String offerId,
+                                          @RequestParam(name = "paymentOptionId", required = false) String paymentOptionId) {
+        CheckoutResponse response = checkout.create(storeId, offerId, paymentOptionId);
         if ("POST".equalsIgnoreCase(response.getMethod())) {
             ModelAndView mv = new ModelAndView("payments/payment-bridge");
             mv.addObject("url", response.getUrl());
@@ -109,18 +151,27 @@ public class ClientOfferController {
     }
 
     @PostMapping("/send-proforma-invoice")
-    public String createProformaInvoice(@PathVariable("storeId") String storeId, @PathVariable String offerId, Locale locale, RedirectAttributes redirectAttributes) {
+    public String createProformaInvoice(@PathVariable("storeId") String storeId,
+                                        @PathVariable String offerId,
+                                        @RequestParam(name = "payments", required = false) String payments,
+                                        Locale locale,
+                                        RedirectAttributes redirectAttributes) {
         Basket basket = basketsRepository.findById(storeId, offerId).get();
 
         InvoicingService.OperationResult op = invoicingService.createProforma(basket, locale, true);
 
         if (op.hasError()) {
             redirectAttributes.addFlashAttribute("errorMessage", op.getErrorMessage());
-            return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+            return redirectToOffer(storeId, offerId, payments);
         }
 
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("offers.send.invoice.success", null, locale));
-        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+        return redirectToOffer(storeId, offerId, payments);
+    }
+
+    private String redirectToOffer(String storeId, String offerId, String payments) {
+        String base = "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+        return PAYMENT_PICKER_FLAG_VALUE.equals(payments) ? base + "?payments=" + PAYMENT_PICKER_FLAG_VALUE : base;
     }
 
 }
