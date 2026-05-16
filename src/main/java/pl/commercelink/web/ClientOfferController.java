@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import com.stripe.exception.StripeException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
@@ -11,19 +10,17 @@ import org.springframework.web.servlet.view.RedirectView;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.checkout.Checkout;
-import pl.commercelink.checkout.CheckoutResponse;
 import pl.commercelink.invoicing.InvoicingService;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.invoicing.api.SplitPaymentPolicy;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
 
-import java.io.IOException;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -98,9 +95,8 @@ public class ClientOfferController {
     }
 
     @PostMapping("/checkout")
-    public RedirectView payByStripe(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId, Locale locale) throws StripeException, IOException {
-        CheckoutResponse checkoutResponse = checkout.create(storeId, offerId);
-        return new RedirectView(checkoutResponse.getUrl());
+    public RedirectView createPaymentLink(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId) {
+        return new RedirectView(checkout.create(storeId, offerId).getUrl());
     }
 
     @PostMapping("/send-proforma-invoice")

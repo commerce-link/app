@@ -104,7 +104,7 @@
                 </div>
             </form>
 
-            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.invoicing.software.provider.label}, ${form.providerConfiguration}, 'invoicing', ${form.store.storeId})}"></div>
+            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.invoicing.software.provider.label}, ${form.providerConfiguration}, 'invoicing', ${form.store.storeId}, false)}"></div>
 
             <div class="field">
                 <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>

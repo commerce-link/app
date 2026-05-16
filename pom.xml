@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.05.21</version>
+    <version>2026.05.22</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -294,15 +294,6 @@
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
             <version>0.9.10</version>
-        </dependency>
-
-        <!-- TECH DEBT: stripe-java added directly because OfferImporter/ClientOfferController
-             reference StripeException. Remove once offer module no longer depends on Stripe types
-             and payments extraction is complete. -->
-        <dependency>
-            <groupId>com.stripe</groupId>
-            <artifactId>stripe-java</artifactId>
-            <version>29.3.0</version>
         </dependency>
 
     </dependencies>

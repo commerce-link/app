@@ -20,6 +20,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.InvoicingConfiguration;
+import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -91,7 +92,11 @@ public class Checkout {
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
 
-        return paymentProviderFactory.get(store).createPaymentLink(paymentRequest);
+        String providerName = store.getDefaultPaymentIntegration()
+                .map(PaymentIntegration::getName)
+                .orElseThrow(() -> new IllegalStateException("No default payment provider configured for store: " + store.getStoreId()));
+
+        return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
     }
 
     private List<PaymentLineItem> buildPaymentLineItems(Store store, Basket basket) {

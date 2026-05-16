@@ -402,13 +402,17 @@ public class StoreController {
         store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
 
         StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(paymentProviderFactory.loadConfigurationForUI(store));
+        form.setProviderConfiguration(new HashMap<>());
+
+        List<ConnectedIntegration> integrations = store.getPayments().stream()
+                .map(p -> new ConnectedIntegration(p.getName(), true, p.is_default()))
+                .toList();
 
         model.addAttribute("form", form);
         model.addAttribute("availableProviders", paymentProviderFactory.availableProviders());
         model.addAttribute("selectedProviderName", form.getPaymentProviderName());
         model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("connectedIntegrations", connectedIntegration(form.getPaymentProviderName()));
+        model.addAttribute("connectedIntegrations", integrations);
 
         return "store-payments";
     }

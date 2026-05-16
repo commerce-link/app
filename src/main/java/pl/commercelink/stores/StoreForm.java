@@ -32,7 +32,9 @@ public class StoreForm {
         this.shippingProvider = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         this.invoicingSoftwareProvider =  store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER);
         this.wmsProvider = store.getConfigurationValue(IntegrationType.WMS_PROVIDER);
-        this.paymentProviderName = store.getConfigurationValue(IntegrationType.PAYMENT_PROVIDER);
+        this.paymentProviderName = store.getDefaultPaymentIntegration()
+                .map(PaymentIntegration::getName)
+                .orElse(null);
     }
 
     public Store getStore() {
