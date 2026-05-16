@@ -181,7 +181,6 @@
                     <div th:if="${!submitted}" class="box is-mobile-padding" style="padding: 2rem">
                         <input type="hidden" id="shipmentType" name="shipmentType" value="Courier">
                         <form th:action="@{/store/{storeId}/individual/offer/{offerId}/submit(storeId=${store.storeId},offerId=${offer.basketId})}" th:object="${form}" enctype="multipart/form-data" method="post" onsubmit="copyBillingDetailsIfNeeded()">
-                            <input type="hidden" name="payments" th:if="${showPaymentPicker}" value="all" />
                             <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
 
                             <div class="field" style="margin-top: 20px">
@@ -295,7 +294,6 @@
 
                 <div th:if="${submitted}" class="field" style="margin-top: 20px">
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/send-proforma-invoice(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
-                        <input type="hidden" name="payments" th:if="${showPaymentPicker}" value="all" />
                         <button type="submit" class="button is-text">
                             <span th:text="#{offers.send.invoice.to.billing.address}"></span>
                         </button>
@@ -354,7 +352,7 @@
                 <div th:if="${submitted && !isSplitPaymentRequired}">
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
 
-                        <div th:if="${showPaymentPicker and #lists.size(paymentOptions) > 1}" class="box payment-method-box"
+                        <div th:if="${#lists.size(paymentOptions) > 1}" class="box payment-method-box"
                              th:style="'padding: 1.5rem; margin-top: 1rem; --payment-primary-color:' + ${branding.primaryColor}">
                             <p class="label" th:text="#{offer.payment.method.title}"></p>
                             <div class="columns is-multiline is-mobile is-variable is-2">

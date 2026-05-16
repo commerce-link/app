@@ -37,8 +37,6 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 @RequestMapping("/store/{storeId}/individual/offer/{offerId}")
 public class ClientOfferController {
 
-    private static final String PAYMENT_PICKER_FLAG_VALUE = "all";
-
     @Autowired
     private BasketsRepository basketsRepository;
 
@@ -60,7 +58,6 @@ public class ClientOfferController {
     @GetMapping("")
     public String getOfferForClient(@PathVariable("storeId") String storeId,
                                     @PathVariable("offerId") String offerId,
-                                    @RequestParam(name = "payments", required = false) String payments,
                                     Model model) {
         Optional<Basket> existingOfferOpt = basketsRepository.findById(storeId, offerId);
         if (!existingOfferOpt.isPresent()) {
@@ -96,7 +93,6 @@ public class ClientOfferController {
         List<PaymentOptionView> paymentOptions = buildPaymentOptions(store);
         model.addAttribute("paymentOptions", paymentOptions);
         model.addAttribute("defaultPaymentOption", resolveDefaultPaymentOption(paymentOptions));
-        model.addAttribute("showPaymentPicker", PAYMENT_PICKER_FLAG_VALUE.equals(payments));
 
         return "clientOffer";
     }
@@ -124,7 +120,6 @@ public class ClientOfferController {
     @PostMapping("/submit")
     public String submitClientOfferForm(@PathVariable("storeId") String storeId,
                                         @PathVariable String offerId,
-                                        @RequestParam(name = "payments", required = false) String payments,
                                         @ModelAttribute ClientDataDto clientDataDto) {
         Optional<Basket> basketOpt = basketsRepository.findById(storeId, offerId);
         Basket basket = basketOpt.get();
@@ -133,7 +128,7 @@ public class ClientOfferController {
         basket.setShippingDetails(clientDataDto.getShippingDetails());
 
         basketsRepository.save(basket);
-        return redirectToOffer(storeId, offerId, payments);
+        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
     }
 
     @PostMapping("/checkout")
@@ -151,27 +146,18 @@ public class ClientOfferController {
     }
 
     @PostMapping("/send-proforma-invoice")
-    public String createProformaInvoice(@PathVariable("storeId") String storeId,
-                                        @PathVariable String offerId,
-                                        @RequestParam(name = "payments", required = false) String payments,
-                                        Locale locale,
-                                        RedirectAttributes redirectAttributes) {
+    public String createProformaInvoice(@PathVariable("storeId") String storeId, @PathVariable String offerId, Locale locale, RedirectAttributes redirectAttributes) {
         Basket basket = basketsRepository.findById(storeId, offerId).get();
 
         InvoicingService.OperationResult op = invoicingService.createProforma(basket, locale, true);
 
         if (op.hasError()) {
             redirectAttributes.addFlashAttribute("errorMessage", op.getErrorMessage());
-            return redirectToOffer(storeId, offerId, payments);
+            return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
         }
 
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("offers.send.invoice.success", null, locale));
-        return redirectToOffer(storeId, offerId, payments);
-    }
-
-    private String redirectToOffer(String storeId, String offerId, String payments) {
-        String base = "redirect:/store/" + storeId + "/individual/offer/" + offerId;
-        return PAYMENT_PICKER_FLAG_VALUE.equals(payments) ? base + "?payments=" + PAYMENT_PICKER_FLAG_VALUE : base;
+        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
     }
 
 }
