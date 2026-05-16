@@ -69,6 +69,7 @@
         .payment-method-card.is-selected,
         .payment-method-card:has(input[type="radio"]:checked) {
             border-width: 2px;
+            border-color: var(--payment-primary-color, #485fc7);
             padding: calc(1rem - 1px);
             background-color: rgba(0, 0, 0, 0.02);
         }
@@ -353,13 +354,13 @@
                 <div th:if="${submitted && !isSplitPaymentRequired}">
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
 
-                        <div th:if="${showPaymentPicker and #lists.size(paymentOptions) > 1}" class="box payment-method-box" style="padding: 1.5rem; margin-top: 1rem;">
+                        <div th:if="${showPaymentPicker and #lists.size(paymentOptions) > 1}" class="box payment-method-box"
+                             th:style="'padding: 1.5rem; margin-top: 1rem; --payment-primary-color:' + ${branding.primaryColor}">
                             <p class="label" th:text="#{offer.payment.method.title}"></p>
                             <div class="columns is-multiline is-mobile is-variable is-2">
                                 <div class="column is-half" th:each="option : ${paymentOptions}">
                                     <label class="payment-method-card"
-                                           th:classappend="${option.name() == defaultPaymentOption} ? 'is-selected' : ''"
-                                           th:style="${option.name() == defaultPaymentOption} ? 'border-color:' + ${branding.primaryColor} : ''">
+                                           th:classappend="${option.name() == defaultPaymentOption} ? 'is-selected' : ''">
                                         <input type="radio" name="paymentOptionId"
                                                th:value="${option.name()}"
                                                th:checked="${option.name() == defaultPaymentOption}" />
