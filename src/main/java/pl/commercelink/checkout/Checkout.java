@@ -20,7 +20,6 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.InvoicingConfiguration;
-import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -67,7 +66,7 @@ public class Checkout {
 
         Basket basket = createBasket(req, store, results);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, null));
+        return new CheckoutResponse(createPaymentLink(store, basket, null, req.getPaymentOptionId()));
     }
 
     public CheckoutResponse create(String storeId, String basketId) {
@@ -76,10 +75,10 @@ public class Checkout {
 
         String offerUrl = basket.createOfferUrl(appDomain);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl));
+        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, null));
     }
 
-    private String createPaymentLink(Store store, Basket basket, String cancelUrlOverride) {
+    private String createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {
         CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         PaymentRequest paymentRequest = new PaymentRequest(
@@ -92,9 +91,7 @@ public class Checkout {
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
 
-        String providerName = store.getDefaultPaymentIntegration()
-                .map(PaymentIntegration::getName)
-                .orElseThrow(() -> new IllegalStateException("No default payment provider configured for store: " + store.getStoreId()));
+        String providerName = store.getPaymentIntegrationOrDefault(paymentOptionId).getName();
 
         return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
     }

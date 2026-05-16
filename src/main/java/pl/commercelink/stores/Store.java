@@ -162,6 +162,19 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public PaymentIntegration getPaymentIntegrationOrDefault(String paymentOptionId) {
+        if (isBlank(paymentOptionId)) {
+            return getDefaultPaymentIntegration()
+                    .orElseThrow(() -> new IllegalStateException("No default payment provider configured for store: " + storeId));
+        }
+        PaymentIntegration integration = getPaymentIntegration(paymentOptionId);
+        if (integration == null) {
+            throw new IllegalStateException("Payment integration not found: " + paymentOptionId);
+        }
+        return integration;
+    }
+
+    @DynamoDBIgnore
     public void addPaymentIntegration(String paymentName) {
         if (getPaymentIntegration(paymentName) != null) {
             return;
