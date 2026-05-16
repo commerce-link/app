@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
@@ -55,6 +56,8 @@ public class Store {
     private ReportingConfiguration reportingConfiguration;
     @DynamoDBAttribute(attributeName = "shipping")
     private ShippingConfiguration shippingConfiguration;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public Store() {
     }
@@ -188,6 +191,14 @@ public class Store {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public List<MarketplaceIntegration> getMarketplaces() {

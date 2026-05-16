@@ -63,6 +63,8 @@ public class Basket {
 
     @DynamoDBAttribute(attributeName = "deliveryOptionId")
     private String deliveryOptionId;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public Basket() {
     }
@@ -254,6 +256,14 @@ public class Basket {
     public static Builder builder(Store store) {
         return new Builder(store.getStoreId())
                 .withFulfilmentType(store.getDefaultFulfilmentType());
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public static class Builder {

@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.ProductCategory;
@@ -23,6 +24,8 @@ public class WarehouseItem extends Item {
 
     @DynamoDBRangeKey(attributeName = "itemId")
     private String itemId;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -151,5 +154,13 @@ public class WarehouseItem extends Item {
 
     public void setItemId(String itemId) {
         this.itemId = itemId;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

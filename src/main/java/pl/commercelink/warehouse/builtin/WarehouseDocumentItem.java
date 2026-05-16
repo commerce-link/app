@@ -41,6 +41,8 @@ public class WarehouseDocumentItem {
     @DynamoDBAttribute(attributeName = "createdAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     public WarehouseDocumentItem() {
     }
@@ -136,5 +138,13 @@ public class WarehouseDocumentItem {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

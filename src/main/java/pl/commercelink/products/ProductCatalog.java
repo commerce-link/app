@@ -27,7 +27,8 @@ public class ProductCatalog implements DeletionProtection {
     private boolean deletionProtection = true;
     @DynamoDBAttribute(attributeName = "categories")
     private List<CategoryDefinition> categories = new LinkedList<>();
-
+    @DynamoDBVersionAttribute
+    private Long version;
 
     // required by DynamoDB
     public ProductCatalog() {
@@ -173,5 +174,12 @@ public class ProductCatalog implements DeletionProtection {
         this.categories = categories;
     }
 
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
 
 }

@@ -56,6 +56,8 @@ public class RMAItem implements Delivered {
     private String serialNo;
     @DynamoDBAttribute(attributeName = "comment")
     private String comment;
+    @DynamoDBVersionAttribute
+    private Long version;
 
     @DynamoDBIgnore
     private boolean selected;
@@ -300,6 +302,14 @@ public class RMAItem implements Delivered {
 
     public void setSelected(boolean selected) {
         this.selected = selected;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     @DynamoDBIgnore
