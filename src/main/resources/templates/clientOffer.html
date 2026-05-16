@@ -299,7 +299,6 @@
                 </div>
 
                 <div th:if="${submitted && !isSplitPaymentRequired}">
-<!--                <div th:if="${submitted && store.hasIntegration(T(pl.commercelink.stores.IntegrationType).PAYMENT_PROVIDER)}">-->
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
                         <button type="submit" class="button is-primary"
                                 th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%;'">
