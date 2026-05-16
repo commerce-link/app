@@ -11,6 +11,7 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentLineItem;
+import pl.commercelink.payments.api.PaymentLink;
 import pl.commercelink.payments.api.PaymentRequest;
 import pl.commercelink.payments.api.PaymentShippingItem;
 import pl.commercelink.pricelist.Pricelist;
@@ -78,7 +79,7 @@ public class Checkout {
         return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, null));
     }
 
-    private String createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {
+    private PaymentLink createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {
         CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         PaymentRequest paymentRequest = new PaymentRequest(

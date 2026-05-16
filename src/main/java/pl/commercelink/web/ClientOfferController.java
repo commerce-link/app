@@ -5,11 +5,13 @@ import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.view.RedirectView;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.checkout.Checkout;
+import pl.commercelink.checkout.CheckoutResponse;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.invoicing.api.SplitPaymentPolicy;
@@ -95,8 +97,15 @@ public class ClientOfferController {
     }
 
     @PostMapping("/checkout")
-    public RedirectView createPaymentLink(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId) {
-        return new RedirectView(checkout.create(storeId, offerId).getUrl());
+    public ModelAndView createPaymentLink(@PathVariable("storeId") String storeId, @PathVariable("offerId") String offerId) {
+        CheckoutResponse response = checkout.create(storeId, offerId);
+        if ("POST".equalsIgnoreCase(response.getMethod())) {
+            ModelAndView mv = new ModelAndView("payments/payment-bridge");
+            mv.addObject("url", response.getUrl());
+            mv.addObject("params", response.getParams());
+            return mv;
+        }
+        return new ModelAndView(new RedirectView(response.getUrl()));
     }
 
     @PostMapping("/send-proforma-invoice")

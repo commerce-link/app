@@ -1,0 +1,45 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}" th:with="showNavbar=false">
+<body>
+
+<div layout:fragment="content">
+
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-half-desktop is-three-quarters-tablet">
+                <div class="box has-text-centered">
+                    <h1 class="title is-4" th:text="#{payment.bridge.title}"></h1>
+                    <p class="subtitle is-6 mt-4" th:text="#{payment.bridge.message}"></p>
+
+                    <div class="mt-5">
+                        <progress class="progress is-primary is-small" max="100">Loading</progress>
+                    </div>
+
+                    <form id="paymentForm" th:action="${url}" method="POST" class="is-hidden">
+                        <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
+                    </form>
+
+                    <noscript>
+                        <div class="notification is-warning mt-4">
+                            <p th:text="#{payment.bridge.javascript.disabled}"></p>
+                        </div>
+                        <form th:action="${url}" method="POST">
+                            <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
+                            <button type="submit" class="button is-primary is-medium mt-3" th:text="#{payment.bridge.continue}"></button>
+                        </form>
+                    </noscript>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('paymentForm').submit();
+    </script>
+
+</div>
+
+</body>
+</html>
