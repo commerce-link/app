@@ -269,6 +269,37 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean canBeSplit() {
+        return hasStatus(OrderStatus.New)
+                && getPaidAmount() == 0
+                && !getDocumentByType(DocumentType.GoodsIssue).isPresent()
+                && !isInvoiced();
+    }
+
+    @DynamoDBIgnore
+    public Order createSplit() {
+        Order copy = new Order(this.storeId);
+        copy.setBillingDetails(this.billingDetails.copy());
+        copy.setShippingDetails(this.shippingDetails.copy());
+        copy.setFulfilmentType(this.fulfilmentType);
+        copy.setSource(this.source);
+        copy.setAffiliateId(this.affiliateId);
+        copy.setOrderRealizationDays(this.orderRealizationDays);
+        copy.setEmailNotificationsEnabled(this.emailNotificationsEnabled);
+        copy.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+
+        Shipment shipment = new Shipment();
+        shipment.setType(shipments.isEmpty() ? ShipmentType.Courier : shipments.get(0).getType());
+        copy.addShipment(shipment);
+
+        Payment payment = new Payment();
+        payment.setSource(payments.isEmpty() ? PaymentSource.BankTransfer : payments.get(0).getSource());
+        copy.addPayment(payment);
+
+        return copy;
+    }
+
+    @DynamoDBIgnore
     public boolean isRMAReplacementOrder() {
         return source != null && "RMA".equals(source.getName());
     }
