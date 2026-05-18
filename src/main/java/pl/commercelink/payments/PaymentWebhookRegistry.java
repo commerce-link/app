@@ -3,7 +3,6 @@ package pl.commercelink.payments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
@@ -17,10 +16,8 @@ import pl.commercelink.payments.api.PaymentProviderDescriptor;
 import pl.commercelink.payments.api.PaymentWebhookRequest;
 import pl.commercelink.payments.api.PaymentWebhookResult;
 import pl.commercelink.provider.EventBindingRegistrar;
-import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.List;
 import java.util.Map;
@@ -38,29 +35,17 @@ public class PaymentWebhookRegistry {
     PaymentWebhookRegistry(PaymentProviderFactory paymentProviderFactory,
                            StoresRepository storesRepository,
                            BasketsRepository basketsRepository,
-                           OrdersManager ordersManager,
-                           SqsAsyncClient sqsAsyncClient) {
+                           OrdersManager ordersManager) {
         this.paymentProviderFactory = paymentProviderFactory;
         this.storesRepository = storesRepository;
         this.basketsRepository = basketsRepository;
         this.ordersManager = ordersManager;
 
-        EventBindingRegistrar registrar = new EventBindingRegistrar(sqsAsyncClient);
-        RouterFunctions.Builder builder = RouterFunctions.route();
-
-        for (PaymentProviderDescriptor descriptor : paymentProviderFactory.availableProviders()) {
-            for (EventBinding<?> binding : descriptor.bindings()) {
-                registrar.register(
-                        binding,
-                        null,
-                        builder,
-                        "/Store/{storeId}/Webhooks/Payments/",
-                        null,
-                        (event, storeId, headers) ->
-                                processPayment((String) event, headers, storeId, descriptor));
-            }
-        }
-        this.routes = EventBindingRegistrar.buildOrEmpty(builder);
+        this.routes = EventBindingRegistrar.buildWebhookRoutes(
+                paymentProviderFactory.availableProviders(),
+                "/Store/{storeId}/Webhooks/Payments/",
+                descriptor -> (event, storeId, headers) ->
+                        processPayment((String) event, headers, storeId, descriptor));
     }
 
     @Bean

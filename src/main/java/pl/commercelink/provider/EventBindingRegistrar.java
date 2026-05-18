@@ -11,38 +11,64 @@ import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.provider.api.EventBinding.QueueBinding;
 import pl.commercelink.provider.api.EventBinding.WebhookBinding;
+import pl.commercelink.provider.api.ProviderDescriptor;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
-public class EventBindingRegistrar {
+public final class EventBindingRegistrar {
 
-    private final SqsAsyncClient sqsAsyncClient;
-    private final ObjectMapper objectMapper;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    public EventBindingRegistrar(SqsAsyncClient sqsAsyncClient) {
-        this.sqsAsyncClient = sqsAsyncClient;
-        this.objectMapper = new ObjectMapper()
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private EventBindingRegistrar() {
     }
 
-    public void register(EventBinding<?> binding,
-                         List<SqsMessageListenerContainer<?>> containers,
-                         RouterFunctions.Builder routes,
-                         String httpPathPrefix,
-                         Consumer<Object> queueDispatcher,
-                         WebhookHandler webhookHandler) {
+    public static <D extends ProviderDescriptor<?>> void registerAll(
+            Collection<D> descriptors,
+            SqsAsyncClient sqsAsyncClient,
+            List<SqsMessageListenerContainer<?>> containers,
+            RouterFunctions.Builder routes,
+            String httpPathPrefix,
+            Consumer<Object> queueDispatcher,
+            Function<D, WebhookHandler> webhookHandlerFn) {
+        for (D descriptor : descriptors) {
+            WebhookHandler handler = webhookHandlerFn != null ? webhookHandlerFn.apply(descriptor) : null;
+            for (EventBinding<?> binding : descriptor.bindings()) {
+                register(binding, sqsAsyncClient, containers, routes, httpPathPrefix, queueDispatcher, handler);
+            }
+        }
+    }
+
+    public static <D extends ProviderDescriptor<?>> RouterFunction<ServerResponse> buildWebhookRoutes(
+            Collection<D> descriptors,
+            String httpPathPrefix,
+            Function<D, WebhookHandler> webhookHandlerFn) {
+        RouterFunctions.Builder builder = RouterFunctions.route();
+        registerAll(descriptors, null, null, builder, httpPathPrefix, null, webhookHandlerFn);
+        return buildOrEmpty(builder);
+    }
+
+    public static void register(EventBinding<?> binding,
+                                SqsAsyncClient sqsAsyncClient,
+                                List<SqsMessageListenerContainer<?>> containers,
+                                RouterFunctions.Builder routes,
+                                String httpPathPrefix,
+                                Consumer<Object> queueDispatcher,
+                                WebhookHandler webhookHandler) {
         switch (binding) {
             case QueueBinding<?> q -> {
                 if (containers == null || queueDispatcher == null) {
                     throw new IllegalStateException(
                             "QueueBinding " + q.queueName() + " requires container list and dispatcher");
                 }
-                containers.add(createSqsContainer(q, queueDispatcher));
+                containers.add(createSqsContainer(q, sqsAsyncClient, queueDispatcher));
             }
             case WebhookBinding<?> w -> {
                 if (routes == null || webhookHandler == null) {
@@ -54,8 +80,12 @@ public class EventBindingRegistrar {
         }
     }
 
-    private <T> SqsMessageListenerContainer<Object> createSqsContainer(
-            QueueBinding<T> binding, Consumer<Object> dispatcher) {
+    private static <T> SqsMessageListenerContainer<Object> createSqsContainer(
+            QueueBinding<T> binding, SqsAsyncClient sqsAsyncClient, Consumer<Object> dispatcher) {
+        if (sqsAsyncClient == null) {
+            throw new IllegalStateException(
+                    "QueueBinding " + binding.queueName() + " requires non-null SqsAsyncClient");
+        }
         SqsContainerOptions options = SqsContainerOptions.builder()
                 .maxConcurrentMessages(1)
                 .maxMessagesPerPoll(1)
@@ -69,7 +99,7 @@ public class EventBindingRegistrar {
                 Object payload = message.getPayload();
                 T event = binding.eventType().isInstance(payload)
                         ? binding.eventType().cast(payload)
-                        : objectMapper.readValue((String) payload, binding.eventType());
+                        : OBJECT_MAPPER.readValue((String) payload, binding.eventType());
                 dispatcher.accept(event);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to process event from " + binding.queueName(), e);
@@ -78,8 +108,8 @@ public class EventBindingRegistrar {
         return container;
     }
 
-    private <T> void addHttpRoute(RouterFunctions.Builder builder, String prefix,
-                                  WebhookBinding<T> binding, WebhookHandler handler) {
+    private static <T> void addHttpRoute(RouterFunctions.Builder builder, String prefix,
+                                         WebhookBinding<T> binding, WebhookHandler handler) {
         builder.POST(prefix + binding.path(), request -> {
             try {
                 String body = request.body(String.class);
@@ -87,7 +117,7 @@ public class EventBindingRegistrar {
                 Map<String, String> headers = request.headers().asHttpHeaders().toSingleValueMap();
                 Object event = binding.eventType() == String.class
                         ? body
-                        : objectMapper.readValue(body, binding.eventType());
+                        : OBJECT_MAPPER.readValue(body, binding.eventType());
                 handler.handle(event, storeId, headers);
                 return ServerResponse.ok().build();
             } catch (Exception e) {

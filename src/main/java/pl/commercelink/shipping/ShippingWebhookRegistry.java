@@ -3,7 +3,6 @@ package pl.commercelink.shipping;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
@@ -16,15 +15,12 @@ import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.provider.EventBindingRegistrar;
-import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.shipping.api.ShippingProvider;
-import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.shipping.api.ShippingWebhookRequest;
 import pl.commercelink.shipping.api.ShippingWebhookResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
-import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.List;
 import java.util.Map;
@@ -48,8 +44,7 @@ public class ShippingWebhookRegistry {
                             OrderLifecycle orderLifecycle,
                             RMARepository rmaRepository,
                             GoodsOutEventPublisher goodsOutEventPublisher,
-                            OrderEventsRepository orderEventsRepository,
-                            SqsAsyncClient sqsAsyncClient) {
+                            OrderEventsRepository orderEventsRepository) {
         this.shippingProviderFactory = shippingProviderFactory;
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
@@ -58,22 +53,11 @@ public class ShippingWebhookRegistry {
         this.goodsOutEventPublisher = goodsOutEventPublisher;
         this.orderEventsRepository = orderEventsRepository;
 
-        EventBindingRegistrar registrar = new EventBindingRegistrar(sqsAsyncClient);
-        RouterFunctions.Builder builder = RouterFunctions.route();
-
-        for (ShippingProviderDescriptor descriptor : shippingProviderFactory.availableProviders()) {
-            for (EventBinding<?> binding : descriptor.bindings()) {
-                registrar.register(
-                        binding,
-                        null,
-                        builder,
-                        "/Store/{storeId}/Webhooks/Shipping/",
-                        null,
-                        (event, storeId, headers) ->
-                                processShipping((String) event, headers, storeId, descriptor.name()));
-            }
-        }
-        this.routes = EventBindingRegistrar.buildOrEmpty(builder);
+        this.routes = EventBindingRegistrar.buildWebhookRoutes(
+                shippingProviderFactory.availableProviders(),
+                "/Store/{storeId}/Webhooks/Shipping/",
+                descriptor -> (event, storeId, headers) ->
+                        processShipping((String) event, headers, storeId, descriptor.name()));
     }
 
     @Bean

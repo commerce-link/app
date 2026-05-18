@@ -13,7 +13,6 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
-import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.starter.secrets.SecretsManager;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
@@ -65,16 +64,14 @@ public class PimCatalogRegistry {
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
 
-        EventBindingRegistrar registrar = new EventBindingRegistrar(sqsAsyncClient);
-        for (EventBinding<?> binding : descriptor.bindings()) {
-            registrar.register(
-                    binding,
-                    containers,
-                    routesBuilder,
-                    "",
-                    catalog::dispatch,
-                    (event, storeId, headers) -> catalog.dispatch(event));
-        }
+        EventBindingRegistrar.registerAll(
+                List.of(descriptor),
+                sqsAsyncClient,
+                containers,
+                routesBuilder,
+                "",
+                catalog::dispatch,
+                d -> (event, storeId, headers) -> catalog.dispatch(event));
 
         this.webhookRoutes = EventBindingRegistrar.buildOrEmpty(routesBuilder);
     }
