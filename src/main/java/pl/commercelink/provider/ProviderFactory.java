@@ -1,5 +1,6 @@
 package pl.commercelink.provider;
 
+import pl.commercelink.provider.api.AuthConfig;
 import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.rest.client.ConfigurableOAuth2AuthorizationService;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
@@ -25,7 +26,8 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     private OAuth2TokenStore tokenStore;
     private StoresRepository storesRepository;
 
-    public ProviderFactory(Class<D> descriptorClass, IntegrationType integrationType, ProviderConfigurationManager configurationManager) {
+    public ProviderFactory(Class<D> descriptorClass, IntegrationType integrationType,
+            ProviderConfigurationManager configurationManager) {
         this.configurationManager = configurationManager;
         this.integrationType = integrationType;
         for (D descriptor : ServiceLoader.load(descriptorClass)) {
@@ -34,9 +36,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     protected ProviderFactory(Class<D> descriptorClass, IntegrationType integrationType,
-                              ProviderConfigurationManager configurationManager,
-                              OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,
-                              StoresRepository storesRepository) {
+            ProviderConfigurationManager configurationManager,
+            OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,
+            StoresRepository storesRepository) {
         this(descriptorClass, integrationType, configurationManager);
         this.credentialStore = credentialStore;
         this.tokenStore = tokenStore;
@@ -44,55 +46,58 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     protected ProviderFactory(Class<D> descriptorClass, ProviderConfigurationManager configurationManager,
-                              OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,
-                              StoresRepository storesRepository) {
+            OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,
+            StoresRepository storesRepository) {
         this(descriptorClass, null, configurationManager, credentialStore, tokenStore, storesRepository);
     }
 
     public T get(Store store) {
-        String providerName = store.getConfigurationValue(integrationType);
-        D descriptor = descriptors.get(providerName);
+        return get(store, store.getConfigurationValue(integrationType));
+    }
+
+    public T get(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
             return null;
         }
-        String configName = resolveCredentialName(descriptor);
-        Map<String, String> config = configurationManager.loadConfiguration(store, configName);
-        Map<String, Object> context = buildContext(store, descriptor, config);
+        Map<String, String> config = loadConfiguration(store, providerName);
+        Map<String, Object> context = buildContext(store, descriptor);
         return descriptor.create(config, context);
     }
 
-    protected Map<String, Object> buildContext(Store store, D descriptor, Map<String, String> config) {
-        Map<String, String> metadata = descriptor.metadata();
-        if (!"oauth2".equals(metadata.get("authType"))) {
-            return Map.of();
-        }
+    protected Map<String, Object> buildContext(Store store, D descriptor) {
+        return switch (descriptor.authConfig()) {
+            case AuthConfig.None none -> Map.of();
+            case AuthConfig.OAuth2 oauth2 -> buildOAuth2Context(store, descriptor, oauth2);
+        };
+    }
 
-        String apiUrl = config.containsKey("apiUrl") ? config.get("apiUrl") : metadata.get("apiUrl");
+    private Map<String, Object> buildOAuth2Context(
+            Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
+        String apiUrl = oauth2.apiUrl();
         String credentialName = resolveCredentialName(descriptor);
 
         ConfigurableOAuth2AuthorizationService authService = new ConfigurableOAuth2AuthorizationService(
                 credentialStore, tokenStore,
                 credentialName,
-                apiUrl + metadata.get("authEndpointPath"),
-                apiUrl + metadata.get("refreshEndpointPath"),
-                Long.parseLong(metadata.get("refreshTokenExpirationSeconds")),
+                apiUrl + oauth2.authEndpointPath(),
+                apiUrl + oauth2.refreshEndpointPath(),
+                oauth2.refreshTokenExpirationSeconds(),
                 storeId -> {
                     Store s = storesRepository.findById(storeId);
                     onAuthorizationLost(s, descriptor);
                     storesRepository.save(s);
-                }
-        );
+                });
 
         RestApi.Builder restApiBuilder = RestApi.builder(apiUrl);
-        String acceptHeader = metadata.get("acceptHeader");
+        String acceptHeader = oauth2.acceptHeader();
         if (acceptHeader != null) {
             restApiBuilder.defaultHeader("Accept", acceptHeader);
         }
 
         RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
                 restApiBuilder.build(),
-                () -> authService.getAccessToken(store.getStoreId())
-        );
+                () -> authService.getAccessToken(store.getStoreId()));
 
         return Map.of("restApi", restApiWithRetry);
     }
@@ -136,7 +141,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         String configName = resolveCredentialName(descriptor);
         configurationManager.deleteConfiguration(store, configName);
 
-        if ("oauth2".equals(descriptor.metadata().get("authType"))
+        if (descriptor.authConfig() instanceof AuthConfig.OAuth2
                 && credentialStore != null && tokenStore != null) {
             credentialStore.deleteSecrets(store.getStoreId(), configName);
             tokenStore.deleteToken(store.getStoreId(), configName, "access_token");
