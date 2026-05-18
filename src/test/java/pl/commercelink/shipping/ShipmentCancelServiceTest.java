@@ -1,6 +1,5 @@
 package pl.commercelink.shipping;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,10 +17,8 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,20 +47,12 @@ class ShipmentCancelServiceTest {
     @Mock
     private ShippingProviderFactory shippingProviderFactory;
     @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock
     private Store store;
     @Mock
     private ShippingProvider shippingProvider;
 
     @InjectMocks
     private ShipmentCancelService shipmentCancelService;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-    }
 
     @Test
     @DisplayName("cancelShipping throws ShippingException when no shipment carries valid shipping data")

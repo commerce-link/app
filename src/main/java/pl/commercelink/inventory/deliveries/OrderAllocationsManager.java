@@ -3,7 +3,6 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.*;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -18,8 +17,6 @@ public class OrderAllocationsManager {
     private OrderItemsRepository orderItemsRepository;
     @Autowired
     private OrdersManager ordersManager;
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public List<Allocation> fetchAll(String storeId) {
         List<Allocation> allocations = new LinkedList<>();
@@ -96,11 +93,9 @@ public class OrderAllocationsManager {
         }
 
         if (removed) {
-            optimisticLockingExecutor.modifyAndSave(
-                    () -> ordersRepository.findById(storeId, orderId),
-                    fresh -> fresh.setStatus(OrderStatus.New),
-                    ordersRepository::save
-            );
+            Order order = ordersRepository.findById(storeId, orderId);
+            order.setStatus(OrderStatus.New);
+            ordersRepository.save(order);
         }
     }
 

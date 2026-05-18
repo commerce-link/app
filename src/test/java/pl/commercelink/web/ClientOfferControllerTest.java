@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,15 +16,12 @@ import pl.commercelink.checkout.Checkout;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,17 +42,9 @@ class ClientOfferControllerTest {
     private InvoicingService invoicingService;
     @Mock
     private MessageSource messageSource;
-    @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private ClientOfferController clientOfferController;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-    }
 
     @Test
     @DisplayName("submitClientOfferForm persists billing and shipping details from the submitted DTO onto the basket")

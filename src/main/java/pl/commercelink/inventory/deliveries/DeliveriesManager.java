@@ -9,7 +9,6 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.time.LocalDate;
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 @Component
@@ -35,8 +33,6 @@ public class DeliveriesManager {
     private OrderAllocationsManager orderAllocationsManager;
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public void deleteAllocations(String storeId, String deliveryId, List<Allocation> allocations) {
         List<Allocation> active = allocations.stream().filter(Allocation::isInAllocation).toList();
@@ -157,30 +153,20 @@ public class DeliveriesManager {
         List<String> orderIds = orderItemsRepository.findByDeliveryIdAndStatuses(
                 delivery.getDeliveryId(), Collections.singletonList(FulfilmentStatus.Ordered));
 
-        LocalDate newDeliveryAt = delivery.getEstimatedDeliveryAt();
-        orderIds.forEach(orderId -> applyNewDeliveryDateToOrder(storeId, orderId, newDeliveryAt));
-    }
+        orderIds.stream()
+                .map(orderId -> ordersRepository.findById(storeId, orderId))
+                .filter(order -> !order.hasStatus(OrderStatus.Completed))
+                .forEach(order -> {
+                    LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
+                    LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
+                            delivery.getEstimatedDeliveryAt()
+                    );
 
-    private void applyNewDeliveryDateToOrder(String storeId, String orderId, LocalDate newDeliveryAt) {
-        Optional<Runnable> deferredNotification = optimisticLockingExecutor.modifyAndSaveReturning(
-                () -> ordersRepository.findById(storeId, orderId),
-                fresh -> {
-                    if (fresh.hasStatus(OrderStatus.Completed)) {
-                        return Optional.<Runnable>empty();
+                    if (oldAssemblyDate != null && !Objects.equals(oldAssemblyDate, newAssemblyDate)) {
+                        notificationEventPublisher.publishAssemblyDateChanged(order, oldAssemblyDate);
                     }
-                    LocalDate oldAssembly = fresh.getEstimatedAssemblyAt();
-                    LocalDate newAssembly = fresh.updateEstimatedAssemblyAt(newDeliveryAt);
-                    if (oldAssembly == null || Objects.equals(oldAssembly, newAssembly)) {
-                        return Optional.<Runnable>empty();
-                    }
-                    return Optional.of(() -> notificationEventPublisher.publishAssemblyDateChanged(fresh, oldAssembly));
-                },
-                order -> {
-                    if (!order.hasStatus(OrderStatus.Completed)) {
-                        ordersRepository.save(order);
-                    }
-                }
-        );
-        deferredNotification.ifPresent(Runnable::run);
+
+                    ordersRepository.save(order);
+                });
     }
 }

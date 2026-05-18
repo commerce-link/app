@@ -19,7 +19,6 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentProviderDescriptor;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.PaymentIntegration;
@@ -55,9 +54,6 @@ public class ClientOfferController {
 
     @Autowired
     private PaymentProviderFactory paymentProviderFactory;
-
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @GetMapping("")
     public String getOfferForClient(@PathVariable("storeId") String storeId,
@@ -125,14 +121,13 @@ public class ClientOfferController {
     public String submitClientOfferForm(@PathVariable("storeId") String storeId,
                                         @PathVariable String offerId,
                                         @ModelAttribute ClientDataDto clientDataDto) {
-        optimisticLockingExecutor.modifyAndSave(
-                () -> basketsRepository.findById(storeId, offerId).orElseThrow(),
-                basket -> {
-                    basket.setBillingDetails(clientDataDto.getBillingDetails());
-                    basket.setShippingDetails(clientDataDto.getShippingDetails());
-                },
-                basketsRepository::save
-        );
+        Optional<Basket> basketOpt = basketsRepository.findById(storeId, offerId);
+        Basket basket = basketOpt.get();
+
+        basket.setBillingDetails(clientDataDto.getBillingDetails());
+        basket.setShippingDetails(clientDataDto.getShippingDetails());
+
+        basketsRepository.save(basket);
         return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
     }
 

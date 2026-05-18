@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.stores.Store;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -35,8 +34,6 @@ public class OrdersManager {
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
     @Autowired
     private OrderLifecycle orderLifecycle;
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory) {
         OrderItem orderItem;
@@ -57,15 +54,9 @@ public class OrdersManager {
         }
         orderItemsRepository.save(orderItem);
 
-        int deliveryDays = matchedInventory.getEstimatedDeliveryDays();
-        optimisticLockingExecutor.modifyAndSave(
-                () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
-                fresh -> {
-                    fresh.increaseRealizationDays(orderItem, deliveryDays);
-                    fresh.increaseTotalPrice(orderItem.getTotalPrice());
-                },
-                ordersRepository::save
-        );
+        order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
+        order.increaseTotalPrice(orderItem.getTotalPrice());
+        ordersRepository.save(order);
     }
 
     public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice) {
@@ -84,15 +75,9 @@ public class OrdersManager {
 
         orderItemsRepository.save(orderItem);
 
-        int deliveryDays = availabilityAndPrice.getEstimatedDeliveryDays();
-        optimisticLockingExecutor.modifyAndSave(
-                () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
-                fresh -> {
-                    fresh.increaseRealizationDays(orderItem, deliveryDays);
-                    fresh.increaseTotalPrice(orderItem.getTotalPrice());
-                },
-                ordersRepository::save
-        );
+        order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
+        order.increaseTotalPrice(orderItem.getTotalPrice());
+        ordersRepository.save(order);
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {

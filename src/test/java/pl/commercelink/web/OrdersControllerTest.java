@@ -20,9 +20,7 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Locale;
 
@@ -44,8 +42,6 @@ class OrdersControllerTest {
     @Mock
     private OrdersRepository ordersRepository;
     @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock
     private MessageSource messageSource;
     @Mock
     private OrdersManager ordersManager;
@@ -60,9 +56,7 @@ class OrdersControllerTest {
     private MockedStatic<CustomSecurityContext> securityStub;
 
     @BeforeEach
-    void setupExecutorAndStoreId() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+    void setupStoreId() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
     }

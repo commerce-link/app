@@ -1,6 +1,5 @@
 package pl.commercelink.orders;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,14 +15,11 @@ import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -45,20 +41,12 @@ class OrdersManagerTest {
     @Mock
     private OrderLifecycle orderLifecycle;
     @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock
     private Store store;
     @Mock
     private MatchedInventory matchedInventory;
 
     @InjectMocks
     private OrdersManager ordersManager;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-    }
 
     @Test
     @DisplayName("addOrderItem from matched inventory with offers persists item with taxonomy data and increments order total price")

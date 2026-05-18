@@ -1,6 +1,5 @@
 package pl.commercelink.inventory.deliveries;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,9 +16,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.List;
 
@@ -43,17 +40,9 @@ class OrderAllocationsManagerTest {
     private OrderItemsRepository orderItemsRepository;
     @Mock
     private OrdersManager ordersManager;
-    @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private OrderAllocationsManager orderAllocationsManager;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-    }
 
     @Test
     @DisplayName("remove resets order status to New when at least one item fulfilment was removed")

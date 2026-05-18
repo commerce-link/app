@@ -24,7 +24,6 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -67,9 +66,6 @@ public class OfferController {
 
     @Autowired
     private MessageSource messageSource;
-
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @Value("${app.domain}")
     private String appDomain;
@@ -211,17 +207,18 @@ public class OfferController {
 
     @PostMapping("/dashboard/offer/{offerId}")
     public String updateOffer(@PathVariable String offerId, @ModelAttribute Basket basket) {
-        modifyAndSave(offerId, existingBasket -> {
-            existingBasket.setName(basket.getName());
-            existingBasket.setFulfilmentType(basket.getFulfilmentType());
-            existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
-            existingBasket.setComment(basket.getComment());
-            existingBasket.setShowPrices(basket.isShowPrices());
-            existingBasket.setExpiresAt(basket.getExpiresAt());
-            existingBasket.setDeliveryOptionId(basket.getDeliveryOptionId());
-            existingBasket.setContactDetails(basket.getContactDetails());
-            existingBasket.setGclid(basket.getGclid());
-        });
+        Basket existingBasket = basketsRepository.findById(getStoreId(), offerId).get();
+        existingBasket.setName(basket.getName());
+        existingBasket.setFulfilmentType(basket.getFulfilmentType());
+        existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
+        existingBasket.setComment(basket.getComment());
+        existingBasket.setShowPrices(basket.isShowPrices());
+        existingBasket.setExpiresAt(basket.getExpiresAt());
+        existingBasket.setDeliveryOptionId(basket.getDeliveryOptionId());
+        existingBasket.setContactDetails(basket.getContactDetails());
+        existingBasket.setGclid(basket.getGclid());
+
+        save(existingBasket);
         return "redirect:/dashboard/offer/" + offerId;
     }
 
@@ -307,6 +304,8 @@ public class OfferController {
                                             @RequestParam("category") String category,
                                             @RequestParam("itemLabel") String itemLabel,
                                             @RequestParam("itemName") String itemName) {
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+
         Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
 
@@ -314,10 +313,9 @@ public class OfferController {
                 .filter(a -> a.getCategory() == ProductCategory.valueOf(category) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
                 .findFirst().get();
 
-        modifyAndSave(offerId, basket -> {
-            BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
-            basket.getBasketItems().add(basketItem);
-        });
+        BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
+        basket.getBasketItems().add(basketItem);
+        save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
     }
@@ -326,27 +324,27 @@ public class OfferController {
     public String addOfferItemFromInventory(@PathVariable String offerId,
                                             @RequestParam(required = false) String itemEan,
                                             @RequestParam(required = false) String itemManufacturerCode) {
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
 
-        modifyAndSave(offerId, basket -> {
-            basket.getBasketItems().add(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
-        });
+        basket.getBasketItems().add(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
+        save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
     }
 
     @PostMapping("/dashboard/offer/{offerId}/remove-item/{index}")
     public String removeOfferItem(@PathVariable String offerId, @PathVariable int index, Model model) {
-        if (basketsRepository.findById(getStoreId(), offerId).isEmpty()) {
+        Optional<Basket> offerOpt = basketsRepository.findById(getStoreId(), offerId);
+        if (!offerOpt.isPresent()) {
             model.addAttribute("error", "Offer not found");
             return "error";
         }
-        modifyAndSave(offerId, offer -> {
-            if (index >= 0 && index < offer.getBasketItems().size()) {
-                offer.getBasketItems().remove(index);
-            }
-        });
+        Basket offer = offerOpt.get();
+        offer.getBasketItems().remove(index);
+        save(offer);
         return "redirect:/dashboard/offer/" + offerId;
     }
 
@@ -435,19 +433,6 @@ public class OfferController {
         basketsRepository.save(basket);
 
         return basket;
-    }
-
-    private void modifyAndSave(String basketId, java.util.function.Consumer<Basket> mutator) {
-        optimisticLockingExecutor.modifyAndSave(
-                () -> basketsRepository.findById(getStoreId(), basketId).orElseThrow(),
-                fresh -> {
-                    mutator.accept(fresh);
-                    if (fresh.getType() == BasketType.Offer && fresh.getSource() == null) {
-                        fresh.setSource(new OrderSource(CustomSecurityContext.getLoggedInUserName(), OrderSourceType.CallCenter));
-                    }
-                },
-                basketsRepository::save
-        );
     }
 
     private Basket.Builder offerBuilder() {

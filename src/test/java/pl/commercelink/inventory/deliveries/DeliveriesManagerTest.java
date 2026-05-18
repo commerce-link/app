@@ -1,6 +1,5 @@
 package pl.commercelink.inventory.deliveries;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,8 +14,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.time.LocalDate;
@@ -51,17 +48,9 @@ class DeliveriesManagerTest {
     private OrderAllocationsManager orderAllocationsManager;
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
-    @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private DeliveriesManager deliveriesManager;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
-    }
 
     @Test
     @DisplayName("updateDelivery propagates new estimated assembly date to all affected non-completed orders when delivery is delayed")

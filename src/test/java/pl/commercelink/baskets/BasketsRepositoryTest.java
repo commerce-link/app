@@ -4,7 +4,6 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedScanList;
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -68,34 +66,6 @@ class BasketsRepositoryTest {
         basketsRepository.deleteAllBasketsOlderThan(LocalDateTime.now());
 
         // then
-        var order = inOrder(basketsRepository);
-        order.verify(basketsRepository).delete(b1);
-        order.verify(basketsRepository).delete(b2);
-        order.verify(basketsRepository).delete(b3);
-    }
-
-    @Test
-    @DisplayName("deleteAllBasketsOlderThan continues iterating remaining baskets after one delete fails with ConditionalCheckFailedException")
-    void deleteAllBasketsOlderThanContinuesLoopAfterConditionalCheckFailedExceptionOnSingleBasket() {
-        // given
-        Basket b1 = basket("b-1");
-        Basket b2 = basket("b-2");
-        Basket b3 = basket("b-3");
-        List<Basket> baskets = Arrays.asList(b1, b2, b3);
-        when(dynamoDBMapper.scan(eq(Basket.class), any(DynamoDBScanExpression.class))).thenReturn(paginatedScanList);
-        doAnswer(invocation -> {
-            Consumer<Basket> action = invocation.getArgument(0);
-            baskets.forEach(action);
-            return null;
-        }).when(paginatedScanList).forEach(any());
-        doNothing().when(basketsRepository).delete(b1);
-        doThrow(new ConditionalCheckFailedException("concurrent modification on b2")).when(basketsRepository).delete(b2);
-        doNothing().when(basketsRepository).delete(b3);
-
-        // when (must not throw)
-        basketsRepository.deleteAllBasketsOlderThan(LocalDateTime.now());
-
-        // then — all three were attempted, including the one after the failure
         var order = inOrder(basketsRepository);
         order.verify(basketsRepository).delete(b1);
         order.verify(basketsRepository).delete(b2);

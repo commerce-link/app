@@ -17,9 +17,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -44,17 +42,13 @@ class OfferItemReloaderTest {
     @Mock
     private BasketsRepository basketsRepository;
     @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock
     private InventoryView inventoryView;
 
     @InjectMocks
     private OfferItemReloader offerItemReloader;
 
     @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
+    void setupInventory() {
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(inventoryView.findByProductCode(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
     }

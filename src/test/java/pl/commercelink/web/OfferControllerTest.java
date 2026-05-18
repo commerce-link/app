@@ -28,11 +28,9 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Collections;
 import java.util.List;
@@ -71,8 +69,6 @@ class OfferControllerTest {
     private List<OfferImporter> offerImporters;
     @Mock
     private MessageSource messageSource;
-    @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private OfferController offerController;
@@ -80,9 +76,7 @@ class OfferControllerTest {
     private MockedStatic<CustomSecurityContext> securityStub;
 
     @BeforeEach
-    void setupExecutorAndStoreId() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+    void setupStoreId() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
         securityStub.when(CustomSecurityContext::getLoggedInUserName).thenReturn("test-user");

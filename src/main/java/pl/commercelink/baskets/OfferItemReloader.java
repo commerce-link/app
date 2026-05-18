@@ -11,10 +11,8 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -25,41 +23,24 @@ public class OfferItemReloader {
     private final Inventory inventory;
     private final PricelistRepository pricelistRepository;
     private final BasketsRepository basketsRepository;
-    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
-    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, BasketsRepository basketsRepository,
-                      OptimisticLockingExecutor optimisticLockingExecutor) {
+    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, BasketsRepository basketsRepository) {
         this.inventory = inventory;
         this.pricelistRepository = pricelistRepository;
         this.basketsRepository = basketsRepository;
-        this.optimisticLockingExecutor = optimisticLockingExecutor;
     }
 
     public List<OfferItem> reload(String storeId, Basket basket) {
-        return reloadAndPersist(storeId, basket, (enabledInventory, fresh) -> {});
+        return reload(inventory.withEnabledSuppliersOnly(storeId), basket);
     }
 
     public List<OfferItem> recalculate(String storeId, Basket basket) {
-        return reloadAndPersist(storeId, basket, (enabledInventory, fresh) -> {
-            updatePrices(fresh.getBasketItems());
-            updateCosts(enabledInventory, fresh.getBasketItems());
-        });
-    }
-
-    private List<OfferItem> reloadAndPersist(String storeId, Basket basket, BiConsumer<InventoryView, Basket> preProcess) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
 
-        return optimisticLockingExecutor.modifyAndSaveReturning(
-                () -> basketsRepository.findById(storeId, basket.getBasketId()).orElseThrow(),
-                fresh -> {
-                    preProcess.accept(enabledInventory, fresh);
-                    List<OfferItem> sortedOfferItems = reload(enabledInventory, fresh);
-                    basket.setBasketItems(fresh.getBasketItems());
-                    basket.setVersion(fresh.getVersion());
-                    return sortedOfferItems;
-                },
-                basketsRepository::save
-        );
+        updatePrices(basket.getBasketItems());
+        updateCosts(enabledInventory, basket.getBasketItems());
+
+        return reload(enabledInventory, basket);
     }
 
     private List<OfferItem> reload(InventoryView inventory, Basket basket) {
@@ -72,6 +53,7 @@ public class OfferItemReloader {
                 .collect(Collectors.toList());
 
         basket.setBasketItems(newOrderedBasketItems);
+        basketsRepository.save(basket);
 
         return sortedOfferItems;
     }

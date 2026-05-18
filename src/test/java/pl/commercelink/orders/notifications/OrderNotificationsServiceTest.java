@@ -1,6 +1,5 @@
 package pl.commercelink.orders.notifications;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,11 +23,9 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -59,17 +56,9 @@ class OrderNotificationsServiceTest {
     private OrderEventsRepository orderEventsRepository;
     @Mock
     private EmailClient emailClient;
-    @Mock
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private OrderNotificationsService orderNotificationsService;
-
-    @BeforeEach
-    void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-    }
 
     @Test
     @DisplayName("send returns immediately and triggers no side effects when email notifications are disabled on the order")

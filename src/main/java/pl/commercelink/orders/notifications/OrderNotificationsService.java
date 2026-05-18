@@ -3,7 +3,6 @@ package pl.commercelink.orders.notifications;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.*;
@@ -31,9 +30,6 @@ class OrderNotificationsService {
 
     @Autowired
     private EmailClient emailClient;
-
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     void send(Order order) {
 
@@ -79,7 +75,6 @@ class OrderNotificationsService {
             }
         }
 
-        boolean reviewNotificationSent = false;
         if (qualifiesForNotification(order, OrderStatus.Delivered, EmailNotificationType.ORDER_REVIEW)) {
 
             if (order.getShipments().stream().allMatch(shipment ->
@@ -87,7 +82,11 @@ class OrderNotificationsService {
                             shipment.getDeliveredAt().isBefore(LocalDateTime.now().minusDays(2))
             )) {
                 if (sendOrderReviewEmailNotification(order)) {
-                    reviewNotificationSent = true;
+                    OrderReview review = order.getReview();
+                    review.setStatus(OrderReviewStatus.InProgress);
+                    review.setReferenceNo(order.getOrderId().split("-")[0]);
+                    review.setRequestedAt(LocalDate.now());
+
                     emailNotificationsSent.add(EmailNotificationType.ORDER_REVIEW);
                 }
             }
@@ -99,19 +98,8 @@ class OrderNotificationsService {
                 orderEventsRepository.save(event);
             }
 
-            if (reviewNotificationSent) {
-                String reviewReferenceNo = order.getOrderId().split("-")[0];
-                LocalDate today = LocalDate.now();
-                optimisticLockingExecutor.modifyAndSave(
-                        () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
-                        fresh -> {
-                            OrderReview review = fresh.getReview();
-                            review.setStatus(OrderReviewStatus.InProgress);
-                            review.setReferenceNo(reviewReferenceNo);
-                            review.setRequestedAt(today);
-                        },
-                        ordersRepository::save
-                );
+            if (emailNotificationsSent.contains(EmailNotificationType.ORDER_REVIEW)) {
+                ordersRepository.save(order);
             }
         }
 

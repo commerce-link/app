@@ -30,7 +30,6 @@ import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.api.ShippingException;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.DeliveryOption;
@@ -43,7 +42,6 @@ import pl.commercelink.web.dtos.OrderItemsForm;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Controller
@@ -72,9 +70,6 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private OrderLifecycle orderLifecycle;
-
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @Autowired
     private PricelistRepository pricelistRepository;
@@ -577,37 +572,18 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/{orderId}/updateAddressDetails")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
-        AtomicBoolean billingLocked = new AtomicBoolean();
-        AtomicBoolean mutated = new AtomicBoolean();
-
-        optimisticLockingExecutor.modifyAndSave(
-                () -> ordersRepository.findById(getStoreId(), orderId),
-                existingOrder -> {
-                    billingLocked.set(false);
-                    mutated.set(false);
-                    if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {
-                        if (existingOrder.isInvoiced()) {
-                            billingLocked.set(true);
-                            return;
-                        }
-                        existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
-                        mutated.set(true);
-                    }
-                    if ("shipping".equals(type) && updatedOrder.getShippingDetails() != null) {
-                        existingOrder.setShippingDetails(updatedOrder.getShippingDetails());
-                        mutated.set(true);
-                    }
-                },
-                order -> {
-                    if (mutated.get()) {
-                        ordersRepository.save(order);
-                    }
-                }
-        );
-
-        if (billingLocked.get()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.billing.details.locked", null, locale));
+        Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
+        if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {
+            if (existingOrder.isInvoiced()) {
+                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.billing.details.locked", null, locale));
+                return "redirect:/dashboard/orders/" + orderId;
+            }
+            existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
         }
+        if ("shipping".equals(type) && updatedOrder.getShippingDetails() != null) {
+            existingOrder.setShippingDetails(updatedOrder.getShippingDetails());
+        }
+        ordersRepository.save(existingOrder);
         return "redirect:/dashboard/orders/" + orderId;
     }
 
