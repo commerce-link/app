@@ -6,10 +6,12 @@ import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RmaGoodsInService;
 import pl.commercelink.documents.Document;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Component
 public class OrdersRMAManager {
@@ -22,12 +24,15 @@ public class OrdersRMAManager {
     private RmaGoodsInService rmaGoodsInService;
     @Autowired
     private OrderLifecycle orderLifecycle;
+    @Autowired
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public OperationResult<Document> acceptReturn(String storeId, RMA rma, List<RMAItem> rmaItems) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         List<OrderItem> newOrderItems = new ArrayList<>();
 
+        double totalToDecrement = 0;
         for (RMAItem rmaItem : rmaItems) {
             OrderItem originalItem = findOrderItemById(rmaItem.getItemId(), orderItems);
 
@@ -39,15 +44,18 @@ public class OrdersRMAManager {
                 itemToProcess = originalItem;
             }
 
-            order.decreaseTotalPrice(itemToProcess.getTotalPrice());
-            order.reopen();
+            totalToDecrement += itemToProcess.getTotalPrice();
 
-            // has to be done after decreasing total price and reopening the order
+            // has to be done after computing total price
             itemToProcess.markAsReturned();
         }
 
+        double finalTotalToDecrement = totalToDecrement;
         OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), false);
-        commitCurrentOrderChangesIfSuccess(op, order, orderItems, newOrderItems);
+        commitCurrentOrderChangesIfSuccess(op, order, fresh -> {
+            fresh.decreaseTotalPrice(finalTotalToDecrement);
+            fresh.reopen();
+        }, orderItems, newOrderItems);
         return op;
     }
 
@@ -75,7 +83,7 @@ public class OrdersRMAManager {
         }
 
         OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), itemsRequireRepair);
-        commitCurrentOrderChangesIfSuccess(op, order, orderItems, newOrderItems);
+        commitCurrentOrderChangesIfSuccess(op, order, fresh -> { }, orderItems, newOrderItems);
         commitNewOrderChangesIfSuccess(op, replacementOrder, replacementItems);
         return op;
     }
@@ -111,15 +119,22 @@ public class OrdersRMAManager {
     }
 
     private void commitCurrentOrderChangesIfSuccess(
-            OperationResult<Document> op, Order order, List<OrderItem> orderItems, List<OrderItem> newOrderItems) {
+            OperationResult<Document> op, Order order, Consumer<Order> orderMutation,
+            List<OrderItem> orderItems, List<OrderItem> newOrderItems) {
         if (op.isSuccess()) {
-            if (op.hasPayload()) {
-                order.addDocument(op.getPayload());
-            }
-
             orderItemsRepository.batchSave(orderItems);
             orderItemsRepository.batchSave(newOrderItems);
-            ordersRepository.save(order);
+
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
+                    fresh -> {
+                        orderMutation.accept(fresh);
+                        if (op.hasPayload()) {
+                            fresh.addDocumentIfMissing(op.getPayload());
+                        }
+                    },
+                    ordersRepository::save
+            );
         }
     }
 
