@@ -43,6 +43,7 @@ import pl.commercelink.web.dtos.OrderItemsForm;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Controller
@@ -576,35 +577,35 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/{orderId}/updateAddressDetails")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
-        boolean[] billingLockedHolder = new boolean[1];
-        boolean[] mutatedHolder = new boolean[1];
+        AtomicBoolean billingLocked = new AtomicBoolean();
+        AtomicBoolean mutated = new AtomicBoolean();
 
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(getStoreId(), orderId),
                 existingOrder -> {
-                    billingLockedHolder[0] = false;
-                    mutatedHolder[0] = false;
+                    billingLocked.set(false);
+                    mutated.set(false);
                     if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {
                         if (existingOrder.isInvoiced()) {
-                            billingLockedHolder[0] = true;
+                            billingLocked.set(true);
                             return;
                         }
                         existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
-                        mutatedHolder[0] = true;
+                        mutated.set(true);
                     }
                     if ("shipping".equals(type) && updatedOrder.getShippingDetails() != null) {
                         existingOrder.setShippingDetails(updatedOrder.getShippingDetails());
-                        mutatedHolder[0] = true;
+                        mutated.set(true);
                     }
                 },
                 order -> {
-                    if (mutatedHolder[0]) {
+                    if (mutated.get()) {
                         ordersRepository.save(order);
                     }
                 }
         );
 
-        if (billingLockedHolder[0]) {
+        if (billingLocked.get()) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.billing.details.locked", null, locale));
         }
         return "redirect:/dashboard/orders/" + orderId;

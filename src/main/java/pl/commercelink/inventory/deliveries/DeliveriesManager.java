@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 @Component
@@ -157,35 +158,29 @@ public class DeliveriesManager {
                 delivery.getDeliveryId(), Collections.singletonList(FulfilmentStatus.Ordered));
 
         LocalDate newDeliveryAt = delivery.getEstimatedDeliveryAt();
-        for (String orderId : orderIds) {
-            LocalDate[] oldAssemblyHolder = new LocalDate[1];
-            LocalDate[] newAssemblyHolder = new LocalDate[1];
-            boolean[] savedHolder = new boolean[1];
+        orderIds.forEach(orderId -> applyNewDeliveryDateToOrder(storeId, orderId, newDeliveryAt));
+    }
 
-            optimisticLockingExecutor.modifyAndSave(
-                    () -> ordersRepository.findById(storeId, orderId),
-                    fresh -> {
-                        savedHolder[0] = false;
-                        if (fresh.hasStatus(OrderStatus.Completed)) {
-                            return;
-                        }
-                        oldAssemblyHolder[0] = fresh.getEstimatedAssemblyAt();
-                        newAssemblyHolder[0] = fresh.updateEstimatedAssemblyAt(newDeliveryAt);
-                        savedHolder[0] = true;
-                    },
-                    order -> {
-                        if (savedHolder[0]) {
-                            ordersRepository.save(order);
-                        }
+    private void applyNewDeliveryDateToOrder(String storeId, String orderId, LocalDate newDeliveryAt) {
+        Optional<Runnable> deferredNotification = optimisticLockingExecutor.modifyAndSaveReturning(
+                () -> ordersRepository.findById(storeId, orderId),
+                fresh -> {
+                    if (fresh.hasStatus(OrderStatus.Completed)) {
+                        return Optional.<Runnable>empty();
                     }
-            );
-
-            if (savedHolder[0]
-                    && oldAssemblyHolder[0] != null
-                    && !Objects.equals(oldAssemblyHolder[0], newAssemblyHolder[0])) {
-                notificationEventPublisher.publishAssemblyDateChanged(
-                        ordersRepository.findById(storeId, orderId), oldAssemblyHolder[0]);
-            }
-        }
+                    LocalDate oldAssembly = fresh.getEstimatedAssemblyAt();
+                    LocalDate newAssembly = fresh.updateEstimatedAssemblyAt(newDeliveryAt);
+                    if (oldAssembly == null || Objects.equals(oldAssembly, newAssembly)) {
+                        return Optional.<Runnable>empty();
+                    }
+                    return Optional.of(() -> notificationEventPublisher.publishAssemblyDateChanged(fresh, oldAssembly));
+                },
+                order -> {
+                    if (!order.hasStatus(OrderStatus.Completed)) {
+                        ordersRepository.save(order);
+                    }
+                }
+        );
+        deferredNotification.ifPresent(Runnable::run);
     }
 }

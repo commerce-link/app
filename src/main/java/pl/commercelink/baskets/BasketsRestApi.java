@@ -62,15 +62,16 @@ public class BasketsRestApi {
     public ResponseEntity<Void> updateBasket(@PathVariable String storeId,
                                              @PathVariable String basketId,
                                              @RequestBody CheckoutRequest req) {
-        if (basketsRepository.findById(storeId, basketId).isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        optimisticLockingExecutor.modifyAndSave(
-                () -> basketsRepository.findById(storeId, basketId).orElseThrow(),
-                basket -> applyChanges(basket, req),
-                basketsRepository::save
-        );
-        return ResponseEntity.ok().build();
+        return basketsRepository.findById(storeId, basketId)
+                .map(existing -> {
+                    optimisticLockingExecutor.modifyAndSave(
+                            () -> basketsRepository.findById(storeId, basketId).orElseThrow(),
+                            basket -> applyChanges(basket, req),
+                            basketsRepository::save
+                    );
+                    return ResponseEntity.ok().<Void>build();
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     private void applyChanges(Basket basket, CheckoutRequest req) {

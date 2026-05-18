@@ -59,8 +59,8 @@ class DeliveriesManagerTest {
 
     @BeforeEach
     void setupExecutorPassThrough() {
-        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+        when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
     }
 
     @Test

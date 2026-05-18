@@ -14,6 +14,7 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -35,17 +36,23 @@ public class OfferItemReloader {
     }
 
     public List<OfferItem> reload(String storeId, Basket basket) {
-        return reload(inventory.withEnabledSuppliersOnly(storeId), basket);
+        return reloadAndPersist(storeId, basket, (enabledInventory, fresh) -> {});
     }
 
     public List<OfferItem> recalculate(String storeId, Basket basket) {
+        return reloadAndPersist(storeId, basket, (enabledInventory, fresh) -> {
+            updatePrices(fresh.getBasketItems());
+            updateCosts(enabledInventory, fresh.getBasketItems());
+        });
+    }
+
+    private List<OfferItem> reloadAndPersist(String storeId, Basket basket, BiConsumer<InventoryView, Basket> preProcess) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
 
         return optimisticLockingExecutor.modifyAndSaveReturning(
                 () -> basketsRepository.findById(storeId, basket.getBasketId()).orElseThrow(),
                 fresh -> {
-                    updatePrices(fresh.getBasketItems());
-                    updateCosts(enabledInventory, fresh.getBasketItems());
+                    preProcess.accept(enabledInventory, fresh);
                     List<OfferItem> sortedOfferItems = reload(enabledInventory, fresh);
                     basket.setBasketItems(fresh.getBasketItems());
                     basket.setVersion(fresh.getVersion());
