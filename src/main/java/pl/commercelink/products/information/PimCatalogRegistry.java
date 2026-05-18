@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
@@ -34,14 +33,12 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager) {
 
-        RouterFunctions.Builder routesBuilder = RouterFunctions.route();
-
         Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
 
         if (descriptorOpt.isEmpty()) {
             System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
             this.catalog = new EmptyPimCatalog();
-            this.webhookRoutes = EventBindingRegistrar.buildOrEmpty(routesBuilder);
+            this.webhookRoutes = EventBindingRegistrar.forDescriptors(List.<PimCatalogDescriptor>of()).register();
             return;
         }
 
@@ -64,16 +61,10 @@ public class PimCatalogRegistry {
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
 
-        EventBindingRegistrar.registerAll(
-                List.of(descriptor),
-                sqsAsyncClient,
-                containers,
-                routesBuilder,
-                "",
-                catalog::dispatch,
-                d -> (event, storeId, headers) -> catalog.dispatch(event));
-
-        this.webhookRoutes = EventBindingRegistrar.buildOrEmpty(routesBuilder);
+        this.webhookRoutes = EventBindingRegistrar.forDescriptors(List.of(descriptor))
+                .withQueues(sqsAsyncClient, containers, catalog::dispatch)
+                .withWebhooks("", d -> (event, storeId, headers) -> catalog.dispatch(event))
+                .register();
     }
 
     @Bean

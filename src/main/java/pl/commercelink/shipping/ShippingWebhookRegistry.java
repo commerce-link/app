@@ -53,11 +53,10 @@ public class ShippingWebhookRegistry {
         this.goodsOutEventPublisher = goodsOutEventPublisher;
         this.orderEventsRepository = orderEventsRepository;
 
-        this.routes = EventBindingRegistrar.buildWebhookRoutes(
-                shippingProviderFactory.availableProviders(),
-                "/Store/{storeId}/Webhooks/Shipping/",
-                descriptor -> (event, storeId, headers) ->
-                        processShipping((String) event, headers, storeId, descriptor.name()));
+        this.routes = EventBindingRegistrar.forDescriptors(shippingProviderFactory.availableProviders())
+                .withWebhooks("/Store/{storeId}/Webhooks/Shipping/", descriptor ->
+                        (event, storeId, headers) -> processShipping((String) event, headers, storeId, descriptor.name()))
+                .register();
     }
 
     @Bean

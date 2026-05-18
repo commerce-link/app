@@ -41,11 +41,10 @@ public class PaymentWebhookRegistry {
         this.basketsRepository = basketsRepository;
         this.ordersManager = ordersManager;
 
-        this.routes = EventBindingRegistrar.buildWebhookRoutes(
-                paymentProviderFactory.availableProviders(),
-                "/Store/{storeId}/Webhooks/Payments/",
-                descriptor -> (event, storeId, headers) ->
-                        processPayment((String) event, headers, storeId, descriptor));
+        this.routes = EventBindingRegistrar.forDescriptors(paymentProviderFactory.availableProviders())
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", descriptor ->
+                        (event, storeId, headers) -> processPayment((String) event, headers, storeId, descriptor))
+                .register();
     }
 
     @Bean

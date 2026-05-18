@@ -8,7 +8,6 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.provider.api.EventBinding;
@@ -31,26 +30,20 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingRoutesPostAndPassesRawPayloadHeadersAndStoreId() throws Exception {
-        RouterFunctions.Builder builder = RouterFunctions.route();
-
         AtomicReference<Object> capturedEvent = new AtomicReference<>();
         AtomicReference<String> capturedStoreId = new AtomicReference<>();
         AtomicReference<Map<String, String>> capturedHeaders = new AtomicReference<>();
 
-        EventBindingRegistrar.register(
-                new WebhookBinding<>("stripe", String.class),
-                null,
-                null,
-                builder,
-                "/Store/{storeId}/Webhooks/Payments/",
-                null,
-                (event, storeId, headers) -> {
-                    capturedEvent.set(event);
-                    capturedStoreId.set(storeId);
-                    capturedHeaders.set(headers);
-                });
-
-        RouterFunction<ServerResponse> routes = builder.build();
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(new TestDescriptor("stripe",
+                        List.of(new WebhookBinding<>("stripe", String.class)))))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", descriptor ->
+                        (event, storeId, headers) -> {
+                            capturedEvent.set(event);
+                            capturedStoreId.set(storeId);
+                            capturedHeaders.set(headers);
+                        })
+                .register();
 
         String rawPayload = "{\"id\":\"evt_123\",\"type\":\"payment_intent.succeeded\"}";
         MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/store-abc/Webhooks/Payments/stripe");
@@ -68,12 +61,12 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingDoesNotMatchUnregisteredPath() throws Exception {
-        RouterFunctions.Builder builder = RouterFunctions.route();
-        EventBindingRegistrar.register(
-                new WebhookBinding<>("stripe", String.class),
-                null, null, builder, "/Store/{storeId}/Webhooks/Payments/", null,
-                (event, storeId, headers) -> { });
-        RouterFunction<ServerResponse> routes = builder.build();
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(new TestDescriptor("stripe",
+                        List.of(new WebhookBinding<>("stripe", String.class)))))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", d ->
+                        (event, storeId, headers) -> { })
+                .register();
 
         MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/x/Webhooks/Payments/unknown");
         ServerRequest req = ServerRequest.create(http, messageConverters);
@@ -82,20 +75,19 @@ class EventBindingRegistrarTest {
     }
 
     @Test
-    void webhookHandlerThrowingExceptionPropagatesAsRuntime() throws Exception {
-        RouterFunctions.Builder builder = RouterFunctions.route();
-        EventBindingRegistrar.register(
-                new WebhookBinding<>("paynow", String.class),
-                null, null, builder, "/Store/{storeId}/Webhooks/Payments/", null,
-                (event, storeId, headers) -> { throw new RuntimeException("provider boom"); });
-        RouterFunction<ServerResponse> routes = builder.build();
+    void webhookHandlerThrowingExceptionPropagatesAsRuntime() {
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(new TestDescriptor("paynow",
+                        List.of(new WebhookBinding<>("paynow", String.class)))))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", d ->
+                        (event, storeId, headers) -> { throw new RuntimeException("provider boom"); })
+                .register();
 
         MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s/Webhooks/Payments/paynow");
         http.setContent("{}".getBytes());
         ServerRequest req = ServerRequest.create(http, messageConverters);
 
-        ServerRequest finalReq = req;
-        assertThatThrownBy(() -> routes.route(finalReq).orElseThrow().handle(finalReq))
+        assertThatThrownBy(() -> routes.route(req).orElseThrow().handle(req))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to process webhook from /Store/{storeId}/Webhooks/Payments/paynow");
     }
@@ -105,75 +97,68 @@ class EventBindingRegistrarTest {
         SqsAsyncClient sqsClient = Mockito.mock(SqsAsyncClient.class);
         List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
 
-        EventBindingRegistrar.register(
-                new QueueBinding<>("pim-entry-added-queue", String.class),
-                sqsClient,
-                containers,
-                null,
-                "",
-                event -> { },
-                null);
+        EventBindingRegistrar
+                .forDescriptors(List.of(new TestDescriptor("pim",
+                        List.of(new QueueBinding<>("pim-entry-added-queue", String.class)))))
+                .withQueues(sqsClient, containers, event -> { })
+                .register();
 
         assertThat(containers).hasSize(1);
         assertThat(containers.get(0).getQueueNames()).containsExactly("pim-entry-added-queue");
     }
 
     @Test
-    void queueBindingWithoutSqsClientThrowsIllegalState() {
-        EventBinding<?> binding = new QueueBinding<>("orphan-queue", String.class);
-        List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
+    void queueBindingWithoutWithQueuesThrowsIllegalState() {
+        TestDescriptor descriptor = new TestDescriptor("pim",
+                List.of(new QueueBinding<>("orphan-queue", String.class)));
 
-        assertThatThrownBy(() -> EventBindingRegistrar.register(
-                binding, null, containers, null, "", event -> { }, null))
+        assertThatThrownBy(() -> EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .register())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("orphan-queue");
     }
 
     @Test
-    void queueBindingWithoutContainerListThrowsIllegalState() {
-        EventBinding<?> binding = new QueueBinding<>("orphan-queue", String.class);
+    void webhookBindingWithoutWithWebhooksThrowsIllegalState() {
+        TestDescriptor descriptor = new TestDescriptor("stripe",
+                List.of(new WebhookBinding<>("orphan", String.class)));
 
-        assertThatThrownBy(() -> EventBindingRegistrar.register(
-                binding, null, null, null, "", null, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("orphan-queue");
-    }
-
-    @Test
-    void webhookBindingWithoutRoutesBuilderThrowsIllegalState() {
-        EventBinding<?> binding = new WebhookBinding<>("orphan", String.class);
-
-        assertThatThrownBy(() -> EventBindingRegistrar.register(
-                binding, null, null, null, "", null, null))
+        assertThatThrownBy(() -> EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .register())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("orphan");
     }
 
     @Test
-    void buildOrEmptyReturnsNoopRouterWhenBuilderHasNoRoutes() throws Exception {
-        RouterFunction<ServerResponse> empty = EventBindingRegistrar.buildOrEmpty(RouterFunctions.route());
+    void emptyDescriptorsReturnsNoopRouter() throws Exception {
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.<TestDescriptor>of())
+                .register();
 
         MockHttpServletRequest http = new MockHttpServletRequest("GET", "/anything");
         ServerRequest req = ServerRequest.create(http, messageConverters);
 
-        assertThat(empty.route(req)).isEmpty();
+        assertThat(routes.route(req)).isEmpty();
     }
 
     @Test
-    void buildWebhookRoutesRegistersAllDescriptorsAndPassesDescriptorToHandler() throws Exception {
+    void registerPassesDescriptorToWebhookHandlerFactory() throws Exception {
         TestDescriptor stripe = new TestDescriptor("stripe", List.of(new WebhookBinding<>("stripe", String.class)));
         TestDescriptor paynow = new TestDescriptor("paynow", List.of(new WebhookBinding<>("paynow", String.class)));
 
         AtomicReference<String> capturedFromStripe = new AtomicReference<>();
         AtomicReference<String> capturedFromPaynow = new AtomicReference<>();
 
-        RouterFunction<ServerResponse> routes = EventBindingRegistrar.buildWebhookRoutes(
-                List.of(stripe, paynow),
-                "/Store/{storeId}/Webhooks/Payments/",
-                descriptor -> (event, storeId, headers) -> {
-                    if (descriptor.name().equals("stripe")) capturedFromStripe.set((String) event);
-                    else capturedFromPaynow.set((String) event);
-                });
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(stripe, paynow))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", descriptor ->
+                        (event, storeId, headers) -> {
+                            if (descriptor.name().equals("stripe")) capturedFromStripe.set((String) event);
+                            else capturedFromPaynow.set((String) event);
+                        })
+                .register();
 
         invokePost(routes, "/Store/s/Webhooks/Payments/stripe", "from-stripe");
         invokePost(routes, "/Store/s/Webhooks/Payments/paynow", "from-paynow");
@@ -183,43 +168,26 @@ class EventBindingRegistrarTest {
     }
 
     @Test
-    void registerAllSupportsMixedQueueAndWebhookBindings() {
+    void mixedQueueAndWebhookBindingsRegisterBothAndReturnRealRouter() throws Exception {
         TestDescriptor pim = new TestDescriptor("pim", List.of(
                 new QueueBinding<>("pim-entry-added-queue", String.class),
                 new WebhookBinding<>("pim", String.class)));
 
         SqsAsyncClient sqsClient = Mockito.mock(SqsAsyncClient.class);
         List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
-        RouterFunctions.Builder builder = RouterFunctions.route();
 
-        EventBindingRegistrar.registerAll(
-                List.of(pim),
-                sqsClient,
-                containers,
-                builder,
-                "",
-                event -> { },
-                descriptor -> (event, storeId, headers) -> { });
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(pim))
+                .withQueues(sqsClient, containers, event -> { })
+                .withWebhooks("", d -> (event, storeId, headers) -> { })
+                .register();
 
         assertThat(containers).hasSize(1);
         assertThat(containers.get(0).getQueueNames()).containsExactly("pim-entry-added-queue");
-        assertThat(EventBindingRegistrar.buildOrEmpty(builder)).isNotNull();
-    }
 
-    @Test
-    void buildOrEmptyReturnsRealRouterWhenBuilderHasRoutes() throws Exception {
-        RouterFunctions.Builder builder = RouterFunctions.route();
-        EventBindingRegistrar.register(
-                new WebhookBinding<>("furgonetka", String.class),
-                null, null, builder, "/Store/{storeId}/Webhooks/Shipping/", null,
-                (event, storeId, headers) -> { });
-
-        RouterFunction<ServerResponse> routes = EventBindingRegistrar.buildOrEmpty(builder);
-
-        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s/Webhooks/Shipping/furgonetka");
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/pim");
         http.setContent("{}".getBytes());
         ServerRequest req = ServerRequest.create(http, messageConverters);
-
         assertThat(routes.route(req)).isPresent();
     }
 
