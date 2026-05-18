@@ -62,6 +62,9 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     }
 
     public List<OrderItem> findByOrderIdAndStatuses(String orderId, List<FulfilmentStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":orderId", new AttributeValue().withS(orderId));
 
@@ -77,6 +80,9 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     }
 
     public List<String> findByDeliveryIdAndStatuses(String deliveryId, List<FulfilmentStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":deliveryId", new AttributeValue().withS(deliveryId));
 
@@ -107,6 +113,9 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     }
 
     public OrderItem findBySerialNoAndStatuses(String serialNo, List<FulfilmentStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":serialNo", new AttributeValue().withS(serialNo));
 
