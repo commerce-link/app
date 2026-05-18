@@ -6,8 +6,6 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.products.ProductRepository;
@@ -27,7 +25,6 @@ public class PimCatalogRegistry {
 
     private final PimCatalog catalog;
     private final List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
-    private final RouterFunction<ServerResponse> webhookRoutes;
 
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
@@ -38,7 +35,6 @@ public class PimCatalogRegistry {
         if (descriptorOpt.isEmpty()) {
             System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
             this.catalog = new EmptyPimCatalog();
-            this.webhookRoutes = EventBindingRegistrar.forDescriptors(List.<PimCatalogDescriptor>of()).register();
             return;
         }
 
@@ -61,20 +57,14 @@ public class PimCatalogRegistry {
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
 
-        this.webhookRoutes = EventBindingRegistrar.forDescriptors(List.of(descriptor))
+        EventBindingRegistrar.forDescriptors(List.of(descriptor))
                 .withQueues(sqsAsyncClient, containers, catalog::dispatch)
-                .withWebhooks("", d -> (event, storeId, headers) -> catalog.dispatch(event))
                 .register();
     }
 
     @Bean
     PimCatalog pimCatalog() {
         return catalog;
-    }
-
-    @Bean
-    RouterFunction<ServerResponse> pimWebhookRoutes() {
-        return webhookRoutes;
     }
 
     @PostConstruct
