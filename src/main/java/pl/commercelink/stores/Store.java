@@ -30,6 +30,8 @@ public class Store {
     private InvoicingConfiguration invoicingConfiguration;
     @DynamoDBAttribute(attributeName = "marketplaces")
     private List<MarketplaceIntegration> marketplaces = new LinkedList<>();
+    @DynamoDBAttribute(attributeName = "payments")
+    private List<PaymentIntegration> payments = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "notifications")
     private List<StoreNotification> notifications = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "bankAccounts")
@@ -147,6 +149,56 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public Optional<PaymentIntegration> getDefaultPaymentIntegration() {
+        return payments.stream().filter(PaymentIntegration::is_default).findFirst();
+    }
+
+    @DynamoDBIgnore
+    public PaymentIntegration getPaymentIntegration(String paymentName) {
+        return payments.stream()
+                .filter(p -> paymentName.equals(p.getName()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @DynamoDBIgnore
+    public PaymentIntegration getPaymentIntegrationOrDefault(String paymentOptionId) {
+        if (isBlank(paymentOptionId)) {
+            return getDefaultPaymentIntegration()
+                    .orElseThrow(() -> new IllegalStateException("No default payment provider configured for store: " + storeId));
+        }
+        PaymentIntegration integration = getPaymentIntegration(paymentOptionId);
+        if (integration == null) {
+            throw new IllegalStateException("Payment integration not found: " + paymentOptionId);
+        }
+        return integration;
+    }
+
+    @DynamoDBIgnore
+    public void addPaymentIntegration(String paymentName) {
+        if (getPaymentIntegration(paymentName) != null) {
+            return;
+        }
+        boolean isFirst = payments.isEmpty();
+        payments.add(new PaymentIntegration(paymentName, isFirst));
+    }
+
+    @DynamoDBIgnore
+    public void setDefaultPaymentIntegration(String paymentName) {
+        payments.forEach(p -> p.set_default(paymentName.equals(p.getName())));
+    }
+
+    @DynamoDBIgnore
+    public void removePaymentIntegration(String paymentName) {
+        boolean wasDefault = payments.stream()
+                .anyMatch(p -> paymentName.equals(p.getName()) && p.is_default());
+        payments.removeIf(p -> paymentName.equals(p.getName()));
+        if (wasDefault && !payments.isEmpty()) {
+            payments.get(0).set_default(true);
+        }
+    }
+
+    @DynamoDBIgnore
     public void setConfigurationValue(IntegrationType type, String value) {
         integrations.removeIf(config -> config.getType() == type);
         integrations.add(new Integration(type, value));
@@ -207,6 +259,14 @@ public class Store {
 
     public void setMarketplaces(List<MarketplaceIntegration> marketplaces) {
         this.marketplaces = marketplaces;
+    }
+
+    public List<PaymentIntegration> getPayments() {
+        return payments;
+    }
+
+    public void setPayments(List<PaymentIntegration> payments) {
+        this.payments = payments;
     }
 
     public List<StoreNotification> getNotifications() {

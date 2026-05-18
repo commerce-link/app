@@ -11,6 +11,7 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentLineItem;
+import pl.commercelink.payments.api.PaymentLink;
 import pl.commercelink.payments.api.PaymentRequest;
 import pl.commercelink.payments.api.PaymentShippingItem;
 import pl.commercelink.pricelist.Pricelist;
@@ -66,19 +67,19 @@ public class Checkout {
 
         Basket basket = createBasket(req, store, results);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, null));
+        return new CheckoutResponse(createPaymentLink(store, basket, null, req.getPaymentOptionId()));
     }
 
-    public CheckoutResponse create(String storeId, String basketId) {
+    public CheckoutResponse create(String storeId, String basketId, String paymentOptionId) {
         Store store = storesRepository.findById(storeId);
         Basket basket = basketsRepository.findById(storeId, basketId).orElseThrow(() -> new IllegalStateException("Basket not found"));
 
         String offerUrl = basket.createOfferUrl(appDomain);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl));
+        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, paymentOptionId));
     }
 
-    private String createPaymentLink(Store store, Basket basket, String cancelUrlOverride) {
+    private PaymentLink createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {
         CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         PaymentRequest paymentRequest = new PaymentRequest(
@@ -91,7 +92,9 @@ public class Checkout {
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
 
-        return paymentProviderFactory.get(store).createPaymentLink(paymentRequest);
+        String providerName = store.getPaymentIntegrationOrDefault(paymentOptionId).getName();
+
+        return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
     }
 
     private List<PaymentLineItem> buildPaymentLineItems(Store store, Basket basket) {

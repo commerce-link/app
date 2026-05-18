@@ -10,8 +10,6 @@ import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.util.Map;
-
 @Service
 public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProviderDescriptor, MarketplaceProvider> {
 
@@ -21,16 +19,6 @@ public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProvi
                                       StoresRepository storesRepository) {
         super(MarketplaceProviderDescriptor.class, configurationManager,
                 credentialStore, tokenStore, storesRepository);
-    }
-
-    public MarketplaceProvider get(Store store, String marketplaceName) {
-        MarketplaceProviderDescriptor descriptor = getDescriptor(marketplaceName);
-        if (descriptor == null) {
-            return null;
-        }
-        Map<String, String> config = loadConfiguration(store, marketplaceName);
-        Map<String, Object> context = buildContext(store, descriptor, config);
-        return descriptor.create(config, context);
     }
 
     @Override

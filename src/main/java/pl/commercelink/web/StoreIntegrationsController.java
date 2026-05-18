@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
@@ -65,7 +66,7 @@ public class StoreIntegrationsController {
         switch (providerType) {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
-            case "payments" -> store.setConfigurationValue(IntegrationType.PAYMENT_PROVIDER, providerName);
+            case "payments" -> store.addPaymentIntegration(providerName);
             case "marketplace" -> {
                 MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
                 if (integration == null) {
@@ -103,13 +104,32 @@ public class StoreIntegrationsController {
         switch (providerType) {
             case "shipping" -> store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
             case "invoicing" -> store.removeIntegration(IntegrationType.INVOICING_PROVIDER);
-            case "payments" -> store.removeIntegration(IntegrationType.PAYMENT_PROVIDER);
+            case "payments" -> store.removePaymentIntegration(providerName);
             case "marketplace" -> store.removeMarketplaceIntegration(providerName);
         }
 
         storesRepository.save(store);
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.disconnect.success", null, locale));
+        return redirectToIntegrationSettings(providerType, store.getStoreId());
+    }
+
+    @PostMapping("/dashboard/store/integrations/default")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String setDefaultIntegration(@RequestParam String providerType,
+                                        @RequestParam String providerName,
+                                        Locale locale,
+                                        RedirectAttributes redirectAttributes) {
+        if (!"payments".equals(providerType)) {
+            throw new IllegalArgumentException("Default selection not supported for provider type: " + providerType);
+        }
+
+        Store store = storesRepository.findById(CustomSecurityContext.getStoreId());
+        store.setDefaultPaymentIntegration(providerName);
+        storesRepository.save(store);
+
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("store.integrations.default.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
     }
 

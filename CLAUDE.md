@@ -135,6 +135,8 @@ See `QUEUE_NAMES.md` for the full migration plan with current → proposed name 
 
 The system is organized around `Store` entities. Each store has independent product catalogs, enabled suppliers, service provider configuration (payment/shipping/invoicing), branding, and RMA settings.
 
+Shipping, invoicing and WMS providers are single-instance per store (selected provider stored as a single `Integration` entry in `Store.integrations`, keyed by `IntegrationType`). Marketplace and payment integrations are multi-instance — a store can connect any number of them via `Store.marketplaces` (`List<MarketplaceIntegration>`) and `Store.payments` (`List<PaymentIntegration>`). Payment integrations carry a `default` flag and exactly one is treated as the store's default (used by `Checkout` for now); `Store.getDefaultPaymentIntegration()` resolves it.
+
 ### DynamoDB Tables
 
 All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annotations. Repositories extend `DynamoDbRepository<T>`.

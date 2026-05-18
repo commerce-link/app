@@ -29,6 +29,8 @@ public class CheckoutRequest {
     private boolean sendInvoice;
     @JsonProperty("deliveryOptionId")
     private String deliveryOptionId;
+    @JsonProperty("paymentOptionId")
+    private String paymentOptionId;
 
     @JsonIgnore
     public Collection<String> getCatalogIds() {
@@ -99,5 +101,9 @@ public class CheckoutRequest {
 
     public String getDeliveryOptionId() {
         return deliveryOptionId;
+    }
+
+    public String getPaymentOptionId() {
+        return paymentOptionId;
     }
 }
