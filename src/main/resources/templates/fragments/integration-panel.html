@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="panel(connectedIntegrations, providers, selectedProviderName, selectLabel, providerConfiguration, providerType, storeId)">
+<div th:fragment="panel(connectedIntegrations, providers, selectedProviderName, selectLabel, providerConfiguration, providerType, storeId, showDefault)">
 
     <div th:if="${!connectedIntegrations.isEmpty()}" class="box">
         <table class="table is-fullwidth is-striped">
@@ -10,6 +10,7 @@
                 <tr>
                     <th th:text="#{store.integrations.provider.name}"></th>
                     <th th:text="#{store.marketplaces.status}"></th>
+                    <th th:if="${showDefault}" th:text="#{store.integrations.default}"></th>
                     <th th:text="#{general.actions}"></th>
                 </tr>
             </thead>
@@ -19,6 +20,14 @@
                     <td>
                         <span class="tag is-success" th:if="${integration.connected}" th:text="#{store.marketplaces.connected}"></span>
                         <span class="tag is-danger" th:unless="${integration.connected}" th:text="#{store.marketplaces.disconnected}"></span>
+                    </td>
+                    <td th:if="${showDefault}">
+                        <span class="tag is-info" th:if="${integration.isDefault}" th:text="#{store.integrations.default}"></span>
+                        <form th:if="${!integration.isDefault}" th:action="@{/dashboard/store/integrations/default}" method="post" style="display:inline;">
+                            <input type="hidden" name="providerType" th:value="${providerType}"/>
+                            <input type="hidden" name="providerName" th:value="${integration.name}"/>
+                            <button type="submit" class="button is-small is-info is-outlined" th:text="#{store.integrations.set.default}"></button>
+                        </form>
                     </td>
                     <td>
                         <form th:action="@{/dashboard/store/integrations/disconnect}" method="post">

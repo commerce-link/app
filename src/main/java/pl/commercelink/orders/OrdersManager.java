@@ -185,6 +185,55 @@ public class OrdersManager {
         return new Result(order, orderItems);
     }
 
+    public Order splitOrder(String storeId, String orderId, List<String> orderItemIds) {
+        Order original = ordersRepository.findById(storeId, orderId);
+
+        if (!original.canBeSplit()) {
+            throw new IllegalStateException("split.order.invalid.state");
+        }
+        if (orderItemIds == null || orderItemIds.isEmpty()) {
+            throw new IllegalStateException("split.order.no.items");
+        }
+
+        List<OrderItem> originalItems = orderItemsRepository.findByOrderId(original.getOrderId());
+        List<OrderItem> selectedItems = originalItems.stream()
+                .filter(i -> orderItemIds.contains(i.getItemId()))
+                .toList();
+
+        if (selectedItems.isEmpty()) {
+            throw new IllegalStateException("split.order.no.items");
+        }
+        if (selectedItems.size() >= originalItems.size()) {
+            throw new IllegalStateException("split.order.all.items");
+        }
+        if (selectedItems.stream().anyMatch(i -> !i.isNew())) {
+            throw new IllegalStateException("split.order.items.have.fulfilment");
+        }
+
+        Order newOrder = original.createSplit();
+        ordersRepository.save(newOrder);
+
+        double movedTotal = 0;
+        for (OrderItem source : selectedItems) {
+            OrderItem moved = new OrderItem(newOrder.getOrderId(), source, source.getQty());
+            orderItemsRepository.save(moved);
+            orderItemsRepository.delete(source);
+
+            movedTotal += source.getTotalPrice();
+        }
+
+        newOrder.setTotalPrice(movedTotal);
+        original.decreaseTotalPrice(movedTotal);
+
+        ordersRepository.save(newOrder);
+        ordersRepository.save(original);
+
+        orderLifecycle.update(newOrder);
+        orderLifecycle.update(original);
+
+        return newOrder;
+    }
+
     public void deleteOrder(String storeId, String orderId) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);

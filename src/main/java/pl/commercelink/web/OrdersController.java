@@ -327,6 +327,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("isNewOrder", order.getStatus() == OrderStatus.New);
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
+        model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
@@ -527,6 +528,20 @@ public class OrdersController extends BaseController {
     public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form, Model model) {
         OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
         return showOrderDetails(result.getOrder(), result.getOrderItems(), null, model);
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/splitOrder")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String splitOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                             RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            Order newOrder = ordersManager.splitOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
+            return "redirect:/dashboard/orders/" + newOrder.getOrderId();
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
     }
 
     @PostMapping("/dashboard/orders/{orderId}/updateSerialNumbers")

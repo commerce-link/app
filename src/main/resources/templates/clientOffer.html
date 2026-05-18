@@ -42,6 +42,57 @@
                 display: none !important;
             }
         }
+
+        .payment-method-card {
+            display: block;
+            position: relative;
+            cursor: pointer;
+            padding: 1rem;
+            border: 1px solid #dbdbdb;
+            border-radius: 6px;
+            background-color: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+            height: 100%;
+        }
+
+        .payment-method-card:hover {
+            border-color: #b5b5b5;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .payment-method-card input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .payment-method-card.is-selected,
+        .payment-method-card:has(input[type="radio"]:checked) {
+            border-width: 2px;
+            border-color: var(--payment-primary-color, #485fc7);
+            padding: calc(1rem - 1px);
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+
+        .payment-method-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .payment-method-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .payment-method-name {
+            font-weight: 600;
+        }
+
+        .payment-method-recommended {
+            align-self: flex-start;
+        }
     </style>
 
     <div th:if="${offer.expired}" class="notification is-danger" style="margin: 2rem auto; padding: 2rem; border-radius: 12px; text-align: center; max-width: 500px;">
@@ -299,12 +350,39 @@
                 </div>
 
                 <div th:if="${submitted && !isSplitPaymentRequired}">
-<!--                <div th:if="${submitted && store.hasIntegration(T(pl.commercelink.stores.IntegrationType).PAYMENT_PROVIDER)}">-->
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
+
+                        <div th:if="${#lists.size(paymentOptions) > 1}" class="box payment-method-box"
+                             th:style="'padding: 1.5rem; margin-top: 1rem; --payment-primary-color:' + ${branding.primaryColor}">
+                            <p class="label" th:text="#{offer.payment.method.title}"></p>
+                            <div class="columns is-multiline is-mobile is-variable is-2">
+                                <div class="column is-half" th:each="option : ${paymentOptions}">
+                                    <label class="payment-method-card"
+                                           th:classappend="${option.name() == defaultPaymentOption} ? 'is-selected' : ''">
+                                        <input type="radio" name="paymentOptionId"
+                                               th:value="${option.name()}"
+                                               th:checked="${option.name() == defaultPaymentOption}" />
+                                        <span class="payment-method-card-body">
+                                            <span class="payment-method-card-header">
+                                                <span class="icon"><i class="fas fa-credit-card"></i></span>
+                                                <span class="payment-method-name" th:text="${option.displayName()}"></span>
+                                            </span>
+                                            <span class="tag is-light is-small payment-method-recommended"
+                                                  th:if="${option.isDefault()}"
+                                                  th:text="#{offer.payment.method.recommended}"></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <button type="submit" class="button is-primary"
-                                th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%;'">
+                                th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%; margin-top: 1rem;'">
                             <span th:text="#{offer.payment.btn.text}">Order and pay</span>
                         </button>
+
+                        <p class="is-size-7 has-text-grey mt-2 has-text-centered"
+                           th:text="#{offer.payment.one.time.notice}"></p>
                     </form>
                 </div>
 
@@ -319,6 +397,15 @@
     </div>
     
     <script>
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.matches('input[type="radio"][name="paymentOptionId"]')) {
+                document.querySelectorAll('.payment-method-card').forEach(function (card) {
+                    var input = card.querySelector('input[type="radio"][name="paymentOptionId"]');
+                    card.classList.toggle('is-selected', !!input && input.checked);
+                });
+            }
+        });
+
         function copyBillingDetailsIfNeeded() {
             if (!document.getElementById('differentShippingAddress').checked) {
                 document.getElementById('shippingName').value = document.getElementById('billingName').value;

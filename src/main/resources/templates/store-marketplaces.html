@@ -11,7 +11,7 @@
 
             <h1 class="title" th:text="#{store.marketplaces.configuration}"></h1>
 
-            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId})}"></div>
+            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId}, false)}"></div>
 
         </div>
     </section>
