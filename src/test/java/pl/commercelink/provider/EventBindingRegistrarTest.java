@@ -31,7 +31,7 @@ class EventBindingRegistrarTest {
     private final List<HttpMessageConverter<?>> messageConverters = List.of(new StringHttpMessageConverter());
 
     @Test
-    void webhookBindingExecutorReceivesRawPayloadStoreIdHeadersAndProviderConfig() throws Exception {
+    void webhookBindingExecutorReceivesRawPayloadHeadersAndProviderConfig() throws Exception {
         AtomicReference<String> capturedEvent = new AtomicReference<>();
         AtomicReference<WebhookContext> capturedContext = new AtomicReference<>();
         AtomicReference<String> capturedResult = new AtomicReference<>();
@@ -67,7 +67,6 @@ class EventBindingRegistrarTest {
 
         assertThat(response.statusCode().value()).isEqualTo(200);
         assertThat(capturedEvent.get()).isEqualTo("raw-body");
-        assertThat(capturedContext.get().storeId()).isEqualTo("store-7");
         assertThat(capturedContext.get().headers()).containsEntry("Signature", "abc");
         assertThat(capturedContext.get().providerConfig()).containsEntry("signingSecret", "secret-for-store-7");
         assertThat(capturedDescriptor.get()).isSameAs(descriptor);

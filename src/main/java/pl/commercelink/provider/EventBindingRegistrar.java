@@ -136,7 +136,7 @@ public final class EventBindingRegistrar {
                             ? (T) body
                             : OBJECT_MAPPER.readValue(body, binding.eventType());
                     Map<String, String> providerConfig = webhookConfigLoader.apply(descriptor, storeId);
-                    WebhookContext ctx = new WebhookContext(storeId, headers, providerConfig);
+                    WebhookContext ctx = new WebhookContext(headers, providerConfig);
                     R result = executor.execute(event, ctx);
                     ((ResultHandler<D, R>) (ResultHandler<D, ?>) webhookResultHandler).handle(descriptor, storeId, result);
                     return ServerResponse.ok().build();

@@ -25,7 +25,6 @@ import java.util.Optional;
 @Configuration
 public class ShippingWebhookRegistry {
 
-    private final ShippingProviderFactory shippingProviderFactory;
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
     private final OrderLifecycle orderLifecycle;
@@ -41,7 +40,6 @@ public class ShippingWebhookRegistry {
                             RMARepository rmaRepository,
                             GoodsOutEventPublisher goodsOutEventPublisher,
                             OrderEventsRepository orderEventsRepository) {
-        this.shippingProviderFactory = shippingProviderFactory;
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
         this.orderLifecycle = orderLifecycle;
