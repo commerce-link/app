@@ -17,7 +17,6 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.warehouse.api.GoodsOutItem;
 import pl.commercelink.warehouse.api.GoodsOutRequest;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.Warehouse;
 
@@ -33,22 +32,19 @@ class GoodsOutService {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
     private final InvoicingProviderFactory invoicingProviderFactory;
-    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     GoodsOutService(
             OrdersRepository ordersRepository,
             OrderItemsRepository orderItemsRepository,
             Warehouse warehouse,
             StoresRepository storesRepository,
-            InvoicingProviderFactory invoicingProviderFactory,
-            OptimisticLockingExecutor optimisticLockingExecutor
+            InvoicingProviderFactory invoicingProviderFactory
     ) {
         this.ordersRepository = ordersRepository;
         this.orderItemsRepository = orderItemsRepository;
         this.warehouse = warehouse;
         this.storesRepository = storesRepository;
         this.invoicingProviderFactory = invoicingProviderFactory;
-        this.optimisticLockingExecutor = optimisticLockingExecutor;
     }
 
     OperationResult<Document> issueGoodsOut(Order order, String createdBy) {
@@ -113,15 +109,8 @@ class GoodsOutService {
 
         if (result.hasPayload()) {
             Document document = result.getPayload();
-            optimisticLockingExecutor.modifyAndSave(
-                    () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
-                    fresh -> {
-                        if (fresh.getDocumentByType(DocumentType.GoodsIssue).isEmpty()) {
-                            fresh.getDocuments().add(document);
-                        }
-                    },
-                    ordersRepository::save
-            );
+            order.getDocuments().add(document);
+            ordersRepository.save(order);
             return OperationResult.success(document);
         }
 
