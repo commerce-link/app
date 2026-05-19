@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
@@ -119,6 +120,12 @@ public class BasketsRepository extends DynamoDbRepository<Basket> {
                 .withExpressionAttributeNames(expressionAttributeNames);
 
         List<Basket> oldBaskets = dynamoDBMapper.scan(Basket.class, scanExpression);
-        oldBaskets.forEach(this::delete);
+        oldBaskets.forEach(basket -> {
+            try {
+                delete(basket);
+            } catch (ConditionalCheckFailedException e) {
+                // Concurrent modification — next cleanup tick will re-evaluate this basket.
+            }
+        });
     }
 }
