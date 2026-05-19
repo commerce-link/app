@@ -14,7 +14,6 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.Store;
@@ -54,9 +53,6 @@ public class InvoicingService {
 
     @Autowired
     private MessageSource messageSource;
-
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     public OperationResult createProforma(Basket basket, Locale locale, boolean send) {
         Store store = storesRepository.findById(basket.getStoreId());
@@ -118,17 +114,10 @@ public class InvoicingService {
             return op;
         }
 
-        Document invoiceDocument = new Document(op.getInvoiceId(), op.getInvoiceNo(), op.getInvoiceUrl(), documentType);
-        Order saved = optimisticLockingExecutor.modifyAndSaveReturning(
-                () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
-                fresh -> {
-                    fresh.addDocumentIfMissing(invoiceDocument);
-                    return fresh;
-                },
-                ordersRepository::save
-        );
+        order.addDocument(new Document(op.getInvoiceId(), op.getInvoiceNo(), op.getInvoiceUrl(), documentType));
+        ordersRepository.save(order);
 
-        orderLifecycleEventPublisher.publish(saved, OrderLifecycleEventType.InvoiceCreated);
+        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.InvoiceCreated);
 
         return op;
     }
