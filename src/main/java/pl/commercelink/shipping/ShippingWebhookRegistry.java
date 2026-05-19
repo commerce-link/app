@@ -1,71 +1,70 @@
 package pl.commercelink.shipping;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.rma.RMA;
-import pl.commercelink.orders.rma.RMARepository;
-import pl.commercelink.orders.rma.RMAStatus;
-import pl.commercelink.shipping.api.ShippingProvider;
-import pl.commercelink.shipping.api.ShippingWebhookRequest;
-import pl.commercelink.shipping.api.ShippingWebhookResult;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.orders.rma.RMARepository;
+import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.provider.EventBindingRegistrar;
+import pl.commercelink.shipping.api.ShippingWebhookResult;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
-import pl.commercelink.web.dtos.StatusDto;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
-@RestController
-@RequestMapping("/Store/{storeId}/Webhooks/Shipping")
-public class ShippingWebhookController {
+@Configuration
+public class ShippingWebhookRegistry {
 
-    @Autowired
-    private StoresRepository storesRepository;
+    private final StoresRepository storesRepository;
+    private final OrdersRepository ordersRepository;
+    private final OrderLifecycle orderLifecycle;
+    private final RMARepository rmaRepository;
+    private final GoodsOutEventPublisher goodsOutEventPublisher;
+    private final OrderEventsRepository orderEventsRepository;
+    private final RouterFunction<ServerResponse> routes;
 
-    @Autowired
-    private OrdersRepository ordersRepository;
+    ShippingWebhookRegistry(ShippingProviderFactory shippingProviderFactory,
+                            StoresRepository storesRepository,
+                            OrdersRepository ordersRepository,
+                            OrderLifecycle orderLifecycle,
+                            RMARepository rmaRepository,
+                            GoodsOutEventPublisher goodsOutEventPublisher,
+                            OrderEventsRepository orderEventsRepository) {
+        this.storesRepository = storesRepository;
+        this.ordersRepository = ordersRepository;
+        this.orderLifecycle = orderLifecycle;
+        this.rmaRepository = rmaRepository;
+        this.goodsOutEventPublisher = goodsOutEventPublisher;
+        this.orderEventsRepository = orderEventsRepository;
 
-    @Autowired
-    private OrderLifecycle orderLifecycle;
+        this.routes = EventBindingRegistrar.forDescriptors(shippingProviderFactory.availableProviders())
+                .<ShippingWebhookResult>withWebhooks(
+                        "/Store/{storeId}/Webhooks/Shipping/",
+                        (descriptor, storeId) -> shippingProviderFactory.loadConfiguration(
+                                storesRepository.findById(storeId), descriptor.name()),
+                        (descriptor, storeId, result) -> processResult(storeId, result))
+                .register();
+    }
 
-    @Autowired
-    private RMARepository rmaRepository;
+    @Bean
+    RouterFunction<ServerResponse> shippingWebhookRoutes() {
+        return routes;
+    }
 
-    @Autowired
-    private GoodsOutEventPublisher goodsOutEventPublisher;
-
-    @Autowired
-    private OrderEventsRepository orderEventsRepository;
-
-    @Autowired
-    private ShippingProviderFactory shippingProviderFactory;
-
-    @PostMapping("/{providerName}")
-    @ResponseBody
-    public StatusDto receiveWebhook(
-            @PathVariable("storeId") String storeId,
-            @PathVariable("providerName") String providerName,
-            @RequestBody String payload,
-            @RequestHeader Map<String, String> headers
-    ) {
-        String normalizedName = providerName.toLowerCase();
-
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
+    private void processResult(String storeId, ShippingWebhookResult result) {
+        if (storesRepository.findById(storeId) == null) {
             throw new RuntimeException("Internal error.");
         }
-
-        ShippingProvider provider = shippingProviderFactory.get(store);
-        ShippingWebhookResult result = provider.processWebhook(new ShippingWebhookRequest(payload, headers));
 
         Optional<Order> order = findOrderByTrackingNo(storeId, result.trackingNo());
         if (order.isPresent()) {
@@ -74,8 +73,6 @@ public class ShippingWebhookController {
             findRmaByTrackingNo(storeId, result.trackingNo())
                     .ifPresent(rma -> handleRmaShipmentStatusChange(rma, result));
         }
-
-        return new StatusDto("OK");
     }
 
     private void handleOrderShipmentStatusChange(Order order, ShippingWebhookResult result) {
