@@ -11,16 +11,12 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
-import pl.commercelink.payments.api.PaymentProvider;
-import pl.commercelink.payments.api.PaymentProviderDescriptor;
-import pl.commercelink.payments.api.PaymentWebhookRequest;
 import pl.commercelink.payments.api.PaymentWebhookResult;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Configuration
@@ -42,27 +38,22 @@ public class PaymentWebhookRegistry {
         this.ordersManager = ordersManager;
 
         this.routes = EventBindingRegistrar.forDescriptors(paymentProviderFactory.availableProviders())
-                .withWebhooks("/Store/{storeId}/Webhooks/Payments/", descriptor ->
-                        (event, storeId, headers) -> processPayment((String) event, headers, storeId, descriptor))
+                .<PaymentWebhookResult>withWebhooks(
+                        "/Store/{storeId}/Webhooks/Payments/",
+                        (descriptor, storeId) -> paymentProviderFactory.loadConfiguration(
+                                storesRepository.findById(storeId), descriptor.name()),
+                        (descriptor, storeId, result) -> {
+                            if (result.processable()) {
+                                Store store = storesRepository.findById(storeId);
+                                createOrder(store, descriptor.displayName(), result);
+                            }
+                        })
                 .register();
     }
 
     @Bean
     RouterFunction<ServerResponse> paymentWebhookRoutes() {
         return routes;
-    }
-
-    private void processPayment(String payload, Map<String, String> headers,
-                                String storeId, PaymentProviderDescriptor descriptor) {
-        Store store = storesRepository.findById(storeId);
-        Map<String, String> configuration = paymentProviderFactory.loadConfiguration(store, descriptor.name());
-
-        PaymentProvider provider = descriptor.create(configuration);
-        PaymentWebhookResult result = provider.processWebhook(new PaymentWebhookRequest(payload, headers));
-
-        if (result.processable()) {
-            createOrder(store, descriptor.displayName(), result);
-        }
     }
 
     private void createOrder(Store store, String providerName, PaymentWebhookResult result) {

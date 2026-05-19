@@ -15,15 +15,11 @@ import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.provider.EventBindingRegistrar;
-import pl.commercelink.shipping.api.ShippingProvider;
-import pl.commercelink.shipping.api.ShippingWebhookRequest;
 import pl.commercelink.shipping.api.ShippingWebhookResult;
-import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Configuration
@@ -54,8 +50,11 @@ public class ShippingWebhookRegistry {
         this.orderEventsRepository = orderEventsRepository;
 
         this.routes = EventBindingRegistrar.forDescriptors(shippingProviderFactory.availableProviders())
-                .withWebhooks("/Store/{storeId}/Webhooks/Shipping/", descriptor ->
-                        (event, storeId, headers) -> processShipping((String) event, headers, storeId, descriptor.name()))
+                .<ShippingWebhookResult>withWebhooks(
+                        "/Store/{storeId}/Webhooks/Shipping/",
+                        (descriptor, storeId) -> shippingProviderFactory.loadConfiguration(
+                                storesRepository.findById(storeId), descriptor.name()),
+                        (descriptor, storeId, result) -> processResult(storeId, result))
                 .register();
     }
 
@@ -64,15 +63,10 @@ public class ShippingWebhookRegistry {
         return routes;
     }
 
-    private void processShipping(String payload, Map<String, String> headers,
-                                 String storeId, String providerName) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
+    private void processResult(String storeId, ShippingWebhookResult result) {
+        if (storesRepository.findById(storeId) == null) {
             throw new RuntimeException("Internal error.");
         }
-
-        ShippingProvider provider = shippingProviderFactory.get(store, providerName);
-        ShippingWebhookResult result = provider.processWebhook(new ShippingWebhookRequest(payload, headers));
 
         Optional<Order> order = findOrderByTrackingNo(storeId, result.trackingNo());
         if (order.isPresent()) {

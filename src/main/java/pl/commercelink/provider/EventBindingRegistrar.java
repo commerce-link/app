@@ -12,6 +12,8 @@ import pl.commercelink.provider.api.EventBinding;
 import pl.commercelink.provider.api.EventBinding.QueueBinding;
 import pl.commercelink.provider.api.EventBinding.WebhookBinding;
 import pl.commercelink.provider.api.ProviderDescriptor;
+import pl.commercelink.provider.api.WebhookContext;
+import pl.commercelink.provider.api.WebhookExecutor;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.time.Duration;
@@ -20,13 +22,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 public final class EventBindingRegistrar {
 
     public static <D extends ProviderDescriptor<?>> Registration<D> forDescriptors(Collection<D> descriptors) {
         return new Registration<>(descriptors);
+    }
+
+    @FunctionalInterface
+    public interface ResultHandler<D, R> {
+        void handle(D descriptor, String storeId, R result);
     }
 
     public static final class Registration<D extends ProviderDescriptor<?>> {
@@ -39,7 +46,8 @@ public final class EventBindingRegistrar {
         private List<SqsMessageListenerContainer<?>> containers;
         private Consumer<Object> queueDispatcher;
         private String webhookPathPrefix;
-        private Function<D, WebhookHandler> webhookHandlerFn;
+        private BiFunction<D, String, Map<String, String>> webhookConfigLoader;
+        private ResultHandler<D, Object> webhookResultHandler;
 
         private Registration(Collection<D> descriptors) {
             this.descriptors = Objects.requireNonNull(descriptors);
@@ -54,25 +62,27 @@ public final class EventBindingRegistrar {
             return this;
         }
 
-        public Registration<D> withWebhooks(String pathPrefix,
-                                            Function<D, WebhookHandler> webhookHandlerFn) {
+        @SuppressWarnings("unchecked")
+        public <R> Registration<D> withWebhooks(String pathPrefix,
+                                                BiFunction<D, String, Map<String, String>> configLoader,
+                                                ResultHandler<D, R> resultHandler) {
             this.webhookPathPrefix = Objects.requireNonNull(pathPrefix);
-            this.webhookHandlerFn = Objects.requireNonNull(webhookHandlerFn);
+            this.webhookConfigLoader = Objects.requireNonNull(configLoader);
+            this.webhookResultHandler = (ResultHandler<D, Object>) (ResultHandler<D, ?>) Objects.requireNonNull(resultHandler);
             return this;
         }
 
         public RouterFunction<ServerResponse> register() {
             RouterFunctions.Builder routes = RouterFunctions.route();
             for (D descriptor : descriptors) {
-                WebhookHandler handler = webhookHandlerFn != null ? webhookHandlerFn.apply(descriptor) : null;
                 for (EventBinding<?> binding : descriptor.bindings()) {
-                    dispatch(binding, handler, routes);
+                    dispatch(binding, descriptor, routes);
                 }
             }
             return buildOrEmpty(routes);
         }
 
-        private void dispatch(EventBinding<?> binding, WebhookHandler handler, RouterFunctions.Builder routes) {
+        private void dispatch(EventBinding<?> binding, D descriptor, RouterFunctions.Builder routes) {
             switch (binding) {
                 case QueueBinding<?> q -> {
                     if (sqsAsyncClient == null) {
@@ -81,12 +91,12 @@ public final class EventBindingRegistrar {
                     }
                     containers.add(createSqsContainer(q));
                 }
-                case WebhookBinding<?> w -> {
-                    if (webhookHandlerFn == null) {
+                case WebhookBinding<?, ?> w -> {
+                    if (webhookConfigLoader == null || webhookResultHandler == null) {
                         throw new IllegalStateException(
                                 "WebhookBinding " + w.path() + " requires withWebhooks(...) to be called");
                     }
-                    addHttpRoute(routes, w, handler);
+                    addHttpRoute(routes, w, descriptor);
                 }
             }
         }
@@ -114,16 +124,21 @@ public final class EventBindingRegistrar {
             return container;
         }
 
-        private <T> void addHttpRoute(RouterFunctions.Builder builder, WebhookBinding<T> binding, WebhookHandler handler) {
+        @SuppressWarnings("unchecked")
+        private <T, R> void addHttpRoute(RouterFunctions.Builder builder, WebhookBinding<T, R> binding, D descriptor) {
+            WebhookExecutor<T, R> executor = binding.executor();
             builder.POST(webhookPathPrefix + binding.path(), request -> {
                 try {
                     String body = request.body(String.class);
                     String storeId = tryPathVariable(request, "storeId");
                     Map<String, String> headers = request.headers().asHttpHeaders().toSingleValueMap();
-                    Object event = binding.eventType() == String.class
-                            ? body
+                    T event = binding.eventType() == String.class
+                            ? (T) body
                             : OBJECT_MAPPER.readValue(body, binding.eventType());
-                    handler.handle(event, storeId, headers);
+                    Map<String, String> providerConfig = webhookConfigLoader.apply(descriptor, storeId);
+                    WebhookContext ctx = new WebhookContext(storeId, headers, providerConfig);
+                    R result = executor.execute(event, ctx);
+                    ((ResultHandler<D, R>) (ResultHandler<D, ?>) webhookResultHandler).handle(descriptor, storeId, result);
                     return ServerResponse.ok().build();
                 } catch (Exception e) {
                     throw new RuntimeException(
