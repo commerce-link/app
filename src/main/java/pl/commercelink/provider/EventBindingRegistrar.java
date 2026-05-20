@@ -13,7 +13,6 @@ import pl.commercelink.provider.api.EventBinding.QueueBinding;
 import pl.commercelink.provider.api.EventBinding.WebhookBinding;
 import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.provider.api.WebhookContext;
-import pl.commercelink.provider.api.WebhookExecutor;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.time.Duration;
@@ -91,7 +90,7 @@ public final class EventBindingRegistrar {
                     }
                     containers.add(createSqsContainer(q));
                 }
-                case WebhookBinding<?, ?> w -> {
+                case WebhookBinding<?> w -> {
                     if (webhookConfigLoader == null || webhookResultHandler == null) {
                         throw new IllegalStateException(
                                 "WebhookBinding " + w.path() + " requires withWebhooks(...) to be called");
@@ -124,27 +123,61 @@ public final class EventBindingRegistrar {
             return container;
         }
 
-        @SuppressWarnings("unchecked")
-        private <T, R> void addHttpRoute(RouterFunctions.Builder builder, WebhookBinding<T, R> binding, D descriptor) {
-            WebhookExecutor<T, R> executor = binding.executor();
-            builder.POST(webhookPathPrefix + binding.path(), request -> {
-                try {
-                    String body = request.body(String.class);
-                    String storeId = tryPathVariable(request, "storeId");
-                    Map<String, String> headers = request.headers().asHttpHeaders().toSingleValueMap();
-                    T event = binding.eventType() == String.class
-                            ? (T) body
-                            : OBJECT_MAPPER.readValue(body, binding.eventType());
-                    Map<String, String> providerConfig = webhookConfigLoader.apply(descriptor, storeId);
-                    WebhookContext ctx = new WebhookContext(headers, providerConfig);
-                    R result = executor.execute(event, ctx);
-                    ((ResultHandler<D, R>) (ResultHandler<D, ?>) webhookResultHandler).handle(descriptor, storeId, result);
-                    return ServerResponse.ok().build();
-                } catch (Exception e) {
-                    throw new RuntimeException(
-                            "Failed to process webhook from " + webhookPathPrefix + binding.path(), e);
+        private <R> void addHttpRoute(RouterFunctions.Builder builder, WebhookBinding<R> binding, D descriptor) {
+            builder.POST(webhookPathPrefix + binding.path(),
+                    request -> handleWebhookRequest(request, binding, descriptor));
+        }
+
+        private <R> ServerResponse handleWebhookRequest(ServerRequest request, WebhookBinding<R> binding, D descriptor) {
+            try {
+                return processWebhook(request, binding, descriptor);
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "Failed to process webhook from " + webhookPathPrefix + binding.path(), e);
+            }
+        }
+
+        private <R> ServerResponse processWebhook(ServerRequest request, WebhookBinding<R> binding, D descriptor)
+                throws Exception {
+            String body = request.body(String.class);
+            if (body == null || body.isBlank()) {
+                return ServerResponse.ok().build();
+            }
+            String storeId = tryPathVariable(request, "storeId");
+            Map<String, String> providerConfig = loadProviderConfig(descriptor, storeId);
+            if (providerConfig == null) {
+                return ServerResponse.ok().build();
+            }
+            WebhookContext ctx = new WebhookContext(extractHeaders(request), providerConfig);
+            R result = binding.executor().execute(body, ctx);
+            if (result != null) {
+                dispatchResult(descriptor, storeId, result);
+            }
+            return ServerResponse.ok().build();
+        }
+
+        private Map<String, String> loadProviderConfig(D descriptor, String storeId) {
+            try {
+                Map<String, String> config = webhookConfigLoader.apply(descriptor, storeId);
+                if (config == null) {
+                    System.err.println("No provider configuration for webhook: provider="
+                            + descriptor.name() + " store=" + storeId);
                 }
-            });
+                return config;
+            } catch (Exception e) {
+                System.err.println("Failed to load provider configuration for webhook: provider="
+                        + descriptor.name() + " store=" + storeId + " error=" + e.getMessage());
+                return null;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private <R> void dispatchResult(D descriptor, String storeId, R result) {
+            ((ResultHandler<D, R>) (ResultHandler<D, ?>) webhookResultHandler).handle(descriptor, storeId, result);
+        }
+
+        private static Map<String, String> extractHeaders(ServerRequest request) {
+            return request.headers().asHttpHeaders().toSingleValueMap();
         }
 
         private static String tryPathVariable(ServerRequest request, String name) {
