@@ -1,8 +1,5 @@
 package pl.commercelink.products.information;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.awspring.cloud.sqs.listener.SqsContainerOptions;
 import io.awspring.cloud.sqs.listener.SqsMessageListenerContainer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -12,13 +9,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.provider.api.EventBinding;
-import pl.commercelink.provider.api.EventBinding.QueueBinding;
+import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
-import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
 
 @Configuration
 public class PimCatalogRegistry {
@@ -57,40 +57,9 @@ public class PimCatalogRegistry {
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
 
-        ObjectMapper objectMapper = new ObjectMapper()
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-        for (EventBinding<?> binding : descriptor.bindings()) {
-            if (binding instanceof QueueBinding<?> queueBinding) {
-                containers.add(createContainer(sqsAsyncClient, objectMapper, queueBinding));
-            }
-        }
-    }
-
-    private <T> SqsMessageListenerContainer<Object> createContainer(
-            SqsAsyncClient sqsAsyncClient, ObjectMapper objectMapper, QueueBinding<T> binding) {
-        SqsContainerOptions options = SqsContainerOptions.builder()
-                .maxConcurrentMessages(1)
-                .maxMessagesPerPoll(1)
-                .pollTimeout(Duration.ofSeconds(20))
-                .build();
-        SqsMessageListenerContainer<Object> container = new SqsMessageListenerContainer<>(sqsAsyncClient, options);
-        container.setQueueNames(binding.queueName());
-        container.setMessageListener(message -> {
-            try {
-                Object payload = message.getPayload();
-                T event;
-                if (binding.eventType().isInstance(payload)) {
-                    event = binding.eventType().cast(payload);
-                } else {
-                    event = objectMapper.readValue((String) payload, binding.eventType());
-                }
-                catalog.dispatch(event);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to process event from " + binding.queueName(), e);
-            }
-        });
-        return container;
+        EventBindingRegistrar.forDescriptors(List.of(descriptor))
+                .withQueues(sqsAsyncClient, containers, catalog::dispatch)
+                .register();
     }
 
     @Bean
