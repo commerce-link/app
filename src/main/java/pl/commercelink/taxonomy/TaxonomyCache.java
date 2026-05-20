@@ -36,12 +36,34 @@ public class TaxonomyCache {
     }
 
     public void add(Taxonomy taxonomy) {
-        Taxonomy t = taxonomyByMfn.get(taxonomy.mfn());
-        if (t == null || taxonomy.dataAccuracyScore() <= t.dataAccuracyScore()) {
-            if (StringUtils.isNotBlank(taxonomy.mfn())) {
-                taxonomyByMfn.put(taxonomy.mfn(), taxonomy);
-            }
+        if (StringUtils.isBlank(taxonomy.mfn())) return;
+        taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> mergeOf(current, taxonomy));
+    }
+
+    private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
+        if (current == null) return incoming;
+
+        Taxonomy recordWinner = incoming.dataAccuracyScore() <= current.dataAccuracyScore()
+                ? incoming : current;
+
+        Integer weight = bestWeight(current, incoming);
+
+        if (weight == null ? recordWinner.weightInGrams() == null
+                           : weight.equals(recordWinner.weightInGrams())) {
+            return recordWinner;
         }
+        return withWeight(recordWinner, weight);
+    }
+
+    private static Integer bestWeight(Taxonomy a, Taxonomy b) {
+        if (a.weightInGrams() == null) return b.weightInGrams();
+        if (b.weightInGrams() == null) return a.weightInGrams();
+        return a.dataAccuracyScore() <= b.dataAccuracyScore() ? a.weightInGrams() : b.weightInGrams();
+    }
+
+    private static Taxonomy withWeight(Taxonomy t, Integer weight) {
+        return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
+                            t.category(), t.dataAccuracyScore(), weight);
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {
