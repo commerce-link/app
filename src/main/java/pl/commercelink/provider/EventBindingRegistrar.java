@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.awspring.cloud.sqs.listener.SqsContainerOptions;
 import io.awspring.cloud.sqs.listener.SqsMessageListenerContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
@@ -26,6 +28,8 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 public final class EventBindingRegistrar {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EventBindingRegistrar.class);
 
     public static <D extends ProviderDescriptor<?>> Registration<D> forDescriptors(Collection<D> descriptors) {
         return new Registration<>(descriptors);
@@ -89,6 +93,7 @@ public final class EventBindingRegistrar {
                         throw new IllegalStateException(
                                 "QueueBinding " + q.queueName() + " requires withQueues(...) to be called");
                     }
+                    LOG.info("Registered queue listener for provider '{}' on queue: {}", descriptor.name(), q.queueName());
                     containers.add(createSqsContainer(q));
                 }
                 case WebhookBinding<?, ?> w -> {
@@ -127,7 +132,9 @@ public final class EventBindingRegistrar {
         @SuppressWarnings("unchecked")
         private <T, R> void addHttpRoute(RouterFunctions.Builder builder, WebhookBinding<T, R> binding, D descriptor) {
             WebhookExecutor<T, R> executor = binding.executor();
-            builder.POST(webhookPathPrefix + binding.path(), request -> {
+            String fullPath = webhookPathPrefix + binding.path();
+            LOG.info("Registered webhook for provider '{}' at path: POST {}", descriptor.name(), fullPath);
+            builder.POST(fullPath, request -> {
                 try {
                     String body = request.body(String.class);
                     String storeId = tryPathVariable(request, "storeId");
@@ -142,7 +149,7 @@ public final class EventBindingRegistrar {
                     return ServerResponse.ok().build();
                 } catch (Exception e) {
                     throw new RuntimeException(
-                            "Failed to process webhook from " + webhookPathPrefix + binding.path(), e);
+                            "Failed to process webhook from " + fullPath, e);
                 }
             });
         }

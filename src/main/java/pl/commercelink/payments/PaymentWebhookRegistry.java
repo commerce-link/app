@@ -22,8 +22,6 @@ import java.util.stream.Collectors;
 @Configuration
 public class PaymentWebhookRegistry {
 
-    private final PaymentProviderFactory paymentProviderFactory;
-    private final StoresRepository storesRepository;
     private final BasketsRepository basketsRepository;
     private final OrdersManager ordersManager;
     private final RouterFunction<ServerResponse> routes;
@@ -32,8 +30,6 @@ public class PaymentWebhookRegistry {
                            StoresRepository storesRepository,
                            BasketsRepository basketsRepository,
                            OrdersManager ordersManager) {
-        this.paymentProviderFactory = paymentProviderFactory;
-        this.storesRepository = storesRepository;
         this.basketsRepository = basketsRepository;
         this.ordersManager = ordersManager;
 
