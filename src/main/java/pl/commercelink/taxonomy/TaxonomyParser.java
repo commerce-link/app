@@ -12,7 +12,7 @@ import java.util.List;
 class TaxonomyParser {
 
     static final String[] COLUMNS = {
-            "ean", "mfn", "brand", "name", "category", "data_accuracy_score"
+            "ean", "mfn", "brand", "name", "category", "data_accuracy_score", "weight_g"
     };
 
     static Taxonomy fromCsvRow(String[] row) {
@@ -22,7 +22,8 @@ class TaxonomyParser {
         String name = row[3];
         ProductCategory category = parseCategory(row[4]);
         int dataAccuracyScore = parseScore(row[5]);
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore);
+        Integer weightInGrams = row.length > 6 ? parseWeight(row[6]) : null;
+        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, weightInGrams);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -52,6 +53,16 @@ class TaxonomyParser {
         }
     }
 
+    private static Integer parseWeight(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            int weight = Integer.parseInt(value.trim());
+            return weight > 0 ? weight : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private static String[] toStringArray(Taxonomy t) {
         return new String[]{
                 t.ean() != null ? t.ean() : "",
@@ -59,7 +70,8 @@ class TaxonomyParser {
                 t.brand() != null ? t.brand() : "",
                 t.name() != null ? t.name() : "",
                 t.category() != null ? t.category().name() : "",
-                String.valueOf(t.dataAccuracyScore())
+                String.valueOf(t.dataAccuracyScore()),
+                t.weightInGrams() != null ? t.weightInGrams().toString() : ""
         };
     }
 }
