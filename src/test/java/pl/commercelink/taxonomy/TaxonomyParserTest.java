@@ -2,7 +2,10 @@ package pl.commercelink.taxonomy;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.starter.csv.CSVLoader;
 
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,10 +19,10 @@ class TaxonomyParserTest {
                 "Test Product", ProductCategory.Laptops, 1, 1300);
 
         byte[] csv = TaxonomyParser.toCsv(List.of(original));
-        String[] rows = new String(csv).split("\r?\n");
+        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
+        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
 
-        String[] dataRow = rows[1].split(",", -1);
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(dataRow);
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
 
         assertEquals(1300, parsed.weightInGrams());
     }
@@ -30,10 +33,10 @@ class TaxonomyParserTest {
                 "Test Product", ProductCategory.Laptops, 1, null);
 
         byte[] csv = TaxonomyParser.toCsv(List.of(original));
-        String[] rows = new String(csv).split("\r?\n");
+        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
+        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
 
-        String[] dataRow = rows[1].split(",", -1);
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(dataRow);
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
 
         assertNull(parsed.weightInGrams());
     }
