@@ -85,16 +85,19 @@ class TaxonomyCacheTest {
     @Test
     void concurrent_adds_do_not_drop_weight() throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(8);
+        Taxonomy bestSource = taxonomyNamed("MFN-1", 5, 1000, "Best");
         List<Taxonomy> inputs = IntStream.range(0, 200)
-                .mapToObj(i -> taxonomyNamed("MFN-1", 5 + (i % 3), 1000 + (i % 5), "N" + i))
+                .mapToObj(i -> taxonomyNamed("MFN-1", 10 + (i % 3), 2000 + (i % 5), "N" + i))
                 .toList();
 
+        pool.submit(() -> cache.add(bestSource));
         for (Taxonomy t : inputs) pool.submit(() -> cache.add(t));
         pool.shutdown();
         assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
 
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals(1000, result.weightInGrams());
+        assertEquals("Best", result.name());
     }
 
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
