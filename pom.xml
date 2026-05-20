@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.05.35</version>
+    <version>2026.05.36</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -84,7 +84,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>provider-api</artifactId>
-            <version>0.1.5</version>
+            <version>0.1.4</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -306,21 +306,6 @@
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
                     <version>0.1.0</version>
-                </dependency>
-                <dependency>
-                    <groupId>pl.commercelink</groupId>
-                    <artifactId>shipping-furgonetka</artifactId>
-                    <version>0.1.6</version>
-                </dependency>
-                <dependency>
-                    <groupId>pl.commercelink</groupId>
-                    <artifactId>payments-paynow</artifactId>
-                    <version>0.2.4</version>
-                </dependency>
-                <dependency>
-                    <groupId>pl.commercelink</groupId>
-                    <artifactId>payments-stripe</artifactId>
-                    <version>0.2.4</version>
                 </dependency>
             </dependencies>
         </profile>
