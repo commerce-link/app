@@ -38,14 +38,14 @@ class EventBindingRegistrarTest {
         AtomicReference<TestDescriptor> capturedDescriptor = new AtomicReference<>();
         AtomicReference<String> capturedStoreId = new AtomicReference<>();
 
-        WebhookExecutor<String, String> executor = (event, ctx) -> {
+        WebhookExecutor<String> executor = (event, ctx) -> {
             capturedEvent.set(event);
             capturedContext.set(ctx);
             return "executed:" + event;
         };
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
-                List.of(new WebhookBinding<>("paynow", String.class, executor)));
+                List.of(new WebhookBinding<>("paynow", executor)));
 
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
                 .forDescriptors(List.of(descriptor))
@@ -76,10 +76,10 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingReturningNullResultStillCompletesWithOk() throws Exception {
-        WebhookExecutor<String, String> executor = (event, ctx) -> null;
+        WebhookExecutor<String> executor = (event, ctx) -> null;
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
-                List.of(new WebhookBinding<>("paynow", String.class, executor)));
+                List.of(new WebhookBinding<>("paynow", executor)));
 
         AtomicReference<Object> capturedResult = new AtomicReference<>("not-called");
 
@@ -97,17 +97,73 @@ class EventBindingRegistrarTest {
         ServerResponse response = routes.route(req).orElseThrow().handle(req);
 
         assertThat(response.statusCode().value()).isEqualTo(200);
-        assertThat(capturedResult.get()).isNull();
+        assertThat(capturedResult.get()).isEqualTo("not-called");
+    }
+
+    @Test
+    void webhookBindingWithEmptyBodyReturns200WithoutCallingExecutor() throws Exception {
+        AtomicReference<Boolean> executorCalled = new AtomicReference<>(false);
+        WebhookExecutor<String> executor = (event, ctx) -> {
+            executorCalled.set(true);
+            throw new RuntimeException("should not be called");
+        };
+
+        TestDescriptor descriptor = new TestDescriptor("paynow",
+                List.of(new WebhookBinding<>("paynow", executor)));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/",
+                        (d, storeId) -> Map.of(),
+                        (d, storeId, result) -> { })
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s/Webhooks/Payments/paynow");
+        http.setContent(new byte[0]);
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        assertThat(response.statusCode().value()).isEqualTo(200);
+        assertThat(executorCalled.get()).isFalse();
+    }
+
+    @Test
+    void webhookBindingWithFailingConfigLoaderReturns200() throws Exception {
+        AtomicReference<Boolean> executorCalled = new AtomicReference<>(false);
+        WebhookExecutor<String> executor = (event, ctx) -> {
+            executorCalled.set(true);
+            return null;
+        };
+
+        TestDescriptor descriptor = new TestDescriptor("paynow",
+                List.of(new WebhookBinding<>("paynow", executor)));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/",
+                        (d, storeId) -> { throw new NullPointerException("store not found"); },
+                        (d, storeId, result) -> { })
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/unknown/Webhooks/Payments/paynow");
+        http.setContent("{}".getBytes());
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        assertThat(response.statusCode().value()).isEqualTo(200);
+        assertThat(executorCalled.get()).isFalse();
     }
 
     @Test
     void webhookBindingExecutorExceptionIsWrappedInRuntime() {
-        WebhookExecutor<String, String> executor = (event, ctx) -> {
+        WebhookExecutor<String> executor = (event, ctx) -> {
             throw new RuntimeException("invalid signature");
         };
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
-                List.of(new WebhookBinding<>("paynow", String.class, executor)));
+                List.of(new WebhookBinding<>("paynow", executor)));
 
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
                 .forDescriptors(List.of(descriptor))
@@ -127,10 +183,10 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingDoesNotMatchUnregisteredPath() {
-        WebhookExecutor<String, String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> null;
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
                 .forDescriptors(List.of(new TestDescriptor("stripe",
-                        List.of(new WebhookBinding<>("stripe", String.class, noop)))))
+                        List.of(new WebhookBinding<>("stripe", noop)))))
                 .withWebhooks("/Store/{storeId}/Webhooks/Payments/",
                         (d, s) -> Map.of(), (d, s, r) -> { })
                 .register();
@@ -143,9 +199,9 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingWithoutWithWebhooksThrowsIllegalState() {
-        WebhookExecutor<String, String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> null;
         TestDescriptor descriptor = new TestDescriptor("stripe",
-                List.of(new WebhookBinding<>("orphan", String.class, noop)));
+                List.of(new WebhookBinding<>("orphan", noop)));
 
         assertThatThrownBy(() -> EventBindingRegistrar
                 .forDescriptors(List.of(descriptor))
@@ -199,10 +255,10 @@ class EventBindingRegistrarTest {
         AtomicReference<String> capturedFromPaynow = new AtomicReference<>();
 
         TestDescriptor stripe = new TestDescriptor("stripe", List.of(
-                new WebhookBinding<>("stripe", String.class,
+                new WebhookBinding<>("stripe",
                         (event, ctx) -> { capturedFromStripe.set(event); return null; })));
         TestDescriptor paynow = new TestDescriptor("paynow", List.of(
-                new WebhookBinding<>("paynow", String.class,
+                new WebhookBinding<>("paynow",
                         (event, ctx) -> { capturedFromPaynow.set(event); return null; })));
 
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
@@ -220,10 +276,10 @@ class EventBindingRegistrarTest {
 
     @Test
     void mixedQueueAndWebhookBindingsRegisterBothAndReturnRealRouter() {
-        WebhookExecutor<String, String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> null;
         TestDescriptor pim = new TestDescriptor("pim", List.of(
                 new QueueBinding<>("pim-entry-added-queue", String.class),
-                new WebhookBinding<>("pim", String.class, noop)));
+                new WebhookBinding<>("pim", noop)));
 
         SqsAsyncClient sqsClient = Mockito.mock(SqsAsyncClient.class);
         List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
