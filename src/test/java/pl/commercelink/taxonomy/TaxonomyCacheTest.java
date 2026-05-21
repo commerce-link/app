@@ -30,14 +30,14 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void single_add_stores_weight() {
+    void singleAddStoresWeight() {
         cache.add(taxonomy("MFN-1", 5, 1300));
 
         assertEquals(1300, cache.findByMfn("MFN-1").weightInGrams());
     }
 
     @Test
-    void better_score_record_without_weight_keeps_previous_weight() {
+    void betterScoreRecordWithoutWeightKeepsPreviousWeight() {
         cache.add(taxonomy("MFN-1", 10, 1300));
         cache.add(taxonomyNamed("MFN-1", 1, null, "BetterName"));
 
@@ -47,7 +47,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void better_score_record_with_weight_replaces_everything() {
+    void betterScoreRecordWithWeightReplacesEverything() {
         cache.add(taxonomy("MFN-1", 10, 1300));
         cache.add(taxonomyNamed("MFN-1", 1, 1500, "BetterName"));
 
@@ -57,7 +57,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void worse_score_record_with_weight_fills_missing_weight_only() {
+    void worseScoreRecordWithWeightFillsMissingWeightOnly() {
         cache.add(taxonomyNamed("MFN-1", 1, null, "BestName"));
         cache.add(taxonomyNamed("MFN-1", 10, 1300, "WorseName"));
 
@@ -67,7 +67,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void two_sources_with_weight_lower_score_wins() {
+    void twoSourcesWithWeightLowerScoreWins() {
         cache.add(taxonomy("MFN-1", 10, 1500));
         cache.add(taxonomy("MFN-1", 5, 1300));
 
@@ -75,7 +75,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void blank_mfn_is_noop() {
+    void blankMfnIsNoop() {
         cache.add(taxonomy("", 5, 1300));
         cache.add(taxonomy("   ", 5, 1300));
 
@@ -83,7 +83,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void concurrent_adds_do_not_drop_weight() throws InterruptedException {
+    void concurrentAddsDoNotDropWeight() throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(8);
         Taxonomy bestSource = taxonomyNamed("MFN-1", 5, 1000, "Best");
         List<Taxonomy> inputs = IntStream.range(0, 200)

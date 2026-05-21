@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class TaxonomyParserTest {
 
     @Test
-    void csv_round_trip_preserves_weight() {
+    void csvRoundTripPreservesWeight() {
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
                 "Test Product", ProductCategory.Laptops, 1, 1300);
 
@@ -28,7 +28,7 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void csv_round_trip_preserves_null_weight() {
+    void csvRoundTripPreservesNullWeight() {
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
                 "Test Product", ProductCategory.Laptops, 1, null);
 
@@ -42,7 +42,7 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void backward_compat_reads_legacy_six_column_row() {
+    void backwardCompatReadsLegacySixColumnRow() {
         String[] legacyRow = {
                 "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1"
         };
@@ -55,7 +55,7 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void empty_weight_cell_yields_null() {
+    void emptyWeightCellYieldsNull() {
         String[] row = {
                 "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", ""
         };
@@ -66,7 +66,7 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void malformed_weight_cell_yields_null() {
+    void malformedWeightCellYieldsNull() {
         String[] row = {
                 "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", "abc"
         };
