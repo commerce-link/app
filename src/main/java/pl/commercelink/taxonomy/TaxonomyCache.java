@@ -8,8 +8,11 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 @Component
 public class TaxonomyCache {
@@ -43,22 +46,24 @@ public class TaxonomyCache {
     private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
         if (current == null) return incoming;
 
-        Taxonomy recordWinner = incoming.dataAccuracyScore() <= current.dataAccuracyScore()
-                ? incoming : current;
-
+        Taxonomy winner = bestByScore(current, incoming);
         Integer weight = bestWeight(current, incoming);
 
-        if (weight == null ? recordWinner.weightInGrams() == null
-                           : weight.equals(recordWinner.weightInGrams())) {
-            return recordWinner;
-        }
-        return withWeight(recordWinner, weight);
+        return Objects.equals(weight, winner.weightInGrams())
+                ? winner
+                : withWeight(winner, weight);
+    }
+
+    private static Taxonomy bestByScore(Taxonomy a, Taxonomy b) {
+        return b.dataAccuracyScore() <= a.dataAccuracyScore() ? b : a;
     }
 
     private static Integer bestWeight(Taxonomy a, Taxonomy b) {
-        if (a.weightInGrams() == null) return b.weightInGrams();
-        if (b.weightInGrams() == null) return a.weightInGrams();
-        return a.dataAccuracyScore() <= b.dataAccuracyScore() ? a.weightInGrams() : b.weightInGrams();
+        return Stream.of(b, a)
+                .filter(t -> t.weightInGrams() != null)
+                .min(Comparator.comparingInt(Taxonomy::dataAccuracyScore))
+                .map(Taxonomy::weightInGrams)
+                .orElse(null);
     }
 
     private static Taxonomy withWeight(Taxonomy t, Integer weight) {
