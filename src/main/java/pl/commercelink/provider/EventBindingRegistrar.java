@@ -13,6 +13,8 @@ import pl.commercelink.provider.api.EventBinding.QueueBinding;
 import pl.commercelink.provider.api.EventBinding.WebhookBinding;
 import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.provider.api.WebhookContext;
+import pl.commercelink.provider.api.WebhookOutcome;
+import pl.commercelink.provider.api.WebhookStatusResponse;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.time.Duration;
@@ -137,21 +139,23 @@ public final class EventBindingRegistrar {
             }
         }
 
+        private static final WebhookStatusResponse STATUS_OK = new WebhookStatusResponse("OK");
+
         private <R> ServerResponse processWebhook(ServerRequest request, WebhookBinding<R> binding, D descriptor)
                 throws Exception {
             String body = request.body(String.class);
-            if (body == null || body.isBlank()) {
-                return ServerResponse.ok().build();
-            }
             String storeId = tryPathVariable(request, "storeId");
             Map<String, String> providerConfig = loadProviderConfig(descriptor, storeId);
             if (providerConfig == null) {
-                return ServerResponse.ok().build();
+                return ServerResponse.ok().body(STATUS_OK);
             }
             WebhookContext ctx = new WebhookContext(extractHeaders(request), providerConfig);
-            R result = binding.executor().execute(body, ctx);
-            if (result != null) {
-                dispatchResult(descriptor, storeId, result);
+            WebhookOutcome<R> outcome = binding.executor().execute(body, ctx);
+            if (outcome.result() != null) {
+                dispatchResult(descriptor, storeId, outcome.result());
+            }
+            if (outcome.responseBody() != null) {
+                return ServerResponse.ok().body(outcome.responseBody());
             }
             return ServerResponse.ok().build();
         }
