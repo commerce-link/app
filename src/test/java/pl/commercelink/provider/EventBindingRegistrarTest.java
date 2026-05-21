@@ -17,6 +17,8 @@ import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.provider.api.WebhookContext;
 import pl.commercelink.provider.api.WebhookExecutor;
+import pl.commercelink.provider.api.WebhookOutcome;
+import pl.commercelink.provider.api.WebhookStatusResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +43,7 @@ class EventBindingRegistrarTest {
         WebhookExecutor<String> executor = (event, ctx) -> {
             capturedEvent.set(event);
             capturedContext.set(ctx);
-            return "executed:" + event;
+            return WebhookOutcome.of("executed:" + event, new WebhookStatusResponse("OK"));
         };
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
@@ -76,7 +78,7 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingReturningNullResultStillCompletesWithOk() throws Exception {
-        WebhookExecutor<String> executor = (event, ctx) -> null;
+        WebhookExecutor<String> executor = (event, ctx) -> WebhookOutcome.empty();
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
                 List.of(new WebhookBinding<>("paynow", executor)));
@@ -101,11 +103,11 @@ class EventBindingRegistrarTest {
     }
 
     @Test
-    void webhookBindingWithEmptyBodyReturns200WithoutCallingExecutor() throws Exception {
-        AtomicReference<Boolean> executorCalled = new AtomicReference<>(false);
+    void webhookBindingWithEmptyBodyDelegatesToExecutor() throws Exception {
+        AtomicReference<String> capturedEvent = new AtomicReference<>();
         WebhookExecutor<String> executor = (event, ctx) -> {
-            executorCalled.set(true);
-            throw new RuntimeException("should not be called");
+            capturedEvent.set(event);
+            return WebhookOutcome.of(null, new WebhookStatusResponse("OK"));
         };
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
@@ -125,7 +127,32 @@ class EventBindingRegistrarTest {
         ServerResponse response = routes.route(req).orElseThrow().handle(req);
 
         assertThat(response.statusCode().value()).isEqualTo(200);
-        assertThat(executorCalled.get()).isFalse();
+        assertThat(capturedEvent.get()).isEmpty();
+    }
+
+    @Test
+    void webhookOutcomeWithResponseBodyReturnsBodyInResponse() throws Exception {
+        WebhookStatusResponse statusOk = new WebhookStatusResponse("OK");
+        WebhookExecutor<String> executor = (event, ctx) -> WebhookOutcome.of("result", statusOk);
+
+        TestDescriptor descriptor = new TestDescriptor("paynow",
+                List.of(new WebhookBinding<>("paynow", executor)));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Payments/",
+                        (d, storeId) -> Map.of(),
+                        (d, storeId, result) -> { })
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s/Webhooks/Payments/paynow");
+        http.setContent("{}".getBytes());
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        assertThat(response.statusCode().value()).isEqualTo(200);
+        assertThat(((org.springframework.web.servlet.function.EntityResponse<?>) response).entity()).isEqualTo(statusOk);
     }
 
     @Test
@@ -133,7 +160,7 @@ class EventBindingRegistrarTest {
         AtomicReference<Boolean> executorCalled = new AtomicReference<>(false);
         WebhookExecutor<String> executor = (event, ctx) -> {
             executorCalled.set(true);
-            return null;
+            return WebhookOutcome.empty();
         };
 
         TestDescriptor descriptor = new TestDescriptor("paynow",
@@ -183,7 +210,7 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingDoesNotMatchUnregisteredPath() {
-        WebhookExecutor<String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> WebhookOutcome.empty();
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
                 .forDescriptors(List.of(new TestDescriptor("stripe",
                         List.of(new WebhookBinding<>("stripe", noop)))))
@@ -199,7 +226,7 @@ class EventBindingRegistrarTest {
 
     @Test
     void webhookBindingWithoutWithWebhooksThrowsIllegalState() {
-        WebhookExecutor<String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> WebhookOutcome.empty();
         TestDescriptor descriptor = new TestDescriptor("stripe",
                 List.of(new WebhookBinding<>("orphan", noop)));
 
@@ -256,10 +283,10 @@ class EventBindingRegistrarTest {
 
         TestDescriptor stripe = new TestDescriptor("stripe", List.of(
                 new WebhookBinding<>("stripe",
-                        (event, ctx) -> { capturedFromStripe.set(event); return null; })));
+                        (event, ctx) -> { capturedFromStripe.set(event); return WebhookOutcome.empty(); })));
         TestDescriptor paynow = new TestDescriptor("paynow", List.of(
                 new WebhookBinding<>("paynow",
-                        (event, ctx) -> { capturedFromPaynow.set(event); return null; })));
+                        (event, ctx) -> { capturedFromPaynow.set(event); return WebhookOutcome.empty(); })));
 
         RouterFunction<ServerResponse> routes = EventBindingRegistrar
                 .forDescriptors(List.of(stripe, paynow))
@@ -276,7 +303,7 @@ class EventBindingRegistrarTest {
 
     @Test
     void mixedQueueAndWebhookBindingsRegisterBothAndReturnRealRouter() {
-        WebhookExecutor<String> noop = (event, ctx) -> null;
+        WebhookExecutor<String> noop = (event, ctx) -> WebhookOutcome.empty();
         TestDescriptor pim = new TestDescriptor("pim", List.of(
                 new QueueBinding<>("pim-entry-added-queue", String.class),
                 new WebhookBinding<>("pim", noop)));
