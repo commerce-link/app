@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 @Component
@@ -47,28 +48,32 @@ public class TaxonomyCache {
         if (current == null) return incoming;
 
         Taxonomy winner = bestByScore(current, incoming);
-        Integer weight = bestWeight(current, incoming);
+        Integer net = bestWeightOf(current, incoming, Taxonomy::netWeightInGrams);
+        Integer gross = bestWeightOf(current, incoming, Taxonomy::grossWeightInGrams);
 
-        return Objects.equals(weight, winner.weightInGrams())
-                ? winner
-                : withWeight(winner, weight);
+        return needsRebuild(winner, net, gross) ? withWeights(winner, net, gross) : winner;
     }
 
     private static Taxonomy bestByScore(Taxonomy a, Taxonomy b) {
         return b.dataAccuracyScore() <= a.dataAccuracyScore() ? b : a;
     }
 
-    private static Integer bestWeight(Taxonomy a, Taxonomy b) {
+    private static Integer bestWeightOf(Taxonomy a, Taxonomy b, Function<Taxonomy, Integer> picker) {
         return Stream.of(b, a)
-                .filter(t -> t.weightInGrams() != null)
+                .filter(t -> picker.apply(t) != null)
                 .min(Comparator.comparingInt(Taxonomy::dataAccuracyScore))
-                .map(Taxonomy::weightInGrams)
+                .map(picker)
                 .orElse(null);
     }
 
-    private static Taxonomy withWeight(Taxonomy t, Integer weight) {
+    private static boolean needsRebuild(Taxonomy winner, Integer net, Integer gross) {
+        return !Objects.equals(net, winner.netWeightInGrams())
+                || !Objects.equals(gross, winner.grossWeightInGrams());
+    }
+
+    private static Taxonomy withWeights(Taxonomy t, Integer net, Integer gross) {
         return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
-                            t.category(), t.dataAccuracyScore(), weight);
+                            t.category(), t.dataAccuracyScore(), net, gross);
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {

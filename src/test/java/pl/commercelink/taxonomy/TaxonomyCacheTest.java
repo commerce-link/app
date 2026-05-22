@@ -13,8 +13,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaxonomyCacheTest {
@@ -33,7 +33,7 @@ class TaxonomyCacheTest {
     void singleAddStoresWeight() {
         cache.add(taxonomy("MFN-1", 5, 1300));
 
-        assertEquals(1300, cache.findByMfn("MFN-1").weightInGrams());
+        assertEquals(1300, cache.findByMfn("MFN-1").netWeightInGrams());
     }
 
     @Test
@@ -43,7 +43,7 @@ class TaxonomyCacheTest {
 
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals("BetterName", result.name());
-        assertEquals(1300, result.weightInGrams());
+        assertEquals(1300, result.netWeightInGrams());
     }
 
     @Test
@@ -53,7 +53,7 @@ class TaxonomyCacheTest {
 
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals("BetterName", result.name());
-        assertEquals(1500, result.weightInGrams());
+        assertEquals(1500, result.netWeightInGrams());
     }
 
     @Test
@@ -63,7 +63,7 @@ class TaxonomyCacheTest {
 
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals("BestName", result.name());
-        assertEquals(1300, result.weightInGrams());
+        assertEquals(1300, result.netWeightInGrams());
     }
 
     @Test
@@ -71,7 +71,7 @@ class TaxonomyCacheTest {
         cache.add(taxonomy("MFN-1", 10, 1500));
         cache.add(taxonomy("MFN-1", 5, 1300));
 
-        assertEquals(1300, cache.findByMfn("MFN-1").weightInGrams());
+        assertEquals(1300, cache.findByMfn("MFN-1").netWeightInGrams());
     }
 
     @Test
@@ -96,8 +96,47 @@ class TaxonomyCacheTest {
         assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
 
         Taxonomy result = cache.findByMfn("MFN-1");
-        assertEquals(1000, result.weightInGrams());
+        assertEquals(1000, result.netWeightInGrams());
         assertEquals("Best", result.name());
+    }
+
+    @Test
+    void mergesNetFromOneAndGrossFromOtherIndependently() {
+        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 100, null);
+        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 10, null, 200);
+
+        cache.add(a);
+        cache.add(b);
+
+        Taxonomy result = cache.findByMfn("MFN1");
+        assertThat(result.netWeightInGrams()).isEqualTo(100);
+        assertThat(result.grossWeightInGrams()).isEqualTo(200);
+    }
+
+    @Test
+    void prefersWeightFromLowestScorePerDimension() {
+        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 2, 999, null);
+        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 9, 100, 200);
+
+        cache.add(highScoreBoth);
+        cache.add(lowScoreNet);
+
+        Taxonomy result = cache.findByMfn("MFN1");
+        assertThat(result.netWeightInGrams()).isEqualTo(999);
+        assertThat(result.grossWeightInGrams()).isEqualTo(200);
+    }
+
+    @Test
+    void incomingWinsTieBreakForBothDimensions() {
+        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 100, 200);
+        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 150, 250);
+
+        cache.add(first);
+        cache.add(second);
+
+        Taxonomy result = cache.findByMfn("MFN1");
+        assertThat(result.netWeightInGrams()).isEqualTo(150);
+        assertThat(result.grossWeightInGrams()).isEqualTo(250);
     }
 
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
@@ -106,6 +145,6 @@ class TaxonomyCacheTest {
 
     private static Taxonomy taxonomyNamed(String mfn, int score, Integer weight, String name) {
         return new Taxonomy("1234567890123", mfn, "Brand", name,
-                ProductCategory.Laptops, score, weight);
+                ProductCategory.Laptops, score, weight, null);
     }
 }

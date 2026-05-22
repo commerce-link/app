@@ -1,6 +1,5 @@
 package pl.commercelink.taxonomy;
 
-import pl.commercelink.taxonomy.BrandMapper;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
@@ -12,7 +11,8 @@ import java.util.List;
 class TaxonomyParser {
 
     static final String[] COLUMNS = {
-            "ean", "mfn", "brand", "name", "category", "data_accuracy_score", "weight_g"
+            "ean", "mfn", "brand", "name", "category", "data_accuracy_score",
+            "net_weight_g", "gross_weight_g"
     };
 
     static Taxonomy fromCsvRow(String[] row) {
@@ -22,8 +22,9 @@ class TaxonomyParser {
         String name = row[3];
         ProductCategory category = parseCategory(row[4]);
         int dataAccuracyScore = parseScore(row[5]);
-        Integer weightInGrams = row.length > 6 ? parseWeight(row[6]) : null;
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, weightInGrams);
+        Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
+        Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
+        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -71,7 +72,8 @@ class TaxonomyParser {
                 t.name() != null ? t.name() : "",
                 t.category() != null ? t.category().name() : "",
                 String.valueOf(t.dataAccuracyScore()),
-                t.weightInGrams() != null ? t.weightInGrams().toString() : ""
+                t.netWeightInGrams() != null ? t.netWeightInGrams().toString() : "",
+                t.grossWeightInGrams() != null ? t.grossWeightInGrams().toString() : ""
         };
     }
 }
