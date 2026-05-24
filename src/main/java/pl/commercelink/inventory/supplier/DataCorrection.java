@@ -34,6 +34,8 @@ class DataCorrection {
         String name = taxonomy.name();
         ProductCategory category = taxonomy.category();
         int score = taxonomy.dataAccuracyScore();
+        Integer netWeight = taxonomy.netWeightInGrams();
+        Integer grossWeight = taxonomy.grossWeightInGrams();
 
         Optional<PimEntry> pim = resolveFromPim(ean, taxonomy.mfn());
         if (pim.isPresent()) {
@@ -41,10 +43,12 @@ class DataCorrection {
             if (isNotBlank(entry.brand())) brand = BrandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
             if (entry.category() != null && entry.category() != ProductCategory.Other) category = entry.category();
+            if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
+            if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score);
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight);
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {

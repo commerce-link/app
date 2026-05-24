@@ -53,7 +53,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryWithOffersIncrementsOrderTotalsAndPersistsItem() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", ProductCategory.Laptops, 1);
+        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", ProductCategory.Laptops, 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(150.0));
