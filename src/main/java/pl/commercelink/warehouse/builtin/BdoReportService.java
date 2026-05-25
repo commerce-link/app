@@ -45,8 +45,12 @@ public class BdoReportService {
 
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
+            if (doc.getType() != DocumentType.GoodsReceipt) continue;
+            if (doc.getReason() != DocumentReason.SupplierDelivery) continue;
+
             String supplier = resolveSupplier(storeId, doc);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
+                if (item.getMfn() == null || item.getMfn().isBlank()) continue;
                 Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
                 ProductCategory category = pim.map(PimEntry::category).orElse(null);
                 Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);

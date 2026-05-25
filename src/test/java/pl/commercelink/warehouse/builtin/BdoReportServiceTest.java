@@ -75,6 +75,39 @@ class BdoReportServiceTest {
         assertThat(row.supplier()).isEqualTo("IngramMicro");
     }
 
+    @Test
+    void skipsDocumentsThatAreNotGoodsReceipt() {
+        WarehouseDocument issue = supplierDeliveryDoc("doc-issue", "delivery-x");
+        issue.setType(DocumentType.GoodsIssue);
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(issue));
+
+        assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
+    }
+
+    @Test
+    void skipsGoodsReceiptWithNonSupplierDeliveryReason() {
+        WarehouseDocument customerReturn = supplierDeliveryDoc("doc-rma", "delivery-rma");
+        customerReturn.setReason(DocumentReason.CustomerReturn);
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(customerReturn));
+
+        assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
+    }
+
+    @Test
+    void skipsItemsWithBlankMfn() {
+        WarehouseDocument doc = supplierDeliveryDoc("doc-blank", "delivery-1");
+        WarehouseDocumentItem blank = item("doc-blank", "5901111111111", "", "Something", 3);
+
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc));
+        when(itemRepository.findByDocumentId("doc-blank")).thenReturn(List.of(blank));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+
+        assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
+    }
+
     // --- helpers ---
 
     private static WarehouseDocument supplierDeliveryDoc(String documentId, String deliveryId) {
