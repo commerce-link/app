@@ -86,12 +86,13 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
         eav.put(":statusCompleted", new AttributeValue().withS(OrderStatus.Completed.name()));
+        eav.put(":statusCancelled", new AttributeValue().withS(OrderStatus.Cancelled.name()));
 
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#status", "status");
 
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND #status <> :statusCompleted")
+                .withFilterExpression("storeId = :storeId AND #status <> :statusCompleted AND #status <> :statusCancelled")
                 .withExpressionAttributeValues(eav)
                 .withExpressionAttributeNames(expressionAttributeNames);
 
@@ -167,7 +168,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     public List<OrderIndexEntry> searchPastOrders(String storeId, PastOrderFilter filter) {
         if (isNotBlank(filter.getOrderId())) {
             Order order = findById(storeId, filter.getOrderId());
-            return order != null && order.getStatus() == OrderStatus.Completed
+            return order != null && (order.getStatus() == OrderStatus.Completed || order.getStatus() == OrderStatus.Cancelled)
                     ? Collections.singletonList(OrderIndexEntry.fromOrder(order))
                     : Collections.emptyList();
         } else {
@@ -176,9 +177,10 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
             StringBuilder filterExpression = new StringBuilder();
 
             eav.put(":storeId", new AttributeValue().withS(storeId));
-            eav.put(":status", new AttributeValue().withS(OrderStatus.Completed.name()));
+            eav.put(":statusCompleted", new AttributeValue().withS(OrderStatus.Completed.name()));
+            eav.put(":statusCancelled", new AttributeValue().withS(OrderStatus.Cancelled.name()));
             expressionAttributeNames.put("#status", "status");
-            appendFilter(filterExpression, "#status = :status");
+            appendFilter(filterExpression, "(#status = :statusCompleted OR #status = :statusCancelled)");
 
             if (isNotBlank(filter.getEmail())) {
                 eav.put(":email", new AttributeValue().withS(filter.getEmail()));

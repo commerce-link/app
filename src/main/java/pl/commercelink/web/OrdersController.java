@@ -97,10 +97,10 @@ public class OrdersController extends BaseController {
     public String orders(@RequestParam(required = false) List<String> statuses,
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
                         Model model) {
-        // Fetch all active orders once (excluding Completed)
+        // Fetch all active orders once (excluding Completed and Cancelled)
         List<Order> allActiveOrders = ordersRepository.findAllActiveOrders(getStoreId())
                 .stream()
-                .filter(order -> order.getStatus() != OrderStatus.Completed)
+                .filter(order -> order.getStatus() != OrderStatus.Completed && order.getStatus() != OrderStatus.Cancelled)
                 .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
 
@@ -159,9 +159,9 @@ public class OrdersController extends BaseController {
         // Add each status enum value to model for template access
         Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
 
-        // Exclude Completed status from filter options
+        // Exclude Completed and Cancelled statuses from filter options
         List<OrderStatus> availableStatuses = Arrays.stream(OrderStatus.values())
-                .filter(status -> status != OrderStatus.Completed)
+                .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
                 .collect(Collectors.toList());
 
         model.addAttribute("liveOrders", filteredOrders);
@@ -306,7 +306,8 @@ public class OrdersController extends BaseController {
         model.addAttribute("serialUpdateItems", serialUpdateItems);
         model.addAttribute("orderFinancials", new OrderFinancials(order, orderItems));
         model.addAttribute("orderStatuses", Arrays.stream(OrderStatus.values())
-                .filter(status -> status != OrderStatus.Completed || order.getStatus() == OrderStatus.Completed)
+                .filter(status -> (status != OrderStatus.Completed || order.getStatus() == OrderStatus.Completed)
+                        && (status != OrderStatus.Cancelled || order.getStatus() == OrderStatus.Cancelled))
                 .collect(Collectors.toList()));
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
@@ -319,10 +320,11 @@ public class OrdersController extends BaseController {
         model.addAttribute("categories", store.getEnabledProductCategories());
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("isCompletedOrder", order.getStatus() == OrderStatus.Completed || isSuperAdmin());
+        model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || isSuperAdmin());
         model.addAttribute("isNewOrder", order.getStatus() == OrderStatus.New);
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
+        model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
@@ -438,6 +440,11 @@ public class OrdersController extends BaseController {
             return "redirect:/dashboard/orders/" + orderId;
         }
 
+        if (updatedOrder.getStatus() == OrderStatus.Cancelled && existingOrder.getStatus() != OrderStatus.Cancelled) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.cancelled.cannot.be.set.manually", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
         existingOrder.setStatus(updatedOrder.getStatus());
         existingOrder.setEmailNotificationsEnabled(updatedOrder.isEmailNotificationsEnabled());
         existingOrder.setEstimatedAssemblyAt(updatedOrder.getEstimatedAssemblyAt());
@@ -487,7 +494,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("orderItem", orderItem);
         model.addAttribute("categories", store.getEnabledProductCategories());
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
-        model.addAttribute("isCompletedOrder", order.getStatus() == OrderStatus.Completed);
+        model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
 
         return "orderItem";
     }
@@ -497,6 +504,17 @@ public class OrdersController extends BaseController {
     public String deleteOrder(@PathVariable String orderId) {
         ordersManager.deleteOrder(getStoreId(), orderId);
         return "redirect:/dashboard/orders";
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/cancel")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String cancelOrder(@PathVariable String orderId, RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            ordersManager.cancelOrder(getStoreId(), orderId);
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.order.cannot.be.cancelled", null, locale));
+        }
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/removeSelectedItemsFromOrder")

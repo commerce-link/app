@@ -269,6 +269,36 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean canBeCancelled(List<OrderItem> orderItems) {
+        if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
+            return false;
+        }
+        if (getPaidAmount() != 0) {
+            return false;
+        }
+        return orderItems.stream()
+                .filter(i -> !i.hasCategory(ProductCategory.Services))
+                .allMatch(OrderItem::isReturned);
+    }
+
+    @DynamoDBIgnore
+    public void cancel(List<OrderItem> orderItems) {
+        orderItems.stream()
+                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .forEach(OrderItem::markAsReturned);
+
+        this.totalPrice = orderItems.stream()
+                .mapToDouble(OrderItem::getTotalPrice)
+                .sum();
+
+        this.status = OrderStatus.Cancelled;
+
+        if (review != null && review.getStatus() == OrderReviewStatus.ToBeCollected) {
+            review.setStatus(OrderReviewStatus.NotApplicable);
+        }
+    }
+
+    @DynamoDBIgnore
     public boolean canBeSplit() {
         return hasStatus(OrderStatus.New)
                 && getPaidAmount() == 0

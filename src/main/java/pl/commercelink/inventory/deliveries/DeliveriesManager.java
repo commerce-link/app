@@ -155,7 +155,7 @@ public class DeliveriesManager {
 
         orderIds.stream()
                 .map(orderId -> ordersRepository.findById(storeId, orderId))
-                .filter(order -> !order.hasStatus(OrderStatus.Completed))
+                .filter(order -> !order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled))
                 .forEach(order -> {
                     LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
                     LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
