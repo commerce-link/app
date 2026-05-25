@@ -118,6 +118,52 @@ class BdoReportServiceTest {
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
     }
 
+    @Test
+    void sumsQuantitiesAndTotalsWhenSameMfnFromSameSupplierAppearsTwice() {
+        WarehouseDocument doc1 = supplierDeliveryDoc("doc-1", "delivery-1");
+        WarehouseDocument doc2 = supplierDeliveryDoc("doc-2", "delivery-2");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc1, doc2));
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
+        when(itemRepository.findByDocumentId("doc-2"))
+                .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
+        when(pimCatalog.findByGtinOrMpn("5900000000001", "MFN-A"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1000, 1200)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(delivery("IngramMicro"));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).qty()).isEqualTo(5);
+        assertThat(rows.get(0).totalWeightNetG()).isEqualTo(5L * 1000);
+        assertThat(rows.get(0).totalWeightGrossG()).isEqualTo(5L * 1200);
+        assertThat(rows.get(0).supplier()).isEqualTo("IngramMicro");
+    }
+
+    @Test
+    void emitsSeparateRowsWhenSameMfnComesFromDifferentSuppliers() {
+        WarehouseDocument doc1 = supplierDeliveryDoc("doc-1", "delivery-1");
+        WarehouseDocument doc2 = supplierDeliveryDoc("doc-2", "delivery-2");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc1, doc2));
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
+        when(itemRepository.findByDocumentId("doc-2"))
+                .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
+        when(pimCatalog.findByGtinOrMpn("5900000000001", "MFN-A"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1000, 1200)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(delivery("AbGroup"));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows).extracting(BdoReportRow::supplier).containsExactlyInAnyOrder("IngramMicro", "AbGroup");
+        assertThat(rows).allSatisfy(r -> assertThat(r.mfn()).isEqualTo("MFN-A"));
+    }
+
     // --- helpers ---
 
     private static WarehouseDocument supplierDeliveryDoc(String documentId, String deliveryId) {
