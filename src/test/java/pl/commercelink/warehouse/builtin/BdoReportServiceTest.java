@@ -206,6 +206,39 @@ class BdoReportServiceTest {
         assertThat(row.totalWeightGrossG()).isEqualTo(7L * 1500);
     }
 
+    @Test
+    void supplierIsUnknownWhenDocumentHasNoDeliveryId() {
+        WarehouseDocument doc = supplierDeliveryDoc("doc-manual", null);
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc));
+        when(itemRepository.findByDocumentId("doc-manual"))
+                .thenReturn(List.of(item("doc-manual", "5900000000004", "MFN-X", "X", 1)));
+        when(pimCatalog.findByGtinOrMpn("5900000000004", "MFN-X"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1000, 1200)));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).supplier()).isEqualTo("Unknown");
+    }
+
+    @Test
+    void supplierIsUnknownWhenDeliveryNotFound() {
+        WarehouseDocument doc = supplierDeliveryDoc("doc-missing-delivery", "delivery-ghost");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc));
+        when(itemRepository.findByDocumentId("doc-missing-delivery"))
+                .thenReturn(List.of(item("doc-missing-delivery", "5900000000005", "MFN-Y", "Y", 1)));
+        when(pimCatalog.findByGtinOrMpn("5900000000005", "MFN-Y"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 500, 600)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-ghost")).thenReturn(null);
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).supplier()).isEqualTo("Unknown");
+    }
+
     // --- helpers ---
 
     private static WarehouseDocument supplierDeliveryDoc(String documentId, String deliveryId) {
