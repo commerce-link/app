@@ -9,10 +9,10 @@ class BdoReportRowTest {
     @Test
     void headersReturnNineLabelsInOrder() {
         assertThat(BdoReportRow.headers()).containsExactly(
-                "Kategoria", "Nazwa", "MFN", "Ilość",
-                "Waga netto (g)", "Waga brutto (g)",
-                "Waga netto razem (g)", "Waga brutto razem (g)",
-                "Dostawca"
+                "Category", "Name", "MFN", "Quantity",
+                "Net weight (g)", "Gross weight (g)",
+                "Total net weight (g)", "Total gross weight (g)",
+                "Supplier"
         );
     }
 

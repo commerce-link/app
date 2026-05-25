@@ -16,10 +16,10 @@ public record BdoReportRow(
 
     public static String[] headers() {
         return new String[]{
-                "Kategoria", "Nazwa", "MFN", "Ilość",
-                "Waga netto (g)", "Waga brutto (g)",
-                "Waga netto razem (g)", "Waga brutto razem (g)",
-                "Dostawca"
+                "Category", "Name", "MFN", "Quantity",
+                "Net weight (g)", "Gross weight (g)",
+                "Total net weight (g)", "Total gross weight (g)",
+                "Supplier"
         };
     }
 

@@ -32,7 +32,7 @@ class BdoReportExportTest {
         byte[] bytes = new BdoReportExport(service).run("store-1", LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31));
 
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertThat(csv).startsWith("\"Kategoria\";\"Nazwa\";\"MFN\";\"Ilość\";\"Waga netto (g)\";\"Waga brutto (g)\";\"Waga netto razem (g)\";\"Waga brutto razem (g)\";\"Dostawca\"");
+        assertThat(csv).startsWith("\"Category\";\"Name\";\"MFN\";\"Quantity\";\"Net weight (g)\";\"Gross weight (g)\";\"Total net weight (g)\";\"Total gross weight (g)\";\"Supplier\"");
         assertThat(csv).contains("\"GPU\";\"DUAL 4070\";\"MFN-A\";\"5\";\"2100\";\"2400\";\"10500\";\"12000\";\"IngramMicro\"");
     }
 }
