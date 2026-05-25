@@ -164,6 +164,48 @@ class BdoReportServiceTest {
         assertThat(rows).allSatisfy(r -> assertThat(r.mfn()).isEqualTo("MFN-A"));
     }
 
+    @Test
+    void usesUnknownCategoryAndEmptyTotalsWhenPimEntryMissing() {
+        WarehouseDocument doc = supplierDeliveryDoc("doc-pim-miss", "delivery-1");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc));
+        when(itemRepository.findByDocumentId("doc-pim-miss"))
+                .thenReturn(List.of(item("doc-pim-miss", "5900000000002", "MFN-MISS", "Mystery", 4)));
+        when(pimCatalog.findByGtinOrMpn("5900000000002", "MFN-MISS")).thenReturn(Optional.empty());
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(1);
+        BdoReportRow row = rows.get(0);
+        assertThat(row.category()).isEqualTo("Unknown");
+        assertThat(row.weightNetG()).isNull();
+        assertThat(row.weightGrossG()).isNull();
+        assertThat(row.totalWeightNetG()).isNull();
+        assertThat(row.totalWeightGrossG()).isNull();
+    }
+
+    @Test
+    void leavesNetSideEmptyWhenPimEntryHasOnlyGrossWeight() {
+        WarehouseDocument doc = supplierDeliveryDoc("doc-half", "delivery-1");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(doc));
+        when(itemRepository.findByDocumentId("doc-half"))
+                .thenReturn(List.of(item("doc-half", "5900000000003", "MFN-HALF", "Half", 7)));
+        when(pimCatalog.findByGtinOrMpn("5900000000003", "MFN-HALF"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.PSU, null, 1500)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).hasSize(1);
+        BdoReportRow row = rows.get(0);
+        assertThat(row.weightNetG()).isNull();
+        assertThat(row.totalWeightNetG()).isNull();
+        assertThat(row.weightGrossG()).isEqualTo(1500);
+        assertThat(row.totalWeightGrossG()).isEqualTo(7L * 1500);
+    }
+
     // --- helpers ---
 
     private static WarehouseDocument supplierDeliveryDoc(String documentId, String deliveryId) {
