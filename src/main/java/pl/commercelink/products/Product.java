@@ -12,7 +12,7 @@ import java.util.UUID;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
-import static pl.commercelink.taxonomy.BrandMapper.unifyBrand;
+import static pl.commercelink.products.information.BrandFacade.unify;
 
 @DynamoDBTable(tableName = "Products")
 public class Product {
@@ -152,11 +152,11 @@ public class Product {
     }
 
     public String getBrand() {
-        return unifyBrand(brand);
+        return unify(brand);
     }
 
     public void setBrand(String brand) {
-        this.brand = unifyBrand(brand);
+        this.brand = unify(brand);
     }
 
     public String getLabel() {

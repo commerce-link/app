@@ -1,6 +1,7 @@
 package pl.commercelink.taxonomy;
 
 import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.products.information.BrandFacade;
 import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
 
@@ -18,7 +19,7 @@ class TaxonomyParser {
     static Taxonomy fromCsvRow(String[] row) {
         String ean = row[0];
         String mfn = row[1];
-        String brand = BrandMapper.unifyBrand(row[2]);
+        String brand = BrandFacade.unify(row[2]);
         String name = row[3];
         ProductCategory category = parseCategory(row[4]);
         int dataAccuracyScore = parseScore(row[5]);

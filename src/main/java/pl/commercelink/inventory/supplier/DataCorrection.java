@@ -3,7 +3,7 @@ package pl.commercelink.inventory.supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.taxonomy.BrandMapper;
+import pl.commercelink.products.information.BrandFacade;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -30,7 +30,7 @@ class DataCorrection {
 
     Taxonomy run(Taxonomy taxonomy) {
         String ean = resolveCorrectEanForMfn(taxonomy.ean(), taxonomy.mfn()).orElse(taxonomy.ean());
-        String brand = BrandMapper.unifyBrand(taxonomy.brand());
+        String brand = BrandFacade.unify(taxonomy.brand());
         String name = taxonomy.name();
         ProductCategory category = taxonomy.category();
         int score = taxonomy.dataAccuracyScore();
@@ -40,7 +40,7 @@ class DataCorrection {
         Optional<PimEntry> pim = resolveFromPim(ean, taxonomy.mfn());
         if (pim.isPresent()) {
             PimEntry entry = pim.get();
-            if (isNotBlank(entry.brand())) brand = BrandMapper.unifyBrand(entry.brand());
+            if (isNotBlank(entry.brand())) brand = BrandFacade.unify(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
             if (entry.category() != null && entry.category() != ProductCategory.Other) category = entry.category();
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
