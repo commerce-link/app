@@ -96,6 +96,8 @@ public class MarketplaceOrderLifecycleEventListener {
                 return MarketplaceOrderStatus.Delivered;
             case Completed:
                 return MarketplaceOrderStatus.Completed;
+            case Cancelled:
+                return MarketplaceOrderStatus.Cancelled;
             default:
                 return MarketplaceOrderStatus.InProgress;
         }
