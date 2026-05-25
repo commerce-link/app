@@ -663,16 +663,6 @@ public class Order {
             );
         }
 
-        public Builder withBillingDetails(BillingDetails billingDetails) {
-            order.setBillingDetails(billingDetails);
-            return this;
-        }
-
-        public Builder withShippingDetails(ShippingDetails shippingDetails) {
-            order.setShippingDetails(shippingDetails);
-            return this;
-        }
-
         public Builder withShipmentType(ShipmentType shipmentType) {
             order.getShipments().get(0).setType(shipmentType);
             return this;
