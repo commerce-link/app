@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -237,6 +238,41 @@ class BdoReportServiceTest {
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).supplier()).isEqualTo("Unknown");
+    }
+
+    @Test
+    void sortsResultByCategoryThenSupplierThenMfn() {
+        WarehouseDocument d1 = supplierDeliveryDoc("doc-1", "delivery-1");
+        WarehouseDocument d2 = supplierDeliveryDoc("doc-2", "delivery-2");
+        WarehouseDocument d3 = supplierDeliveryDoc("doc-3", "delivery-3");
+        WarehouseDocument d4 = supplierDeliveryDoc("doc-4", "delivery-4");
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(d1, d2, d3, d4));
+
+        when(itemRepository.findByDocumentId("doc-1")).thenReturn(List.of(item("doc-1", "ean-1", "M-Z", "z", 1)));
+        when(itemRepository.findByDocumentId("doc-2")).thenReturn(List.of(item("doc-2", "ean-2", "M-A", "a", 1)));
+        when(itemRepository.findByDocumentId("doc-3")).thenReturn(List.of(item("doc-3", "ean-3", "M-A", "a", 1)));
+        when(itemRepository.findByDocumentId("doc-4")).thenReturn(List.of(item("doc-4", "ean-4", "M-B", "b", 1)));
+
+        when(pimCatalog.findByGtinOrMpn("ean-1", "M-Z")).thenReturn(Optional.of(pimEntry(ProductCategory.PSU, 1, 1)));
+        when(pimCatalog.findByGtinOrMpn("ean-2", "M-A")).thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1, 1)));
+        when(pimCatalog.findByGtinOrMpn("ean-3", "M-A")).thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1, 1)));
+        when(pimCatalog.findByGtinOrMpn("ean-4", "M-B")).thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1, 1)));
+
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(delivery("IngramMicro"));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(delivery("IngramMicro"));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-3")).thenReturn(delivery("AbGroup"));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-4")).thenReturn(delivery("AbGroup"));
+
+        List<BdoReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        assertThat(rows).extracting(BdoReportRow::category, BdoReportRow::supplier, BdoReportRow::mfn)
+                .containsExactly(
+                        tuple("GPU", "AbGroup", "M-A"),
+                        tuple("GPU", "AbGroup", "M-B"),
+                        tuple("GPU", "IngramMicro", "M-A"),
+                        tuple("PSU", "IngramMicro", "M-Z")
+                );
     }
 
     // --- helpers ---
