@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class BdoReportService {
 
     private static final String UNKNOWN = "Unknown";
@@ -27,16 +29,6 @@ public class BdoReportService {
     private final WarehouseDocumentItemRepository itemRepository;
     private final PimCatalog pimCatalog;
     private final DeliveriesRepository deliveriesRepository;
-
-    BdoReportService(WarehouseDocumentRepository documentRepository,
-                     WarehouseDocumentItemRepository itemRepository,
-                     PimCatalog pimCatalog,
-                     DeliveriesRepository deliveriesRepository) {
-        this.documentRepository = documentRepository;
-        this.itemRepository = itemRepository;
-        this.pimCatalog = pimCatalog;
-        this.deliveriesRepository = deliveriesRepository;
-    }
 
     public List<BdoReportRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
