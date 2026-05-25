@@ -81,6 +81,11 @@ class BdoReportServiceTest {
         issue.setType(DocumentType.GoodsIssue);
         when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
                 .thenReturn(List.of(issue));
+        when(itemRepository.findByDocumentId("doc-issue"))
+                .thenReturn(List.of(item("doc-issue", "5901111111111", "MFN-ISSUE", "Widget", 2)));
+        when(pimCatalog.findByGtinOrMpn("5901111111111", "MFN-ISSUE"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 1000, 1200)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-x")).thenReturn(delivery("IngramMicro"));
 
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
     }
@@ -91,6 +96,11 @@ class BdoReportServiceTest {
         customerReturn.setReason(DocumentReason.CustomerReturn);
         when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
                 .thenReturn(List.of(customerReturn));
+        when(itemRepository.findByDocumentId("doc-rma"))
+                .thenReturn(List.of(item("doc-rma", "5902222222222", "MFN-RMA", "Returned item", 1)));
+        when(pimCatalog.findByGtinOrMpn("5902222222222", "MFN-RMA"))
+                .thenReturn(Optional.of(pimEntry(ProductCategory.GPU, 500, 600)));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-rma")).thenReturn(delivery("IngramMicro"));
 
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
     }
