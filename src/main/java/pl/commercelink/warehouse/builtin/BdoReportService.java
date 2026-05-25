@@ -12,7 +12,6 @@ import pl.commercelink.taxonomy.ProductCategory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +42,17 @@ public class BdoReportService {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
         LocalDateTime periodEnd = dateTo.atTime(LocalTime.MAX);
 
+        Map<AggregateKey, Aggregate> aggregates = aggregate(storeId, periodStart, periodEnd);
+
+        return aggregates.entrySet().stream()
+                .map(BdoReportService::toRow)
+                .sorted(Comparator.comparing(BdoReportRow::category)
+                        .thenComparing(BdoReportRow::supplier)
+                        .thenComparing(BdoReportRow::mfn))
+                .toList();
+    }
+
+    private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
@@ -50,50 +60,47 @@ public class BdoReportService {
 
             String supplier = resolveSupplier(storeId, doc);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                if (item.getMfn() == null || item.getMfn().isBlank()) continue;
-                Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
-                ProductCategory category = pim.map(PimEntry::category).orElse(null);
-                Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);
-                Integer grossG = pim.map(PimEntry::grossWeightInGrams).orElse(null);
-
-                AggregateKey key = new AggregateKey(category, item.getMfn(), supplier);
-                Aggregate agg = aggregates.computeIfAbsent(key, k -> new Aggregate());
-                agg.qty += item.getQty();
-                if (netG != null) agg.totalNetG += (long) item.getQty() * netG;
-                if (grossG != null) agg.totalGrossG += (long) item.getQty() * grossG;
-                if (item.getName() != null && !item.getName().isBlank()) agg.latestName = item.getName();
-                agg.unitNetG = netG;
-                agg.unitGrossG = grossG;
+                accumulate(item, supplier, aggregates);
             }
         }
+        return aggregates;
+    }
 
-        List<BdoReportRow> rows = new ArrayList<>();
-        for (Map.Entry<AggregateKey, Aggregate> e : aggregates.entrySet()) {
-            AggregateKey k = e.getKey();
-            Aggregate a = e.getValue();
-            rows.add(new BdoReportRow(
-                    k.category() != null ? k.category().name() : UNKNOWN,
-                    a.latestName,
-                    k.mfn(),
-                    a.qty,
-                    a.unitNetG,
-                    a.unitGrossG,
-                    a.unitNetG != null ? a.totalNetG : null,
-                    a.unitGrossG != null ? a.totalGrossG : null,
-                    k.supplier()
-            ));
-        }
-        rows.sort(Comparator
-                .comparing(BdoReportRow::category, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(BdoReportRow::supplier, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(BdoReportRow::mfn, Comparator.nullsLast(Comparator.naturalOrder())));
-        return rows;
+    private void accumulate(WarehouseDocumentItem item, String supplier, Map<AggregateKey, Aggregate> aggregates) {
+        if (item.getMfn() == null || item.getMfn().isBlank()) return;
+        Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
+        ProductCategory category = pim.map(PimEntry::category).orElse(null);
+        Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);
+        Integer grossG = pim.map(PimEntry::grossWeightInGrams).orElse(null);
+
+        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(category, item.getMfn(), supplier), k -> new Aggregate());
+        agg.qty += item.getQty();
+        if (netG != null) agg.totalNetG += (long) item.getQty() * netG;
+        if (grossG != null) agg.totalGrossG += (long) item.getQty() * grossG;
+        if (item.getName() != null && !item.getName().isBlank()) agg.latestName = item.getName();
+        agg.unitNetG = netG;
+        agg.unitGrossG = grossG;
     }
 
     private String resolveSupplier(String storeId, WarehouseDocument doc) {
         if (doc.getDeliveryId() == null) return UNKNOWN;
         Delivery delivery = deliveriesRepository.findById(storeId, doc.getDeliveryId());
         return delivery != null && delivery.getProvider() != null ? delivery.getProvider() : UNKNOWN;
+    }
+
+    private static BdoReportRow toRow(Map.Entry<AggregateKey, Aggregate> entry) {
+        AggregateKey k = entry.getKey();
+        Aggregate a = entry.getValue();
+        return new BdoReportRow(
+                k.category() != null ? k.category().name() : UNKNOWN,
+                a.latestName,
+                k.mfn(),
+                a.qty,
+                a.unitNetG,
+                a.unitGrossG,
+                a.unitNetG != null ? a.totalNetG : null,
+                a.unitGrossG != null ? a.totalGrossG : null,
+                k.supplier());
     }
 
     private record AggregateKey(ProductCategory category, String mfn, String supplier) {}
