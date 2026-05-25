@@ -8,8 +8,12 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 @Component
 public class TaxonomyCache {
@@ -36,12 +40,40 @@ public class TaxonomyCache {
     }
 
     public void add(Taxonomy taxonomy) {
-        Taxonomy t = taxonomyByMfn.get(taxonomy.mfn());
-        if (t == null || taxonomy.dataAccuracyScore() <= t.dataAccuracyScore()) {
-            if (StringUtils.isNotBlank(taxonomy.mfn())) {
-                taxonomyByMfn.put(taxonomy.mfn(), taxonomy);
-            }
-        }
+        if (StringUtils.isBlank(taxonomy.mfn())) return;
+        taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> mergeOf(current, taxonomy));
+    }
+
+    private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
+        if (current == null) return incoming;
+
+        Taxonomy winner = bestByScore(current, incoming);
+        Integer net = bestWeightOf(current, incoming, Taxonomy::netWeightInGrams);
+        Integer gross = bestWeightOf(current, incoming, Taxonomy::grossWeightInGrams);
+
+        return needsRebuild(winner, net, gross) ? withWeights(winner, net, gross) : winner;
+    }
+
+    private static Taxonomy bestByScore(Taxonomy a, Taxonomy b) {
+        return b.dataAccuracyScore() <= a.dataAccuracyScore() ? b : a;
+    }
+
+    private static Integer bestWeightOf(Taxonomy a, Taxonomy b, Function<Taxonomy, Integer> picker) {
+        return Stream.of(b, a)
+                .filter(t -> picker.apply(t) != null)
+                .min(Comparator.comparingInt(Taxonomy::dataAccuracyScore))
+                .map(picker)
+                .orElse(null);
+    }
+
+    private static boolean needsRebuild(Taxonomy winner, Integer net, Integer gross) {
+        return !Objects.equals(net, winner.netWeightInGrams())
+                || !Objects.equals(gross, winner.grossWeightInGrams());
+    }
+
+    private static Taxonomy withWeights(Taxonomy t, Integer net, Integer gross) {
+        return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
+                            t.category(), t.dataAccuracyScore(), net, gross);
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {
