@@ -31,6 +31,9 @@ public class FinancialReportsController {
     private StockLedgerExport stockLedgerExport;
 
     @Autowired
+    private BdoReportExport bdoReportExport;
+
+    @Autowired
     private FinancialReportGenerator financialReportGenerator;
 
     @GetMapping("/dashboard/reports")
@@ -83,6 +86,16 @@ public class FinancialReportsController {
 
         response.setContentType("text/csv; charset=UTF-8");
         response.setHeader("Content-Disposition", "attachment; filename=\"stock-ledger-" + dateFrom + "_" + dateTo + ".csv\"");
+        response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+        response.getOutputStream().write(csv);
+    }
+
+    @GetMapping("/dashboard/reports/bdoExport")
+    public void bdoExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
+        byte[] csv = bdoReportExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"bdo-" + dateFrom + "_" + dateTo + ".csv\"");
         response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         response.getOutputStream().write(csv);
     }
