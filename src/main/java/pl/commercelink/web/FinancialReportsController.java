@@ -31,7 +31,7 @@ public class FinancialReportsController {
     private StockLedgerExport stockLedgerExport;
 
     @Autowired
-    private BdoReportExport bdoReportExport;
+    private ProductWeightOriginComplianceReportExport productWeightOriginComplianceReportExport;
 
     @Autowired
     private FinancialReportGenerator financialReportGenerator;
@@ -90,12 +90,12 @@ public class FinancialReportsController {
         response.getOutputStream().write(csv);
     }
 
-    @GetMapping("/dashboard/reports/bdoExport")
-    public void bdoExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
-        byte[] csv = bdoReportExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+    @GetMapping("/dashboard/reports/productWeightOriginComplianceExport")
+    public void productWeightOriginComplianceExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
+        byte[] csv = productWeightOriginComplianceReportExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
 
         response.setContentType("text/csv; charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment; filename=\"bdo-" + dateFrom + "_" + dateTo + ".csv\"");
+        response.setHeader("Content-Disposition", "attachment; filename=\"product-weight-origin-compliance-" + dateFrom + "_" + dateTo + ".csv\"");
         response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         response.getOutputStream().write(csv);
     }
