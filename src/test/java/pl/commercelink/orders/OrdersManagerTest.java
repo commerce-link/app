@@ -19,7 +19,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.Warehouse;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -38,6 +41,8 @@ class OrdersManagerTest {
     private OrderItemsRepository orderItemsRepository;
     @Mock
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
+    @Mock
+    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock
     private OrderLifecycle orderLifecycle;
     @Mock
@@ -151,10 +156,90 @@ class OrdersManagerTest {
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
 
+    @Test
+    @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes StatusChange")
+    void cancelOrderZeroesServicesAndSetsCancelled() {
+        // given
+        Order order = deliveredOrder(150.0);
+        OrderItem product = returnedProduct("item-1", 100.0);
+        OrderItem service = serviceItem("item-2", 50.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product, service));
+
+        // when
+        ordersManager.cancelOrder(STORE_ID, ORDER_ID);
+
+        // then
+        assertThat(service.getPrice()).isEqualTo(0.0);
+        assertThat(service.isReturned()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        assertThat(order.getTotalPrice()).isEqualTo(0.0);
+        verify(orderItemsRepository).batchSave(List.of(product, service));
+        verify(ordersRepository).save(order);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.StatusChange);
+    }
+
+    @Test
+    @DisplayName("cancelOrder throws when not all non-service items are returned")
+    void cancelOrderThrowsWhenItemsNotReturned() {
+        // given
+        Order order = deliveredOrder(150.0);
+        OrderItem product = orderItem("item-1", 100.0);
+        OrderItem service = serviceItem("item-2", 50.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product, service));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("cancelOrder throws when payments are not settled")
+    void cancelOrderThrowsWhenPaymentsNotSettled() {
+        // given
+        Order order = deliveredOrder(150.0);
+        Payment incoming = new Payment(PaymentSource.BankTransfer);
+        incoming.setAmount(150.0);
+        order.addPayment(incoming);
+        OrderItem product = returnedProduct("item-1", 100.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     private Order orderWithTotalPrice(double totalPrice) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         order.setTotalPrice(totalPrice);
         return order;
+    }
+
+    private Order deliveredOrder(double totalPrice) {
+        Order order = orderWithTotalPrice(totalPrice);
+        order.setStatus(OrderStatus.Delivered);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        return order;
+    }
+
+    private OrderItem orderItem(String itemId, double price) {
+        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Other, "product", 1, price, "SKU-" + itemId, false);
+        item.setItemId(itemId);
+        return item;
+    }
+
+    private OrderItem returnedProduct(String itemId, double price) {
+        OrderItem item = orderItem(itemId, price);
+        item.markAsReturned();
+        return item;
+    }
+
+    private OrderItem serviceItem(String itemId, double price) {
+        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Services, "service", 1, price, null, false);
+        item.setItemId(itemId);
+        return item;
     }
 }

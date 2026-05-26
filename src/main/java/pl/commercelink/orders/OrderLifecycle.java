@@ -42,6 +42,10 @@ public class OrderLifecycle {
 
     public void update(Order order, List<OrderItem> orderItems) {
 
+        if (order.getStatus() == OrderStatus.Cancelled) {
+            return;
+        }
+
         OrderStatus previousOrderStatus = order.getStatus();
 
         if (order.getStatus() == OrderStatus.New || order.getStatus() == OrderStatus.Assembly) {
@@ -101,7 +105,7 @@ public class OrderLifecycle {
 
             boolean hasAllOrderItemsReturned = getOrFetchOrderItems(order.getOrderId(), orderItems).stream().allMatch(OrderItem::isReturned);
             if (hasAllOrderItemsReturned) {
-                order.setStatus(OrderStatus.Completed);
+                order.setStatus(OrderStatus.Cancelled);
 
                 if (order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
                     order.getReview().setStatus(OrderReviewStatus.NotApplicable);

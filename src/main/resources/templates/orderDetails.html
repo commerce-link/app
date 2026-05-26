@@ -791,6 +791,10 @@
                   onsubmit="return confirm('Czy na pewno chcesz usunąć to zamówienie?');">
                 <button class="button is-danger" type="submit" th:text="#{order.action.delete}"></button>
             </form>
+            <form th:if="${canCancelOrder}" method="post" th:action="@{/dashboard/orders/{orderId}/cancel(orderId=${order.orderId})}" class="ml-2"
+                  onsubmit="return confirm('Czy na pewno chcesz anulować to zamówienie? Ceny usług zostaną wyzerowane.');">
+                <button class="button is-danger" type="submit" th:text="#{order.action.cancel}"></button>
+            </form>
         </div>
     </div>
 

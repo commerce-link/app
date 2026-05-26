@@ -10,6 +10,7 @@ public enum OrderStatus implements LocalizedEnum<OrderStatus> {
     Realization("W realizacji"),
     Shipping("W dostawie"),
     Delivered("Dostarczone"),
+    Cancelled("Anulowane"),
     Completed("Zakończone"); // meaning paid, delivered and reviewed,
 
     private final String localizedName;

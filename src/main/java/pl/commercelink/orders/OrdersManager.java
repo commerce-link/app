@@ -33,6 +33,8 @@ public class OrdersManager {
     @Autowired
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
     @Autowired
+    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    @Autowired
     private OrderLifecycle orderLifecycle;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory) {
@@ -234,6 +236,21 @@ public class OrdersManager {
         }
 
         ordersRepository.delete(order);
+    }
+
+    public void cancelOrder(String storeId, String orderId) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
+
+        if (!order.canBeCancelled(orderItems)) {
+            throw new IllegalStateException("Order cannot be cancelled");
+        }
+
+        order.cancel(orderItems);
+
+        orderItemsRepository.batchSave(orderItems);
+        ordersRepository.save(order);
+        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.StatusChange);
     }
 
     public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {
