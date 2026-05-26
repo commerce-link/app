@@ -6,6 +6,31 @@
 
 <div layout:fragment="content">
 
+    <style>
+        .invoice-sync-mapping tr.match-row td:first-child {
+            border-left-width: 4px;
+            border-left-style: solid;
+        }
+        .invoice-sync-mapping tr.match-exact td:first-child { border-left-color: hsl(141, 71%, 48%); }
+        .invoice-sync-mapping tr.match-close td:first-child { border-left-color: hsl(48, 100%, 67%); }
+        .invoice-sync-mapping tr.match-none  td:first-child { border-left-color: hsl(348, 86%, 61%); }
+        .invoice-sync-mapping tr.match-exact { background-color: hsla(141, 71%, 48%, 0.08); }
+        .invoice-sync-mapping tr.match-close { background-color: hsla(48, 100%, 67%, 0.10); }
+        .invoice-sync-mapping tr.match-none  { background-color: hsla(348, 86%, 61%, 0.08); }
+        .invoice-sync-mapping td { vertical-align: middle !important; }
+        .invoice-sync-mapping select option { padding: 4px; }
+        .invoice-sync-mapping .delta-cell {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .invoice-sync-mapping .delta-zero  { color: hsl(141, 71%, 38%); }
+        .invoice-sync-mapping .delta-close { color: hsl(38, 90%, 45%); font-weight: 600; }
+        .invoice-sync-mapping .delta-far   { color: hsl(348, 86%, 51%); font-weight: 600; }
+        .invoice-sync-mapping .delta-empty { color: #b5b5b5; }
+        .invoice-sync-summary .tag { margin-right: 0.5rem; font-size: 0.95rem; }
+    </style>
+
     <section class="section">
         <div class="container">
 
@@ -137,9 +162,33 @@
                 <input type="hidden" th:field="*{invoiceShortcut}"/>
                 <input type="hidden" th:field="*{deliveryProvider}"/>
 
+                <div th:if="${preview.allExact}" class="notification is-success">
+                    <strong th:text="#{invoiceSync.allExactBanner}"></strong>
+                </div>
+
+                <div th:if="${!preview.allExact and !preview.mappings.isEmpty()}" class="box invoice-sync-summary">
+                    <span class="tag is-success is-medium" th:if="${preview.exactMatchCount > 0}">
+                        <span>&#10003;</span>&nbsp;<span th:text="${preview.exactMatchCount} + ' ' + #{invoiceSync.summary.exact}"></span>
+                    </span>
+                    <span class="tag is-warning is-medium" th:if="${preview.closeMatchCount > 0}">
+                        <span>~</span>&nbsp;<span th:text="${preview.closeMatchCount} + ' ' + #{invoiceSync.summary.close}"></span>
+                    </span>
+                    <span class="tag is-danger is-light is-medium" th:if="${preview.noMatchCount > 0}">
+                        <span>&#9675;</span>&nbsp;<span th:text="${preview.noMatchCount} + ' ' + #{invoiceSync.summary.none}"></span>
+                    </span>
+                </div>
+
                 <div class="box">
                     <h4 class="title is-5" th:text="#{invoiceSync.itemMapping}"></h4>
-                    <table class="table is-fullwidth is-striped">
+                    <table class="table is-fullwidth invoice-sync-mapping" data-cost-mode="unit">
+                        <colgroup>
+                            <col style="width: 23%"/>
+                            <col style="width: 12%"/>
+                            <col style="width: 5%"/>
+                            <col style="width: 12%"/>
+                            <col style="width: 40%"/>
+                            <col style="width: 8%"/>
+                        </colgroup>
                         <thead>
                         <tr>
                             <th th:text="#{general.name}"></th>
@@ -147,11 +196,14 @@
                             <th th:text="#{general.quantity}"></th>
                             <th th:text="#{invoiceSync.deliveryUnitCost}"></th>
                             <th th:text="#{invoiceSync.invoicePosition}"></th>
+                            <th th:text="#{invoiceSync.priceDelta}"></th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="mapping, stat : ${preview.mappings}">
-                            <td th:text="${mapping.name}"></td>
+                        <tr th:each="mapping, stat : ${preview.mappings}"
+                            th:classappend="${mapping.exact} ? 'match-row match-exact' : (${mapping.close} ? 'match-row match-close' : 'match-row match-none')"
+                            th:attr="data-unit-cost=${mapping.unitCost}">
+                            <td th:text="${mapping.name}" th:title="${mapping.name}"></td>
                             <td th:text="${mapping.mfn}"></td>
                             <td th:text="${mapping.qty}"></td>
                             <td th:text="${#numbers.formatDecimal(mapping.unitCost, 1, 2)} + ' PLN'"></td>
@@ -162,13 +214,43 @@
                                         <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
                                         <option th:each="pos : ${preview.options}"
                                                 th:value="${pos.id}"
-                                                th:text="${pos.label}">
+                                                th:title="${pos.name}"
+                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
+                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
                                         </option>
                                     </select>
                                 </div>
                             </td>
+                            <td class="delta-cell">—</td>
                         </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="box">
+                    <h4 class="title is-5" th:text="#{invoiceSync.additionalCosts}"></h4>
+                    <table class="table is-fullwidth invoice-sync-mapping" data-cost-mode="total">
+                        <colgroup>
+                            <col style="width: 23%"/>
+                            <col style="width: 12%"/>
+                            <col style="width: 5%"/>
+                            <col style="width: 12%"/>
+                            <col style="width: 40%"/>
+                            <col style="width: 8%"/>
+                        </colgroup>
+                        <thead>
                         <tr>
+                            <th th:text="#{general.name}"></th>
+                            <th></th>
+                            <th th:text="#{general.quantity}"></th>
+                            <th th:text="#{invoiceSync.deliveryUnitCost}"></th>
+                            <th th:text="#{invoiceSync.invoicePosition}"></th>
+                            <th th:text="#{invoiceSync.priceDelta}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:classappend="${preview.allExact or (preview.shippingCostPositionId != null and !preview.shippingCostPositionId.isBlank())} ? 'match-row match-exact' : 'match-row match-none'"
+                            th:attr="data-unit-cost=${preview.shippingCost}">
                             <td th:text="#{invoiceSync.shippingCost}"></td>
                             <td>-</td>
                             <td>1</td>
@@ -179,13 +261,17 @@
                                         <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
                                         <option th:each="pos : ${preview.options}"
                                                 th:value="${pos.id}"
-                                                th:text="${pos.label}">
+                                                th:title="${pos.name}"
+                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
+                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
                                         </option>
                                     </select>
                                 </div>
                             </td>
+                            <td class="delta-cell">—</td>
                         </tr>
-                        <tr>
+                        <tr th:classappend="${preview.allExact or (preview.paymentCostPositionId != null and !preview.paymentCostPositionId.isBlank())} ? 'match-row match-exact' : 'match-row match-none'"
+                            th:attr="data-unit-cost=${preview.paymentCost}">
                             <td th:text="#{invoiceSync.paymentCost}"></td>
                             <td>-</td>
                             <td>1</td>
@@ -196,11 +282,14 @@
                                         <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
                                         <option th:each="pos : ${preview.options}"
                                                 th:value="${pos.id}"
-                                                th:text="${pos.label}">
+                                                th:title="${pos.name}"
+                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
+                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
                                         </option>
                                     </select>
                                 </div>
                             </td>
+                            <td class="delta-cell">—</td>
                         </tr>
                         </tbody>
                     </table>
@@ -216,6 +305,51 @@
 
         </div>
     </section>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        (function () {
+            const fmt = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            function updateDelta(select) {
+                const row = select.closest('tr');
+                if (!row) return;
+                const cell = row.querySelector('.delta-cell');
+                if (!cell) return;
+
+                const table = select.closest('table');
+                const mode = table && table.dataset.costMode === 'total' ? 'data-total-net' : 'data-price-net';
+
+                const opt = select.options[select.selectedIndex];
+                const priceAttr = opt ? opt.getAttribute(mode) : null;
+                const unitCost = parseFloat(row.dataset.unitCost);
+
+                cell.classList.remove('delta-zero', 'delta-close', 'delta-far', 'delta-empty');
+
+                if (priceAttr === null || priceAttr === '' || isNaN(unitCost)) {
+                    cell.textContent = '—';
+                    cell.classList.add('delta-empty');
+                    return;
+                }
+
+                const delta = parseFloat(priceAttr) - unitCost;
+                const rounded = Math.round(delta * 100) / 100;
+                const sign = rounded > 0 ? '+' : (rounded < 0 ? '−' : '');
+                cell.textContent = sign + fmt.format(Math.abs(rounded)) + ' PLN';
+
+                const abs = Math.abs(rounded);
+                if (abs < 0.005)      cell.classList.add('delta-zero');
+                else if (abs <= 0.01) cell.classList.add('delta-close');
+                else                  cell.classList.add('delta-far');
+            }
+
+            document.querySelectorAll('.invoice-sync-mapping select').forEach(function (select) {
+                updateDelta(select);
+                select.addEventListener('change', function () { updateDelta(select); });
+            });
+        })();
+        /*]]>*/
+    </script>
 
 </div>
 </body>

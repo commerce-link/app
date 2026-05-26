@@ -19,8 +19,7 @@ import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.orders.imports.OrderImporter;
-import pl.commercelink.orders.imports.OrderReferenceType;
+import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -78,7 +77,7 @@ public class OrdersController extends BaseController {
     private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
 
     @Autowired
-    private List<OrderImporter> orderImporters;
+    private BasketOrderImporter basketOrderImporter;
 
     @Autowired
     private MessageSource messageSource;
@@ -194,7 +193,6 @@ public class OrdersController extends BaseController {
 
         ClientDataDto form = new ClientDataDto();
         form.setOrderReference(basketId);
-        form.setOrderReferenceType(OrderReferenceType.Basket);
         form.setShipmentType(shipmentType);
         form.setBillingDetails(billingDetails);
         form.setShippingDetails(shippingDetails);
@@ -209,21 +207,10 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/new/fulfilment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrder(@ModelAttribute ClientDataDto dto, Model model) {
-        OrderImporter importer = getImporter(dto);
-        Order order = importer._import(getStoreId(), dto);
-
+    public String submitOrder(@ModelAttribute ClientDataDto dto) {
+        Order order = basketOrderImporter._import(getStoreId(), dto);
         return "redirect:/dashboard/orders/" + order.getOrderId();
     }
-
-    public OrderImporter getImporter(ClientDataDto clientDataDto) {
-        return orderImporters.stream()
-                .filter(i -> i.supports(getStoreId(), clientDataDto))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown order importer"));
-    }
-
-
 
     @GetMapping("/dashboard/orders/{orderId}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")

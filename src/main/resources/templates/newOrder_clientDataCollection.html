@@ -6,10 +6,9 @@
 
 <div layout:fragment="content" class="container">
 
-    <form th:action="@{/dashboard/orders/new/fulfilment}" th:object="${form}" enctype="multipart/form-data" method="post" class="box" onsubmit="copyBillingDetailsIfNeeded()">
+    <form th:action="@{/dashboard/orders/new/fulfilment}" th:object="${form}" method="post" class="box" onsubmit="copyBillingDetailsIfNeeded()">
         <h2 class="title is-4" th:text="#{client.order.reference.title}"></h2>
         <input type="hidden" th:field="*{orderReference}" />
-        <input type="hidden" th:field="*{orderReferenceType}" />
 
         <div class="field">
             <label class="label" th:text="#{order.payment.source}"></label>
@@ -23,18 +22,6 @@
             </div>
         </div>
 
-        <div class="field" th:if="*{orderReferenceType == T(pl.commercelink.orders.imports.OrderReferenceType).Csv}">
-            <label class="label" th:text="#{client.csv.file}"></label>
-            <div class="control">
-                <input class="input" type="file" th:field="*{csvFile}" accept=".csv" required>
-            </div>
-        </div>
-        <div class="field" th:if="*{orderReferenceType == 'CSV'}">
-            <label class="label" for="affiliateId" th:text="#{client.affiliate.id}"></label>
-            <div class="control">
-                <input class="input" type="text" id="affiliateId" th:field="*{affiliateId}">
-            </div>
-        </div>
         <div class="field">
             <label class="label" for="shipmentType" th:text="#{client.shipment.type}"></label>
             <div class="control">

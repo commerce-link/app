@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import static pl.commercelink.starter.security.CustomSecurityContext.getStoreId;
 
 @Component
-public class BasketOrderImporter implements OrderImporter {
+public class BasketOrderImporter {
 
     @Autowired
     private StoresRepository storesRepository;
@@ -29,20 +29,15 @@ public class BasketOrderImporter implements OrderImporter {
     @Autowired
     private OrdersManager ordersManager;
 
-    @Override
-    public boolean supports(String storeId, ClientDataDto dto) {
-        return dto.getOrderReferenceType() == OrderReferenceType.Basket;
-    }
-
-    @Override
     public Order _import(String storeId, ClientDataDto dto) {
         Store store = storesRepository.findById(storeId);
         Basket basket = basketsRepository.findById(storeId, dto.getOrderReference())
                 .orElseThrow(() -> new IllegalArgumentException("Basket not found"));
 
+        basket.setBillingDetails(dto.getBillingDetails());
+        basket.setShippingDetails(dto.getShippingDetails());
+
         Order order = new Order.Builder(store, basket)
-                .withBillingDetails(dto.getBillingDetails())
-                .withShippingDetails(dto.getShippingDetails())
                 .withShipmentType(dto.getShipmentType())
                 .withPaymentSource(dto.getPaymentSource())
                 .build();

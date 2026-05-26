@@ -1,6 +1,7 @@
 /target/
 /target_classes/
 /target_test-classes/
+/docs/
 !.mvn/wrapper/maven-wrapper.jar
 nul
 
