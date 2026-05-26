@@ -3,18 +3,17 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.InvoicePositionMatcher;
-import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
-import pl.commercelink.invoicing.api.InvoicePosition;
 import pl.commercelink.invoicing.api.InvoiceDirection;
+import pl.commercelink.invoicing.api.InvoicePosition;
+import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class InvoiceSyncPreviewBuilder {
@@ -40,14 +39,13 @@ public class InvoiceSyncPreviewBuilder {
             return null;
         }
 
-        // fetch shortcut if missing
         String shortcut = invoice.seller().hasShortcut() ?
                 invoice.seller().shortcut() :
                 invoicingProvider.fetchBillingPartyById(invoice.seller().id()).shortcut();
 
         InvoicePositionMatcher matcher = new InvoicePositionMatcher(invoice.positions());
 
-        List<InvoiceSyncPreview.Option> options = createOptions(invoice.positions());
+        List<InvoiceSyncPreview.Option> options = createOptions(invoice.positions(), invoice.currency());
         List<InvoiceSyncPreview.Mapping> mappings = createMappings(delivery.getItems(), matcher);
 
         InvoiceSyncPreview preview = new InvoiceSyncPreview();
@@ -66,8 +64,8 @@ public class InvoiceSyncPreviewBuilder {
         preview.setMappings(mappings);
         preview.setShippingCost(delivery.getShippingCost());
         preview.setPaymentCost(delivery.getPaymentCost());
-        preview.setShippingCostPositionId(matcher.findIdByCost(delivery.getShippingCost()));
-        preview.setPaymentCostPositionId(matcher.findIdByCost(delivery.getPaymentCost()));
+        preview.setShippingCostPositionId(matcher.matchAuxiliary(delivery.getShippingCost()).orElse(null));
+        preview.setPaymentCostPositionId(matcher.matchAuxiliary(delivery.getPaymentCost()).orElse(null));
         preview.setInvoiceShortcut(shortcut);
         preview.setDeliveryProvider(delivery.getProvider());
         preview.setInvoicePaid(invoice.paid());
@@ -78,16 +76,17 @@ public class InvoiceSyncPreviewBuilder {
         return preview;
     }
 
-    private List<InvoiceSyncPreview.Option> createOptions(List<InvoicePosition> positions) {
+    private List<InvoiceSyncPreview.Option> createOptions(List<InvoicePosition> positions, String currency) {
         List<InvoiceSyncPreview.Option> options = new ArrayList<>();
 
         for (InvoicePosition pos : positions) {
             InvoiceSyncPreview.Option option = new InvoiceSyncPreview.Option();
             option.setId(pos.id());
-
-            String truncatedName = pos.name().length() > 30 ? pos.name().substring(0, 30) + "..." : pos.name();
-            option.setLabel(String.format("%d x %s (%.2f %s)", pos.qty(), truncatedName, pos.price().netValue(), pos.price().currency()));
-
+            option.setName(pos.name());
+            option.setQty(pos.qty());
+            option.setPriceNet(pos.price().netValue());
+            option.setCurrency(pos.price().currency() != null ? pos.price().currency() : currency);
+            option.setLabel(String.format("%d x %s (%.2f %s)", pos.qty(), pos.name(), pos.price().netValue(), option.getCurrency()));
             options.add(option);
         }
 
@@ -95,17 +94,22 @@ public class InvoiceSyncPreviewBuilder {
     }
 
     private List<InvoiceSyncPreview.Mapping> createMappings(List<DeliveryItem> deliveryItems, InvoicePositionMatcher matcher) {
-        return deliveryItems.stream()
-                .map(item -> {
-                    InvoiceSyncPreview.Mapping mapping = new InvoiceSyncPreview.Mapping();
-                    mapping.setName(item.getName());
-                    mapping.setMfn(item.getMfn());
-                    mapping.setQty(item.getOrderedQty());
-                    mapping.setUnitCost(item.getUnitCost());
-                    mapping.setSelectedPositionId(matcher.findIdByCostAndQty(item.getUnitCost(), item.getOrderedQty()));
+        List<InvoiceSyncPreview.Mapping> mappings = new ArrayList<>();
+        for (DeliveryItem item : deliveryItems) {
+            InvoiceSyncPreview.Mapping mapping = new InvoiceSyncPreview.Mapping();
+            mapping.setName(item.getName());
+            mapping.setMfn(item.getMfn());
+            mapping.setQty(item.getOrderedQty());
+            mapping.setUnitCost(item.getUnitCost());
 
-                    return mapping;
-                })
-                .collect(Collectors.toList());
+            InvoicePositionMatcher.Match match = matcher.match(item.getUnitCost(), item.getOrderedQty());
+            mapping.setMatchQuality(match.quality());
+            if (match.found()) {
+                mapping.setSelectedPositionId(match.positionId());
+            }
+
+            mappings.add(mapping);
+        }
+        return mappings;
     }
 }

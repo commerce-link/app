@@ -1,5 +1,7 @@
 package pl.commercelink.web.dtos;
 
+import pl.commercelink.invoicing.InvoicePositionMatcher;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -240,9 +242,29 @@ public class InvoiceSyncPreview {
         return invoiceShortcut != null && !invoiceShortcut.equals(deliveryProvider);
     }
 
+    public int getExactMatchCount() {
+        return (int) mappings.stream().filter(m -> m.getMatchQuality() == InvoicePositionMatcher.Quality.EXACT_MATCH).count();
+    }
+
+    public int getCloseMatchCount() {
+        return (int) mappings.stream().filter(m -> m.getMatchQuality() == InvoicePositionMatcher.Quality.CLOSE_MATCH).count();
+    }
+
+    public int getNoMatchCount() {
+        return (int) mappings.stream().filter(m -> m.getMatchQuality() == null || m.getMatchQuality() == InvoicePositionMatcher.Quality.NO_MATCH).count();
+    }
+
+    public boolean isAllExact() {
+        return !mappings.isEmpty() && getExactMatchCount() == mappings.size();
+    }
+
     public static class Option {
         private String id;
         private String label;
+        private String name;
+        private int qty;
+        private double priceNet;
+        private String currency;
 
         public String getId() {
             return id;
@@ -259,6 +281,38 @@ public class InvoiceSyncPreview {
         public void setLabel(String label) {
             this.label = label;
         }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getQty() {
+            return qty;
+        }
+
+        public void setQty(int qty) {
+            this.qty = qty;
+        }
+
+        public double getPriceNet() {
+            return priceNet;
+        }
+
+        public void setPriceNet(double priceNet) {
+            this.priceNet = priceNet;
+        }
+
+        public String getCurrency() {
+            return currency;
+        }
+
+        public void setCurrency(String currency) {
+            this.currency = currency;
+        }
     }
 
     public static class Mapping {
@@ -267,6 +321,7 @@ public class InvoiceSyncPreview {
         private int qty;
         private double unitCost;
         private String selectedPositionId;
+        private InvoicePositionMatcher.Quality matchQuality;
 
         public String getMfn() {
             return mfn;
@@ -306,6 +361,26 @@ public class InvoiceSyncPreview {
 
         public void setSelectedPositionId(String selectedPositionId) {
             this.selectedPositionId = selectedPositionId;
+        }
+
+        public InvoicePositionMatcher.Quality getMatchQuality() {
+            return matchQuality;
+        }
+
+        public void setMatchQuality(InvoicePositionMatcher.Quality matchQuality) {
+            this.matchQuality = matchQuality;
+        }
+
+        public boolean isExact() {
+            return matchQuality == InvoicePositionMatcher.Quality.EXACT_MATCH;
+        }
+
+        public boolean isClose() {
+            return matchQuality == InvoicePositionMatcher.Quality.CLOSE_MATCH;
+        }
+
+        public boolean isUnmatched() {
+            return matchQuality == null || matchQuality == InvoicePositionMatcher.Quality.NO_MATCH;
         }
     }
 }
