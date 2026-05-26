@@ -2,6 +2,7 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
@@ -21,7 +22,9 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -47,6 +50,9 @@ public class MarketplaceOfferExportEventListener {
 
     @Autowired
     private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
+
+    @Value("${marketplace.export.removalAttempts:3}")
+    private int removalRetryCount;
 
     @SqsListener(
             value = "marketplace-offer-export-queue",
@@ -111,31 +117,27 @@ public class MarketplaceOfferExportEventListener {
             AvailabilityAndPrice availabilityAndPrice = op.get();
             MatchedInventory matchedInventory = inventory.findByProduct(product);
 
+            long qtyToPublish;
             if (marketplaceDefinition.getMinWarehouseQty() > 0) {
-
                 int totalQty = matchedInventory
                         .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
                         .stream()
                         .map(InventoryItem::qty)
                         .mapToInt(Integer::intValue)
                         .sum();
-
-                if (totalQty >= marketplaceDefinition.getMinWarehouseQty()) {
-                    result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), totalQty, categoryName));
-                }
-
+                qtyToPublish = totalQty >= marketplaceDefinition.getMinWarehouseQty() ? totalQty : 0L;
             } else {
-
                 boolean hasRequiredTotalQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinTotalQty());
                 boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
                         marketplaceDefinition.getMinNumOfDistributors(),
                         marketplaceDefinition.getMinQtyPerDistributor()
                 );
-
-                if (hasRequiredTotalQty & hasRequiredNumOfDistributorsWithMinQty) {
-                    result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), matchedInventory.getTotalAvailableQty(), categoryName));
-                }
+                qtyToPublish = (hasRequiredTotalQty && hasRequiredNumOfDistributorsWithMinQty)
+                        ? matchedInventory.getTotalAvailableQty()
+                        : 0L;
             }
+
+            result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
         return result;
     }
@@ -157,45 +159,63 @@ public class MarketplaceOfferExportEventListener {
         );
     }
 
-    private void handleMarketplaceExport(Store store, ProductCatalog catalog, String marketplace, List<MarketplaceOffer> offers) {
+    private void handleMarketplaceExport(Store store, ProductCatalog catalog, String marketplace, List<MarketplaceOffer> currentOffers) {
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
         if (provider == null) {
             return;
         }
 
-        List<MarketplaceOfferSnapshot> previousSnapshots = marketplaceOfferExportRepository.loadPreviousExport(
-                store.getStoreId(),
-                catalog.getCatalogId(),
-                marketplace
-        );
+        List<MarketplaceOfferSnapshot> previousSnapshots = loadPreviousSnapshot(store, catalog, marketplace);
+        List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, pimIdsOf(currentOffers));
+        List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
-        List<MarketplaceOffer> offersToRemove = previousSnapshots.stream()
-                .filter(ps -> offers.stream().noneMatch(o -> o.productId().equals(ps.getPimId())))
-                .map(ps -> new MarketplaceOffer(ps.getPimId(), null, null, null, null, null, ps.getPrice(), ps.getQty(), 0))
-                .collect(Collectors.toList());
-
-        List<MarketplaceOffer> offersToPublish = offers.stream()
-                .filter(offer -> {
-                    Optional<MarketplaceOfferSnapshot> previousSnapshot = previousSnapshots.stream()
-                            .filter(ps -> ps.hasPimId(offer.productId()))
-                            .findFirst();
-                    return !previousSnapshot.isPresent() || previousSnapshot.get().getPrice() != offer.price() || previousSnapshot.get().getQty() != offer.quantity();
-                })
-                .collect(Collectors.toList());
-
-        if (!offersToPublish.isEmpty() || !offersToRemove.isEmpty()) {
-            provider.exportOffers(offersToPublish, offersToRemove);
+        if (!currentOffers.isEmpty() || !pendingRemovals.isEmpty()) {
+            provider.exportOffers(currentOffers, pendingRemovals);
         }
 
-        List<MarketplaceOfferSnapshot> currentSnapshots = offers.stream()
-                .map(o -> new MarketplaceOfferSnapshot(o.productId(), o.price(), o.quantity()))
-                .collect(Collectors.toList());
+        saveCurrentSnapshot(store, catalog, marketplace, buildNextSnapshot(retryableOrphans, currentOffers));
+    }
 
-        marketplaceOfferExportRepository.saveCurrentExport(
-                store.getStoreId(),
-                catalog.getCatalogId(),
-                marketplace,
-                currentSnapshots
+    private List<MarketplaceOfferSnapshot> loadPreviousSnapshot(Store store, ProductCatalog catalog, String marketplace) {
+        return marketplaceOfferExportRepository.loadPreviousExport(
+                store.getStoreId(), catalog.getCatalogId(), marketplace
         );
+    }
+
+    private void saveCurrentSnapshot(Store store, ProductCatalog catalog, String marketplace, List<MarketplaceOfferSnapshot> snapshot) {
+        marketplaceOfferExportRepository.saveCurrentExport(
+                store.getStoreId(), catalog.getCatalogId(), marketplace, snapshot
+        );
+    }
+
+    private Set<String> pimIdsOf(List<MarketplaceOffer> offers) {
+        return offers.stream()
+                .map(MarketplaceOffer::productId)
+                .collect(Collectors.toSet());
+    }
+
+    private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
+        return previousSnapshots.stream()
+                .filter(ps -> !currentPimIds.contains(ps.getPimId()))
+                .filter(ps -> ps.getRemovalAttempts() < removalRetryCount)
+                .toList();
+    }
+
+    private List<MarketplaceOffer> toUnpublishOffers(List<MarketplaceOfferSnapshot> orphans) {
+        return orphans.stream()
+                .map(ps -> new MarketplaceOffer(
+                        ps.getPimId(), null, null, null, null, null,
+                        ps.getPrice(), 0L, 0))
+                .toList();
+    }
+
+    private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans, List<MarketplaceOffer> currentOffers) {
+        Stream<MarketplaceOfferSnapshot> incrementedOrphans = retryableOrphans.stream()
+                .map(ps -> new MarketplaceOfferSnapshot(
+                        ps.getPimId(), ps.getPrice(), 0L, ps.getRemovalAttempts() + 1));
+        Stream<MarketplaceOfferSnapshot> currentAsActive = currentOffers.stream()
+                .map(o -> new MarketplaceOfferSnapshot(
+                        o.productId(), o.price(), o.quantity(), 0));
+        return Stream.concat(incrementedOrphans, currentAsActive).toList();
     }
 }
