@@ -32,6 +32,13 @@ awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
 awslocal sqs create-queue --queue-name pim-fetch-queue
 
+# Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
+# When PIM is up locally, App fetches its index from there. When PIM is down,
+# PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
+awslocal secretsmanager create-secret \
+  --name commercelink-pim \
+  --secret-string '{"apiDomain":"http://localhost:8081","apiKey":""}'
+
 # Cognito User Pool + App Client for local OAuth2 login
 POOL_ID=$(awslocal cognito-idp create-user-pool \
   --pool-name commercelink-local \
