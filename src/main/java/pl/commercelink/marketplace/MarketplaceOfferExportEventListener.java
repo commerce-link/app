@@ -51,7 +51,7 @@ public class MarketplaceOfferExportEventListener {
     @Autowired
     private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
 
-    @Value("${marketplace.export.removalRetryCount:3}")
+    @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
 
     @SqsListener(
