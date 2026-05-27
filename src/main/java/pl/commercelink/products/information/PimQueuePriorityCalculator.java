@@ -25,7 +25,6 @@ class PimQueuePriorityCalculator {
             priority += (int) (totalAvailability * AVAILABILITY_WEIGHT);
         }
 
-        priority *= BrandFacade.strength(brand);
         return Math.min(priority, MAX_VALUE);
     }
 
