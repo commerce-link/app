@@ -1,6 +1,7 @@
 package pl.commercelink.products.brand;
 
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.Brand;
@@ -11,14 +12,11 @@ import java.util.Optional;
 
 @Component
 @DependsOn("pimCatalogRegistry")
+@RequiredArgsConstructor
 public class BrandMapper {
 
     private final PimCatalog pimCatalog;
     private volatile List<Brand> brands = List.of();
-
-    public BrandMapper(PimCatalog pimCatalog) {
-        this.pimCatalog = pimCatalog;
-    }
 
     @PostConstruct
     public void load() {
