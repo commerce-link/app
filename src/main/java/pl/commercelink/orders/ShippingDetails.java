@@ -167,6 +167,20 @@ public class ShippingDetails {
     }
 
     @DynamoDBIgnore
+    public static ShippingDetails pickUpPoint(ShippingDetails pickUpAddress, String pickUpRecipientName) {
+        ShippingDetails shippingDetails = new ShippingDetails();
+        shippingDetails.setName(pickUpRecipientName);
+        shippingDetails.setStreetAndNumber(pickUpAddress.getStreetAndNumber());
+        shippingDetails.setPostalCode(pickUpAddress.getPostalCode());
+        shippingDetails.setCity(pickUpAddress.getCity());
+        shippingDetails.setCountry(pickUpAddress.getCountry());
+        shippingDetails.setEmail(pickUpAddress.getEmail());
+        shippingDetails.setPhone(pickUpAddress.getPhone());
+        shippingDetails.set_default(true);
+        return shippingDetails;
+    }
+
+    @DynamoDBIgnore
     public ShippingDetails copy() {
         ShippingDetails copy = new ShippingDetails();
         copy.setName(this.name);

@@ -15,23 +15,30 @@
                 </div>
             </div>
             <div class="control" th:each="status : ${statuses}">
-                <div class="tags has-addons">
-                    <a class="tag status-tag"
-                       th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                       th:data-status="${status.name()}"
-                       href="javascript:void(0)">
-                        <span th:text="${status.localizedName}"></span>
-                        <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
-                        <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
-                    </a>
-                </div>
+                <button type="button"
+                        class="button is-small status-tag"
+                        th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
+                        th:data-status="${status.name()}">
+                    <span th:text="${status.localizedName}"></span>
+                    <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
+                    <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
+                </button>
             </div>
 
             <div class="control">
-                <button class="button is-small is-danger is-light" id="clearFilters">
+                <button type="button" class="button is-small is-danger is-light" id="clearFilters">
                     <span class="icon is-small"><i class="fas fa-times"></i></span>
                     <span>Clear Filters</span>
                 </button>
+            </div>
+
+            <div class="control ml-auto">
+                <form method="post" action="/dashboard/orders/new/pos">
+                    <button type="submit" class="button is-small is-success">
+                        <span class="icon is-small"><i class="fas fa-cash-register"></i></span>
+                        <span th:text="#{orders.new.pos.button}">New POS sale</span>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
