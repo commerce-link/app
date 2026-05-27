@@ -52,14 +52,4 @@ class EmptyPimCatalog implements PimCatalog {
     @Override
     public void onEntryDeleted(Consumer<PIMEntryDeletedEvent> listener) {
     }
-
-    @Override
-    public String unifyBrand(String raw) {
-        return raw;
-    }
-
-    @Override
-    public int brandStrength(String brand) {
-        return 1;
-    }
 }

@@ -35,7 +35,6 @@ public class PimCatalogRegistry {
         if (descriptorOpt.isEmpty()) {
             System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
             this.catalog = new EmptyPimCatalog();
-            BrandFacade.initialize(this.catalog);
             return;
         }
 
@@ -47,7 +46,6 @@ public class PimCatalogRegistry {
         }
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
-        BrandFacade.initialize(this.catalog);
 
         catalog.onEntryAdded(event ->
                 productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes())
