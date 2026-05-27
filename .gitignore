@@ -1,11 +1,7 @@
 /target/
 /target_classes/
 /target_test-classes/
-<<<<<<< HEAD
 /docs/
-=======
-docs/
->>>>>>> main
 !.mvn/wrapper/maven-wrapper.jar
 nul
 
