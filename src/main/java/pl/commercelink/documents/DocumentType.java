@@ -21,10 +21,10 @@ public enum DocumentType implements LocalizedEnum<DocumentType> {
     StockTransfer("MM"),
     Reservation("Res");
 
-    private final String localizedName;
+    private final String sequenceCode;
 
-    DocumentType(String localizedName) {
-        this.localizedName = localizedName;
+    DocumentType(String sequenceCode) {
+        this.sequenceCode = sequenceCode;
     }
 
     public boolean isB2BInvoice() {
@@ -60,11 +60,11 @@ public enum DocumentType implements LocalizedEnum<DocumentType> {
     }
 
     public String getSequenceKey(String warehouseId) {
-        return getLocalizedName() + "/" + warehouseId + "/" + Year.now().getValue();
+        return sequenceCode + "/" + warehouseId + "/" + Year.now().getValue();
     }
 
     @Override
     public String getLocalizedName() {
-        return localizedName;
+        return sequenceCode;
     }
 }
