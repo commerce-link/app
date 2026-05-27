@@ -140,6 +140,19 @@ public class BillingDetails {
     }
 
     @DynamoDBIgnore
+    public static BillingDetails walkInCustomer(BillingDetails storeBillingDetails, String walkInCustomerName) {
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setName(walkInCustomerName);
+        billingDetails.setStreetAndNumber(storeBillingDetails.getStreetAndNumber());
+        billingDetails.setPostalCode(storeBillingDetails.getPostalCode());
+        billingDetails.setCity(storeBillingDetails.getCity());
+        billingDetails.setCountry(storeBillingDetails.getCountry());
+        billingDetails.setEmail(storeBillingDetails.getEmail());
+        billingDetails.setPhone(storeBillingDetails.getPhone());
+        return billingDetails;
+    }
+
+    @DynamoDBIgnore
     public BillingDetails copy() {
         BillingDetails copy = new BillingDetails();
         copy.setName(this.name);

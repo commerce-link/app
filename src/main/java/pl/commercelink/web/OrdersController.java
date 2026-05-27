@@ -20,6 +20,8 @@ import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
+import pl.commercelink.orders.pos.PosOrderCreator;
+import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -78,6 +80,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private BasketOrderImporter basketOrderImporter;
+
+    @Autowired
+    private PosOrderCreator posOrderCreator;
 
     @Autowired
     private MessageSource messageSource;
@@ -210,6 +215,17 @@ public class OrdersController extends BaseController {
     public String submitOrder(@ModelAttribute ClientDataDto dto) {
         Order order = basketOrderImporter._import(getStoreId(), dto);
         return "redirect:/dashboard/orders/" + order.getOrderId();
+    }
+
+    @PostMapping("/dashboard/orders/new/pos")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String createPosOrder(Locale locale, RedirectAttributes redirectAttributes) {
+        OperationResult<Order> result = posOrderCreator.create(getStoreId(), locale);
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
+            return "redirect:/dashboard/orders";
+        }
+        return "redirect:/dashboard/orders/" + result.getPayload().getOrderId();
     }
 
     @GetMapping("/dashboard/orders/{orderId}")

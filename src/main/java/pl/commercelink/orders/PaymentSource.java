@@ -6,5 +6,6 @@ public enum PaymentSource {
     CashOnDelivery,
     Installments,
     OnlinePayment,
+    Card,
     Cash
 }
