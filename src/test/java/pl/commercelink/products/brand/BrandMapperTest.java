@@ -25,7 +25,6 @@ class BrandMapperTest {
                 new Brand("Apple", List.of("apple"))
         ));
         brandMapper = new BrandMapper(pimCatalog);
-        brandMapper.load();
     }
 
     @Test
