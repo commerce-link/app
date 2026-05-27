@@ -663,11 +663,11 @@ public class Order {
             );
         }
 
-        public static Builder forPos(Store store, BillingDetails billingDetails, ShippingDetails shippingDetails) {
+        public static Builder forPos(Store store, BillingDetails billingDetails, ShippingDetails shippingDetails, String operatorName) {
             Builder builder = new Builder(
                     store.getStoreId(), null, 0, false, null,
                     OrderReviewStatus.NotApplicable, FulfilmentType.WarehouseFulfilment, 0,
-                    billingDetails, shippingDetails, new OrderSource("POS", OrderSourceType.PointOfSale)
+                    billingDetails, shippingDetails, new OrderSource(operatorName, OrderSourceType.PointOfSale)
             );
             builder.withShipmentType(ShipmentType.PersonalCollection);
             builder.withPaymentSource(PaymentSource.Cash);

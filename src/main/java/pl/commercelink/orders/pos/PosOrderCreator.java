@@ -7,6 +7,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -46,7 +47,7 @@ public class PosOrderCreator {
         BillingDetails billingDetails = BillingDetails.walkInCustomer(storeBillingDetails, customerName);
         ShippingDetails shippingDetails = ShippingDetails.pickUpPoint(pickUpAddress, pickUpRecipientName);
 
-        Order order = Order.Builder.forPos(store, billingDetails, shippingDetails).build();
+        Order order = Order.Builder.forPos(store, billingDetails, shippingDetails, CustomSecurityContext.getLoggedInUserName()).build();
         ordersRepository.save(order);
 
         return OperationResult.success(order);
