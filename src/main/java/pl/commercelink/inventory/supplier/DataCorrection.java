@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -14,15 +15,11 @@ import java.util.Optional;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
+@RequiredArgsConstructor
 class DataCorrection {
 
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
-
-    DataCorrection(PimCatalog pimCatalog, BrandMapper brandMapper) {
-        this.pimCatalog = pimCatalog;
-        this.brandMapper = brandMapper;
-    }
 
     InventoryItem run(InventoryItem inventoryItem) {
         return resolveCorrectEanForMfn(inventoryItem.ean(), inventoryItem.mfn())
