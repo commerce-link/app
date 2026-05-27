@@ -1,6 +1,7 @@
 package pl.commercelink.products.brand;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.Brand;
 import pl.commercelink.pim.api.PimCatalog;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
+@DependsOn("pimCatalogRegistry")
 public class BrandMapper {
 
     private final PimCatalog pimCatalog;
