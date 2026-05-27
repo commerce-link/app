@@ -12,7 +12,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.test.util.ReflectionTestUtils;
-import pl.commercelink.starter.localization.EnumMessageResolver;
+import pl.commercelink.products.ProductCategoryLocalization;
+import pl.commercelink.products.ProductGroupLocalization;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -75,7 +76,8 @@ class MarketplaceOfferExportEventListenerTest {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasenames("messages_pl", "messages_en");
         messageSource.setDefaultEncoding("UTF-8");
-        ReflectionTestUtils.setField(EnumMessageResolver.class, "messageSource", messageSource);
+        new ProductCategoryLocalization(messageSource);
+        new ProductGroupLocalization(messageSource);
     }
 
     @BeforeEach

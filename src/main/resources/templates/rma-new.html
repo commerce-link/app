@@ -88,7 +88,7 @@
                                                 <select class="rma-item-resolution"
                                                         th:field="*{draftRmaItems[__${i.index}__].desiredResolution}" disabled>
                                                     <option th:each="res : ${T(pl.commercelink.orders.rma.RMAResolutionType).values()}"
-                                                            th:value="${res}" th:text="${res.localizedName}"></option>
+                                                            th:value="${res}" th:text="${enumI18n.localize(res)}"></option>
                                                 </select>
                                             </div>
                                         </div>

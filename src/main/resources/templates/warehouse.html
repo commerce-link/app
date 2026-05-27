@@ -45,7 +45,7 @@
                 <div class="tags has-addons">
                     <a class="tag status-tag"
                        th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                       th:text="${status.localizedName}"
+                       th:text="${enumI18n.localize(status)}"
                        th:data-status="${status.name()}"
                        href="javascript:void(0)"></a>
                 </div>

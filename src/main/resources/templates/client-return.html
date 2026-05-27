@@ -22,7 +22,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="item : ${rmaItems}">
-                                <td th:text="${item.desiredResolution.localizedName}"></td>
+                                <td th:text="${enumI18n.localize(item.desiredResolution)}"></td>
                                 <td th:text="${item.name}"></td>
                                 <td th:text="${item.qty}"></td>
                                 <td th:text="${item.reason}"></td>
@@ -200,7 +200,7 @@
                                 </thead>
                                 <tbody>
                                 <tr th:each="shipment : ${rma.shipments}">
-                                    <td th:text="${shipment.type.localizedName}"></td>
+                                    <td th:text="${enumI18n.localize(shipment.type)}"></td>
                                     <td th:text="${shipment.trackingNo}"></td>
                                     <td th:text="${shipment.carrier}"></td>
                                     <td th:text="${shipment.shippedAt}"></td>

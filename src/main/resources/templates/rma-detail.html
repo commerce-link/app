@@ -37,7 +37,7 @@
                         <div class="control">
                             <div class="select">
                                 <select th:field="*{status}" th:disabled="${isClosed}">
-                                    <option th:each="status : ${rmaStatusTypes}" th:value="${status}" th:text="${status.localizedName}"
+                                    <option th:each="status : ${rmaStatusTypes}" th:value="${status}" th:text="${enumI18n.localize(status)}"
                                             th:disabled="${rma.status.name() == 'Processing' and status.name() == 'ItemsReceived'}">>
                                     </option>
                                 </select>
@@ -295,7 +295,7 @@
                             <div class="select">
                                 <select name="desiredResolution" required>
                                     <option th:each="resolution : ${rmaResolutionsTypes}" th:value="${resolution}"
-                                            th:text="${resolution.localizedName}"></option>
+                                            th:text="${enumI18n.localize(resolution)}"></option>
                                 </select>
                             </div>
                         </div>

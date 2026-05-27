@@ -19,7 +19,7 @@
                         class="button is-small status-tag"
                         th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
                         th:data-status="${status.name()}">
-                    <span th:text="${status.localizedName}"></span>
+                    <span th:text="${enumI18n.localize(status)}"></span>
                     <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
                     <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
                 </button>

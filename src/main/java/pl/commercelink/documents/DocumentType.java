@@ -1,11 +1,10 @@
 package pl.commercelink.documents;
 
 import pl.commercelink.invoicing.api.InvoiceKind;
-import pl.commercelink.starter.localization.LocalizedEnum;
 
 import java.time.Year;
 
-public enum DocumentType implements LocalizedEnum<DocumentType> {
+public enum DocumentType {
     Proforma("Proforma"),
     Order("Zamówienie"),
     InvoiceVat("Faktura VAT"),
@@ -61,10 +60,5 @@ public enum DocumentType implements LocalizedEnum<DocumentType> {
 
     public String getSequenceKey(String warehouseId) {
         return sequenceCode + "/" + warehouseId + "/" + Year.now().getValue();
-    }
-
-    @Override
-    public String getLocalizedName() {
-        return sequenceCode;
     }
 }

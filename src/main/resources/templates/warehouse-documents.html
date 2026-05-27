@@ -27,7 +27,7 @@
                                             <option value="" th:text="#{general.all}"></option>
                                             <option th:each="docType : ${documentTypes}"
                                                     th:value="${docType.name()}"
-                                                    th:text="${docType.localizedName}"
+                                                    th:text="${enumI18n.localize(docType)}"
                                                     th:selected="${docType.name() == searchParams.type}"></option>
                                         </select>
                                     </div>
@@ -92,7 +92,7 @@
                                     <span th:text="${doc.documentNo}"></span>
                                 </a>
                             </td>
-                            <td th:text="${doc.type.localizedName}"></td>
+                            <td th:text="${enumI18n.localize(doc.type)}"></td>
                             <td th:text="${doc.counterparty?.companyName} ?: (${doc.counterparty?.name} != null ? ${doc.counterparty.name + (doc.counterparty.surname != null ? ' ' + doc.counterparty.surname : '')} : '')"></td>
                             <td th:text="${#temporals.format(doc.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
                         </tr>

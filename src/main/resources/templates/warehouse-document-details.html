@@ -36,8 +36,8 @@
                     <div class="column">
                         <p class="heading" th:text="#{warehouse.documents.type}"></p>
                         <p class="title is-5">
-                            <span class="tag is-info" th:text="${document.type.localizedName}"></span>
-                            <span th:if="${document.reason}" class="tag is-light ml-1" th:text="${document.reason.localizedName}"></span>
+                            <span class="tag is-info" th:text="${enumI18n.localize(document.type)}"></span>
+                            <span th:if="${document.reason}" class="tag is-light ml-1" th:text="${enumI18n.localize(document.reason)}"></span>
                         </p>
                     </div>
                     <div class="column">

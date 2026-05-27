@@ -34,7 +34,7 @@
                             </a>
                         </td>
                         <td th:text="${order.fulfilmentType}"></td>
-                        <td th:text="${order.status.localizedName}"></td>
+                        <td th:text="${enumI18n.localize(order.status)}"></td>
                         <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
                     </tr>
                     </tbody>

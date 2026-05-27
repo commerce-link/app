@@ -46,7 +46,7 @@
                             <a th:href="@{/dashboard/deliveries/details(deliveryId=${item.deliveryId})}" th:text="${item.shortenedDeliveryId}"></a>
                         </td>
                         <td th:text="${item.serialNo}"></td>
-                        <td th:text="${item.status.localizedName}"></td>
+                        <td th:text="${enumI18n.localize(item.status)}"></td>
                         <td th:text="${item.comment}"></td>
                         <td th:text="${item.destroyedAt}" th:if="${status.name() == 'Destroyed'}"></td>
                     </tr>
