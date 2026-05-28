@@ -85,13 +85,18 @@ public class WebController {
 
         List<OrderIndexEntry> paginatedPastOrders = PaginationUtil.paginate(pastOrders, page, CLIENTS_PAGE_SIZE, model);
 
+        List<Order> pastOrderDetails = paginatedPastOrders.stream()
+                .map(entry -> ordersRepository.findById(entry.getStoreId(), entry.getOrderId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
         Map<String, Object> searchParams = new HashMap<>();
         searchParams.put("orderId", orderId);
         searchParams.put("email", email);
         searchParams.put("orderedAtStart", orderedAtStart);
         searchParams.put("orderedAtEnd", orderedAtEnd);
 
-        model.addAttribute("pastOrders", paginatedPastOrders);
+        model.addAttribute("pastOrders", pastOrderDetails);
         model.addAttribute("searchParams", searchParams);
 
         return "clients";

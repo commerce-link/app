@@ -55,6 +55,8 @@
                     <th th:text="#{order.ordered.at}"></th>
                     <th th:text="#{orders.status}"></th>
                     <th th:text="#{orders.email}"></th>
+                    <th th:text="#{order.warehouse.document}"></th>
+                    <th th:text="#{order.billing.document}"></th>
                 </tr>
                 <tr th:each="pastOrder : ${pastOrders}">
                     <td>
@@ -66,6 +68,18 @@
                     <td th:text="${#temporals.format(pastOrder.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
                     <td th:text="${pastOrder.status}"></td>
                     <td th:text="${pastOrder.email}"></td>
+                    <td th:with="goodsIssue=${pastOrder.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
+                        <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
+                        <span th:unless="${goodsIssue.isPresent()}">-</span>
+                    </td>
+                    <td th:with="closing=${pastOrder.closingDocument},pending=${pastOrder.nextDocumentToIssue}">
+                        <th:block th:if="${closing.isPresent()}">
+                            <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></a>
+                            <span th:if="${closing.get().viewUrl == null}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></span>
+                        </th:block>
+                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get())} + ' — ' + #{order.document.to.issue}"></span>
+                        <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
+                    </td>
                 </tr>
             </table>
 

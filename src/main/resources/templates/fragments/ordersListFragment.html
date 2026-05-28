@@ -7,16 +7,16 @@
         <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
                 <tr>
-                    <th>Nr zamówienia</th>
-                    <th>Email</th>
+                    <th th:text="#{order.number}"></th>
+                    <th th:text="#{orders.email}"></th>
                     <th th:text="#{order.source}"></th>
-                    <th>Data zamówienia</th>
-                    <th>Data wysyłki</th>
-                    <th>Status zamówienia</th>
-                    <th>Dokument magazynowy</th>
-                    <th>Dokument rozliczeniowy</th>
-                    <th>Status opinii</th>
-                    <th>Pozostało do zapłaty</th>
+                    <th th:text="#{orders.ordered.at.date}"></th>
+                    <th th:text="#{order.shipped.at}"></th>
+                    <th th:text="#{order.status}"></th>
+                    <th th:text="#{order.warehouse.document}"></th>
+                    <th th:text="#{order.billing.document}"></th>
+                    <th th:text="#{order.review.status}"></th>
+                    <th th:text="#{orders.unpaid}"></th>
                 </tr>
             </thead>
             <tbody>
@@ -38,7 +38,7 @@
                             <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></a>
                             <span th:if="${closing.get().viewUrl == null}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></span>
                         </th:block>
-                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get()) + ' — do wystawienia'}"></span>
+                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get())} + ' — ' + #{order.document.to.issue}"></span>
                         <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
                     </td>
                     <td th:text="${order.review?.status != null ? enumI18n.localize(order.review.status) : '-'}"></td>
