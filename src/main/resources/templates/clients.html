@@ -50,24 +50,20 @@
 
             <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
                 <tr>
-                    <th th:text="#{orders.id}"></th>
-                    <th th:text="#{store.id}"></th>
-                    <th th:text="#{order.ordered.at}"></th>
-                    <th th:text="#{orders.status}"></th>
+                    <th th:text="#{order.number}"></th>
                     <th th:text="#{orders.email}"></th>
+                    <th th:text="#{orders.ordered.at.date}"></th>
+                    <th th:text="#{order.status}"></th>
                     <th th:text="#{order.warehouse.document}"></th>
                     <th th:text="#{order.billing.document}"></th>
                 </tr>
                 <tr th:each="pastOrder : ${pastOrders}">
                     <td>
-                        <a th:href="@{/dashboard/orders/{id}(id=${pastOrder.orderId})}">
-                            <span th:text="${pastOrder.orderId}"></span>
-                        </a>
+                        <a th:href="@{/dashboard/orders/{id}(id=${pastOrder.orderId})}" th:text="${pastOrder.shortenedOrderId}"></a>
                     </td>
-                    <td th:text="${pastOrder.storeId}"></td>
-                    <td th:text="${#temporals.format(pastOrder.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                    <td th:text="${pastOrder.status}"></td>
                     <td th:text="${pastOrder.email}"></td>
+                    <td th:text="${#temporals.format(pastOrder.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    <td th:text="${enumI18n.localize(pastOrder.status)}"></td>
                     <td th:with="goodsIssue=${pastOrder.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
                         <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
                         <span th:unless="${goodsIssue.isPresent()}">-</span>
