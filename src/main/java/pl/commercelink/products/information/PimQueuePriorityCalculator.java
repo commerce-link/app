@@ -1,7 +1,6 @@
 package pl.commercelink.products.information;
 
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.taxonomy.BrandMapper;
 import pl.commercelink.products.CategoryDefinitionType;
 
 class PimQueuePriorityCalculator {
@@ -26,7 +25,6 @@ class PimQueuePriorityCalculator {
             priority += (int) (totalAvailability * AVAILABILITY_WEIGHT);
         }
 
-        priority *= BrandMapper.getStrength(brand);
         return Math.min(priority, MAX_VALUE);
     }
 

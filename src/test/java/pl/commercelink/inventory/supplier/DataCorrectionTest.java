@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
@@ -11,18 +12,22 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class DataCorrectionTest {
 
     private PimCatalog pimCatalog;
+    private BrandMapper brandMapper;
     private DataCorrection dataCorrection;
 
     @BeforeEach
     void setUp() {
         pimCatalog = mock(PimCatalog.class);
-        dataCorrection = new DataCorrection(pimCatalog);
+        brandMapper = mock(BrandMapper.class);
+        when(brandMapper.unifyBrand(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        dataCorrection = new DataCorrection(pimCatalog, brandMapper);
     }
 
     @Test

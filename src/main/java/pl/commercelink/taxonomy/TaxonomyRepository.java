@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 
@@ -19,6 +20,9 @@ public class TaxonomyRepository {
 
     @Autowired
     private FileStorage fileStorage;
+
+    @Autowired
+    private BrandMapper brandMapper;
 
     @Value("${s3.bucket.datalake}")
     private String bucketName;
@@ -36,7 +40,12 @@ public class TaxonomyRepository {
             List<Taxonomy> taxonomies = new ArrayList<>();
             csvLoader.readRows(CSVLoader.DEFAULT_SEPARATOR, row -> {
                 try {
-                    taxonomies.add(TaxonomyParser.fromCsvRow(row));
+                    Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+                    Taxonomy unified = new Taxonomy(parsed.ean(), parsed.mfn(),
+                            brandMapper.unifyBrand(parsed.brand()),
+                            parsed.name(), parsed.category(), parsed.dataAccuracyScore(),
+                            parsed.netWeightInGrams(), parsed.grossWeightInGrams());
+                    taxonomies.add(unified);
                 } catch (Exception e) {
                     System.err.println("Failed to load taxonomy row: " + e.getMessage());
                 }

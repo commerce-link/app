@@ -19,6 +19,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.products.*;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -56,6 +57,9 @@ public class ProductCatalogController {
 
     @Autowired
     private PricelistEventScheduler pricelistEventScheduler;
+
+    @Autowired
+    private BrandMapper brandMapper;
 
     @Value("${application.env}")
     private String env;
@@ -503,7 +507,7 @@ public class ProductCatalogController {
                 pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode())
                         .ifPresent(entry -> {
                             product.setPimId(entry.pimId());
-                            product.setBrand(entry.brand());
+                            product.setBrand(brandMapper.unifyBrand(entry.brand()));
                         });
             }
         }
