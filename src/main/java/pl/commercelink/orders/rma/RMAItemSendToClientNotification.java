@@ -2,6 +2,7 @@ package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.starter.email.EmailNotification;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.orders.Shipment;
 
 import java.util.List;
@@ -18,14 +19,14 @@ class RMAItemSendToClientNotification extends EmailNotification {
     @JsonProperty("shipments")
     private List<ShipmentInfo> shipments;
 
-    RMAItemSendToClientNotification(String recipientEmail, String recipientName, String rmaId, String orderId, List<RMAItem> rmaItems, List<Shipment> shipments) {
+    RMAItemSendToClientNotification(String recipientEmail, String recipientName, String rmaId, String orderId, List<RMAItem> rmaItems, List<Shipment> shipments, EnumLocalizer enumLocalizer) {
         super(recipientEmail, recipientName);
         this.rmaId = rmaId;
         this.orderId = orderId;
         this.rmaItems = rmaItems.stream()
                 .map(i -> new ItemInfo(
                         i.getName(),
-                        i.getStatus().getLocalizedName(new Locale("pl")),
+                        enumLocalizer.localize(i.getStatus(), new Locale("pl")),
                         i.getActualResolution() != null ? i.getActualResolution().name() : "N/A",
                         i.getReason()))
                 .collect(Collectors.toList());

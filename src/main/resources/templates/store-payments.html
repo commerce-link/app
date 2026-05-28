@@ -67,7 +67,7 @@
                                 <td>
                                     <div class="select">
                                         <select th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].type}">
-                                            <option th:each="st : ${shipmentTypes}" th:value="${st}" th:text="${st.localizedName}"></option>
+                                            <option th:each="st : ${shipmentTypes}" th:value="${st}" th:text="${enumI18n.localize(st)}"></option>
                                         </select>
                                     </div>
                                 </td>

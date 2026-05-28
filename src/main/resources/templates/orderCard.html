@@ -77,7 +77,7 @@
                             <tbody>
                             <tr th:each="document : ${order.documents}">
                                 <td th:text="${document.number}"></td>
-                                <td th:text="${document.type.localizedName}"></td>
+                                <td th:text="${enumI18n.localize(document.type)}"></td>
                                 <td th:text="#{document.status.issued}"></td>
                             </tr>
                             </tbody>
@@ -100,7 +100,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="shipment : ${order.shipments}">
-                                <td th:text="${shipment.type.localizedName}"></td>
+                                <td th:text="${enumI18n.localize(shipment.type)}"></td>
                                 <td th:text="${shipment.trackingNo}"></td>
                                 <td th:text="${shipment.carrier}"></td>
                                 <td th:text="${shipment.shippedAt}"></td>

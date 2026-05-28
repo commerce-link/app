@@ -49,7 +49,7 @@
                                th:text="${row.documentNo()}"></a>
                         </td>
                         <td>
-                            <span class="tag is-info" th:text="${row.documentType().localizedName}"></span>
+                            <span class="tag is-info" th:text="${enumI18n.localize(row.documentType())}"></span>
                         </td>
                         <td th:text="${row.createdAt() != null} ? ${#temporals.format(row.createdAt(), 'yyyy-MM-dd HH:mm')} : '-'"></td>
                         <td th:text="${row.qty()}"></td>

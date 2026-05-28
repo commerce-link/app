@@ -95,7 +95,7 @@
                                 <select name="direction" id="addPaymentDirection" required>
                                     <option th:each="dir : ${T(pl.commercelink.orders.PaymentDirection).values()}"
                                             th:value="${dir}"
-                                            th:text="${dir.localizedName}"></option>
+                                            th:text="${enumI18n.localize(dir)}"></option>
                                 </select>
                             </div>
                         </div>
