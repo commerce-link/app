@@ -121,7 +121,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="doc : ${delivery.documents}">
-                                <td th:text="${doc.type.localizedName}"></td>
+                                <td th:text="${enumI18n.localize(doc.type)}"></td>
                                 <td>
                                     <a th:href="${doc.viewUrl}" target="_blank" class="is-link" th:text="${doc.number}"></a>
                                 </td>

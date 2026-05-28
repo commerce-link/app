@@ -108,7 +108,7 @@
                     <div class="field">
                         <label class="label" th:text="#{warehouse.item.status}">Status</label>
                         <div class="control" th:if="${isEdit}">
-                            <input class="input" type="text" th:value="${warehouseItem.status.localizedName}"
+                            <input class="input" type="text" th:value="${enumI18n.localize(warehouseItem.status)}"
                                    readonly="readonly"/>
                             <input type="hidden" th:field="*{status}"/>
                         </div>
@@ -116,7 +116,7 @@
                             <div class="select">
                                 <select th:field="*{status}" id="statusSelect">
                                     <option th:each="status : ${fulfilmentStatuses}" th:value="${status}"
-                                            th:text="${status.localizedName}"></option>
+                                            th:text="${enumI18n.localize(status)}"></option>
                                 </select>
                             </div>
                         </div>

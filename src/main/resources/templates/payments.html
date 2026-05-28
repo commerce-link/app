@@ -93,7 +93,7 @@
                 </thead>
                 <tbody>
                 <tr th:each="order : ${unpaidOrders}">
-                    <td th:text="${order.status.localizedName}"></td>
+                    <td th:text="${enumI18n.localize(order.status)}"></td>
                     <td>
                         <a th:href="@{/dashboard/orders/{orderId}(orderId=${order.orderId})}" th:text="${order.email}"></a>
                     </td>

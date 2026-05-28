@@ -27,7 +27,7 @@
             <div class="control">
                 <div class="select">
                     <select id="shipmentType" th:field="*{shipmentType}" onchange="toggleShippingDetails()">
-                        <option th:each="type : ${shipmentTypes}" th:value="${type}" th:text="${type.localizedName}"></option>
+                        <option th:each="type : ${shipmentTypes}" th:value="${type}" th:text="${enumI18n.localize(type)}"></option>
                     </select>
                 </div>
             </div>

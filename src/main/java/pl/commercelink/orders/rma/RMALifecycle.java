@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.notifications.EmailNotificationType;
@@ -22,14 +23,18 @@ public class RMALifecycle {
     private final RMARepository rmaRepository;
     private final EmailClient emailClient;
     private final String appDomain;
+    private final EnumLocalizer enumLocalizer;
 
     private final Map<RMAStatus, Consumer<RMA>> notificationHandlers;
     private final Map<RMAItemStatus, BiConsumer<RMA, List<RMAItem>>> itemNotificationHandlers;
 
-    public RMALifecycle(RMARepository rmaRepository, EmailClient emailClient, @Value("${app.domain}") String appDomain) {
+    public RMALifecycle(RMARepository rmaRepository, EmailClient emailClient,
+                        @Value("${app.domain}") String appDomain,
+                        EnumLocalizer enumLocalizer) {
         this.rmaRepository = rmaRepository;
         this.emailClient = emailClient;
         this.appDomain = appDomain;
+        this.enumLocalizer = enumLocalizer;
 
         this.notificationHandlers = new HashMap<>();
         this.notificationHandlers.put(RMAStatus.Approved, this::sendCarrierArrangement);
@@ -73,7 +78,8 @@ public class RMALifecycle {
                     rma.getRmaId(),
                     rma.getOrderId(),
                     rma.getStatus(),
-                    rmaClientLink
+                    rmaClientLink,
+                    enumLocalizer
             );
             sendAndRecordEvent(rma, EmailNotificationType.RMA_CARRIER_ARRANGEMENT, msg);
         }
@@ -120,13 +126,13 @@ public class RMALifecycle {
 
     private void sendItemsAccepted(RMA rma, List<RMAItem> updatedItems) {
         if (updatedItems.isEmpty()) return;
-        RMAItemAcceptNotification msg = new RMAItemAcceptNotification(rma.getEmail(), rma.getEmail(), rma.getRmaId(), rma.getOrderId(), updatedItems);
+        RMAItemAcceptNotification msg = new RMAItemAcceptNotification(rma.getEmail(), rma.getEmail(), rma.getRmaId(), rma.getOrderId(), updatedItems, enumLocalizer);
         sendAndRecordEvent(rma, EmailNotificationType.RMA_ITEMS_ACCEPTED, msg);
     }
 
     private void sendItemsReturnToClient(RMA rma, List<RMAItem> updatedItems) {
         if (updatedItems.isEmpty()) return;
-        RMAItemSendToClientNotification msg = new RMAItemSendToClientNotification(rma.getEmail(), rma.getEmail(), rma.getRmaId(), rma.getOrderId(), updatedItems, rma.getShipments());
+        RMAItemSendToClientNotification msg = new RMAItemSendToClientNotification(rma.getEmail(), rma.getEmail(), rma.getRmaId(), rma.getOrderId(), updatedItems, rma.getShipments(), enumLocalizer);
         sendAndRecordEvent(rma, EmailNotificationType.RMA_ITEMS_SEND_TO_CLIENT, msg);
     }
 

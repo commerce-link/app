@@ -103,7 +103,7 @@
                                 <select th:field="*{status}" disabled>
                                     <option th:each="status : ${fulfilmentStatuses}"
                                             th:value="${status}"
-                                            th:text="${status.localizedName}"></option>
+                                            th:text="${enumI18n.localize(status)}"></option>
                                 </select>
                             </div>
                         </div>

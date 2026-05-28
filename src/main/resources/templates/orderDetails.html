@@ -78,7 +78,7 @@
                                         <div class="select">
                                             <select th:field="*{status}" th:disabled="${isCompletedOrder}">
                                                 <option th:each="status : ${orderStatuses}" th:value="${status}"
-                                                        th:text="${status.localizedName}"></option>
+                                                        th:text="${enumI18n.localize(status)}"></option>
                                             </select>
                                         </div>
                                     </div>
@@ -272,7 +272,7 @@
                                                   (${item.status.name() == 'Ordered'} ? 'is-link' :
                                                   (${item.status.name() == 'Delivered'} ? 'is-success' :
                                                   (${item.status.name() == 'InRMA'} ? 'is-danger' : ''))))"
-                                  th:text="${item.status.localizedName}"
+                                  th:text="${enumI18n.localize(item.status)}"
                                   th:id="'status-tag-' + ${iterStat.index}"
                                   th:attr="data-status=${item.status}"></span>
                         </td>

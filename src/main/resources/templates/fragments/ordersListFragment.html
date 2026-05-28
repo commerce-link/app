@@ -28,20 +28,20 @@
                     <td th:text="${order.source?.type ?: '-'}"></td>
                     <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
                     <td th:text="${order.estimatedShippingAt}"></td>
-                    <td th:text="${order.status.localizedName}"></td>
+                    <td th:text="${enumI18n.localize(order.status)}"></td>
                     <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
                         <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
                         <span th:unless="${goodsIssue.isPresent()}">-</span>
                     </td>
                     <td th:with="closing=${order.closingDocument},pending=${order.nextDocumentToIssue}">
                         <th:block th:if="${closing.isPresent()}">
-                            <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${closing.get().type.localizedName + ' ' + closing.get().number}"></a>
-                            <span th:if="${closing.get().viewUrl == null}" th:text="${closing.get().type.localizedName + ' ' + closing.get().number}"></span>
+                            <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></a>
+                            <span th:if="${closing.get().viewUrl == null}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></span>
                         </th:block>
-                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${pending.get().localizedName + ' — do wystawienia'}"></span>
+                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get()) + ' — do wystawienia'}"></span>
                         <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
                     </td>
-                    <td th:text="${order.review?.status?.localizedName ?: '-'}"></td>
+                    <td th:text="${order.review?.status != null ? enumI18n.localize(order.review.status) : '-'}"></td>
                     <td th:text="${order.unpaidAmount}"></td>
                 </tr>
             </tbody>
