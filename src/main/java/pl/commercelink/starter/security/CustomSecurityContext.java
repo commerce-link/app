@@ -19,7 +19,7 @@ public class CustomSecurityContext {
 
     public static Optional<CustomUser> getLoggedInUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication.isAuthenticated() && authentication.getPrincipal() instanceof CustomUser) {
+        if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof CustomUser) {
             return Optional.of((CustomUser) authentication.getPrincipal());
         }
         return Optional.empty();
