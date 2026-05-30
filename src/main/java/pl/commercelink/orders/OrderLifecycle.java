@@ -8,9 +8,11 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
-import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +23,8 @@ import java.util.Objects;
 @Component
 public class OrderLifecycle {
 
+    @Autowired
+    private StoresRepository storesRepository;
     @Autowired
     private OrdersRepository ordersRepository;
     @Autowired
@@ -47,6 +51,9 @@ public class OrderLifecycle {
         }
 
         OrderStatus previousOrderStatus = order.getStatus();
+
+        Store store = storesRepository.findById(order.getStoreId());
+        boolean documentsGenerationEnabled = store != null && store.hasDocumentsGenerationEnabled();
 
         if (order.getStatus() == OrderStatus.New || order.getStatus() == OrderStatus.Assembly) {
             orderItems = getOrFetchOrderItems(order.getOrderId(), orderItems);
@@ -96,7 +103,7 @@ public class OrderLifecycle {
                         }
                     });
 
-            if (order.isAwaitingInvoiceGeneration() || order.isAwaitingDocumentsGeneration()) {
+            if (order.isAwaitingInvoiceGeneration() || order.isAwaitingDocumentsGeneration(documentsGenerationEnabled)) {
                 String createdBy = CustomSecurityContext.getLoggedInUser()
                         .map(CustomUser::getName)
                         .orElse("System");
@@ -113,7 +120,7 @@ public class OrderLifecycle {
             }
         }
 
-        if (order.isSettled()) {
+        if (order.isSettled(documentsGenerationEnabled)) {
             order.setStatus(OrderStatus.Completed);
         }
 

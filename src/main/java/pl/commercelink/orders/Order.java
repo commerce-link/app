@@ -126,8 +126,8 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isSettled() {
-        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration() && !isAwaitingReview();
+    public boolean isSettled(boolean documentsGenerationEnabled) {
+        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(documentsGenerationEnabled) && !isAwaitingReview();
     }
 
     @DynamoDBIgnore
@@ -143,8 +143,8 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isAwaitingDocumentsGeneration() {
-        return !getDocumentByType(DocumentType.GoodsIssue).isPresent();
+    public boolean isAwaitingDocumentsGeneration(boolean documentsGenerationEnabled) {
+        return documentsGenerationEnabled && !getDocumentByType(DocumentType.GoodsIssue).isPresent();
     }
 
     @DynamoDBIgnore
