@@ -139,6 +139,10 @@ public class InvoicingService {
             return new OperationResult(null, null, null, "WMS order number is missing");
         }
 
+        if (order.getPaidAmount() <= 0) {
+            return new OperationResult(null, null, null, "Advance invoice requires a received payment");
+        }
+
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.advanceInvoice()
                 .orderId(order.getOrderId())

@@ -195,6 +195,29 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public List<DocumentType> getIssuableDocumentTypes() {
+        if (!isB2B() || isInvoiced()) {
+            return List.of();
+        }
+
+        if (getDocumentByType(DocumentType.InvoiceAdvance).isPresent()) {
+            return List.of(DocumentType.InvoiceFinal);
+        }
+
+        boolean hasOrder = getDocumentByType(DocumentType.Order).isPresent();
+
+        List<DocumentType> types = new ArrayList<>();
+        if (!hasOrder) {
+            types.add(DocumentType.Order);
+        }
+        types.add(DocumentType.InvoiceVat);
+        if (hasOrder && getPaidAmount() > 0) {
+            types.add(DocumentType.InvoiceAdvance);
+        }
+        return types;
+    }
+
+    @DynamoDBIgnore
     public DocumentType getReceiptType() {
         Optional<Document> op = getClosingDocument();
         if (op.isPresent()) {

@@ -7,8 +7,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 
-import java.util.Optional;
-
 @Component
 public class InvoiceCreationEventPublisher {
 
@@ -21,18 +19,18 @@ public class InvoiceCreationEventPublisher {
     private SqsTemplate sqsTemplate;
 
     public void publish(Order order, boolean sendEmail) {
-        if (!"prod".equals(env)) {
-            return;
-        }
+        order.getNextInvoiceToIssue().ifPresent(type -> publish(order, type, sendEmail));
+    }
 
-        Optional<DocumentType> op = order.getNextInvoiceToIssue();
-        if (!op.isPresent()) {
+    public void publish(Order order, DocumentType documentType, boolean sendEmail) {
+        if (!"prod".equals(env)) {
             return;
         }
 
         InvoiceCreationRequest request = new InvoiceCreationRequest(
                 order.getStoreId(),
                 order.getOrderId(),
+                documentType,
                 sendEmail
         );
 
@@ -40,7 +38,7 @@ public class InvoiceCreationEventPublisher {
                 .queue(QUEUE_NAME)
                 .payload(request)
                 .messageGroupId(order.getStoreId())
-                .messageDeduplicationId(order.getOrderId())
+                .messageDeduplicationId(order.getOrderId() + ":" + documentType.name())
         );
     }
 }

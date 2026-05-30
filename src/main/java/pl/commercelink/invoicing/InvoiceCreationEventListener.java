@@ -8,8 +8,6 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 
-import java.util.Optional;
-
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 public class InvoiceCreationEventListener {
@@ -32,12 +30,10 @@ public class InvoiceCreationEventListener {
             return;
         }
 
-        Optional<DocumentType> op = order.getNextInvoiceToIssue();
-        if (!op.isPresent()) {
-            return;
-        }
+        DocumentType documentType = payload.getDocumentType();
+        boolean sendEmail = payload.isSendEmail() && documentType != DocumentType.Order;
 
-        InvoicingService.OperationResult result = invoicingService.createInvoice(order, op.get(), payload.isSendEmail());
+        InvoicingService.OperationResult result = invoicingService.createInvoice(order, documentType, sendEmail);
 
         if (result.hasError()) {
             throw new RuntimeException("Failed to create invoice for order " + order.getOrderId() + ": " + result.getErrorMessage());

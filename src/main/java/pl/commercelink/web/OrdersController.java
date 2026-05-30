@@ -344,6 +344,7 @@ public class OrdersController extends BaseController {
         DocumentType nextDocumentToIssue = order.getNextDocumentToIssue().orElse(null);
         model.addAttribute("nextInvoiceToIssue", nextDocumentToIssue);
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
+        model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
 
         return "orderDetails";
     }
@@ -395,15 +396,15 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/invoicing")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String createInvoice(@PathVariable String orderId, @RequestParam(defaultValue = "false") boolean send, Locale locale, RedirectAttributes redirectAttributes) {
+    public String createInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, @RequestParam(defaultValue = "false") boolean send, Locale locale, RedirectAttributes redirectAttributes) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
-        if (!order.getNextInvoiceToIssue().isPresent()) {
+        if (!order.getIssuableDocumentTypes().contains(documentType)) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.no.eligible.invoice.to.create", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
 
-        invoiceCreationEventPublisher.publish(order, send);
+        invoiceCreationEventPublisher.publish(order, documentType, send);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("invoice.generation.started", null, locale));
 
         return "redirect:/dashboard/orders/" + orderId;
