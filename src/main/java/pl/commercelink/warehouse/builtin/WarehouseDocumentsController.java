@@ -8,6 +8,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -35,6 +36,9 @@ class WarehouseDocumentsController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private WarehouseLabelPrintService warehouseLabelPrintService;
 
     @GetMapping("/dashboard/warehouse-documents")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
@@ -148,12 +152,22 @@ class WarehouseDocumentsController {
         model.addAttribute("items", items);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("documentReasons", DocumentReason.values());
+        model.addAttribute("printers", store.getWarehouseConfiguration() != null
+                ? store.getWarehouseConfiguration().getPrinters()
+                : List.of());
 
         if (isSuperAdmin()) {
             model.addAttribute("storeId", storeId);
         }
 
         return "warehouse-document-details";
+    }
+
+    @GetMapping(value = "/dashboard/warehouse-documents/print-labels", produces = "application/zpl")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @ResponseBody
+    String printLabels(@RequestParam String documentId, @RequestParam String printer) {
+        return warehouseLabelPrintService.renderDocumentLabels(getStoreId(), documentId, printer).content();
     }
 
     @GetMapping("/dashboard/warehouse-documents/delivery-mfn-history")

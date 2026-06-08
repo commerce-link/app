@@ -4,7 +4,7 @@
 
 CommerceLink is a Spring Boot 3.5.10 / Java 21 multi-tenant B2B e-commerce platform. It aggregates inventory from 14 suppliers (distributors/retailers), manages product catalogs, processes orders, and integrates with service providers for payments (Stripe, PayNow), invoicing, and shipping (Furgonetka).
 
-The project is being modularized: integrations are extracted into separate libraries following the provider-api plugin pattern. Invoicing is fully extracted behind `invoicing-api`. Shipping is fully extracted behind `shipping-api`. PIM is fully extracted to a separate microservice. Payments, marketplace integrations, and multistore management will all be extracted, making the core platform simpler.
+The project is being modularized: integrations are extracted into separate libraries following the provider-api plugin pattern. Invoicing is fully extracted behind `invoicing-api`. Shipping is fully extracted behind `shipping-api`. Label printing is extracted behind `printing-api`. PIM is fully extracted to a separate microservice. Payments, marketplace integrations, and multistore management will all be extracted, making the core platform simpler.
 
 ## Development Commands
 
@@ -54,6 +54,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 | `provider-api/` | `provider-api` (0.1.0) | Base plugin system: `ProviderDescriptor`, `ProviderField` |
 | `invoicing-api/` | `invoicing-api` (0.2.0) | Invoicing provider interface: `InvoicingProvider`, `InvoicingProviderDescriptor` |
 | `shipping-api/` | `shipping-api` | Shipping provider interface: `ShippingProvider`, `ShippingProviderDescriptor` |
+| `printing-api/` | `printing-api` (0.1.0) | Label printer interface: `PrintProvider`, `PrintProviderDescriptor`, `WarehouseLabel` |
 | `localstack/` | - | Local S3 simulation data |
 
 ### Library Extraction Pattern
@@ -90,6 +91,7 @@ All extracted integrations follow this pattern:
 | `web/` | Controllers and REST APIs |
 | `exception/` | Global exception handling |
 | `provider/` | Service provider configuration management |
+| `printing/` | Label printing: `PrintProviderRegistry` discovers printer adapters (`printing-api` SPI). Printer profiles are stored per store in `WarehouseConfiguration.printers`; warehouse labels are rendered by the configured provider and printed client-side |
 
 ### `starter/` Subpackages (formerly `infrastructure/`)
 

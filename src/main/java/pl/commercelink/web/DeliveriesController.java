@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.AddPaymentForm;
@@ -192,7 +193,7 @@ public class DeliveriesController {
     @PostMapping("/dashboard/deliveries/markSelectedAsReceived")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
-        OperationResult<?> result = deliveryReceptionService.receive(
+        OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
                 form.getProvider(),
                 form.getDeliveryId(),
@@ -203,6 +204,8 @@ public class DeliveriesController {
 
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+        } else if (result.hasPayload()) {
+            return "redirect:/dashboard/warehouse-documents/details?documentId=" + result.getPayload().getId();
         }
 
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();

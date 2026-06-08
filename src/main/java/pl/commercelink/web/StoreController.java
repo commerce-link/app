@@ -16,6 +16,7 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.payments.PaymentProviderFactory;
+import pl.commercelink.printing.PrintProviderRegistry;
 import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
@@ -24,6 +25,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 import pl.commercelink.web.dtos.ParcelForm;
+import pl.commercelink.web.dtos.PrinterForm;
 
 import java.io.IOException;
 import java.util.*;
@@ -59,6 +61,9 @@ public class StoreController {
 
     @Autowired
     private MessageSource messageSource;
+
+    @Autowired
+    private PrintProviderRegistry printProviderRegistry;
 
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
@@ -735,6 +740,7 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
 
         model.addAttribute("form", form);
+        model.addAttribute("availableProviders", printProviderRegistry.availableProviders());
         return "store-warehouse";
     }
 
@@ -742,7 +748,15 @@ public class StoreController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreWarehouse(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setWarehouseConfiguration(form.getStore().getWarehouseConfiguration());
+        WarehouseConfiguration existingConfiguration = existingStore.getWarehouseConfiguration();
+        if (existingConfiguration == null) {
+            existingConfiguration = new WarehouseConfiguration();
+            existingStore.setWarehouseConfiguration(existingConfiguration);
+        }
+        WarehouseConfiguration submitted = form.getStore().getWarehouseConfiguration();
+        existingConfiguration.setWarehouseId(submitted.getWarehouseId());
+        existingConfiguration.setCostCenterId(submitted.getCostCenterId());
+        existingConfiguration.setDocumentsGenerationEnabled(submitted.isDocumentsGenerationEnabled());
 
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.update.success", null, locale));
@@ -750,6 +764,38 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/warehouse", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/warehouse";
+    }
+
+    @PostMapping("/dashboard/store/warehouse/printers/add")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String addWarehousePrinter(@ModelAttribute PrinterForm form, Locale locale, RedirectAttributes redirectAttributes) {
+        Store store = storesRepository.findById(getStoreId());
+        if (store.getWarehouseConfiguration() == null) {
+            store.setWarehouseConfiguration(new WarehouseConfiguration());
+        }
+
+        Printer printer = new Printer();
+        printer.setName(form.getName());
+        printer.setProviderName(form.getProviderName());
+        printer.setSettings(form.getSettings());
+        store.getWarehouseConfiguration().addPrinter(printer);
+
+        storesRepository.save(store);
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.printers.add.success", null, locale));
+        return "redirect:/dashboard/store/warehouse";
+    }
+
+    @PostMapping("/dashboard/store/warehouse/printers/delete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String deleteWarehousePrinter(@RequestParam String name, Locale locale, RedirectAttributes redirectAttributes) {
+        Store store = storesRepository.findById(getStoreId());
+        if (store.getWarehouseConfiguration() != null) {
+            store.getWarehouseConfiguration().removePrinter(name);
+        }
+
+        storesRepository.save(store);
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.printers.delete.success", null, locale));
+        return "redirect:/dashboard/store/warehouse";
     }
 
     @GetMapping("/dashboard/store/report")

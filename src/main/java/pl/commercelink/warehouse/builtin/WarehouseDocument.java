@@ -210,4 +210,13 @@ public class WarehouseDocument {
     public void setVersion(Long version) {
         this.version = version;
     }
+
+    @DynamoDBIgnore
+    public boolean isForeignDelivery() {
+        if (counterparty == null || counterparty.getCountry() == null || counterparty.getCountry().isBlank()) {
+            return false;
+        }
+        String issuerCountry = issuer == null || issuer.getCountry() == null ? "" : issuer.getCountry().trim();
+        return !counterparty.getCountry().trim().equalsIgnoreCase(issuerCountry);
+    }
 }

@@ -39,18 +39,117 @@
                             <span th:text="#{store.warehouse.configuration.documentation.enabled}"></span>
                         </label>
                     </div>
-                </div>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                    th:text="#{general.save}"></button>
+                        </div>
+                        <div class="control">
+                            <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                        </div>
                     </div>
                 </div>
             </form>
+
+            <div class="box">
+                <h2 class="subtitle" th:text="#{store.warehouse.printers.title}"></h2>
+
+                <table th:if="${!#lists.isEmpty(form.store.warehouseConfiguration.printers)}"
+                       class="table is-fullwidth is-striped">
+                    <thead>
+                        <tr>
+                            <th th:text="#{store.warehouse.printers.name}"></th>
+                            <th th:text="#{store.warehouse.printers.provider}"></th>
+                            <th th:text="#{store.warehouse.printers.device}"></th>
+                            <th th:text="#{general.actions}"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="printer : ${form.store.warehouseConfiguration.printers}">
+                            <td th:text="${printer.name}"></td>
+                            <td th:text="${printer.providerName}"></td>
+                            <td th:text="${printer.settings['deviceId']}"></td>
+                            <td>
+                                <form th:action="@{/dashboard/store/warehouse/printers/delete}" method="post">
+                                    <input type="hidden" name="name" th:value="${printer.name}"/>
+                                    <button type="button" class="button is-small is-danger is-outlined"
+                                            onclick="confirmDelete(this)" th:text="#{general.delete}"></button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <form th:action="@{/dashboard/store/warehouse/printers/add}" method="post">
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.warehouse.printers.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="name" required>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{store.warehouse.printers.provider}"></label>
+                        <div class="control">
+                            <div class="select">
+                                <select name="providerName" id="printer-provider-select" required>
+                                    <option value="" th:text="#{general.select}"></option>
+                                    <option th:each="provider : ${availableProviders}"
+                                            th:value="${provider.name()}"
+                                            th:text="${provider.displayName()}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div th:each="provider : ${availableProviders}"
+                         th:id="'printer-fields-' + ${provider.name()}"
+                         class="printer-fields" style="display:none;">
+                        <div class="field" th:each="field : ${provider.configurationFields()}">
+                            <label class="label" th:text="${field.label()}"></label>
+                            <div class="control">
+                                <input class="input"
+                                       th:type="${field.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                                       th:name="'settings[' + ${field.key()} + ']'"
+                                       th:placeholder="${field.placeholder()}"
+                                       th:required="${field.required()}"
+                                       disabled>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped mt-4">
+                        <div class="control">
+                            <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                    th:text="#{store.warehouse.printers.add}"></button>
+                        </div>
+                    </div>
+                </form>
+
+                <script th:inline="javascript">
+                    (function () {
+                        var select = document.getElementById('printer-provider-select');
+                        if (!select) {
+                            return;
+                        }
+                        function toggle(providerName) {
+                            document.querySelectorAll('.printer-fields').forEach(function (div) {
+                                var active = div.id === 'printer-fields-' + providerName;
+                                div.style.display = active ? '' : 'none';
+                                div.querySelectorAll('input').forEach(function (input) {
+                                    input.disabled = !active;
+                                });
+                            });
+                        }
+                        toggle(select.value);
+                        select.addEventListener('change', function () {
+                            toggle(this.value);
+                        });
+                    })();
+                </script>
+            </div>
 
         </div>
     </section>

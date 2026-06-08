@@ -176,14 +176,111 @@
                 </table>
             </div>
 
-            <div class="field">
-                <div class="control">
-                    <a th:href="${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents'"
-                       class="button is-light" th:text="#{general.back}"></a>
+            <div class="box" th:if="${document.type.name() == 'GoodsReceipt' and !#lists.isEmpty(printers)}">
+                <h2 class="title is-5" th:text="#{warehouse.documents.print.title}"></h2>
+
+                <div class="field is-grouped is-align-items-center">
+                    <div class="control">
+                        <div class="select">
+                            <select id="label-printer-select">
+                                <option th:each="printer : ${printers}"
+                                        th:value="${printer.name}"
+                                        th:attr="data-device-id=${printer.settings['deviceId']}"
+                                        th:text="${printer.name}"></option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="control">
+                        <button type="button" class="button is-primary" id="print-labels-button"
+                                th:attr="data-document-id=${document.documentId}"
+                                th:text="#{warehouse.documents.print.button}"></button>
+                    </div>
+                    <div class="control">
+                        <span id="print-labels-status" class="is-size-7 has-text-grey"></span>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
+
+    <script th:inline="javascript">
+        (function () {
+            var BROWSER_PRINT_URL = 'http://localhost:9100';
+            var button = document.getElementById('print-labels-button');
+            if (!button) {
+                return;
+            }
+            var select = document.getElementById('label-printer-select');
+            var status = document.getElementById('print-labels-status');
+            var endpoint = /*[[@{/dashboard/warehouse-documents/print-labels}]]*/ '/dashboard/warehouse-documents/print-labels';
+            var successText = /*[[#{warehouse.documents.print.success}]]*/ 'Sent to printer';
+            var errorText = /*[[#{warehouse.documents.print.error}]]*/ 'Print error';
+
+            function setStatus(message) {
+                if (status) {
+                    status.textContent = message;
+                }
+            }
+
+            async function fetchZpl(documentId, printer) {
+                var url = endpoint + '?documentId=' + encodeURIComponent(documentId) + '&printer=' + encodeURIComponent(printer);
+                var response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return await response.text();
+            }
+
+            async function getPrinterDevice(deviceId) {
+                var response = await fetch(BROWSER_PRINT_URL + '/available');
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                var data = await response.json();
+                var printers = (data && data.printer) || [];
+                if (!printers.length) {
+                    throw new Error('no printers available');
+                }
+                if (deviceId) {
+                    var match = printers.filter(function (p) { return p.uid === deviceId; })[0];
+                    if (match) {
+                        return match;
+                    }
+                }
+                return printers.filter(function (p) { return p.connection === 'usb'; })[0] || printers[0];
+            }
+
+            async function sendToPrinter(device, data) {
+                var response = await fetch(BROWSER_PRINT_URL + '/write', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device: device, data: data })
+                });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+            }
+
+            button.addEventListener('click', async function () {
+                var documentId = button.getAttribute('data-document-id');
+                var printer = select ? select.value : '';
+                var selectedOption = select ? select.options[select.selectedIndex] : null;
+                var deviceId = selectedOption ? selectedOption.getAttribute('data-device-id') : null;
+                button.classList.add('is-loading');
+                setStatus('');
+                try {
+                    var zpl = await fetchZpl(documentId, printer);
+                    var device = await getPrinterDevice(deviceId);
+                    await sendToPrinter(device, zpl);
+                    setStatus(successText);
+                } catch (e) {
+                    setStatus(errorText + ': ' + e.message);
+                } finally {
+                    button.classList.remove('is-loading');
+                }
+            });
+        })();
+    </script>
 </div>
 </body>
 </html>
