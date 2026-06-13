@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,20 +43,18 @@ public class StockLedgerService {
         for (Map.Entry<String, Aggregate> entry : aggregates.entrySet()) {
             Aggregate a = entry.getValue();
 
-            int bzQty = a.boQty + a.inQty - a.outQty;
-            double bzValue = a.boValue + a.inValue - a.outValue;
-
-            boolean emptyRow = a.boQty == 0 && a.inQty == 0 && a.outQty == 0
-                    && a.boValue == 0.0 && a.inValue == 0.0 && a.outValue == 0.0;
+            boolean emptyRow = a.boQty == 0 && a.boValue == 0.0 && a.qty.isEmpty();
             if (emptyRow) continue;
+
+            Map<LedgerCategory, Double> roundedValue = new EnumMap<>(LedgerCategory.class);
+            a.value.forEach((category, value) -> roundedValue.put(category, round(value)));
 
             rows.add(new StockLedgerRow(
                     entry.getKey(),
                     a.latestName,
                     a.boQty, round(a.boValue),
-                    a.inQty, round(a.inValue),
-                    a.outQty, round(a.outValue),
-                    bzQty, round(bzValue)
+                    a.qty,
+                    roundedValue
             ));
         }
 
@@ -81,10 +80,9 @@ public class StockLedgerService {
 
                 int qty = item.getQty();
                 double value = qty * item.getUnitPrice();
-                boolean isReceipt = type.isReceiptType();
 
                 if (bucket == Bucket.OPENING) {
-                    if (isReceipt) {
+                    if (type.isReceiptType()) {
                         a.boQty += qty;
                         a.boValue += value;
                     } else {
@@ -92,13 +90,8 @@ public class StockLedgerService {
                         a.boValue -= value;
                     }
                 } else {
-                    if (isReceipt) {
-                        a.inQty += qty;
-                        a.inValue += value;
-                    } else {
-                        a.outQty += qty;
-                        a.outValue += value;
-                    }
+                    LedgerCategory category = LedgerCategory.resolve(type, document.getReason());
+                    a.add(category, qty, value);
                 }
             }
         }
@@ -121,9 +114,12 @@ public class StockLedgerService {
         String latestName;
         int boQty;
         double boValue;
-        int inQty;
-        double inValue;
-        int outQty;
-        double outValue;
+        final Map<LedgerCategory, Integer> qty = new EnumMap<>(LedgerCategory.class);
+        final Map<LedgerCategory, Double> value = new EnumMap<>(LedgerCategory.class);
+
+        void add(LedgerCategory category, int q, double v) {
+            qty.merge(category, q, Integer::sum);
+            value.merge(category, v, Double::sum);
+        }
     }
 }
