@@ -145,6 +145,9 @@ public class InvoiceSyncService {
         for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
             if (!item.isReturned() && costsByMfn.containsKey(item.getManufacturerCode())) {
                 double itemDelta = item.updateCost(costsByMfn.get(item.getManufacturerCode()));
+                if (itemDelta == 0) {
+                    continue;
+                }
                 if (!item.isReplacedOrReturned()) {
                     delta += itemDelta;
                 }
@@ -157,8 +160,10 @@ public class InvoiceSyncService {
     private void updateRMAItems(String deliveryId, Map<String, Double> costsByMfn) {
         for (RMAItem item : rmaItemsRepository.findByDeliveryId(deliveryId)) {
             if (costsByMfn.containsKey(item.getMfn())) {
-                item.setCost(costsByMfn.get(item.getMfn()));
-                rmaItemsRepository.save(item);
+                double itemDelta = item.updateCost(costsByMfn.get(item.getMfn()));
+                if (itemDelta != 0) {
+                    rmaItemsRepository.save(item);
+                }
             }
         }
     }

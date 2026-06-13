@@ -124,6 +124,12 @@ public class WarehouseDocumentItem {
         this.unitPrice = unitPrice;
     }
 
+    public double updateUnitPrice(double newUnitPrice) {
+        double delta = (newUnitPrice - this.unitPrice) * getQty();
+        this.unitPrice = newUnitPrice;
+        return delta;
+    }
+
     public DocumentType getDocumentType() {
         return documentType;
     }

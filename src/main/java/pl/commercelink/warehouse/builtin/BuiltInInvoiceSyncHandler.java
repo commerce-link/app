@@ -54,8 +54,10 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
     private void updateWarehouseDocumentItems(String deliveryId, Map<String, Double> costsByMfn) {
         for (WarehouseDocumentItem item : warehouseDocumentItemRepository.findByDeliveryId(deliveryId)) {
             if (costsByMfn.containsKey(item.getMfn())) {
-                item.setUnitPrice(costsByMfn.get(item.getMfn()));
-                warehouseDocumentItemRepository.save(item);
+                double delta = item.updateUnitPrice(costsByMfn.get(item.getMfn()));
+                if (delta != 0) {
+                    warehouseDocumentItemRepository.save(item);
+                }
             }
         }
     }
@@ -64,7 +66,11 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
         double delta = 0;
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
             if (costsByMfn.containsKey(item.getManufacturerCode())) {
-                delta += item.updateCost(costsByMfn.get(item.getManufacturerCode()));
+                double itemDelta = item.updateCost(costsByMfn.get(item.getManufacturerCode()));
+                if (itemDelta == 0) {
+                    continue;
+                }
+                delta += itemDelta;
                 warehouseRepository.save(item);
             }
         }

@@ -267,6 +267,12 @@ public class RMAItem implements Delivered {
         this.cost = cost;
     }
 
+    public double updateCost(double newCost) {
+        double delta = (newCost - this.cost) * getQty();
+        this.cost = newCost;
+        return delta;
+    }
+
     @DynamoDBIgnore
     public Price unitCost() {
         return Price.fromNet(cost, tax);
