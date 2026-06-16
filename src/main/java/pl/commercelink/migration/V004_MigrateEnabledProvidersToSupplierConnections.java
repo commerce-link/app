@@ -3,6 +3,7 @@ package pl.commercelink.migration;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
+import lombok.RequiredArgsConstructor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -13,13 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @ChangeUnit(id = "V004-migrate-enabled-providers-to-supplier-connections", order = "004", author = "commercelink")
+@RequiredArgsConstructor
 public class V004_MigrateEnabledProvidersToSupplierConnections {
 
     private final StoresRepository storesRepository;
-
-    public V004_MigrateEnabledProvidersToSupplierConnections(StoresRepository storesRepository) {
-        this.storesRepository = storesRepository;
-    }
 
     @Execution
     public void migrate() {

@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.StoreInventoryCache;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class StoreSupplierFeedService {
 
     private final StoresRepository storesRepository;
@@ -20,18 +22,6 @@ public class StoreSupplierFeedService {
     private final SupplierRegistry supplierRegistry;
     private final InventoryRepository inventoryRepository;
     private final StoreInventoryCache storeInventoryCache;
-
-    public StoreSupplierFeedService(StoresRepository storesRepository,
-                                    SupplierConfigurationManager configurationManager,
-                                    SupplierRegistry supplierRegistry,
-                                    InventoryRepository inventoryRepository,
-                                    StoreInventoryCache storeInventoryCache) {
-        this.storesRepository = storesRepository;
-        this.configurationManager = configurationManager;
-        this.supplierRegistry = supplierRegistry;
-        this.inventoryRepository = inventoryRepository;
-        this.storeInventoryCache = storeInventoryCache;
-    }
 
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);

@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
@@ -19,19 +20,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class StoreSupplierConnectionService {
 
     private final SupplierRegistry supplierRegistry;
     private final SupplierConfigurationManager configurationManager;
     private final SupplierConnectionValidator validator;
-
-    public StoreSupplierConnectionService(SupplierRegistry supplierRegistry,
-                                          SupplierConfigurationManager configurationManager,
-                                          SupplierConnectionValidator validator) {
-        this.supplierRegistry = supplierRegistry;
-        this.configurationManager = configurationManager;
-        this.validator = validator;
-    }
 
     public Map<String, List<SupplierConfigField>> configurationFields() {
         Map<String, List<SupplierConfigField>> fields = new LinkedHashMap<>();

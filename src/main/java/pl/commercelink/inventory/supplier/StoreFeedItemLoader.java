@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
@@ -11,15 +13,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreFeedItemLoader {
 
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
-
-    StoreFeedItemLoader(CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader) {
-        this.csvProductFeedLoader = csvProductFeedLoader;
-        this.xmlProductFeedLoader = xmlProductFeedLoader;
-    }
 
     public List<InventoryItem> load(String storeId, SupplierDescriptor descriptor, Map<String, Double> sellRates) {
         List<InventoryItem> items = switch (descriptor.feedFormat()) {

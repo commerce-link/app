@@ -1,5 +1,7 @@
 package pl.commercelink.inventory;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryCache {
 
     private final StoreInventoryStore store;
@@ -23,18 +26,6 @@ public class StoreInventoryCache {
     private final InventoryAutoDiscovery autoDiscovery;
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
-
-    StoreInventoryCache(StoreInventoryStore store, StoresRepository storesRepository, Inventory inventory,
-                        SupplierRegistry supplierRegistry, InventoryAutoDiscovery autoDiscovery,
-                        StoreFeedItemLoader storeFeedItemLoader, ExchangeRates exchangeRates) {
-        this.store = store;
-        this.storesRepository = storesRepository;
-        this.inventory = inventory;
-        this.supplierRegistry = supplierRegistry;
-        this.autoDiscovery = autoDiscovery;
-        this.storeFeedItemLoader = storeFeedItemLoader;
-        this.exchangeRates = exchangeRates;
-    }
 
     public StoreInventory get(String storeId) {
         return store.get(storeId).orElseGet(() -> {

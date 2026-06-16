@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.starter.secrets.SecretsManager;
@@ -13,14 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
+@RequiredArgsConstructor
 public class SupplierConfigurationManager {
 
     private final Map<String, Map<String, String>> cache = new ConcurrentHashMap<>();
     private final SecretsManager secretsManager;
-
-    public SupplierConfigurationManager(SecretsManager secretsManager) {
-        this.secretsManager = secretsManager;
-    }
 
     public Map<String, String> getConfigurationForUI(Store store, String supplierName, List<SupplierConfigField> fields) {
         Map<String, String> masked = new HashMap<>(loadConfiguration(store, supplierName));
