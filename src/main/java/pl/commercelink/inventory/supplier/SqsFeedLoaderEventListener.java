@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryRepository;
@@ -10,17 +11,12 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@RequiredArgsConstructor
 public class SqsFeedLoaderEventListener {
 
     private final SupplierRegistry supplierRegistry;
     private final InventoryRepository inventoryRepository;
     private final StoreSupplierFeedService storeSupplierFeedService;
-
-    public SqsFeedLoaderEventListener(SupplierRegistry supplierRegistry, InventoryRepository inventoryRepository, StoreSupplierFeedService storeSupplierFeedService) {
-        this.supplierRegistry = supplierRegistry;
-        this.inventoryRepository = inventoryRepository;
-        this.storeSupplierFeedService = storeSupplierFeedService;
-    }
 
     @SqsListener(
             value = "supplier-feed-import-queue",

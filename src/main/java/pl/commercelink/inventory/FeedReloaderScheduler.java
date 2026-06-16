@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -18,6 +19,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class FeedReloaderScheduler {
 
     private final Inventory inventory;
@@ -27,18 +29,6 @@ public class FeedReloaderScheduler {
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
     private final StoreInventoryCache storeInventoryCache;
-
-    public FeedReloaderScheduler(Inventory inventory, InventoryRepository inventoryRepository, SupplierRegistry supplierRegistry,
-                                 CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader,
-                                 ExchangeRates exchangeRates, StoreInventoryCache storeInventoryCache) {
-        this.inventory = inventory;
-        this.inventoryRepository = inventoryRepository;
-        this.supplierRegistry = supplierRegistry;
-        this.csvProductFeedLoader = csvProductFeedLoader;
-        this.xmlProductFeedLoader = xmlProductFeedLoader;
-        this.exchangeRates = exchangeRates;
-        this.storeInventoryCache = storeInventoryCache;
-    }
 
     @Scheduled(cron = "0 */5 * * * ?")
     public void reloadIfNewFeedsAvailable() {

@@ -1,6 +1,8 @@
 package pl.commercelink.inventory;
 
 import jakarta.annotation.PostConstruct;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
@@ -15,6 +17,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class InventoryLoad {
 
     private final Inventory inventory;
@@ -22,16 +25,6 @@ class InventoryLoad {
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
-
-    InventoryLoad(Inventory inventory, SupplierRegistry supplierRegistry,
-                  CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader,
-                  ExchangeRates exchangeRates) {
-        this.inventory = inventory;
-        this.supplierRegistry = supplierRegistry;
-        this.csvProductFeedLoader = csvProductFeedLoader;
-        this.xmlProductFeedLoader = xmlProductFeedLoader;
-        this.exchangeRates = exchangeRates;
-    }
 
     @PostConstruct
     void onStartUp() {

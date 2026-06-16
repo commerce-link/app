@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryRepository;
@@ -25,19 +27,13 @@ import java.util.LinkedList;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class XmlProductFeedLoader {
 
     private final InventoryRepository inventoryRepository;
     private final DataCorrection dataCorrection;
     private final DataCleanup dataCleanup;
     private final TaxonomyCache taxonomyCache;
-
-    XmlProductFeedLoader(InventoryRepository inventoryRepository, DataCorrection dataCorrection, DataCleanup dataCleanup, TaxonomyCache taxonomyCache) {
-        this.inventoryRepository = inventoryRepository;
-        this.dataCorrection = dataCorrection;
-        this.dataCleanup = dataCleanup;
-        this.taxonomyCache = taxonomyCache;
-    }
 
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
