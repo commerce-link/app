@@ -1,0 +1,74 @@
+package pl.commercelink.inventory;
+
+import org.springframework.stereotype.Component;
+import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Component
+public class StoreInventoryCache {
+
+    private final StoreInventoryStore store;
+    private final StoresRepository storesRepository;
+    private final Inventory inventory;
+    private final SupplierRegistry supplierRegistry;
+    private final InventoryAutoDiscovery autoDiscovery;
+    private final StoreFeedItemLoader storeFeedItemLoader;
+    private final ExchangeRates exchangeRates;
+
+    StoreInventoryCache(StoreInventoryStore store, StoresRepository storesRepository, Inventory inventory,
+                        SupplierRegistry supplierRegistry, InventoryAutoDiscovery autoDiscovery,
+                        StoreFeedItemLoader storeFeedItemLoader, ExchangeRates exchangeRates) {
+        this.store = store;
+        this.storesRepository = storesRepository;
+        this.inventory = inventory;
+        this.supplierRegistry = supplierRegistry;
+        this.autoDiscovery = autoDiscovery;
+        this.storeFeedItemLoader = storeFeedItemLoader;
+        this.exchangeRates = exchangeRates;
+    }
+
+    public StoreInventory get(String storeId) {
+        return store.get(storeId).orElseGet(() -> {
+            StoreInventory built = build(storeId);
+            store.put(storeId, built);
+            return built;
+        });
+    }
+
+    public void invalidate(String storeId) {
+        store.invalidate(storeId);
+    }
+
+    public void invalidateAll() {
+        store.invalidateAll();
+    }
+
+    private StoreInventory build(String storeId) {
+        Store storeEntity = storesRepository.findById(storeId);
+        if (storeEntity == null) {
+            return new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+        }
+
+        List<InventoryItem> combined = new ArrayList<>();
+        if (storeEntity.canUseGlobalSuppliers()) {
+            combined.addAll(inventory.globalItemsForSuppliers(storeEntity.getGlobalSupplierNames()));
+        }
+
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
+        for (String supplierName : storeEntity.getOwnSupplierNames()) {
+            supplierRegistry.getDescriptor(supplierName)
+                    .ifPresent(descriptor -> combined.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates)));
+        }
+
+        return new StoreInventory(autoDiscovery.run(combined), LocalDateTime.now());
+    }
+}

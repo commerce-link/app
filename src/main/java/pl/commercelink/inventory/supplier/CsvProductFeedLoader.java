@@ -34,26 +34,40 @@ public class CsvProductFeedLoader {
             System.out.println("Skipping feed file for " + supplierName + " as it does not exist or is unreadable.");
             return new LinkedList<>();
         }
-
         try (Reader reader = inventoryRepository.read(supplierName)) {
-            List<InventoryItem> res = new ArrayList<>();
-
-            new CSVLoader(reader).readRows(separator, row -> {
-                parser.tryParse(row).ifPresent(parsed -> {
-                    InventoryItem item = dataCorrection.run(parsed.item());
-                    Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
-                    if (item != null && taxonomy != null && taxonomy.isProcessable() && item.isSellable()) {
-                        taxonomyCache.add(taxonomy);
-                        res.add(item);
-                    }
-                });
-            });
-
-            return dataCleanup.run(res);
+            return parseRows(parser, separator, reader);
         } catch (IOException e) {
             System.out.println("Error reading feed file for " + supplierName + ": " + e.getMessage());
             return new LinkedList<>();
         }
+    }
+
+    public List<InventoryItem> fetch(CsvRowParser parser, Character separator, String storeId, String supplierName) {
+        if (!inventoryRepository.canRead(storeId, supplierName)) {
+            System.out.println("Skipping store feed file for " + storeId + "/" + supplierName + " as it does not exist or is unreadable.");
+            return new LinkedList<>();
+        }
+        try (Reader reader = inventoryRepository.read(storeId, supplierName, "csv")) {
+            return parseRows(parser, separator, reader);
+        } catch (IOException e) {
+            System.out.println("Error reading store feed file for " + storeId + "/" + supplierName + ": " + e.getMessage());
+            return new LinkedList<>();
+        }
+    }
+
+    private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader) {
+        List<InventoryItem> res = new ArrayList<>();
+        new CSVLoader(reader).readRows(separator, row -> {
+            parser.tryParse(row).ifPresent(parsed -> {
+                InventoryItem item = dataCorrection.run(parsed.item());
+                Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
+                if (item != null && taxonomy != null && taxonomy.isProcessable() && item.isSellable()) {
+                    taxonomyCache.add(taxonomy);
+                    res.add(item);
+                }
+            });
+        });
+        return dataCleanup.run(res);
     }
 
 }

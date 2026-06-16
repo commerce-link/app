@@ -10,7 +10,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
+import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.SupplierConfigField;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -52,6 +55,9 @@ public class StoreController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
+
+    @Autowired
+    private StoreSupplierConnectionService storeSupplierConnectionService;
 
     @Value("${app.domain}")
     private String appDomain;
@@ -374,12 +380,19 @@ public class StoreController {
             store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         }
 
+        Map<String, List<SupplierConfigField>> supplierFields = storeSupplierConnectionService.configurationFields();
+
         StoreForm form = new StoreForm(store);
+        form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
+        form.setSupplierSelections(storeSupplierConnectionService.selectionsFor(store));
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("productGroupTypes", ProductGroup.values());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
+        model.addAttribute("supplierFields", supplierFields);
+        model.addAttribute("connectionModes", ConnectionMode.values());
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "store-fulfilment";
     }
@@ -635,14 +648,20 @@ public class StoreController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreFulfilmentConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setFulfilmentConfiguration(form.getStore().getFulfilmentConfiguration());
+        FulfilmentConfiguration submitted = form.getStore().getFulfilmentConfiguration();
 
+        List<String> errors = storeSupplierConnectionService.apply(
+                existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
+        if (!errors.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", String.join(" ", errors));
+            return redirectToFulfilment(form.getStore().getStoreId());
+        }
+
+        existingStore.setFulfilmentConfiguration(submitted);
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
 
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/fulfilment", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/fulfilment";
+        return redirectToFulfilment(form.getStore().getStoreId());
     }
 
     @PostMapping("/dashboard/store/payments/checkout/edit")
@@ -855,6 +874,12 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/report", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/report";
+    }
+
+    private String redirectToFulfilment(String storeId) {
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/fulfilment", storeId)
+                : "redirect:/dashboard/store/fulfilment";
     }
 
     private Branding createOrUpdateBranding(StoreForm form, Store store) throws IOException {

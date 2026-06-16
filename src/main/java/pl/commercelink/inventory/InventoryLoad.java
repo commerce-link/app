@@ -21,22 +21,25 @@ class InventoryLoad {
     private final SupplierRegistry supplierRegistry;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
+    private final ExchangeRates exchangeRates;
 
     InventoryLoad(Inventory inventory, SupplierRegistry supplierRegistry,
-                  CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader) {
+                  CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader,
+                  ExchangeRates exchangeRates) {
         this.inventory = inventory;
         this.supplierRegistry = supplierRegistry;
         this.csvProductFeedLoader = csvProductFeedLoader;
         this.xmlProductFeedLoader = xmlProductFeedLoader;
+        this.exchangeRates = exchangeRates;
     }
 
     @PostConstruct
     void onStartUp() {
-        Map<String, Double> sellRates = new ExchangeRates().getCurrentSellRates();
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         List<List<InventoryItem>> rawFeeds = supplierRegistry.getAllDescriptors().stream()
                 .map(this::fetchItems)
                 .map(items -> items.stream()
-                        .flatMap(item -> item.toLocalCurrency("PLN", sellRates.get(item.currency())).stream())
+                        .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList()))
                 .collect(Collectors.toList());
         inventory.init(rawFeeds);

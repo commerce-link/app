@@ -42,37 +42,7 @@ public class XmlProductFeedLoader {
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
         try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
-            XMLInputFactory xif = XMLInputFactory.newFactory();
-            XMLStreamReader xsr = xif.createXMLStreamReader(reader);
-
-            JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
-            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-
-            List<InventoryItem> res = new LinkedList<>();
-
-            try {
-                while (xsr.hasNext()) {
-                    if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
-                        V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
-
-                        ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                        InventoryItem inventoryItem = dataCorrection.run(parsed.item());
-                        Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
-
-                        if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
-                            taxonomyCache.add(taxonomy);
-                            res.add(inventoryItem);
-                        }
-                    } else {
-                        xsr.next();
-                    }
-                }
-            } finally {
-                xsr.close();
-            }
-
-            return dataCleanup.run(res);
-
+            return parse(itemClass, itemElementName, supplierInfo, reader);
         } catch (JAXBException | XMLStreamException e) {
             System.out.println("Skipping feed file: " + supplierName + " as it can't be deserialized.");
             return new LinkedList<>();
@@ -83,6 +53,56 @@ public class XmlProductFeedLoader {
             System.out.println("Skipping feed file: " + supplierName + " as it can't be read.");
             return new LinkedList<>();
         }
+    }
+
+    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId) {
+        String supplierName = supplierInfo.name();
+        try (Reader reader = inventoryRepository.read(storeId, supplierName, "xml")) {
+            return parse(itemClass, itemElementName, supplierInfo, reader);
+        } catch (JAXBException | XMLStreamException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be deserialized.");
+            return new LinkedList<>();
+        } catch (NoSuchBucketException | NoSuchKeyException | FileNotFoundException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it does not exists or is unreadable.");
+            return new LinkedList<>();
+        } catch (IOException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be read.");
+            return new LinkedList<>();
+        }
+    }
+
+    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader)
+            throws JAXBException, XMLStreamException {
+        XMLInputFactory xif = XMLInputFactory.newFactory();
+        XMLStreamReader xsr = xif.createXMLStreamReader(reader);
+
+        JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
+        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+
+        List<InventoryItem> res = new LinkedList<>();
+
+        try {
+            while (xsr.hasNext()) {
+                if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
+                    V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
+
+                    ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
+                    InventoryItem inventoryItem = dataCorrection.run(parsed.item());
+                    Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
+
+                    if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
+                        taxonomyCache.add(taxonomy);
+                        res.add(inventoryItem);
+                    }
+                } else {
+                    xsr.next();
+                }
+            }
+        } finally {
+            xsr.close();
+        }
+
+        return dataCleanup.run(res);
     }
 
 }

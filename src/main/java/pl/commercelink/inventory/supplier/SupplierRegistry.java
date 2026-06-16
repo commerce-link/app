@@ -19,9 +19,11 @@ public class SupplierRegistry {
     private final Map<String, SupplierDescriptor> descriptors = new LinkedHashMap<>();
     private final Map<String, SupplierInfo> suppliers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final SecretsManager secretsManager;
+    private final SupplierSecretCodec secretCodec;
 
-    public SupplierRegistry(SecretsManager secretsManager) {
+    public SupplierRegistry(SecretsManager secretsManager, SupplierSecretCodec secretCodec) {
         this.secretsManager = secretsManager;
+        this.secretCodec = secretCodec;
         for (SupplierDescriptor descriptor : ServiceLoader.load(SupplierDescriptor.class)) {
             descriptors.put(descriptor.supplierInfo().name(), descriptor);
             suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
@@ -38,6 +40,11 @@ public class SupplierRegistry {
         suppliers.put(entity.name(), entity);
     }
 
+    void registerDescriptor(SupplierDescriptor descriptor) {
+        descriptors.put(descriptor.supplierInfo().name(), descriptor);
+        suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
+    }
+
     public Optional<FeedData> downloadFeed(String supplierName) throws ResourceDownloadException {
         SupplierDescriptor descriptor = descriptors.get(supplierName);
         if (descriptor == null) {
@@ -45,6 +52,19 @@ public class SupplierRegistry {
         }
         String secret = secretsManager.getSecret(supplierName);
         return descriptor.download(secret);
+    }
+
+    public Optional<FeedData> downloadFeed(String supplierName, Map<String, String> config) throws ResourceDownloadException {
+        SupplierDescriptor descriptor = descriptors.get(supplierName);
+        if (descriptor == null) {
+            return Optional.empty();
+        }
+        String secret = secretCodec.toSecretString(config);
+        return descriptor.download(secret);
+    }
+
+    public Optional<SupplierDescriptor> getDescriptor(String supplierName) {
+        return Optional.ofNullable(descriptors.get(supplierName));
     }
 
     public Collection<SupplierDescriptor> getAllDescriptors() {

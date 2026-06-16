@@ -25,14 +25,19 @@ public class FeedReloaderScheduler {
     private final SupplierRegistry supplierRegistry;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
+    private final ExchangeRates exchangeRates;
+    private final StoreInventoryCache storeInventoryCache;
 
     public FeedReloaderScheduler(Inventory inventory, InventoryRepository inventoryRepository, SupplierRegistry supplierRegistry,
-                                 CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader) {
+                                 CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader,
+                                 ExchangeRates exchangeRates, StoreInventoryCache storeInventoryCache) {
         this.inventory = inventory;
         this.inventoryRepository = inventoryRepository;
         this.supplierRegistry = supplierRegistry;
         this.csvProductFeedLoader = csvProductFeedLoader;
         this.xmlProductFeedLoader = xmlProductFeedLoader;
+        this.exchangeRates = exchangeRates;
+        this.storeInventoryCache = storeInventoryCache;
     }
 
     @Scheduled(cron = "0 */5 * * * ?")
@@ -40,7 +45,7 @@ public class FeedReloaderScheduler {
         Map<String, LocalDateTime> latestModifiedPerSupplier = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         latestModifiedPerSupplier.putAll(inventoryRepository.getLatestModifiedPerSupplier());
         Map<String, List<InventoryItem>> updatesBySupplier = new LinkedHashMap<>();
-        Map<String, Double> sellRates = new ExchangeRates().getCurrentSellRates();
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
 
         for (SupplierDescriptor supplierDescriptor : supplierRegistry.getAllDescriptors()) {
             String supplierName = supplierDescriptor.supplierInfo().name();
@@ -49,7 +54,7 @@ public class FeedReloaderScheduler {
 
             if (lastModified != null && lastUpdateDate.isBefore(lastModified)) {
                 List<InventoryItem> items = fetchItems(supplierDescriptor).stream()
-                        .flatMap(item -> item.toLocalCurrency("PLN", sellRates.get(item.currency())).stream())
+                        .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList());
                 updatesBySupplier.put(supplierName, items);
             }
@@ -57,6 +62,7 @@ public class FeedReloaderScheduler {
 
         if (!updatesBySupplier.isEmpty()) {
             inventory.update(updatesBySupplier);
+            storeInventoryCache.invalidateAll();
         }
     }
 

@@ -1,5 +1,6 @@
 package pl.commercelink.financials;
 
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -9,7 +10,10 @@ import java.util.Map;
 /*
     Generate by AI
  */
+@Component
 public class ExchangeRates {
+
+    public static final String LOCAL_CURRENCY = "PLN";
 
     private static final String NBP_API_URL = "http://api.nbp.pl/api/exchangerates/tables/C";
 

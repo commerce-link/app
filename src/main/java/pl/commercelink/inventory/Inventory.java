@@ -1,8 +1,10 @@
 package pl.commercelink.inventory;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -23,16 +25,28 @@ public class Inventory {
     private final InventoryAutoDiscovery autoDiscovery;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
+    private final StoreInventoryCache storeInventoryCache;
 
     private Collection<MatchedInventory> autoDiscoveredInventory = new LinkedList<>();
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
-    Inventory(Warehouse warehouse, StoresRepository storesRepository, InventoryAutoDiscovery autoDiscovery, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    Inventory(Warehouse warehouse, StoresRepository storesRepository, InventoryAutoDiscovery autoDiscovery,
+              TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
+              @Lazy StoreInventoryCache storeInventoryCache) {
         this.warehouse = warehouse;
         this.storesRepository = storesRepository;
         this.autoDiscovery = autoDiscovery;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
+        this.storeInventoryCache = storeInventoryCache;
+    }
+
+    private Collection<MatchedInventory> baseInventoryFor(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        if (store != null && store.hasOwnSupplierConnections()) {
+            return storeInventoryCache.get(storeId).items();
+        }
+        return autoDiscoveredInventory;
     }
 
     void init(List<List<InventoryItem>> rawFeeds) {
@@ -86,6 +100,13 @@ public class Inventory {
                 .collect(Collectors.toList());
     }
 
+    public List<InventoryItem> globalItemsForSuppliers(Collection<String> supplierNames) {
+        return autoDiscoveredInventory.stream()
+                .flatMap(matched -> matched.getInventoryItems().stream())
+                .filter(item -> supplierNames.contains(item.supplier()))
+                .collect(Collectors.toList());
+    }
+
     public InventoryView withGlobalData() {
         return new InventoryView(autoDiscoveredInventory);
     }
@@ -95,12 +116,12 @@ public class Inventory {
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(autoDiscoveredInventory, new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
+        return new InventoryView(baseInventoryFor(storeId), new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
         return new InventoryView(
-                autoDiscoveredInventory,
+                baseInventoryFor(storeId),
                 new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry),
                 new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry)
         );

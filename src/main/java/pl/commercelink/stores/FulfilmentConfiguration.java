@@ -8,6 +8,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.products.ProductGroupListConverter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @DynamoDBDocument
@@ -27,6 +28,10 @@ public class FulfilmentConfiguration {
     private List<ProductGroup> enabledProductGroups;
     @DynamoDBAttribute(attributeName = "enabledProviders")
     private List<String> enabledProviders;
+    @DynamoDBAttribute(attributeName = "canUseGlobalSuppliers")
+    private boolean canUseGlobalSuppliers = false;
+    @DynamoDBAttribute(attributeName = "supplierConnections")
+    private List<StoreSupplierConnection> supplierConnections = new ArrayList<>();
 
     public FulfilmentConfiguration() {
     }
@@ -77,5 +82,21 @@ public class FulfilmentConfiguration {
 
     public void setEnabledProviders(List<String> enabledProviders) {
         this.enabledProviders = enabledProviders;
+    }
+
+    public boolean isCanUseGlobalSuppliers() {
+        return canUseGlobalSuppliers;
+    }
+
+    public void setCanUseGlobalSuppliers(boolean canUseGlobalSuppliers) {
+        this.canUseGlobalSuppliers = canUseGlobalSuppliers;
+    }
+
+    public List<StoreSupplierConnection> getSupplierConnections() {
+        return supplierConnections;
+    }
+
+    public void setSupplierConnections(List<StoreSupplierConnection> supplierConnections) {
+        this.supplierConnections = supplierConnections;
     }
 }
