@@ -26,9 +26,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class StoreInventoryCacheTest {
+class StoreInventoryProviderTest {
 
-    private final StoreInventoryStore store = mock(StoreInventoryStore.class);
+    private final StoreInventoryCache cache = mock(StoreInventoryCache.class);
     private final StoresRepository storesRepository = mock(StoresRepository.class);
     private final Inventory inventory = mock(Inventory.class);
     private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
@@ -36,8 +36,8 @@ class StoreInventoryCacheTest {
     private final StoreFeedItemLoader storeFeedItemLoader = mock(StoreFeedItemLoader.class);
     private final ExchangeRates exchangeRates = mock(ExchangeRates.class);
 
-    private final StoreInventoryCache cache = new StoreInventoryCache(
-            store, storesRepository, inventory, supplierRegistry, autoDiscovery, storeFeedItemLoader, exchangeRates);
+    private final StoreInventoryProvider provider = new StoreInventoryProvider(
+            cache, storesRepository, inventory, supplierRegistry, autoDiscovery, storeFeedItemLoader, exchangeRates);
 
     private InventoryItem item(String supplier) {
         return new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, supplier, true, true, false);
@@ -46,16 +46,16 @@ class StoreInventoryCacheTest {
     @Test
     void returnsCachedEntryWithoutBuilding() {
         StoreInventory cached = new StoreInventory(new LinkedList<>(), LocalDateTime.now());
-        when(store.get("store-1")).thenReturn(Optional.of(cached));
+        when(cache.get("store-1")).thenReturn(Optional.of(cached));
 
-        assertSame(cached, cache.get("store-1"));
+        assertSame(cached, provider.get("store-1"));
         verify(inventory, never()).globalItemsForSuppliers(any());
-        verify(store, never()).put(any(), any());
+        verify(cache, never()).put(any(), any());
     }
 
     @Test
     void buildsFromGlobalAndOwnItemsThenStores() {
-        when(store.get("store-1")).thenReturn(Optional.empty());
+        when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.canUseGlobalSuppliers()).thenReturn(true);
@@ -69,16 +69,16 @@ class StoreInventoryCacheTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(autoDiscovery.run(anyList())).thenReturn(List.of(matched));
 
-        StoreInventory result = cache.get("store-1");
+        StoreInventory result = provider.get("store-1");
 
         assertEquals(List.of(matched), result.items());
-        verify(store).put(eq("store-1"), any(StoreInventory.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class));
         verify(autoDiscovery).run(argThat(list -> list.size() == 2));
     }
 
     @Test
     void excludesGlobalItemsWhenStoreCannotUseGlobalSuppliers() {
-        when(store.get("store-1")).thenReturn(Optional.empty());
+        when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.canUseGlobalSuppliers()).thenReturn(false);
@@ -86,27 +86,27 @@ class StoreInventoryCacheTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         when(autoDiscovery.run(anyList())).thenReturn(List.of());
 
-        cache.get("store-1");
+        provider.get("store-1");
 
         verify(inventory, never()).globalItemsForSuppliers(any());
         verify(autoDiscovery).run(argThat(List::isEmpty));
     }
 
     @Test
-    void invalidateAllDelegatesToStore() {
-        cache.invalidateAll();
+    void invalidateAllDelegatesToCache() {
+        provider.invalidateAll();
 
-        verify(store).invalidateAll();
+        verify(cache).invalidateAll();
     }
 
     @Test
     void buildsEmptyInventoryWhenStoreMissing() {
-        when(store.get("store-1")).thenReturn(Optional.empty());
+        when(cache.get("store-1")).thenReturn(Optional.empty());
         when(storesRepository.findById("store-1")).thenReturn(null);
 
-        StoreInventory result = cache.get("store-1");
+        StoreInventory result = provider.get("store-1");
 
         assertEquals(0, result.items().size());
-        verify(store).put(eq("store-1"), any(StoreInventory.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class));
     }
 }

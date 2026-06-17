@@ -24,10 +24,10 @@ class InventoryStoreRoutingTest {
     private final InventoryAutoDiscovery autoDiscovery = mock(InventoryAutoDiscovery.class);
     private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
     private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final StoreInventoryCache storeInventoryCache = mock(StoreInventoryCache.class);
+    private final StoreInventoryProvider storeInventoryProvider = mock(StoreInventoryProvider.class);
 
     private final Inventory inventory = new Inventory(
-            warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry, storeInventoryCache);
+            warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry, storeInventoryProvider);
 
     private Store store(boolean hasOwn) {
         Store store = mock(Store.class);
@@ -40,12 +40,12 @@ class InventoryStoreRoutingTest {
     void withEnabledSuppliersOnlyQueriesStoreCacheWhenStoreHasOwnConnections() {
         Store store = store(true);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(storeInventoryCache.get("store-1"))
+        when(storeInventoryProvider.get("store-1"))
                 .thenReturn(new StoreInventory(new LinkedList<>(), LocalDateTime.now()));
 
         inventory.withEnabledSuppliersOnly("store-1");
 
-        verify(storeInventoryCache).get("store-1");
+        verify(storeInventoryProvider).get("store-1");
     }
 
     @Test
@@ -55,6 +55,6 @@ class InventoryStoreRoutingTest {
 
         inventory.withEnabledSuppliersOnly("store-1");
 
-        verify(storeInventoryCache, never()).get(any());
+        verify(storeInventoryProvider, never()).get(any());
     }
 }

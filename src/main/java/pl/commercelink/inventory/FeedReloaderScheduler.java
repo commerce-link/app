@@ -28,7 +28,7 @@ public class FeedReloaderScheduler {
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
-    private final StoreInventoryCache storeInventoryCache;
+    private final StoreInventoryProvider storeInventoryProvider;
 
     @Scheduled(cron = "0 */5 * * * ?")
     public void reloadIfNewFeedsAvailable() {
@@ -52,7 +52,7 @@ public class FeedReloaderScheduler {
 
         if (!updatesBySupplier.isEmpty()) {
             inventory.update(updatesBySupplier);
-            storeInventoryCache.invalidateAll();
+            storeInventoryProvider.invalidateAll();
         }
     }
 

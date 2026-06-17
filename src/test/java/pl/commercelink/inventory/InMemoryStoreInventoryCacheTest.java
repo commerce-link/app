@@ -8,9 +8,9 @@ import java.util.LinkedList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class InMemoryStoreInventoryStoreTest {
+class InMemoryStoreInventoryCacheTest {
 
-    private final InMemoryStoreInventoryStore store = new InMemoryStoreInventoryStore(100, 60);
+    private final InMemoryStoreInventoryCache cache = new InMemoryStoreInventoryCache(100, 60);
 
     private StoreInventory anyInventory() {
         return new StoreInventory(new LinkedList<>(), LocalDateTime.now());
@@ -19,32 +19,32 @@ class InMemoryStoreInventoryStoreTest {
     @Test
     void storesAndRetrievesByStoreId() {
         StoreInventory inventory = anyInventory();
-        store.put("store-1", inventory);
+        cache.put("store-1", inventory);
 
-        assertEquals(inventory, store.get("store-1").orElseThrow());
+        assertEquals(inventory, cache.get("store-1").orElseThrow());
     }
 
     @Test
     void returnsEmptyForUnknownStore() {
-        assertTrue(store.get("missing").isEmpty());
+        assertTrue(cache.get("missing").isEmpty());
     }
 
     @Test
     void invalidateRemovesEntry() {
-        store.put("store-1", anyInventory());
-        store.invalidate("store-1");
+        cache.put("store-1", anyInventory());
+        cache.invalidate("store-1");
 
-        assertTrue(store.get("store-1").isEmpty());
+        assertTrue(cache.get("store-1").isEmpty());
     }
 
     @Test
     void invalidateAllRemovesEveryEntry() {
-        store.put("store-1", anyInventory());
-        store.put("store-2", anyInventory());
+        cache.put("store-1", anyInventory());
+        cache.put("store-2", anyInventory());
 
-        store.invalidateAll();
+        cache.invalidateAll();
 
-        assertTrue(store.get("store-1").isEmpty());
-        assertTrue(store.get("store-2").isEmpty());
+        assertTrue(cache.get("store-1").isEmpty());
+        assertTrue(cache.get("store-2").isEmpty());
     }
 }

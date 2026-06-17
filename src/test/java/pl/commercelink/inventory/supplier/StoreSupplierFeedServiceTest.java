@@ -2,7 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.StoreInventoryCache;
+import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.stores.Store;
@@ -19,10 +19,10 @@ class StoreSupplierFeedServiceTest {
     private final SupplierConfigurationManager configurationManager = mock(SupplierConfigurationManager.class);
     private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
     private final InventoryRepository inventoryRepository = mock(InventoryRepository.class);
-    private final StoreInventoryCache storeInventoryCache = mock(StoreInventoryCache.class);
+    private final StoreInventoryProvider storeInventoryProvider = mock(StoreInventoryProvider.class);
 
     private final StoreSupplierFeedService service = new StoreSupplierFeedService(
-            storesRepository, configurationManager, supplierRegistry, inventoryRepository, storeInventoryCache);
+            storesRepository, configurationManager, supplierRegistry, inventoryRepository, storeInventoryProvider);
 
     private Store storeWithId(String id) {
         Store store = new Store();
@@ -58,7 +58,7 @@ class StoreSupplierFeedServiceTest {
 
         service.loadStoreFeed("store-1", "Wortmann");
 
-        verify(storeInventoryCache).invalidate("store-1");
+        verify(storeInventoryProvider).invalidate("store-1");
     }
 
     @Test
@@ -69,7 +69,7 @@ class StoreSupplierFeedServiceTest {
 
         verifyNoInteractions(supplierRegistry);
         verify(inventoryRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
-        verify(storeInventoryCache, never()).invalidate(anyString());
+        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 
     @Test
@@ -84,6 +84,6 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         verify(inventoryRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
-        verify(storeInventoryCache, never()).invalidate(anyString());
+        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 }

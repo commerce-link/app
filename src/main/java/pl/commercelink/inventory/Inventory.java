@@ -25,26 +25,26 @@ public class Inventory {
     private final InventoryAutoDiscovery autoDiscovery;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
-    private final StoreInventoryCache storeInventoryCache;
+    private final StoreInventoryProvider storeInventoryProvider;
 
     private Collection<MatchedInventory> autoDiscoveredInventory = new LinkedList<>();
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
     Inventory(Warehouse warehouse, StoresRepository storesRepository, InventoryAutoDiscovery autoDiscovery,
               TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
-              @Lazy StoreInventoryCache storeInventoryCache) {
+              @Lazy StoreInventoryProvider storeInventoryProvider) {
         this.warehouse = warehouse;
         this.storesRepository = storesRepository;
         this.autoDiscovery = autoDiscovery;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
-        this.storeInventoryCache = storeInventoryCache;
+        this.storeInventoryProvider = storeInventoryProvider;
     }
 
     private Collection<MatchedInventory> baseInventoryFor(String storeId) {
         Store store = storesRepository.findById(storeId);
         if (store != null && store.hasOwnSupplierConnections()) {
-            return storeInventoryCache.get(storeId).items();
+            return storeInventoryProvider.get(storeId).items();
         }
         return autoDiscoveredInventory;
     }

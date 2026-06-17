@@ -9,11 +9,11 @@ import java.time.Duration;
 import java.util.Optional;
 
 @Component
-public class InMemoryStoreInventoryStore implements StoreInventoryStore {
+public class InMemoryStoreInventoryCache implements StoreInventoryCache {
 
     private final Cache<String, StoreInventory> cache;
 
-    public InMemoryStoreInventoryStore(
+    public InMemoryStoreInventoryCache(
             @Value("${inventory.store-cache.max-size:100}") long maxSize,
             @Value("${inventory.store-cache.ttl-minutes:60}") long ttlMinutes) {
         this.cache = Caffeine.newBuilder()
