@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.FeedData;
@@ -13,16 +19,23 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreSupplierFeedServiceTest {
 
-    private final StoresRepository storesRepository = mock(StoresRepository.class);
-    private final SupplierConfigurationManager configurationManager = mock(SupplierConfigurationManager.class);
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final InventoryRepository inventoryRepository = mock(InventoryRepository.class);
-    private final StoreInventoryProvider storeInventoryProvider = mock(StoreInventoryProvider.class);
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private SupplierConfigurationManager configurationManager;
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private InventoryRepository inventoryRepository;
+    @Mock
+    private StoreInventoryProvider storeInventoryProvider;
 
-    private final StoreSupplierFeedService service = new StoreSupplierFeedService(
-            storesRepository, configurationManager, supplierRegistry, inventoryRepository, storeInventoryProvider);
+    @InjectMocks
+    private StoreSupplierFeedService service;
 
     private Store storeWithId(String id) {
         Store store = new Store();

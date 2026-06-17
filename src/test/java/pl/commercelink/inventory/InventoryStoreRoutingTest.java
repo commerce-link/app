@@ -1,6 +1,12 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -17,17 +23,27 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class InventoryStoreRoutingTest {
 
-    private final Warehouse warehouse = mock(Warehouse.class);
-    private final StoresRepository storesRepository = mock(StoresRepository.class);
-    private final InventoryAutoDiscovery autoDiscovery = mock(InventoryAutoDiscovery.class);
-    private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final StoreInventoryProvider storeInventoryProvider = mock(StoreInventoryProvider.class);
+    @Mock
+    private Warehouse warehouse;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private InventoryAutoDiscovery autoDiscovery;
+    @Mock
+    private TaxonomyCache taxonomyCache;
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private StoreInventoryProvider storeInventoryProvider;
+    @Mock
+    private GlobalMatchedInventory globalInventory;
 
-    private final Inventory inventory = new Inventory(
-            warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry, storeInventoryProvider);
+    @InjectMocks
+    private Inventory inventory;
 
     private Store store(boolean hasOwn) {
         Store store = mock(Store.class);

@@ -1,6 +1,12 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -26,18 +32,27 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreInventoryProviderTest {
 
-    private final StoreInventoryCache cache = mock(StoreInventoryCache.class);
-    private final StoresRepository storesRepository = mock(StoresRepository.class);
-    private final Inventory inventory = mock(Inventory.class);
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final InventoryAutoDiscovery autoDiscovery = mock(InventoryAutoDiscovery.class);
-    private final StoreFeedItemLoader storeFeedItemLoader = mock(StoreFeedItemLoader.class);
-    private final ExchangeRates exchangeRates = mock(ExchangeRates.class);
+    @Mock
+    private StoreInventoryCache cache;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private GlobalMatchedInventory globalInventory;
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private InventoryAutoDiscovery autoDiscovery;
+    @Mock
+    private StoreFeedItemLoader storeFeedItemLoader;
+    @Mock
+    private ExchangeRates exchangeRates;
 
-    private final StoreInventoryProvider provider = new StoreInventoryProvider(
-            cache, storesRepository, inventory, supplierRegistry, autoDiscovery, storeFeedItemLoader, exchangeRates);
+    @InjectMocks
+    private StoreInventoryProvider provider;
 
     private InventoryItem item(String supplier) {
         return new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, supplier, true, true, false);
@@ -49,7 +64,7 @@ class StoreInventoryProviderTest {
         when(cache.get("store-1")).thenReturn(Optional.of(cached));
 
         assertSame(cached, provider.get("store-1"));
-        verify(inventory, never()).globalItemsForSuppliers(any());
+        verify(globalInventory, never()).itemsForSuppliers(any());
         verify(cache, never()).put(any(), any());
     }
 
@@ -61,7 +76,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.canUseGlobalSuppliers()).thenReturn(true);
         when(storeEntity.getGlobalSupplierNames()).thenReturn(List.of("Action"));
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of("Wortmann"));
-        when(inventory.globalItemsForSuppliers(List.of("Action"))).thenReturn(List.of(item("Action")));
+        when(globalInventory.itemsForSuppliers(List.of("Action"))).thenReturn(List.of(item("Action")));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
         when(supplierRegistry.getDescriptor("Wortmann")).thenReturn(Optional.of(descriptor));
@@ -88,7 +103,7 @@ class StoreInventoryProviderTest {
 
         provider.get("store-1");
 
-        verify(inventory, never()).globalItemsForSuppliers(any());
+        verify(globalInventory, never()).itemsForSuppliers(any());
         verify(autoDiscovery).run(argThat(List::isEmpty));
     }
 
