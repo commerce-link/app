@@ -1,6 +1,12 @@
 package pl.commercelink.migration;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -11,16 +17,19 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class V004MigrateEnabledProvidersToSupplierConnectionsTest {
 
-    private final StoresRepository storesRepository = mock(StoresRepository.class);
-    private final V004_MigrateEnabledProvidersToSupplierConnections migration =
-            new V004_MigrateEnabledProvidersToSupplierConnections(storesRepository);
+    @Mock
+    private StoresRepository storesRepository;
+
+    @InjectMocks
+    private V004_MigrateEnabledProvidersToSupplierConnections migration;
 
     private Store storeWith(FulfilmentConfiguration config) {
         Store store = new Store();

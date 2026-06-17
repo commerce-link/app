@@ -1,5 +1,7 @@
 package pl.commercelink.inventory;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -17,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class Inventory {
 
     private final Warehouse warehouse;
@@ -28,18 +31,6 @@ public class Inventory {
     private final GlobalMatchedInventory globalInventory;
 
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
-
-    Inventory(Warehouse warehouse, StoresRepository storesRepository, InventoryAutoDiscovery autoDiscovery,
-              TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
-              StoreInventoryProvider storeInventoryProvider, GlobalMatchedInventory globalInventory) {
-        this.warehouse = warehouse;
-        this.storesRepository = storesRepository;
-        this.autoDiscovery = autoDiscovery;
-        this.taxonomyCache = taxonomyCache;
-        this.supplierRegistry = supplierRegistry;
-        this.storeInventoryProvider = storeInventoryProvider;
-        this.globalInventory = globalInventory;
-    }
 
     private Collection<MatchedInventory> baseInventoryFor(String storeId) {
         Store store = storesRepository.findById(storeId);
@@ -80,13 +71,8 @@ public class Inventory {
     }
 
     private void load(List<InventoryItem> items) {
-        long timestamp = System.currentTimeMillis();
         Collection<MatchedInventory> autoDiscoveredItems = autoDiscovery.run(items);
         globalInventory.replace(autoDiscoveredItems);
-
-        System.out.println("Auto-discovered took " + (System.currentTimeMillis() - timestamp) + "ms");
-        System.out.println("Auto-discovered items: " + size());
-        System.out.println("Auto-discovered suppliers: " + getMatchedSuppliers());
     }
 
     public InventoryView withGlobalData() {

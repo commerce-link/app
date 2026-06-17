@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -21,11 +27,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreFeedItemLoaderTest {
 
-    private final CsvProductFeedLoader csvLoader = mock(CsvProductFeedLoader.class);
-    private final XmlProductFeedLoader xmlLoader = mock(XmlProductFeedLoader.class);
-    private final StoreFeedItemLoader loader = new StoreFeedItemLoader(csvLoader, xmlLoader);
+    @Mock
+    private CsvProductFeedLoader csvLoader;
+    @Mock
+    private XmlProductFeedLoader xmlLoader;
+
+    @InjectMocks
+    private StoreFeedItemLoader loader;
 
     private SupplierInfo supplierInfo(String name) {
         return new SupplierInfo(name, SupplierType.Distributor, 1, "PL",

@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
@@ -27,14 +33,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreSupplierConnectionServiceTest {
 
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final SupplierConfigurationManager configurationManager = mock(SupplierConfigurationManager.class);
-    private final SupplierConnectionValidator validator = mock(SupplierConnectionValidator.class);
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private SupplierConfigurationManager configurationManager;
+    @Mock
+    private SupplierConnectionValidator validator;
 
-    private final StoreSupplierConnectionService service =
-            new StoreSupplierConnectionService(supplierRegistry, configurationManager, validator);
+    @InjectMocks
+    private StoreSupplierConnectionService service;
 
     private Store storeWith(boolean canUseGlobal, StoreSupplierConnection... connections) {
         FulfilmentConfiguration config = new FulfilmentConfiguration();

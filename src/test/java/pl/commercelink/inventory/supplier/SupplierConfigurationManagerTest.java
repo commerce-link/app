@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.stores.Store;
@@ -11,10 +17,15 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SupplierConfigurationManagerTest {
 
-    private final SecretsManager secretsManager = mock(SecretsManager.class);
-    private final SupplierConfigurationManager manager = new SupplierConfigurationManager(secretsManager);
+    @Mock
+    private SecretsManager secretsManager;
+
+    @InjectMocks
+    private SupplierConfigurationManager manager;
 
     private Store storeWithId(String id) {
         Store store = new Store();

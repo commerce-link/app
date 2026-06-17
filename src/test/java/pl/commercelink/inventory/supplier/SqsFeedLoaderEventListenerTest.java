@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.SqsFeedLoaderEventListener.FeedLoaderEventPayload;
 import pl.commercelink.inventory.supplier.api.FeedData;
@@ -10,14 +16,19 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SqsFeedLoaderEventListenerTest {
 
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final InventoryRepository inventoryRepository = mock(InventoryRepository.class);
-    private final StoreSupplierFeedService storeSupplierFeedService = mock(StoreSupplierFeedService.class);
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private InventoryRepository inventoryRepository;
+    @Mock
+    private StoreSupplierFeedService storeSupplierFeedService;
 
-    private final SqsFeedLoaderEventListener listener =
-            new SqsFeedLoaderEventListener(supplierRegistry, inventoryRepository, storeSupplierFeedService);
+    @InjectMocks
+    private SqsFeedLoaderEventListener listener;
 
     private FeedLoaderEventPayload payload(String supplierName, String storeId) throws Exception {
         FeedLoaderEventPayload payload = new FeedLoaderEventPayload();

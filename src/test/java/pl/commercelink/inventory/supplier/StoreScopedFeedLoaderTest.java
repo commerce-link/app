@@ -1,6 +1,12 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 
@@ -15,16 +21,24 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreScopedFeedLoaderTest {
 
-    private final InventoryRepository inventoryRepository = mock(InventoryRepository.class);
-    private final DataCorrection dataCorrection = mock(DataCorrection.class);
-    private final DataCleanup dataCleanup = mock(DataCleanup.class);
-    private final pl.commercelink.taxonomy.TaxonomyCache taxonomyCache = mock(pl.commercelink.taxonomy.TaxonomyCache.class);
+    @Mock
+    private InventoryRepository inventoryRepository;
+    @Mock
+    private DataCorrection dataCorrection;
+    @Mock
+    private DataCleanup dataCleanup;
+    @Mock
+    private pl.commercelink.taxonomy.TaxonomyCache taxonomyCache;
+
+    @InjectMocks
+    private CsvProductFeedLoader loader;
 
     @Test
     void csvStoreOverloadReturnsEmptyWhenStoreFeedNotReadable() {
-        CsvProductFeedLoader loader = new CsvProductFeedLoader(inventoryRepository, dataCorrection, dataCleanup, taxonomyCache);
         when(inventoryRepository.canRead("store-1", "Action")).thenReturn(false);
 
         List<?> result = loader.fetch(mock(CsvRowParser.class), ';', "store-1", "Action");
@@ -35,7 +49,6 @@ class StoreScopedFeedLoaderTest {
 
     @Test
     void csvStoreOverloadReadsStoreScopedKey() throws Exception {
-        CsvProductFeedLoader loader = new CsvProductFeedLoader(inventoryRepository, dataCorrection, dataCleanup, taxonomyCache);
         when(inventoryRepository.canRead("store-1", "Action")).thenReturn(true);
         Reader reader = new StringReader("");
         when(inventoryRepository.read(eq("store-1"), eq("Action"), eq("csv"))).thenReturn(reader);
