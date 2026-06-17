@@ -1,0 +1,166 @@
+package pl.commercelink.inventory.supplier;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.StoreInventoryProvider;
+import pl.commercelink.inventory.supplier.api.SupplierConfigField;
+import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
+import pl.commercelink.stores.StoresRepository;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class StoreSupplierConnectionPersisterTest {
+
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private SupplierConfigurationManager configurationManager;
+    @Mock
+    private StoreSupplierFeedScheduler feedScheduler;
+    @Mock
+    private StoreFeedRepository storeFeedRepository;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private StoreInventoryProvider storeInventoryProvider;
+
+    @InjectMocks
+    private StoreSupplierConnectionPersister persister;
+
+    private Store storeWith(boolean canUseGlobal, StoreSupplierConnection... connections) {
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setCanUseGlobalSuppliers(canUseGlobal);
+        config.setSupplierConnections(new ArrayList<>(List.of(connections)));
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setFulfilmentConfiguration(config);
+        return store;
+    }
+
+    private FulfilmentConfiguration configWith(boolean canUseGlobal, StoreSupplierConnection... connections) {
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setCanUseGlobalSuppliers(canUseGlobal);
+        config.setSupplierConnections(new ArrayList<>(List.of(connections)));
+        return config;
+    }
+
+    private SupplierDescriptor descriptor(String name, boolean hasFields) {
+        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+        SupplierInfo info = mock(SupplierInfo.class);
+        when(info.name()).thenReturn(name);
+        when(descriptor.supplierInfo()).thenReturn(info);
+        when(descriptor.configurationFields())
+                .thenReturn(hasFields ? List.of(SupplierConfigField.url()) : List.of());
+        return descriptor;
+    }
+
+    @Test
+    void createsScheduleSavesAndTriggersImportForAddedOwnSupplier() {
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        SupplierDescriptor acme = descriptor("Acme", true);
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
+
+        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+
+        assertTrue(result);
+        verify(feedScheduler).createSchedule("store-1", "Acme");
+        verify(configurationManager).saveConfiguration(eq(existing), eq("Acme"), anyList(), any());
+        verify(storesRepository).save(existing);
+        verify(feedScheduler).triggerImmediateImport("store-1", "Acme");
+        verify(feedScheduler, never()).deleteSchedule(anyString(), anyString());
+        verify(storeFeedRepository, never()).delete(anyString(), anyString());
+        verify(storeInventoryProvider).invalidate("store-1");
+    }
+
+    @Test
+    void deletesScheduleForRemovedOwnSupplierWithoutTriggeringImport() {
+        Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        FulfilmentConfiguration submitted = configWith(true);
+        SupplierDescriptor acme = descriptor("Acme", true);
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
+
+        boolean result = persister.persist(existing, submitted, Map.of());
+
+        assertTrue(result);
+        verify(feedScheduler).deleteSchedule("store-1", "Acme");
+        verify(configurationManager).deleteConfiguration(existing, "Acme");
+        verify(storeFeedRepository).delete("store-1", "Acme");
+        verify(storesRepository).save(existing);
+        verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
+    }
+
+    @Test
+    void rollsBackAndReturnsFalseWhenSchedulerFails() {
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        SupplierDescriptor acme = descriptor("Acme", true);
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
+        when(configurationManager.snapshot(existing, "Acme"))
+                .thenReturn(new SupplierConfigurationManager.SecretSnapshot(false, null));
+        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).createSchedule("store-1", "Acme");
+
+        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+
+        assertFalse(result);
+        verify(storesRepository, never()).save(any());
+        verify(configurationManager, never()).saveConfiguration(any(), anyString(), anyList(), any());
+        verify(configurationManager).restore(eq(existing), eq("Acme"), any());
+        verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
+        verify(storeFeedRepository, never()).delete(anyString(), anyString());
+        verify(storeInventoryProvider, never()).invalidate(anyString());
+    }
+
+    @Test
+    void persistConfigurationsSavesOwnConfigurationsWithFields() {
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        SupplierDescriptor acme = descriptor("Acme", true);
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
+        Map<String, Map<String, String>> submittedConfig = Map.of("Acme", Map.of("url", "https://feed"));
+
+        persister.persistConfigurations(existing, submitted, submittedConfig);
+
+        verify(configurationManager).saveConfiguration(eq(existing), eq("Acme"), anyList(), eq(Map.of("url", "https://feed")));
+        verify(configurationManager, never()).deleteConfiguration(any(), anyString());
+    }
+
+    @Test
+    void persistConfigurationsDeletesOrphanedSecretWhenSupplierLeavesOwnMode() {
+        Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL));
+        SupplierDescriptor acme = descriptor("Acme", true);
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
+
+        persister.persistConfigurations(existing, submitted, Map.of());
+
+        verify(configurationManager).deleteConfiguration(existing, "Acme");
+        verify(configurationManager, never()).saveConfiguration(any(), anyString(), anyList(), any());
+    }
+}

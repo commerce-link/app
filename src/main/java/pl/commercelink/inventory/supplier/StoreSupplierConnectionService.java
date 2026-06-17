@@ -11,13 +11,11 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierSelectionForm;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +24,9 @@ public class StoreSupplierConnectionService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierConfigurationManager configurationManager;
     private final SupplierConnectionValidator validator;
+    private final StoreSupplierConnectionPersister persister;
+
+    private static final List<String> UPDATE_FAILED = List.of("Failed to update supplier connections. Please try again.");
 
     public Map<String, List<SupplierConfigField>> configurationFields() {
         Map<String, List<SupplierConfigField>> fields = new LinkedHashMap<>();
@@ -36,7 +37,7 @@ public class StoreSupplierConnectionService {
     }
 
     public Map<String, Map<String, String>> configurationsForUI(Store store) {
-        Map<String, Map<String, String>> configs = new HashMap<>();
+        Map<String, Map<String, String>> configs = new LinkedHashMap<>();
         configurationFields().forEach((name, fields) ->
                 configs.put(name, configurationManager.getConfigurationForUI(store, name, fields)));
         return configs;
@@ -61,22 +62,25 @@ public class StoreSupplierConnectionService {
     public List<String> apply(Store existingStore, FulfilmentConfiguration submitted,
                               List<SupplierSelectionForm> selections,
                               Map<String, Map<String, String>> submittedConfig, boolean isSuperAdmin) {
-        boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
-        submitted.setCanUseGlobalSuppliers(canUseGlobal);
-        submitted.setSupplierConnections(buildConnections(selections, canUseGlobal));
+        prepareSubmittedConfiguration(existingStore, submitted, selections, isSuperAdmin);
 
         List<String> errors = validate(existingStore, submitted, submittedConfig);
         if (!errors.isEmpty()) {
             return errors;
         }
-        persistConfigurations(existingStore, submitted, submittedConfig);
-        return errors;
+
+        return persister.persist(existingStore, submitted, submittedConfig) ? List.of() : UPDATE_FAILED;
+    }
+
+    private void prepareSubmittedConfiguration(Store existingStore, FulfilmentConfiguration submitted,
+                                               List<SupplierSelectionForm> selections, boolean isSuperAdmin) {
+        boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
+        submitted.setCanUseGlobalSuppliers(canUseGlobal);
+        submitted.setSupplierConnections(buildConnections(selections, canUseGlobal));
     }
 
     boolean resolveCanUseGlobalSuppliers(Store existingStore, boolean submittedCanUseGlobal, boolean isSuperAdmin) {
-        boolean storedCanUseGlobal = existingStore.getFulfilmentConfiguration() == null
-                || existingStore.getFulfilmentConfiguration().isCanUseGlobalSuppliers();
-        return isSuperAdmin ? submittedCanUseGlobal : storedCanUseGlobal;
+        return isSuperAdmin ? submittedCanUseGlobal : existingStore.canUseGlobalSuppliers();
     }
 
     List<StoreSupplierConnection> buildConnections(List<SupplierSelectionForm> selections, boolean canUseGlobal) {
@@ -103,30 +107,5 @@ public class StoreSupplierConnectionService {
         return validator.validate(
                 submitted.isCanUseGlobalSuppliers(), submitted.getSupplierConnections(),
                 configurationFields(), submittedConfig, suppliersWithStoredConfig);
-    }
-
-    void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
-        Set<String> newOwnSuppliers = ownSupplierNames(submitted);
-
-        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
-            String name = descriptor.supplierInfo().name();
-            if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()) {
-                Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
-                configurationManager.saveConfiguration(existingStore, name, descriptor.configurationFields(), config);
-            }
-        }
-
-        for (String previouslyOwn : existingStore.getOwnSupplierNames()) {
-            if (!newOwnSuppliers.contains(previouslyOwn)) {
-                configurationManager.deleteConfiguration(existingStore, previouslyOwn);
-            }
-        }
-    }
-
-    private Set<String> ownSupplierNames(FulfilmentConfiguration config) {
-        return config.getSupplierConnections().stream()
-                .filter(connection -> connection.getMode() == ConnectionMode.OWN)
-                .map(StoreSupplierConnection::getSupplierName)
-                .collect(Collectors.toSet());
     }
 }

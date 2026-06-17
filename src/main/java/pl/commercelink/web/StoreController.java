@@ -648,7 +648,13 @@ public class StoreController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreFulfilmentConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
         Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        FulfilmentConfiguration submitted = form.getStore().getFulfilmentConfiguration();
+        if (existingStore == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Store not found.");
+            return redirectToFulfilment(form.getStore().getStoreId());
+        }
+        FulfilmentConfiguration submitted = form.getStore().getFulfilmentConfiguration() != null
+                ? form.getStore().getFulfilmentConfiguration()
+                : new FulfilmentConfiguration();
 
         List<String> errors = storeSupplierConnectionService.apply(
                 existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
@@ -657,8 +663,6 @@ public class StoreController {
             return redirectToFulfilment(form.getStore().getStoreId());
         }
 
-        existingStore.setFulfilmentConfiguration(submitted);
-        storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
 
         return redirectToFulfilment(form.getStore().getStoreId());

@@ -1,7 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
@@ -13,18 +12,25 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreFeedItemLoader {
 
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
+    private final int taxonomyPenalty;
+
+    StoreFeedItemLoader(CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader,
+                        @Value("${inventory.store-feed.taxonomy-penalty}") int taxonomyPenalty) {
+        this.csvProductFeedLoader = csvProductFeedLoader;
+        this.xmlProductFeedLoader = xmlProductFeedLoader;
+        this.taxonomyPenalty = taxonomyPenalty;
+    }
 
     public List<InventoryItem> load(String storeId, SupplierDescriptor descriptor, Map<String, Double> sellRates) {
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
-                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, descriptor.supplierInfo().name());
+                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, descriptor.supplierInfo().name(), taxonomyPenalty);
             case FeedFormat.Xml xml ->
-                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), descriptor.supplierInfo(), storeId);
+                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), descriptor.supplierInfo(), storeId, taxonomyPenalty);
         };
 
         return items.stream()

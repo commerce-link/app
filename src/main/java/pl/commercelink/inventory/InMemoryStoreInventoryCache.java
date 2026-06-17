@@ -3,12 +3,14 @@ package pl.commercelink.inventory;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Optional;
 
 @Component
+@ConditionalOnProperty(name = "inventory.store-cache.type", havingValue = "memory", matchIfMissing = true)
 public class InMemoryStoreInventoryCache implements StoreInventoryCache {
 
     private final Cache<String, StoreInventory> cache;

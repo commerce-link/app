@@ -7,7 +7,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
@@ -30,7 +29,7 @@ class StoreSupplierFeedServiceTest {
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
-    private InventoryRepository inventoryRepository;
+    private StoreFeedRepository storeFeedRepository;
     @Mock
     private StoreInventoryProvider storeInventoryProvider;
 
@@ -56,7 +55,7 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         verify(supplierRegistry).downloadFeed("Wortmann", config);
-        verify(inventoryRepository).store("store-1", "Wortmann", data, "csv");
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
     }
 
     @Test
@@ -81,7 +80,7 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("missing", "Wortmann");
 
         verifyNoInteractions(supplierRegistry);
-        verify(inventoryRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
         verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 
@@ -96,7 +95,7 @@ class StoreSupplierFeedServiceTest {
 
         service.loadStoreFeed("store-1", "Wortmann");
 
-        verify(inventoryRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
         verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 }

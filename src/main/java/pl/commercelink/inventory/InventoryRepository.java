@@ -34,18 +34,8 @@ public class InventoryRepository {
         fileStorage.put(bucketName, key, data);
     }
 
-    public void store(String storeId, String supplierName, byte[] data, String fileExtension) {
-        String key = createStoreKey(storeId, supplierName, fileExtension);
-        fileStorage.put(bucketName, key, data);
-    }
-
     public boolean canRead(String supplierName) {
         String key = createKey(supplierName, "csv");
-        return fileStorage.canRead(bucketName, key);
-    }
-
-    public boolean canRead(String storeId, String supplierName) {
-        String key = createStoreKey(storeId, supplierName, "csv");
         return fileStorage.canRead(bucketName, key);
     }
 
@@ -58,17 +48,8 @@ public class InventoryRepository {
         return fileStorage.get(bucketName, key);
     }
 
-    public Reader read(String storeId, String supplierName, String extension) throws IOException {
-        String key = createStoreKey(storeId, supplierName, extension);
-        return fileStorage.get(bucketName, key);
-    }
-
     private String createKey(String supplierName, String fileExtension) {
         return supplierName.toLowerCase() + "-feed." + fileExtension;
-    }
-
-    private String createStoreKey(String storeId, String supplierName, String fileExtension) {
-        return storeId + "-" + supplierName.toLowerCase() + "-feed." + fileExtension;
     }
 
     public Map<String, LocalDateTime> getLatestModifiedPerSupplier() {

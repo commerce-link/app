@@ -62,6 +62,30 @@ public class SupplierConfigurationManager {
         cache.remove(secretName);
     }
 
+    public SecretSnapshot snapshot(Store store, String supplierName) {
+        String secretName = store.getSecretesName(supplierName);
+        if (secretsManager.exists(secretName)) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> value = secretsManager.getSecret(secretName, Map.class);
+            return new SecretSnapshot(true, value);
+        }
+        return new SecretSnapshot(false, null);
+    }
+
+    public void restore(Store store, String supplierName, SecretSnapshot snapshot) {
+        String secretName = store.getSecretesName(supplierName);
+        if (snapshot.existed()) {
+            if (secretsManager.exists(secretName)) {
+                secretsManager.updateSecret(secretName, snapshot.value());
+            } else {
+                secretsManager.createSecret(secretName, snapshot.value());
+            }
+        } else if (secretsManager.exists(secretName)) {
+            secretsManager.deleteSecret(secretName);
+        }
+        cache.remove(secretName);
+    }
+
     public Map<String, String> loadConfiguration(Store store, String supplierName) {
         String secretName = store.getSecretesName(supplierName);
         Map<String, String> cached = cache.get(secretName);
@@ -75,5 +99,8 @@ public class SupplierConfigurationManager {
             return config;
         }
         return new HashMap<>();
+    }
+
+    public record SecretSnapshot(boolean existed, Map<String, String> value) {
     }
 }

@@ -1,8 +1,8 @@
 package pl.commercelink.inventory.supplier;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -23,6 +23,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -36,8 +37,12 @@ class StoreFeedItemLoaderTest {
     @Mock
     private XmlProductFeedLoader xmlLoader;
 
-    @InjectMocks
     private StoreFeedItemLoader loader;
+
+    @BeforeEach
+    void setUp() {
+        loader = new StoreFeedItemLoader(csvLoader, xmlLoader, 1000);
+    }
 
     private SupplierInfo supplierInfo(String name) {
         return new SupplierInfo(name, SupplierType.Distributor, 1, "PL",
@@ -55,7 +60,7 @@ class StoreFeedItemLoaderTest {
     void loadsCsvFeedFromStoreScopedKeyAndConvertsToLocalCurrency() {
         SupplierDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"))).thenReturn(List.of(eurItem));
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
 
         List<InventoryItem> result = loader.load("store-1", descriptor, Map.of("EUR", 4.0));
 
@@ -67,7 +72,7 @@ class StoreFeedItemLoaderTest {
     void dropsItemsWithoutAnExchangeRate() {
         SupplierDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"))).thenReturn(List.of(eurItem));
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
 
         List<InventoryItem> result = loader.load("store-1", descriptor, Map.of());
 

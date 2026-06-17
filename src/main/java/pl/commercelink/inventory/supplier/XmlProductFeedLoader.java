@@ -31,6 +31,7 @@ import java.util.List;
 public class XmlProductFeedLoader {
 
     private final InventoryRepository inventoryRepository;
+    private final StoreFeedRepository storeFeedRepository;
     private final DataCorrection dataCorrection;
     private final DataCleanup dataCleanup;
     private final TaxonomyCache taxonomyCache;
@@ -38,7 +39,7 @@ public class XmlProductFeedLoader {
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
         try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
-            return parse(itemClass, itemElementName, supplierInfo, reader);
+            return parse(itemClass, itemElementName, supplierInfo, reader, 0);
         } catch (JAXBException | XMLStreamException e) {
             System.out.println("Skipping feed file: " + supplierName + " as it can't be deserialized.");
             return new LinkedList<>();
@@ -51,10 +52,10 @@ public class XmlProductFeedLoader {
         }
     }
 
-    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId) {
+    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId, int taxonomyPenalty) {
         String supplierName = supplierInfo.name();
-        try (Reader reader = inventoryRepository.read(storeId, supplierName, "xml")) {
-            return parse(itemClass, itemElementName, supplierInfo, reader);
+        try (Reader reader = storeFeedRepository.read(storeId, supplierName, "xml")) {
+            return parse(itemClass, itemElementName, supplierInfo, reader, taxonomyPenalty);
         } catch (JAXBException | XMLStreamException e) {
             System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be deserialized.");
             return new LinkedList<>();
@@ -67,7 +68,7 @@ public class XmlProductFeedLoader {
         }
     }
 
-    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader)
+    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty)
             throws JAXBException, XMLStreamException {
         XMLInputFactory xif = XMLInputFactory.newFactory();
         XMLStreamReader xsr = xif.createXMLStreamReader(reader);
@@ -87,7 +88,7 @@ public class XmlProductFeedLoader {
                     Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
 
                     if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
-                        taxonomyCache.add(taxonomy);
+                        taxonomyCache.add(StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty));
                         res.add(inventoryItem);
                     }
                 } else {
