@@ -20,7 +20,7 @@
                         <div class="control">
                             <div class="select">
                                 <select th:field="*{category}" th:disabled="${isCompletedOrder}">
-                                    <option th:each="category : ${categories}" th:value="${category}" th:text="${pcl.name(category)}"></option>
+                                    <option th:each="category : ${categories}" th:value="${category}" th:text="${enumI18n.localize(category, 'plural')}"></option>
                                 </select>
                             </div>
                         </div>
