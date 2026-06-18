@@ -1,5 +1,6 @@
 package pl.commercelink.products;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -8,16 +9,10 @@ import pl.commercelink.taxonomy.ProductGroup;
 import java.util.Locale;
 
 @Component
+@RequiredArgsConstructor
 public class ProductGroupLocalization {
 
-    public static ProductGroupLocalization INSTANCE;
-
     private final MessageSource messageSource;
-
-    public ProductGroupLocalization(MessageSource messageSource) {
-        this.messageSource = messageSource;
-        INSTANCE = this;
-    }
 
     public String name(ProductGroup g) {
         return resolve("product.group." + g.name());
