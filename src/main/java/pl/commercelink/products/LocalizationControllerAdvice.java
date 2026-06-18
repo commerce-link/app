@@ -1,18 +1,23 @@
 package pl.commercelink.products;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 @ControllerAdvice
+@RequiredArgsConstructor
 class LocalizationControllerAdvice {
 
+    private final ProductCategoryLocalization productCategoryLocalization;
+    private final ProductGroupLocalization productGroupLocalization;
+
     @ModelAttribute("pcl")
-    public ProductCategoryLocalization pcl() {
-        return ProductCategoryLocalization.INSTANCE;
+    ProductCategoryLocalization pcl() {
+        return productCategoryLocalization;
     }
 
     @ModelAttribute("pgl")
-    public ProductGroupLocalization pgl() {
-        return ProductGroupLocalization.INSTANCE;
+    ProductGroupLocalization pgl() {
+        return productGroupLocalization;
     }
 }
