@@ -31,9 +31,10 @@ class LocalizedOrderItem {
         return price;
     }
 
-    static LocalizedOrderItem fromOrderItem(OrderItem orderItem) {
+    static LocalizedOrderItem fromOrderItem(OrderItem orderItem,
+                                            ProductCategoryLocalization productCategoryLocalization) {
         LocalizedOrderItem localizedOrderItem = new LocalizedOrderItem();
-        localizedOrderItem.category = ProductCategoryLocalization.INSTANCE.singular(orderItem.getCategory());
+        localizedOrderItem.category = productCategoryLocalization.singular(orderItem.getCategory());
         localizedOrderItem.name = orderItem.getName();
         localizedOrderItem.quantity = orderItem.getQty();
         localizedOrderItem.price = orderItem.getPrice();

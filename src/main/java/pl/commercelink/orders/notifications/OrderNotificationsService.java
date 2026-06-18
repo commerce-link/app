@@ -3,6 +3,7 @@ package pl.commercelink.orders.notifications;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.products.ProductCategoryLocalization;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.*;
@@ -30,6 +31,9 @@ class OrderNotificationsService {
 
     @Autowired
     private EmailClient emailClient;
+
+    @Autowired
+    private ProductCategoryLocalization productCategoryLocalization;
 
     void send(Order order) {
 
@@ -264,7 +268,8 @@ class OrderNotificationsService {
                 orderItems,
                 shippingDetails,
                 documentType,
-                order.isPersonalCollection()
+                order.isPersonalCollection(),
+                productCategoryLocalization
         );
 
         return send(order.getStoreId(), msg, EmailNotificationType.ORDER_CONFIRMATION);
