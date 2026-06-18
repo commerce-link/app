@@ -1,6 +1,6 @@
 package pl.commercelink.orders.notifications;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.products.ProductCategoryLocalization;
@@ -18,22 +18,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 class OrderNotificationsService {
 
-    @Autowired
-    private OrdersRepository ordersRepository;
+    private final OrdersRepository ordersRepository;
 
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
+    private final OrderItemsRepository orderItemsRepository;
 
-    @Autowired
-    private OrderEventsRepository orderEventsRepository;
+    private final OrderEventsRepository orderEventsRepository;
 
-    @Autowired
-    private EmailClient emailClient;
+    private final EmailClient emailClient;
 
-    @Autowired
-    private ProductCategoryLocalization productCategoryLocalization;
+    private final ProductCategoryLocalization productCategoryLocalization;
 
     void send(Order order) {
 
