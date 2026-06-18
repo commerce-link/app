@@ -1,6 +1,7 @@
 package pl.commercelink.orders.notifications;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Getter;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.OrderItem;
@@ -11,6 +12,7 @@ import pl.commercelink.taxonomy.ProductCategory;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Getter
 class OrderConfirmationEmailNotification extends EmailNotification {
 
     @JsonProperty("orderId")
@@ -52,35 +54,4 @@ class OrderConfirmationEmailNotification extends EmailNotification {
                 .collect(Collectors.toList());
     }
 
-    public String getOrderId() {
-        return orderId;
-    }
-
-    public double getTotalAmount() {
-        return totalAmount;
-    }
-
-    public String getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public List<LocalizedOrderItem> getProducts() {
-        return products;
-    }
-
-    public List<LocalizedOrderItem> getServices() {
-        return services;
-    }
-
-    public ShippingDetails getShippingDetails() {
-        return shippingDetails;
-    }
-
-    public DocumentType getDocumentType() {
-        return documentType;
-    }
-
-    public boolean isPersonalCollection() {
-        return personalCollection;
-    }
 }
