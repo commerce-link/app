@@ -51,6 +51,12 @@ public class MarketplaceOfferExportEventListener {
     @Autowired
     private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
 
+    @Autowired
+    private ProductCategoryLocalization productCategoryLocalization;
+
+    @Autowired
+    private ProductGroupLocalization productGroupLocalization;
+
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
 
@@ -99,8 +105,8 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
-        String categoryName = ProductGroupLocalization.INSTANCE.name(category.getCategory().getProductGroup())
-                + " / " + ProductCategoryLocalization.INSTANCE.name(category.getCategory());
+        String categoryName = productGroupLocalization.name(category.getCategory().getProductGroup())
+                + " / " + productCategoryLocalization.name(category.getCategory());
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 
