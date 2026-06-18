@@ -23,6 +23,8 @@ public class DeliveryCreationService {
     private OrderAllocationsManager orderAllocationsManager;
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Autowired
+    private ExchangeRates exchangeRates;
 
     public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
 
@@ -31,7 +33,7 @@ public class DeliveryCreationService {
         }
 
         if (form.hasPricesInForeignCurrency()) {
-            form.applyExchangeRate(new ExchangeRates().getCurrentSellRates().get(form.getSourceCurrency()));
+            form.applyExchangeRate(exchangeRates.getCurrentSellRates().get(form.getSourceCurrency()));
         }
 
         if (form.hasDeliveryDetails()) {

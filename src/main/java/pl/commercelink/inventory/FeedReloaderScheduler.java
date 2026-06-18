@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -18,6 +19,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class FeedReloaderScheduler {
 
     private final Inventory inventory;
@@ -25,22 +27,15 @@ public class FeedReloaderScheduler {
     private final SupplierRegistry supplierRegistry;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
-
-    public FeedReloaderScheduler(Inventory inventory, InventoryRepository inventoryRepository, SupplierRegistry supplierRegistry,
-                                 CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader) {
-        this.inventory = inventory;
-        this.inventoryRepository = inventoryRepository;
-        this.supplierRegistry = supplierRegistry;
-        this.csvProductFeedLoader = csvProductFeedLoader;
-        this.xmlProductFeedLoader = xmlProductFeedLoader;
-    }
+    private final ExchangeRates exchangeRates;
+    private final StoreInventoryProvider storeInventoryProvider;
 
     @Scheduled(cron = "0 */5 * * * ?")
     public void reloadIfNewFeedsAvailable() {
         Map<String, LocalDateTime> latestModifiedPerSupplier = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         latestModifiedPerSupplier.putAll(inventoryRepository.getLatestModifiedPerSupplier());
         Map<String, List<InventoryItem>> updatesBySupplier = new LinkedHashMap<>();
-        Map<String, Double> sellRates = new ExchangeRates().getCurrentSellRates();
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
 
         for (SupplierDescriptor supplierDescriptor : supplierRegistry.getAllDescriptors()) {
             String supplierName = supplierDescriptor.supplierInfo().name();
@@ -49,7 +44,7 @@ public class FeedReloaderScheduler {
 
             if (lastModified != null && lastUpdateDate.isBefore(lastModified)) {
                 List<InventoryItem> items = fetchItems(supplierDescriptor).stream()
-                        .flatMap(item -> item.toLocalCurrency("PLN", sellRates.get(item.currency())).stream())
+                        .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList());
                 updatesBySupplier.put(supplierName, items);
             }
@@ -57,6 +52,7 @@ public class FeedReloaderScheduler {
 
         if (!updatesBySupplier.isEmpty()) {
             inventory.update(updatesBySupplier);
+            storeInventoryProvider.invalidateAll();
         }
     }
 

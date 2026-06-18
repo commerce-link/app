@@ -2,8 +2,11 @@ package pl.commercelink.stores;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
 public class StoreForm {
 
     private Store store;
@@ -22,6 +25,12 @@ public class StoreForm {
 
     // marketplaces
     private String marketplace;
+
+    // per-supplier credentials: supplier name → (field key → value)
+    private Map<String, Map<String, String>> supplierConfiguration = new HashMap<>();
+
+    // per-supplier enablement + mode, fixed-index for stable form binding
+    private List<SupplierSelectionForm> supplierSelections = new ArrayList<>();
 
     public StoreForm() {
         this.providerConfiguration = new HashMap<>();
@@ -135,5 +144,21 @@ public class StoreForm {
 
     public void setWmsProvider(String wmsProvider) {
         this.wmsProvider = wmsProvider;
+    }
+
+    public Map<String, Map<String, String>> getSupplierConfiguration() {
+        return supplierConfiguration;
+    }
+
+    public void setSupplierConfiguration(Map<String, Map<String, String>> supplierConfiguration) {
+        this.supplierConfiguration = supplierConfiguration;
+    }
+
+    public List<SupplierSelectionForm> getSupplierSelections() {
+        return supplierSelections;
+    }
+
+    public void setSupplierSelections(List<SupplierSelectionForm> supplierSelections) {
+        this.supplierSelections = supplierSelections;
     }
 }

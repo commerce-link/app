@@ -1,8 +1,11 @@
 package pl.commercelink.inventory;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -16,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class Inventory {
 
     private final Warehouse warehouse;
@@ -23,16 +27,17 @@ public class Inventory {
     private final InventoryAutoDiscovery autoDiscovery;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
+    private final StoreInventoryProvider storeInventoryProvider;
+    private final GlobalMatchedInventory globalInventory;
 
-    private Collection<MatchedInventory> autoDiscoveredInventory = new LinkedList<>();
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
-    Inventory(Warehouse warehouse, StoresRepository storesRepository, InventoryAutoDiscovery autoDiscovery, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
-        this.warehouse = warehouse;
-        this.storesRepository = storesRepository;
-        this.autoDiscovery = autoDiscovery;
-        this.taxonomyCache = taxonomyCache;
-        this.supplierRegistry = supplierRegistry;
+    private Collection<MatchedInventory> baseInventoryFor(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        if (store != null && store.hasOwnSupplierConnections()) {
+            return storeInventoryProvider.get(storeId).items();
+        }
+        return globalInventory.all();
     }
 
     void init(List<List<InventoryItem>> rawFeeds) {
@@ -53,7 +58,7 @@ public class Inventory {
     void update(Map<String, List<InventoryItem>> rawInventoryItemsBySupplier) {
         System.out.println("Reloading inventory for suppliers: " + rawInventoryItemsBySupplier.keySet());
 
-        List<InventoryItem> inventoryItemsCopy = getInventoryItemsAsShallowCopy();
+        List<InventoryItem> inventoryItemsCopy = globalInventory.allItems();
 
         inventoryItemsCopy.removeIf(item -> rawInventoryItemsBySupplier.containsKey(item.supplier()));
         for (Map.Entry<String, List<InventoryItem>> entry : rawInventoryItemsBySupplier.entrySet()) {
@@ -62,32 +67,16 @@ public class Inventory {
 
         load(inventoryItemsCopy);
 
-        // set new last update date for all suppliers that were reloaded
         rawInventoryItemsBySupplier.keySet().forEach(supplierName -> lastUpdateDateBySupplier.put(supplierName, LocalDateTime.now()));
     }
 
     private void load(List<InventoryItem> items) {
-        long timestamp = System.currentTimeMillis();
         Collection<MatchedInventory> autoDiscoveredItems = autoDiscovery.run(items);
-
-        synchronized (this) {
-            this.autoDiscoveredInventory = autoDiscoveredItems;
-
-            System.out.println("Auto-discovered took " + (System.currentTimeMillis() - timestamp) + "ms");
-            System.out.println("Auto-discovered items: " + size());
-            System.out.println("Auto-discovered suppliers: " + getMatchedSuppliers());
-        }
-    }
-
-    // returns a copy of the inventory items list to be modified without affecting the original inventory
-    private List<InventoryItem> getInventoryItemsAsShallowCopy() {
-        return autoDiscoveredInventory.stream()
-                .flatMap(i -> i.getInventoryItems().stream())
-                .collect(Collectors.toList());
+        globalInventory.replace(autoDiscoveredItems);
     }
 
     public InventoryView withGlobalData() {
-        return new InventoryView(autoDiscoveredInventory);
+        return new InventoryView(globalInventory.all());
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
@@ -95,19 +84,19 @@ public class Inventory {
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(autoDiscoveredInventory, new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
+        return new InventoryView(baseInventoryFor(storeId), new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
         return new InventoryView(
-                autoDiscoveredInventory,
+                baseInventoryFor(storeId),
                 new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry),
                 new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry)
         );
     }
 
     public int size() {
-        return autoDiscoveredInventory.size();
+        return globalInventory.size();
     }
 
     public LocalDateTime getLastUpdateDate(String supplierName) {
