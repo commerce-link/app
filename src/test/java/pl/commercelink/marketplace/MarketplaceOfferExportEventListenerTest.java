@@ -10,8 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
-import pl.commercelink.products.ProductCategoryLocalization;
-import pl.commercelink.products.ProductGroupLocalization;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -59,8 +58,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private Inventory inventory;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Mock private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-    @Mock private ProductCategoryLocalization productCategoryLocalization;
-    @Mock private ProductGroupLocalization productGroupLocalization;
+    @Mock private EnumLocalizer enumLocalizer;
 
     @Mock private Store store;
     @Mock private ProductCatalog catalog;

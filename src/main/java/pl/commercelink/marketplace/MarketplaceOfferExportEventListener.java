@@ -16,6 +16,7 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -38,8 +39,7 @@ public class MarketplaceOfferExportEventListener {
     private final Inventory inventory;
     private final MarketplaceProviderFactory providerFactory;
     private final MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-    private final ProductCategoryLocalization productCategoryLocalization;
-    private final ProductGroupLocalization productGroupLocalization;
+    private final EnumLocalizer enumLocalizer;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -89,8 +89,8 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
-        String categoryName = productGroupLocalization.name(category.getCategory().getProductGroup())
-                + " / " + productCategoryLocalization.name(category.getCategory());
+        String categoryName = enumLocalizer.localize(category.getCategory().getProductGroup())
+                + " / " + enumLocalizer.localize(category.getCategory(), "plural");
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 
