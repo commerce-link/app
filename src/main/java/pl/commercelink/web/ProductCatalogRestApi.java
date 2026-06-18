@@ -1,6 +1,6 @@
 package pl.commercelink.web;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.offer.*;
@@ -22,34 +22,18 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/Store/{storeId}/Catalog/{catalogId}")
+@RequiredArgsConstructor
 public class ProductCatalogRestApi {
 
-    @Autowired
-    private Inventory inventory;
-
-    @Autowired
-    private PimCatalog pimCatalog;
-
-    @Autowired
-    private ProductCatalogRepository productCatalogRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
-    private ProductRecommendationEngine recommendationEngine;
-
-    @Autowired
-    private PricelistRepository pricelistRepository;
-
-    @Autowired
-    private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
-
-    @Autowired
-    private ProductCategoryLocalization productCategoryLocalization;
-
-    @Autowired
-    private ProductGroupLocalization productGroupLocalization;
+    private final Inventory inventory;
+    private final PimCatalog pimCatalog;
+    private final ProductCatalogRepository productCatalogRepository;
+    private final ProductRepository productRepository;
+    private final ProductRecommendationEngine recommendationEngine;
+    private final PricelistRepository pricelistRepository;
+    private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    private final ProductCategoryLocalization productCategoryLocalization;
+    private final ProductGroupLocalization productGroupLocalization;
 
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
