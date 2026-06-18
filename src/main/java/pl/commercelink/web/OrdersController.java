@@ -343,6 +343,7 @@ public class OrdersController extends BaseController {
 
         DocumentType nextDocumentToIssue = order.getNextDocumentToIssue().orElse(null);
         model.addAttribute("nextInvoiceToIssue", nextDocumentToIssue);
+        model.addAttribute("today", LocalDate.now());
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
 

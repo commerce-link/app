@@ -595,6 +595,7 @@
                         <th th:text="#{order.document.no}"></th>
                         <th th:text="#{order.document.link}"></th>
                         <th th:text="#{order.document.type}"></th>
+                        <th th:text="#{order.document.issuedAt}"></th>
                         <th th:text="#{order.document.status}"></th>
                     </tr>
                     </thead>
@@ -606,12 +607,14 @@
                             <span th:if="${document.viewUrl == null}">-</span>
                         </td>
                         <td th:text="${document.type}"></td>
+                        <td th:text="${document.issuedAt != null ? document.issuedAt : '-'}"></td>
                         <td th:text="#{document.status.issued}"></td>
                     </tr>
                     <tr th:if="${!order.closingDocument.isPresent() and !order.isRMAReplacementOrder()}">
                         <td>-</td>
                         <td>-</td>
                         <td th:text="${order.receiptType}"></td>
+                        <td>-</td>
                         <td th:text="#{document.status.toBeIssued}"></td>
                     </tr>
                     </tbody>
@@ -679,6 +682,12 @@
                                 <div class="control">
                                     <input class="input" type="text" name="link"
                                            th:placeholder="#{order.document.link.placeholder}" />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{order.document.issuedAt}"></label>
+                                <div class="control">
+                                    <input class="input" type="date" name="issuedAt" th:value="${today}" required />
                                 </div>
                             </div>
                             <div class="field">

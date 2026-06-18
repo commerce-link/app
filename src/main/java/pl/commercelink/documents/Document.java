@@ -3,7 +3,12 @@ package pl.commercelink.documents;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
+import org.springframework.format.annotation.DateTimeFormat;
+import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
+
+import java.time.LocalDate;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -19,6 +24,10 @@ public class Document {
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private DocumentType type;
+    @DynamoDBAttribute(attributeName = "issuedAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateConverter.class)
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate issuedAt;
 
     public Document() {
     }
@@ -28,6 +37,14 @@ public class Document {
         this.number = number;
         this.link = link;
         this.type = type;
+    }
+
+    public Document(String id, String number, String link, DocumentType type, LocalDate issuedAt) {
+        this.id = id;
+        this.number = number;
+        this.link = link;
+        this.type = type;
+        this.issuedAt = issuedAt;
     }
 
     @DynamoDBIgnore
@@ -99,5 +116,13 @@ public class Document {
 
     public void setType(DocumentType type) {
         this.type = type;
+    }
+
+    public LocalDate getIssuedAt() {
+        return issuedAt;
+    }
+
+    public void setIssuedAt(LocalDate issuedAt) {
+        this.issuedAt = issuedAt;
     }
 }
