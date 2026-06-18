@@ -44,7 +44,7 @@ public class OrdersExport {
                     .append(order.getBillingDetails().getCity()).append(",")
                     .append(order.getShippingDetails().getCity()).append(",")
                     .append(paymentSource != null ? paymentSource.name() : "").append(",")
-                    .append(String.valueOf(order.getTotalPrice()))
+                    .append(String.valueOf(order.getTotalPrice()).replace('.', ','))
                     .append("\n");
         }
 
