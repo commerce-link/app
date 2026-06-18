@@ -118,7 +118,7 @@ public class InvoicingService {
             return op;
         }
 
-        Document invoiceDocument = new Document(op.getInvoiceId(), op.getInvoiceNo(), op.getInvoiceUrl(), documentType);
+        Document invoiceDocument = new Document(op.getInvoiceId(), op.getInvoiceNo(), op.getInvoiceUrl(), documentType, LocalDate.now());
         Order saved = optimisticLockingExecutor.modifyAndSaveReturning(
                 () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
                 fresh -> {
