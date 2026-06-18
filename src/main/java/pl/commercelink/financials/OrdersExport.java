@@ -30,7 +30,7 @@ public class OrdersExport {
                 .collect(Collectors.toList());
 
         StringWriter csvWriter = new StringWriter();
-        csvWriter.append("Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Billing City,Shipping City,Original payment source,Total Amount\n");
+        csvWriter.append("Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount\n");
 
         for (Order order : orders) {
             PaymentSource paymentSource = order.getPayments().get(0).getSource();
@@ -40,6 +40,7 @@ public class OrdersExport {
                     .append(order.getOrderedAt().toString()).append(",")
                     .append(order.getSource().getName()).append(",")
                     .append(order.getSource().getType().name()).append(",")
+                    .append(order.isB2B() ? "B2B" : "B2C").append(",")
                     .append(order.getBillingDetails().getCity()).append(",")
                     .append(order.getShippingDetails().getCity()).append(",")
                     .append(paymentSource != null ? paymentSource.name() : "").append(",")
