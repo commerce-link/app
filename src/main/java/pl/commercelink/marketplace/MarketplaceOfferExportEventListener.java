@@ -1,7 +1,7 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -28,34 +28,18 @@ import java.util.stream.Stream;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@RequiredArgsConstructor
 public class MarketplaceOfferExportEventListener {
 
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private ProductCatalogRepository productCatalogRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
-    private PricelistRepository pricelistRepository;
-
-    @Autowired
-    private Inventory inventory;
-
-    @Autowired
-    private MarketplaceProviderFactory providerFactory;
-
-    @Autowired
-    private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-
-    @Autowired
-    private ProductCategoryLocalization productCategoryLocalization;
-
-    @Autowired
-    private ProductGroupLocalization productGroupLocalization;
+    private final StoresRepository storesRepository;
+    private final ProductCatalogRepository productCatalogRepository;
+    private final ProductRepository productRepository;
+    private final PricelistRepository pricelistRepository;
+    private final Inventory inventory;
+    private final MarketplaceProviderFactory providerFactory;
+    private final MarketplaceOfferExportRepository marketplaceOfferExportRepository;
+    private final ProductCategoryLocalization productCategoryLocalization;
+    private final ProductGroupLocalization productGroupLocalization;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
