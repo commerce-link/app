@@ -9,6 +9,8 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductCategoryLocalization;
+import pl.commercelink.products.ProductGroupLocalization;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
@@ -43,6 +45,12 @@ public class ProductCatalogRestApi {
     @Autowired
     private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
 
+    @Autowired
+    private ProductCategoryLocalization productCategoryLocalization;
+
+    @Autowired
+    private ProductGroupLocalization productGroupLocalization;
+
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
                                             @PathVariable("catalogId") String catalogId) {
@@ -68,7 +76,11 @@ public class ProductCatalogRestApi {
     private List<ProductCategoryTree> getCategoriesTree(@PathVariable("storeId") String storeId, @PathVariable("catalogId") String catalogId) {
         List<CategoryDefinition> categoryDefinitions = productCatalogRepository.findById(storeId, catalogId).getCategories();
         return categoryDefinitions.stream()
-                .map(c -> new ProductCategoryTree(c, categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory())))
+                .map(c -> new ProductCategoryTree(
+                        c,
+                        categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory()),
+                        productCategoryLocalization.name(c.getCategory()),
+                        productGroupLocalization.name(c.getCategory().getProductGroup())))
                 .collect(Collectors.toList());
     }
 
