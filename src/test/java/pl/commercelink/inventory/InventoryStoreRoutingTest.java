@@ -54,23 +54,32 @@ class InventoryStoreRoutingTest {
 
     @Test
     void withEnabledSuppliersOnlyQueriesStoreCacheWhenStoreHasOwnConnections() {
+        // given
         Store store = store(true);
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeInventoryProvider.get("store-1"))
                 .thenReturn(new StoreInventory(new LinkedList<>(), LocalDateTime.now()));
 
+        // when
         inventory.withEnabledSuppliersOnly("store-1");
 
+        // then
         verify(storeInventoryProvider).get("store-1");
+        verify(globalInventory, never()).all();
     }
 
     @Test
     void withEnabledSuppliersOnlyUsesGlobalPathWhenStoreHasNoOwnConnections() {
+        // given
         Store store = store(false);
         when(storesRepository.findById("store-1")).thenReturn(store);
+        when(globalInventory.all()).thenReturn(new LinkedList<>());
 
+        // when
         inventory.withEnabledSuppliersOnly("store-1");
 
+        // then
+        verify(globalInventory).all();
         verify(storeInventoryProvider, never()).get(any());
     }
 }

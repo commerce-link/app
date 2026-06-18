@@ -18,32 +18,42 @@ class InMemoryStoreInventoryCacheTest {
 
     @Test
     void storesAndRetrievesByStoreId() {
+        // given
         StoreInventory inventory = anyInventory();
         cache.put("store-1", inventory);
 
+        // when / then
         assertEquals(inventory, cache.get("store-1").orElseThrow());
     }
 
     @Test
     void returnsEmptyForUnknownStore() {
+        // when / then
         assertTrue(cache.get("missing").isEmpty());
     }
 
     @Test
     void invalidateRemovesEntry() {
+        // given
         cache.put("store-1", anyInventory());
+
+        // when
         cache.invalidate("store-1");
 
+        // then
         assertTrue(cache.get("store-1").isEmpty());
     }
 
     @Test
     void invalidateAllRemovesEveryEntry() {
+        // given
         cache.put("store-1", anyInventory());
         cache.put("store-2", anyInventory());
 
+        // when
         cache.invalidateAll();
 
+        // then
         assertTrue(cache.get("store-1").isEmpty());
         assertTrue(cache.get("store-2").isEmpty());
     }

@@ -16,6 +16,7 @@ import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.inventory.supplier.api.XmlItem;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,26 +58,56 @@ class StoreFeedItemLoaderTest {
         return descriptor;
     }
 
+    private SupplierDescriptor xmlDescriptor(String name) {
+        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+        when(descriptor.supplierInfo()).thenReturn(supplierInfo(name));
+        when(descriptor.feedFormat()).thenReturn(new FeedFormat.Xml(XmlItem.class, "Item"));
+        return descriptor;
+    }
+
     @Test
     void loadsCsvFeedFromStoreScopedKeyAndConvertsToLocalCurrency() {
+        // given
         SupplierDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), eq(1000))).thenReturn(List.of(eurItem));
 
+        // when
         List<InventoryItem> result = loader.load("store-1", descriptor, Map.of("EUR", 4.0));
 
+        // then
         assertEquals(1, result.size());
         assertEquals("PLN", result.get(0).currency());
+        verify(csvLoader).fetch(any(), eq(';'), eq("store-1"), eq("Action"), eq(1000));
+    }
+
+    @Test
+    void loadsXmlFeedFromStoreScopedKeyAndPassesPenalty() {
+        // given
+        SupplierDescriptor descriptor = xmlDescriptor("Action");
+        InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
+        when(xmlLoader.load(any(), eq("Item"), any(), eq("store-1"), eq(1000))).thenReturn(List.of(eurItem));
+
+        // when
+        List<InventoryItem> result = loader.load("store-1", descriptor, Map.of("EUR", 4.0));
+
+        // then
+        assertEquals(1, result.size());
+        assertEquals("PLN", result.get(0).currency());
+        verify(xmlLoader).load(any(), eq("Item"), any(), eq("store-1"), eq(1000));
     }
 
     @Test
     void dropsItemsWithoutAnExchangeRate() {
+        // given
         SupplierDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
 
+        // when
         List<InventoryItem> result = loader.load("store-1", descriptor, Map.of());
 
+        // then
         assertTrue(result.isEmpty());
     }
 }

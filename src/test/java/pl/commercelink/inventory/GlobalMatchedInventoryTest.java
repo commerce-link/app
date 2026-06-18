@@ -26,6 +26,7 @@ class GlobalMatchedInventoryTest {
 
     @Test
     void startsEmpty() {
+        // then
         assertEquals(0, inventory.size());
         assertTrue(inventory.all().isEmpty());
         assertTrue(inventory.allItems().isEmpty());
@@ -33,30 +34,37 @@ class GlobalMatchedInventoryTest {
 
     @Test
     void replaceSwapsState() {
+        // when
         inventory.replace(List.of(matchedWith(item("Action"))));
 
+        // then
         assertEquals(1, inventory.size());
         assertEquals(1, inventory.allItems().size());
     }
 
     @Test
     void itemsForSuppliersReturnsOnlyRequestedSuppliers() {
+        // given
         inventory.replace(List.of(
                 matchedWith(item("Action"), item("Wortmann")),
                 matchedWith(item("Elko"))));
 
+        // when
         List<InventoryItem> result = inventory.itemsForSuppliers(List.of("Action", "Elko"));
 
+        // then
         assertEquals(2, result.size());
         assertTrue(result.stream().allMatch(i -> List.of("Action", "Elko").contains(i.supplier())));
     }
 
     @Test
     void allItemsFlattensEveryMatchedEntry() {
+        // given
         inventory.replace(List.of(
                 matchedWith(item("Action"), item("Wortmann")),
                 matchedWith(item("Elko"))));
 
+        // when / then
         assertEquals(3, inventory.allItems().size());
     }
 }

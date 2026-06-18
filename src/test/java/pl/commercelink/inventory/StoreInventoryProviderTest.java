@@ -60,9 +60,11 @@ class StoreInventoryProviderTest {
 
     @Test
     void returnsCachedEntryWithoutBuilding() {
+        // given
         StoreInventory cached = new StoreInventory(new LinkedList<>(), LocalDateTime.now());
         when(cache.get("store-1")).thenReturn(Optional.of(cached));
 
+        // when / then
         assertSame(cached, provider.get("store-1"));
         verify(globalInventory, never()).itemsForSuppliers(any());
         verify(cache, never()).put(any(), any());
@@ -70,6 +72,7 @@ class StoreInventoryProviderTest {
 
     @Test
     void buildsFromGlobalAndOwnItemsThenStores() {
+        // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
@@ -84,8 +87,10 @@ class StoreInventoryProviderTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(autoDiscovery.run(anyList())).thenReturn(List.of(matched));
 
+        // when
         StoreInventory result = provider.get("store-1");
 
+        // then
         assertEquals(List.of(matched), result.items());
         verify(cache).put(eq("store-1"), any(StoreInventory.class));
         verify(autoDiscovery).run(argThat(list -> list.size() == 2));
@@ -93,6 +98,7 @@ class StoreInventoryProviderTest {
 
     @Test
     void excludesGlobalItemsWhenStoreCannotUseGlobalSuppliers() {
+        // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
@@ -101,26 +107,33 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         when(autoDiscovery.run(anyList())).thenReturn(List.of());
 
+        // when
         provider.get("store-1");
 
+        // then
         verify(globalInventory, never()).itemsForSuppliers(any());
         verify(autoDiscovery).run(argThat(List::isEmpty));
     }
 
     @Test
     void invalidateAllDelegatesToCache() {
+        // when
         provider.invalidateAll();
 
+        // then
         verify(cache).invalidateAll();
     }
 
     @Test
     void buildsEmptyInventoryWhenStoreMissing() {
+        // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         when(storesRepository.findById("store-1")).thenReturn(null);
 
+        // when
         StoreInventory result = provider.get("store-1");
 
+        // then
         assertEquals(0, result.items().size());
         verify(cache).put(eq("store-1"), any(StoreInventory.class));
     }

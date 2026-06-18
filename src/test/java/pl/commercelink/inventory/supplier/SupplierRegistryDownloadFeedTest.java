@@ -20,6 +20,7 @@ import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SupplierRegistryDownloadFeedTest {
 
@@ -50,29 +51,61 @@ class SupplierRegistryDownloadFeedTest {
 
     @Test
     void downloadFeedWithConfigEncodesSingleFieldAsRawValueAndPassesToDescriptor() throws ResourceDownloadException {
+        // given
         AtomicReference<String> captured = new AtomicReference<>();
         registry.registerDescriptor(fakeDescriptor("Wortmann", captured));
 
+        // when
         Optional<FeedData> result = registry.downloadFeed("Wortmann", Map.of("url", "https://feed/x.csv"));
 
+        // then
         assertTrue(result.isPresent());
         assertEquals("https://feed/x.csv", captured.get());
     }
 
     @Test
     void downloadFeedWithConfigEncodesMultiFieldAsJsonAndPassesToDescriptor() throws ResourceDownloadException {
+        // given
         AtomicReference<String> captured = new AtomicReference<>();
         registry.registerDescriptor(fakeDescriptor("Action", captured));
 
+        // when
         registry.downloadFeed("Action", Map.of("host", "ftp.x", "password", "p"));
 
-        assertTrue(captured.get().contains("\"host\":\"ftp.x\""));
-        assertTrue(captured.get().contains("\"password\":\"p\""));
+        // then
+        assertEquals("{\"host\":\"ftp.x\",\"password\":\"p\"}", captured.get());
     }
 
     @Test
     void downloadFeedWithConfigReturnsEmptyForUnknownSupplier() throws ResourceDownloadException {
+        // when
         Optional<FeedData> result = registry.downloadFeed("Unknown", Map.of("url", "x"));
+
+        // then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void downloadFeedBySupplierNameLoadsSecretAndDelegatesToDescriptor() throws ResourceDownloadException {
+        // given
+        AtomicReference<String> captured = new AtomicReference<>();
+        registry.registerDescriptor(fakeDescriptor("Kosatec", captured));
+        when(secretsManager.getSecret("Kosatec")).thenReturn("stored-secret");
+
+        // when
+        Optional<FeedData> result = registry.downloadFeed("Kosatec");
+
+        // then
+        assertTrue(result.isPresent());
+        assertEquals("stored-secret", captured.get());
+    }
+
+    @Test
+    void downloadFeedBySupplierNameReturnsEmptyForUnknownSupplier() throws ResourceDownloadException {
+        // when
+        Optional<FeedData> result = registry.downloadFeed("Unknown");
+
+        // then
         assertTrue(result.isEmpty());
     }
 }

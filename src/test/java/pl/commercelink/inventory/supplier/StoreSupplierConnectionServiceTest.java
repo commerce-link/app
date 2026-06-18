@@ -62,28 +62,35 @@ class StoreSupplierConnectionServiceTest {
 
     @Test
     void superAdminControlsGlobalFlagWhileNonAdminKeepsStoredValue() {
+        // given
         Store stored = storeWith(true);
 
+        // when / then
         assertFalse(service.resolveCanUseGlobalSuppliers(stored, false, true));
         assertTrue(service.resolveCanUseGlobalSuppliers(stored, false, false));
     }
 
     @Test
     void nonAdminWithoutStoredConfigurationDefaultsToNoGlobalSuppliers() {
+        // given
         Store store = new Store();
         store.setStoreId("store-1");
 
+        // when / then
         assertFalse(service.resolveCanUseGlobalSuppliers(store, true, false));
     }
 
     @Test
     void buildsConnectionsForcingOwnWhenGlobalNotAllowed() {
+        // given
         List<SupplierSelectionForm> selections = List.of(
                 new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL),
                 new SupplierSelectionForm("Wortmann", false, ConnectionMode.OWN));
 
+        // when
         List<StoreSupplierConnection> result = service.buildConnections(selections, false);
 
+        // then
         assertEquals(1, result.size());
         assertEquals("Acme", result.get(0).getSupplierName());
         assertEquals(ConnectionMode.OWN, result.get(0).getMode());
@@ -91,12 +98,15 @@ class StoreSupplierConnectionServiceTest {
 
     @Test
     void buildsConnectionsHonouringSelectedModeWhenGlobalAllowed() {
+        // given
         List<SupplierSelectionForm> selections = List.of(
                 new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL),
                 new SupplierSelectionForm("Wortmann", true, ConnectionMode.OWN));
 
+        // when
         List<StoreSupplierConnection> result = service.buildConnections(selections, true);
 
+        // then
         assertEquals(2, result.size());
         assertEquals(ConnectionMode.GLOBAL, result.get(0).getMode());
         assertEquals(ConnectionMode.OWN, result.get(1).getMode());
@@ -104,42 +114,51 @@ class StoreSupplierConnectionServiceTest {
 
     @Test
     void applyReturnsValidationErrorsWithoutDelegatingToPersister() {
+        // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any()))
                 .thenReturn(List.of("Supplier Acme requires field Feed URL."));
 
+        // when
         List<String> errors = service.apply(existing, submitted, selections, Map.of(), true);
 
+        // then
         assertFalse(errors.isEmpty());
         verify(persister, never()).persist(any(), any(), any());
     }
 
     @Test
     void applyDelegatesToPersisterAndSucceeds() {
+        // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any())).thenReturn(true);
 
+        // when
         List<String> errors = service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
 
+        // then
         assertTrue(errors.isEmpty());
         verify(persister).persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
     }
 
     @Test
     void applyReturnsFailureWhenPersisterFails() {
+        // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any())).thenReturn(false);
 
+        // when
         List<String> errors = service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
 
+        // then
         assertFalse(errors.isEmpty());
     }
 }

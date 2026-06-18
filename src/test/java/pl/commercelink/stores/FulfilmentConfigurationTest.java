@@ -8,6 +8,7 @@ class FulfilmentConfigurationTest {
 
     @Test
     void newConfigurationHasGlobalSuppliersDisabledByDefault() {
+        // when / then
         assertFalse(new FulfilmentConfiguration().isCanUseGlobalSuppliers());
     }
 }

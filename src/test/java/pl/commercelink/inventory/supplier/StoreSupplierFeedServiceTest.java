@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,7 +44,8 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
-    void downloadsFeedWithStoreConfigAndStoresToPerStoreKey() throws ResourceDownloadException {
+    void downloadsFeedToPerStoreKeyThenInvalidatesCache() throws ResourceDownloadException {
+        // given
         Store store = storeWithId("store-1");
         Map<String, String> config = Map.of("url", "https://feed/x.csv");
         byte[] data = "rows".getBytes();
@@ -52,33 +54,25 @@ class StoreSupplierFeedServiceTest {
         when(configurationManager.loadConfiguration(store, "Wortmann")).thenReturn(config);
         when(supplierRegistry.downloadFeed("Wortmann", config)).thenReturn(Optional.of(new FeedData(data, "csv")));
 
+        // when
         service.loadStoreFeed("store-1", "Wortmann");
 
+        // then
         verify(supplierRegistry).downloadFeed("Wortmann", config);
-        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
-    }
-
-    @Test
-    void invalidatesStoreCacheAfterStoringFeed() throws ResourceDownloadException {
-        Store store = storeWithId("store-1");
-        Map<String, String> config = Map.of("url", "https://feed/x.csv");
-        byte[] data = "rows".getBytes();
-
-        when(storesRepository.findById("store-1")).thenReturn(store);
-        when(configurationManager.loadConfiguration(store, "Wortmann")).thenReturn(config);
-        when(supplierRegistry.downloadFeed("Wortmann", config)).thenReturn(Optional.of(new FeedData(data, "csv")));
-
-        service.loadStoreFeed("store-1", "Wortmann");
-
-        verify(storeInventoryProvider).invalidate("store-1");
+        InOrder inOrder = inOrder(storeFeedRepository, storeInventoryProvider);
+        inOrder.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        inOrder.verify(storeInventoryProvider).invalidate("store-1");
     }
 
     @Test
     void doesNothingWhenStoreNotFound() throws ResourceDownloadException {
+        // given
         when(storesRepository.findById("missing")).thenReturn(null);
 
+        // when
         service.loadStoreFeed("missing", "Wortmann");
 
+        // then
         verifyNoInteractions(supplierRegistry);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
         verify(storeInventoryProvider, never()).invalidate(anyString());
@@ -86,6 +80,7 @@ class StoreSupplierFeedServiceTest {
 
     @Test
     void doesNotStoreWhenDownloadReturnsEmpty() throws ResourceDownloadException {
+        // given
         Store store = storeWithId("store-1");
         Map<String, String> config = Map.of("url", "https://feed/x.csv");
 
@@ -93,8 +88,10 @@ class StoreSupplierFeedServiceTest {
         when(configurationManager.loadConfiguration(store, "Wortmann")).thenReturn(config);
         when(supplierRegistry.downloadFeed("Wortmann", config)).thenReturn(Optional.empty());
 
+        // when
         service.loadStoreFeed("store-1", "Wortmann");
 
+        // then
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
         verify(storeInventoryProvider, never()).invalidate(anyString());
     }

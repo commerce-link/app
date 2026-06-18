@@ -20,28 +20,34 @@ class StoreSupplierModeNamesTest {
 
     @Test
     void partitionsSupplierNamesByConnectionMode() {
+        // given
         Store store = storeWithConnections(
                 new StoreSupplierConnection("Action", ConnectionMode.GLOBAL),
                 new StoreSupplierConnection("Wortmann", ConnectionMode.OWN),
                 new StoreSupplierConnection("Elko", ConnectionMode.OWN));
 
+        // when / then
         assertEquals(List.of("Action"), store.getGlobalSupplierNames());
         assertEquals(List.of("Wortmann", "Elko"), store.getOwnSupplierNames());
     }
 
     @Test
     void hasOwnSupplierConnectionsReflectsOwnModeConnections() {
+        // given
         Store withOwn = storeWithConnections(new StoreSupplierConnection("Wortmann", ConnectionMode.OWN));
         Store globalOnly = storeWithConnections(new StoreSupplierConnection("Action", ConnectionMode.GLOBAL));
 
+        // when / then
         assertTrue(withOwn.hasOwnSupplierConnections());
         assertFalse(globalOnly.hasOwnSupplierConnections());
     }
 
     @Test
     void returnsEmptyWhenFulfilmentConfigurationMissing() {
+        // given
         Store store = new Store();
 
+        // when / then
         assertTrue(store.getOwnSupplierNames().isEmpty());
         assertTrue(store.getGlobalSupplierNames().isEmpty());
         assertFalse(store.hasOwnSupplierConnections());

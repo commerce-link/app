@@ -15,8 +15,10 @@ class StoreFeedTaxonomyTest {
 
     @Test
     void addsPenaltyToScoreAndPreservesOtherFields() {
+        // when
         Taxonomy result = StoreFeedTaxonomy.deprioritized(taxonomy(5), 1000);
 
+        // then
         assertEquals(1005, result.dataAccuracyScore());
         assertEquals("5900000000001", result.ean());
         assertEquals("MFN1", result.mfn());
@@ -29,8 +31,10 @@ class StoreFeedTaxonomyTest {
 
     @Test
     void returnsSameInstanceWhenPenaltyZeroOrNegative() {
+        // given
         Taxonomy base = taxonomy(5);
 
+        // when / then
         assertSame(base, StoreFeedTaxonomy.deprioritized(base, 0));
         assertSame(base, StoreFeedTaxonomy.deprioritized(base, -3));
     }

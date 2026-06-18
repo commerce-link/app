@@ -47,11 +47,14 @@ class SqsFeedLoaderEventListenerTest {
 
     @Test
     void globalPayloadUsesGlobalDownloadPath() throws Exception {
+        // given
         when(supplierRegistry.downloadFeed("Wortmann"))
                 .thenReturn(Optional.of(FeedData.csv("rows".getBytes())));
 
+        // when
         listener.handleMessage(payload("Wortmann", null));
 
+        // then
         verify(supplierRegistry).downloadFeed("Wortmann");
         verify(inventoryRepository).store(eq("Wortmann"), any(byte[].class), eq("csv"));
         verifyNoInteractions(storeSupplierFeedService);
@@ -59,8 +62,10 @@ class SqsFeedLoaderEventListenerTest {
 
     @Test
     void storeScopedPayloadDelegatesToStoreSupplierFeedService() throws Exception {
+        // when
         listener.handleMessage(payload("Wortmann", "store-1"));
 
+        // then
         verify(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
         verify(supplierRegistry, never()).downloadFeed(anyString());
     }
