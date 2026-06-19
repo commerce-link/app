@@ -48,10 +48,12 @@ public class StoreInventoryProvider {
     }
 
     private Duration resolveTtl(Store storeEntity) {
-        return Optional.ofNullable(storeEntity)
+        long minutes = Optional.ofNullable(storeEntity)
                 .flatMap(Store::getInventoryCacheTtlMinutes)
-                .map(Duration::ofMinutes)
-                .orElse(Duration.ofMinutes(defaultTtlMinutes));
+                .filter(value -> value > 0)
+                .map(Integer::longValue)
+                .orElse(defaultTtlMinutes);
+        return Duration.ofMinutes(Math.max(1, minutes));
     }
 
     private StoreInventory build(String storeId, Store storeEntity) {

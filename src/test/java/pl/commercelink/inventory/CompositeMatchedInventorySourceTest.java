@@ -97,6 +97,25 @@ class CompositeMatchedInventorySourceTest {
     }
 
     @Test
+    void allMergesTwoOwnGroupsBridgedByOneGlobalGroup() {
+        // given
+        MatchedInventory ownA = group("111", "AAA", item("111", "AAA", "OwnA"));
+        MatchedInventory ownB = group("222", "BBB", item("222", "BBB", "OwnB"));
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "BBB", item("111", "BBB", "Glob"))));
+        CompositeMatchedInventorySource source = new CompositeMatchedInventorySource(
+                List.of(ownA, ownB), global, Set.of("Glob"), taxonomyCache, supplierRegistry);
+
+        // when
+        Collection<MatchedInventory> all = source.all();
+
+        // then
+        assertThat(all).hasSize(1);
+        assertThat(all.iterator().next().getSuppliers())
+                .containsExactlyInAnyOrder("OwnA", "OwnB", "Glob");
+    }
+
+    @Test
     void allCoalescesOwnWithMatchingGlobalAndKeepsUnmatchedGlobal() {
         // given
         MatchedInventory own = group("111", "AAA", item("111", "AAA", "ActionOwn"));

@@ -50,31 +50,57 @@ class CompositeMatchedInventorySource implements MatchedInventorySource {
             group.getEans().forEach(ean -> globalByEan.put(ean, group));
             group.getMfnCodes().forEach(mfn -> globalByMfn.put(mfn, group));
         }
-        List<MatchedInventory> result = new ArrayList<>();
-        Set<MatchedInventory> consumed = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (MatchedInventory ownGroup : own) {
-            Set<MatchedInventory> matches = new LinkedHashSet<>();
+        List<MatchedInventory> ownList = new ArrayList<>(own);
+        List<MatchedInventory> globalList = new ArrayList<>(narrowedGlobal);
+        int ownSize = ownList.size();
+        int globalSize = globalList.size();
+        int[] parent = new int[ownSize + globalSize];
+        for (int i = 0; i < parent.length; i++) parent[i] = i;
+        Map<MatchedInventory, Integer> globalNodeIndex = new IdentityHashMap<>();
+        for (int i = 0; i < globalSize; i++) {
+            globalNodeIndex.put(globalList.get(i), ownSize + i);
+        }
+        for (int i = 0; i < ownSize; i++) {
+            MatchedInventory ownGroup = ownList.get(i);
+            int ownIdx = i;
             ownGroup.getEans().forEach(ean -> {
                 MatchedInventory match = globalByEan.get(ean);
                 if (match != null) {
-                    matches.add(match);
+                    union(parent, ownIdx, globalNodeIndex.get(match));
                 }
             });
             ownGroup.getMfnCodes().forEach(mfn -> {
                 MatchedInventory match = globalByMfn.get(mfn);
                 if (match != null) {
-                    matches.add(match);
+                    union(parent, ownIdx, globalNodeIndex.get(match));
                 }
             });
-            if (matches.isEmpty()) {
-                result.add(ownGroup);
+        }
+        Map<Integer, List<Integer>> components = new HashMap<>();
+        for (int i = 0; i < ownSize + globalSize; i++) {
+            components.computeIfAbsent(find(parent, i), k -> new ArrayList<>()).add(i);
+        }
+        List<MatchedInventory> result = new ArrayList<>();
+        Set<MatchedInventory> consumed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (List<Integer> component : components.values()) {
+            boolean hasOwn = component.stream().anyMatch(idx -> idx < ownSize);
+            if (!hasOwn) {
                 continue;
             }
-            Set<InventoryItem> items = new LinkedHashSet<>(ownGroup.getInventoryItems());
-            InventoryKey mergedKey = ownGroup.getInventoryKey().copy();
-            for (MatchedInventory match : matches) {
-                items.addAll(match.getInventoryItems());
-                consumed.add(match);
+            Set<InventoryItem> items = new LinkedHashSet<>();
+            InventoryKey mergedKey = null;
+            for (int idx : component) {
+                if (idx < ownSize) {
+                    MatchedInventory ownGroup = ownList.get(idx);
+                    if (mergedKey == null) {
+                        mergedKey = ownGroup.getInventoryKey().copy();
+                    }
+                    items.addAll(ownGroup.getInventoryItems());
+                } else {
+                    MatchedInventory globalGroup = globalList.get(idx - ownSize);
+                    items.addAll(globalGroup.getInventoryItems());
+                    consumed.add(globalGroup);
+                }
             }
             result.add(new MatchedInventory(mergedKey, items, taxonomyCache, supplierRegistry));
         }
@@ -84,6 +110,22 @@ class CompositeMatchedInventorySource implements MatchedInventorySource {
             }
         }
         return result;
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        return i;
+    }
+
+    private static void union(int[] parent, int a, int b) {
+        int ra = find(parent, a);
+        int rb = find(parent, b);
+        if (ra != rb) {
+            parent[ra] = rb;
+        }
     }
 
     private List<MatchedInventory> narrow(Collection<MatchedInventory> globalGroups) {

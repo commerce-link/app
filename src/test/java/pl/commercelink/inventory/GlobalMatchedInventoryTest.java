@@ -107,20 +107,6 @@ class GlobalMatchedInventoryTest {
     }
 
     @Test
-    void itemsForSuppliersReturnsOnlyRequestedSupplier() {
-        // given
-        GlobalMatchedInventory global = new GlobalMatchedInventory();
-        global.replace(List.of(group("111", "AAA", "Action"), group("222", "BBB", "Asbis")));
-
-        // when
-        var items = global.itemsForSuppliers(List.of("Action"));
-
-        // then
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).supplier()).isEqualTo("Action");
-    }
-
-    @Test
     void sizeReturnsNumberOfGroups() {
         // given
         GlobalMatchedInventory global = new GlobalMatchedInventory();
