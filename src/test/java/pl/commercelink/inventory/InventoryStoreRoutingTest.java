@@ -49,6 +49,7 @@ class InventoryStoreRoutingTest {
         Store store = mock(Store.class);
         when(store.hasOwnSupplierConnections()).thenReturn(hasOwn);
         when(store.getEnabledProviders()).thenReturn(List.of());
+        when(store.getGlobalSupplierNames()).thenReturn(List.of());
         return store;
     }
 
@@ -65,21 +66,18 @@ class InventoryStoreRoutingTest {
 
         // then
         verify(storeInventoryProvider).get("store-1");
-        verify(globalInventory, never()).all();
     }
 
     @Test
-    void withEnabledSuppliersOnlyUsesGlobalPathWhenStoreHasNoOwnConnections() {
+    void withEnabledSuppliersOnlyDoesNotQueryStoreCacheWhenStoreHasNoOwnConnections() {
         // given
         Store store = store(false);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(globalInventory.all()).thenReturn(new LinkedList<>());
 
         // when
         inventory.withEnabledSuppliersOnly("store-1");
 
         // then
-        verify(globalInventory).all();
         verify(storeInventoryProvider, never()).get(any());
     }
 }
