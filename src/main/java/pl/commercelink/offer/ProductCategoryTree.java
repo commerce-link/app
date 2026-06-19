@@ -3,9 +3,7 @@ package pl.commercelink.offer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.products.ProductCategoryLocalization;
 import pl.commercelink.taxonomy.ProductGroup;
-import pl.commercelink.products.ProductGroupLocalization;
 
 import java.util.List;
 
@@ -36,7 +34,10 @@ public class ProductCategoryTree {
     private ProductCategoryTree() {
     }
 
-    public ProductCategoryTree(CategoryDefinition categoryDefinition, boolean isDuplicated) {
+    public ProductCategoryTree(CategoryDefinition categoryDefinition,
+                               boolean isDuplicated,
+                               String productCategoryLocalizedName,
+                               String productGroupLocalizedName) {
         this.categoryId = categoryDefinition.getCategoryId();
         this.name = categoryDefinition.getName();
 
@@ -47,9 +48,6 @@ public class ProductCategoryTree {
 
         this.productCategory = categoryDefinition.getCategory();
         this.productGroup = categoryDefinition.getCategory().getProductGroup();
-
-        String productCategoryLocalizedName = ProductCategoryLocalization.INSTANCE.name(categoryDefinition.getCategory());
-        String productGroupLocalizedName = ProductGroupLocalization.INSTANCE.name(categoryDefinition.getCategory().getProductGroup());
 
         if (isDuplicated) {
             this.categoryTree = productGroupLocalizedName + "/" + productCategoryLocalizedName + "/" + name;

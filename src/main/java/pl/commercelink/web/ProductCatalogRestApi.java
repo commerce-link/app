@@ -1,6 +1,6 @@
 package pl.commercelink.web;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.offer.*;
@@ -10,6 +10,7 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.web.dtos.ObjectIdDto;
@@ -20,28 +21,17 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/Store/{storeId}/Catalog/{catalogId}")
+@RequiredArgsConstructor
 public class ProductCatalogRestApi {
 
-    @Autowired
-    private Inventory inventory;
-
-    @Autowired
-    private PimCatalog pimCatalog;
-
-    @Autowired
-    private ProductCatalogRepository productCatalogRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    @Autowired
-    private ProductRecommendationEngine recommendationEngine;
-
-    @Autowired
-    private PricelistRepository pricelistRepository;
-
-    @Autowired
-    private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    private final Inventory inventory;
+    private final PimCatalog pimCatalog;
+    private final ProductCatalogRepository productCatalogRepository;
+    private final ProductRepository productRepository;
+    private final ProductRecommendationEngine recommendationEngine;
+    private final PricelistRepository pricelistRepository;
+    private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    private final EnumLocalizer enumLocalizer;
 
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
@@ -68,7 +58,11 @@ public class ProductCatalogRestApi {
     private List<ProductCategoryTree> getCategoriesTree(@PathVariable("storeId") String storeId, @PathVariable("catalogId") String catalogId) {
         List<CategoryDefinition> categoryDefinitions = productCatalogRepository.findById(storeId, catalogId).getCategories();
         return categoryDefinitions.stream()
-                .map(c -> new ProductCategoryTree(c, categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory())))
+                .map(c -> new ProductCategoryTree(
+                        c,
+                        categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory()),
+                        enumLocalizer.localize(c.getCategory(), "plural"),
+                        enumLocalizer.localize(c.getCategory().getProductGroup())))
                 .collect(Collectors.toList());
     }
 

@@ -1,8 +1,9 @@
 package pl.commercelink.orders.notifications;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.*;
@@ -17,19 +18,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 class OrderNotificationsService {
 
-    @Autowired
-    private OrdersRepository ordersRepository;
+    private final OrdersRepository ordersRepository;
 
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
+    private final OrderItemsRepository orderItemsRepository;
 
-    @Autowired
-    private OrderEventsRepository orderEventsRepository;
+    private final OrderEventsRepository orderEventsRepository;
 
-    @Autowired
-    private EmailClient emailClient;
+    private final EmailClient emailClient;
+
+    private final EnumLocalizer enumLocalizer;
 
     void send(Order order) {
 
@@ -264,7 +264,8 @@ class OrderNotificationsService {
                 orderItems,
                 shippingDetails,
                 documentType,
-                order.isPersonalCollection()
+                order.isPersonalCollection(),
+                enumLocalizer
         );
 
         return send(order.getStoreId(), msg, EmailNotificationType.ORDER_CONFIRMATION);
