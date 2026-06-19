@@ -64,18 +64,89 @@
                         </div>
                     </div>
 
+                    <div class="field" th:if="${isSuperAdmin}">
+                        <label class="checkbox">
+                            <input type="checkbox" class="global-suppliers-toggle"
+                                   th:field="*{store.fulfilmentConfiguration.canUseGlobalSuppliers}">
+                            <strong th:text="#{store.use.global.suppliers}"></strong>
+                        </label>
+                        <p th:text="#{store.use.global.suppliers.description}"></p>
+                    </div>
+
                     <div class="field">
                         <label class="label" th:text="#{store.enabled.providers}"></label>
-                        <div th:each="type : ${supplierTypes}" class="field">
+                        <div th:each="sel, stat : *{supplierSelections}" class="field supplier-item">
+                            <input type="hidden" th:field="*{supplierSelections[__${stat.index}__].supplierName}" />
                             <label class="checkbox">
-                                <input type="checkbox"
-                                       th:value="${type}"
-                                       th:field="*{store.fulfilmentConfiguration.enabledProviders}" />
-                                <span th:text="${type}"></span>
+                                <input type="checkbox" class="supplier-enabled"
+                                       th:field="*{supplierSelections[__${stat.index}__].enabled}" />
+                                <span th:text="${sel.supplierName}"></span>
                             </label>
+                            <div class="supplier-detail ml-5 mt-2">
+                                <div class="field supplier-mode-wrap">
+                                    <label class="label" th:text="#{store.supplier.connection.mode}"></label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select class="supplier-mode" th:field="*{supplierSelections[__${stat.index}__].mode}">
+                                                <option th:each="m : ${connectionModes}"
+                                                        th:value="${m}"
+                                                        th:text="#{'store.supplier.mode.' + ${m}}"></option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="supplier-own-fields"
+                                     th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
+                                    <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">
+                                        <label class="label" th:text="${cf.label()}"></label>
+                                        <div class="control">
+                                            <input class="input"
+                                                   th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                                                   th:name="'supplierConfiguration[' + ${sel.supplierName} + '][' + ${cf.key()} + ']'"
+                                                   th:value="${form.supplierConfiguration.get(sel.supplierName) != null ? form.supplierConfiguration.get(sel.supplierName).get(cf.key()) : ''}"
+                                                   th:placeholder="${cf.placeholder()}" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <script th:inline="javascript">
+                    (function() {
+                        var globalToggle = document.querySelector('.global-suppliers-toggle');
+                        var storeGlobalAllowed = /*[[${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}]]*/ true;
+                        var panels = document.querySelectorAll('.supplier-item');
+                        function globalAllowed() {
+                            return globalToggle ? globalToggle.checked : storeGlobalAllowed;
+                        }
+                        function refreshAll() {
+                            var allowed = globalAllowed();
+                            panels.forEach(function(panel) {
+                                var isEnabled = panel.querySelector('.supplier-enabled').checked;
+                                var detail = panel.querySelector('.supplier-detail');
+                                var modeWrap = panel.querySelector('.supplier-mode-wrap');
+                                var mode = panel.querySelector('.supplier-mode');
+                                var ownFields = panel.querySelector('.supplier-own-fields');
+                                if (detail) detail.style.display = isEnabled ? '' : 'none';
+                                if (modeWrap) modeWrap.style.display = allowed ? '' : 'none';
+                                if (mode) mode.disabled = !isEnabled || !allowed;
+                                var effectiveOwn = !allowed || (mode && mode.value === 'OWN');
+                                if (ownFields) {
+                                    ownFields.style.display = (isEnabled && effectiveOwn) ? '' : 'none';
+                                }
+                            });
+                        }
+                        panels.forEach(function(panel) {
+                            panel.querySelector('.supplier-enabled').addEventListener('change', refreshAll);
+                            var mode = panel.querySelector('.supplier-mode');
+                            if (mode) mode.addEventListener('change', refreshAll);
+                        });
+                        if (globalToggle) globalToggle.addEventListener('change', refreshAll);
+                        refreshAll();
+                    })();
+                </script>
 
                 <div class="field is-grouped">
                     <div class="control">

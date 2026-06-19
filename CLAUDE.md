@@ -256,3 +256,5 @@ All paths relative to `src/main/java/pl/commercelink/`.
 - Test files in `src/test/java` mirror source structure
 - Currently minimal coverage (4 test files: pricelist, products)
 - `mvn test -Dtest=ClassName#methodName`
+- Test method names are camelCase (not snake_case)
+- Structure every `@Test` body with `// given` / `// when` / `// then` section comments. Use a combined `// when / then` when a single statement both invokes and asserts (e.g. `assertThrows`). Omit a section when it has no lines — never leave an empty section.

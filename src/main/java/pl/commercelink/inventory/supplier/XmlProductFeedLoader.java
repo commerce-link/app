@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryRepository;
@@ -25,54 +27,19 @@ import java.util.LinkedList;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class XmlProductFeedLoader {
 
     private final InventoryRepository inventoryRepository;
+    private final StoreFeedRepository storeFeedRepository;
     private final DataCorrection dataCorrection;
     private final DataCleanup dataCleanup;
     private final TaxonomyCache taxonomyCache;
 
-    XmlProductFeedLoader(InventoryRepository inventoryRepository, DataCorrection dataCorrection, DataCleanup dataCleanup, TaxonomyCache taxonomyCache) {
-        this.inventoryRepository = inventoryRepository;
-        this.dataCorrection = dataCorrection;
-        this.dataCleanup = dataCleanup;
-        this.taxonomyCache = taxonomyCache;
-    }
-
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
         try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
-            XMLInputFactory xif = XMLInputFactory.newFactory();
-            XMLStreamReader xsr = xif.createXMLStreamReader(reader);
-
-            JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
-            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-
-            List<InventoryItem> res = new LinkedList<>();
-
-            try {
-                while (xsr.hasNext()) {
-                    if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
-                        V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
-
-                        ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                        InventoryItem inventoryItem = dataCorrection.run(parsed.item());
-                        Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
-
-                        if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
-                            taxonomyCache.add(taxonomy);
-                            res.add(inventoryItem);
-                        }
-                    } else {
-                        xsr.next();
-                    }
-                }
-            } finally {
-                xsr.close();
-            }
-
-            return dataCleanup.run(res);
-
+            return parse(itemClass, itemElementName, supplierInfo, reader, 0);
         } catch (JAXBException | XMLStreamException e) {
             System.out.println("Skipping feed file: " + supplierName + " as it can't be deserialized.");
             return new LinkedList<>();
@@ -83,6 +50,56 @@ public class XmlProductFeedLoader {
             System.out.println("Skipping feed file: " + supplierName + " as it can't be read.");
             return new LinkedList<>();
         }
+    }
+
+    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId, int taxonomyPenalty) {
+        String supplierName = supplierInfo.name();
+        try (Reader reader = storeFeedRepository.read(storeId, supplierName, "xml")) {
+            return parse(itemClass, itemElementName, supplierInfo, reader, taxonomyPenalty);
+        } catch (JAXBException | XMLStreamException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be deserialized.");
+            return new LinkedList<>();
+        } catch (NoSuchBucketException | NoSuchKeyException | FileNotFoundException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it does not exists or is unreadable.");
+            return new LinkedList<>();
+        } catch (IOException e) {
+            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be read.");
+            return new LinkedList<>();
+        }
+    }
+
+    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty)
+            throws JAXBException, XMLStreamException {
+        XMLInputFactory xif = XMLInputFactory.newFactory();
+        XMLStreamReader xsr = xif.createXMLStreamReader(reader);
+
+        JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
+        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+
+        List<InventoryItem> res = new LinkedList<>();
+
+        try {
+            while (xsr.hasNext()) {
+                if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
+                    V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
+
+                    ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
+                    InventoryItem inventoryItem = dataCorrection.run(parsed.item());
+                    Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
+
+                    if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
+                        taxonomyCache.add(StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty));
+                        res.add(inventoryItem);
+                    }
+                } else {
+                    xsr.next();
+                }
+            }
+        } finally {
+            xsr.close();
+        }
+
+        return dataCleanup.run(res);
     }
 
 }

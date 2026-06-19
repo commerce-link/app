@@ -416,9 +416,44 @@ public class Store {
 
     @DynamoDBIgnore
     public List<String> getEnabledProviders() {
-        return  Optional.ofNullable(fulfilmentConfiguration)
-                .map(FulfilmentConfiguration::getEnabledProviders)
-                .orElse(Collections.emptyList());
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getSupplierConnections)
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(StoreSupplierConnection::getSupplierName)
+                .collect(Collectors.toList());
+    }
+
+    @DynamoDBIgnore
+    public List<String> getOwnSupplierNames() {
+        return supplierNamesByMode(ConnectionMode.OWN);
+    }
+
+    @DynamoDBIgnore
+    public List<String> getGlobalSupplierNames() {
+        return supplierNamesByMode(ConnectionMode.GLOBAL);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasOwnSupplierConnections() {
+        return !getOwnSupplierNames().isEmpty();
+    }
+
+    @DynamoDBIgnore
+    public boolean canUseGlobalSuppliers() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isCanUseGlobalSuppliers)
+                .orElse(false);
+    }
+
+    private List<String> supplierNamesByMode(ConnectionMode mode) {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getSupplierConnections)
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(connection -> connection.getMode() == mode)
+                .map(StoreSupplierConnection::getSupplierName)
+                .collect(Collectors.toList());
     }
 
     @DynamoDBIgnore

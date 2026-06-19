@@ -1,6 +1,8 @@
 package pl.commercelink.inventory;
 
 import jakarta.annotation.PostConstruct;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
@@ -15,28 +17,22 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class InventoryLoad {
 
     private final Inventory inventory;
     private final SupplierRegistry supplierRegistry;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
-
-    InventoryLoad(Inventory inventory, SupplierRegistry supplierRegistry,
-                  CsvProductFeedLoader csvProductFeedLoader, XmlProductFeedLoader xmlProductFeedLoader) {
-        this.inventory = inventory;
-        this.supplierRegistry = supplierRegistry;
-        this.csvProductFeedLoader = csvProductFeedLoader;
-        this.xmlProductFeedLoader = xmlProductFeedLoader;
-    }
+    private final ExchangeRates exchangeRates;
 
     @PostConstruct
     void onStartUp() {
-        Map<String, Double> sellRates = new ExchangeRates().getCurrentSellRates();
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         List<List<InventoryItem>> rawFeeds = supplierRegistry.getAllDescriptors().stream()
                 .map(this::fetchItems)
                 .map(items -> items.stream()
-                        .flatMap(item -> item.toLocalCurrency("PLN", sellRates.get(item.currency())).stream())
+                        .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList()))
                 .collect(Collectors.toList());
         inventory.init(rawFeeds);
