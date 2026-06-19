@@ -117,6 +117,45 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void usesStoreTtlWhenConfigured() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.canUseGlobalSuppliers()).thenReturn(false);
+        when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList())).thenReturn(List.of());
+
+        // when
+        provider.get("store-1");
+
+        // then
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+    }
+
+    @Test
+    void usesDefaultTtlWhenStoreHasNone() {
+        // given
+        provider.defaultTtlMinutes = 60;
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.canUseGlobalSuppliers()).thenReturn(false);
+        when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList())).thenReturn(List.of());
+
+        // when
+        provider.get("store-1");
+
+        // then
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+    }
+
+    @Test
     void buildsEmptyInventoryWhenStoreMissing() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());

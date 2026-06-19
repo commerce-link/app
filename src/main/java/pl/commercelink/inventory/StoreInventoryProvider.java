@@ -31,7 +31,7 @@ public class StoreInventoryProvider {
     private final ExchangeRates exchangeRates;
 
     @Value("${inventory.store-cache.ttl-minutes:60}")
-    private long defaultTtlMinutes;
+    long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
         Optional<StoreInventory> cached = cache.get(storeId);

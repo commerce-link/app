@@ -83,7 +83,6 @@ class RedisStoreInventoryCacheTest {
         // given
         RedisStoreInventoryCache cache = cache();
         StoreInventory inventory = new StoreInventory(new ArrayList<>(), LocalDateTime.now());
-        when(valueOps.get("store-inventory:store-1")).thenReturn(null);
 
         // when
         cache.put("store-1", inventory, Duration.ofMinutes(15));
