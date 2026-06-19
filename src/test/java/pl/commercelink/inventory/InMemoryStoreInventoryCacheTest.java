@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InMemoryStoreInventoryCacheTest {
 
-    private final InMemoryStoreInventoryCache cache = new InMemoryStoreInventoryCache(100, 60);
+    private final InMemoryStoreInventoryCache cache = new InMemoryStoreInventoryCache(100);
 
     private StoreInventory anyInventory() {
         return new StoreInventory(new LinkedList<>(), LocalDateTime.now());
