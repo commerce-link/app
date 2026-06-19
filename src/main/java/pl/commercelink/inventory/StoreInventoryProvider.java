@@ -43,10 +43,6 @@ public class StoreInventoryProvider {
         return built;
     }
 
-    public void invalidate(String storeId) {
-        cache.invalidate(storeId);
-    }
-
     private Duration resolveTtl(Store storeEntity) {
         long minutes = Optional.ofNullable(storeEntity)
                 .flatMap(Store::getInventoryCacheTtlMinutes)

@@ -92,18 +92,6 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
-    void invalidateDeletesKey() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-
-        // when
-        cache.invalidate("s1");
-
-        // then
-        verify(redisTemplate).delete("store-inventory:s1");
-    }
-
-    @Test
     void getDegradesToMissWhenRedisFails() {
         // given
         RedisStoreInventoryCache cache = cache();
@@ -124,13 +112,4 @@ class RedisStoreInventoryCacheTest {
         assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60)));
     }
 
-    @Test
-    void invalidateSwallowsRedisFailure() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        doThrow(new RuntimeException("redis down")).when(redisTemplate).delete("store-inventory:s1");
-
-        // when / then
-        assertDoesNotThrow(() -> cache.invalidate("s1"));
-    }
 }

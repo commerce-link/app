@@ -2,7 +2,6 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -20,7 +19,6 @@ public class StoreSupplierFeedService {
     private final SupplierConfigurationManager configurationManager;
     private final SupplierRegistry supplierRegistry;
     private final StoreFeedRepository storeFeedRepository;
-    private final StoreInventoryProvider storeInventoryProvider;
 
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);
@@ -29,9 +27,7 @@ public class StoreSupplierFeedService {
         }
         Map<String, String> config = configurationManager.loadConfiguration(store, supplierName);
         Optional<FeedData> feed = supplierRegistry.downloadFeed(supplierName, config);
-        feed.ifPresent(feedData -> {
-            storeFeedRepository.store(storeId, supplierName, feedData.data(), feedData.extension());
-            storeInventoryProvider.invalidate(storeId);
-        });
+        feed.ifPresent(feedData ->
+                storeFeedRepository.store(storeId, supplierName, feedData.data(), feedData.extension()));
     }
 }

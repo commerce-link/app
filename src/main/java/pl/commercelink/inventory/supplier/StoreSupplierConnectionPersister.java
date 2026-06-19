@@ -2,7 +2,6 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -26,7 +25,6 @@ public class StoreSupplierConnectionPersister {
     private final StoreSupplierFeedScheduler feedScheduler;
     private final StoreFeedRepository storeFeedRepository;
     private final StoresRepository storesRepository;
-    private final StoreInventoryProvider storeInventoryProvider;
 
     public boolean persist(Store existingStore, FulfilmentConfiguration submitted,
                            Map<String, Map<String, String>> submittedConfig) {
@@ -43,18 +41,9 @@ public class StoreSupplierConnectionPersister {
             return false;
         }
 
-        invalidateCache(changes);
         triggerImmediateImports(changes);
         deleteRemovedFeeds(changes);
         return true;
-    }
-
-    private void invalidateCache(ConnectionChanges changes) {
-        try {
-            storeInventoryProvider.invalidate(changes.storeId());
-        } catch (RuntimeException e) {
-            System.err.println("Failed to invalidate store inventory cache for " + changes.storeId() + ": " + e.getMessage());
-        }
     }
 
     private ConnectionChanges computeChanges(Store existingStore, FulfilmentConfiguration submitted) {

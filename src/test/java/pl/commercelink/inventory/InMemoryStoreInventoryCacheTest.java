@@ -47,15 +47,4 @@ class InMemoryStoreInventoryCacheTest {
         assertTrue(cache.get("missing").isEmpty());
     }
 
-    @Test
-    void invalidateRemovesEntry() {
-        // given
-        cache.put("store-1", anyInventory(), Duration.ofMinutes(60));
-
-        // when
-        cache.invalidate("store-1");
-
-        // then
-        assertTrue(cache.get("store-1").isEmpty());
-    }
 }

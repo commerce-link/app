@@ -53,8 +53,4 @@ public class InMemoryStoreInventoryCache implements StoreInventoryCache {
         cache.put(storeId, new CachedEntry(inventory, ttl));
     }
 
-    @Override
-    public void invalidate(String storeId) {
-        cache.invalidate(storeId);
-    }
 }

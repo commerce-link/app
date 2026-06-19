@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
@@ -49,8 +48,6 @@ class StoreSupplierConnectionPersisterTest {
     private StoreFeedRepository storeFeedRepository;
     @Mock
     private StoresRepository storesRepository;
-    @Mock
-    private StoreInventoryProvider storeInventoryProvider;
 
     @InjectMocks
     private StoreSupplierConnectionPersister persister;
@@ -101,7 +98,6 @@ class StoreSupplierConnectionPersisterTest {
         verify(feedScheduler).triggerImmediateImport("store-1", "Acme");
         verify(feedScheduler, never()).deleteSchedule(anyString(), anyString());
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
-        verify(storeInventoryProvider).invalidate("store-1");
     }
 
     @Test
@@ -145,7 +141,6 @@ class StoreSupplierConnectionPersisterTest {
         verify(configurationManager).restore(eq(existing), eq("Acme"), any());
         verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
-        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 
     @Test
@@ -203,7 +198,6 @@ class StoreSupplierConnectionPersisterTest {
         verify(configurationManager).restore(eq(existing), eq("Old"), any());
         verify(feedScheduler, never()).triggerImmediateImport(any(), any());
         verify(storeFeedRepository, never()).delete(any(), any());
-        verify(storeInventoryProvider, never()).invalidate(any());
     }
 
     @Test
@@ -223,23 +217,6 @@ class StoreSupplierConnectionPersisterTest {
         verify(storesRepository).save(existing);
         verify(configurationManager, never()).restore(any(), any(), any());
         verify(feedScheduler, never()).deleteSchedule("store-1", "Acme");
-    }
-
-    @Test
-    void returnsTrueWhenCacheInvalidationFails() {
-        // given
-        Store existing = storeWith(true);
-        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
-        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
-        doThrow(new RuntimeException("cache boom")).when(storeInventoryProvider).invalidate(any());
-
-        // when
-        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
-
-        // then
-        assertTrue(result);
-        verify(storesRepository).save(existing);
     }
 
     @Test

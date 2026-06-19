@@ -52,15 +52,6 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
         }
     }
 
-    @Override
-    public void invalidate(String storeId) {
-        try {
-            redisTemplate.delete(key(storeId));
-        } catch (Exception e) {
-            System.err.println("Redis store-inventory invalidate failed for " + storeId + ": " + e.getMessage());
-        }
-    }
-
     private String key(String storeId) {
         return "store-inventory:" + storeId;
     }
