@@ -32,6 +32,8 @@ public class FulfilmentConfiguration {
     private boolean canUseGlobalSuppliers = false;
     @DynamoDBAttribute(attributeName = "supplierConnections")
     private List<StoreSupplierConnection> supplierConnections = new ArrayList<>();
+    @DynamoDBAttribute(attributeName = "inventoryCacheTtlMinutes")
+    private Integer inventoryCacheTtlMinutes;
 
     public FulfilmentConfiguration() {
     }
@@ -98,5 +100,13 @@ public class FulfilmentConfiguration {
 
     public void setSupplierConnections(List<StoreSupplierConnection> supplierConnections) {
         this.supplierConnections = supplierConnections;
+    }
+
+    public Integer getInventoryCacheTtlMinutes() {
+        return inventoryCacheTtlMinutes;
+    }
+
+    public void setInventoryCacheTtlMinutes(Integer inventoryCacheTtlMinutes) {
+        this.inventoryCacheTtlMinutes = inventoryCacheTtlMinutes;
     }
 }
