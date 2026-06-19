@@ -96,10 +96,16 @@ public class StoreSupplierConnectionService {
         boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
         submitted.setCanUseGlobalSuppliers(canUseGlobal);
         submitted.setSupplierConnections(buildConnections(selections, canUseGlobal));
+        submitted.setInventoryCacheTtlMinutes(
+                resolveInventoryCacheTtlMinutes(existingStore, submitted.getInventoryCacheTtlMinutes(), isSuperAdmin));
     }
 
     boolean resolveCanUseGlobalSuppliers(Store existingStore, boolean submittedCanUseGlobal, boolean isSuperAdmin) {
         return isSuperAdmin ? submittedCanUseGlobal : existingStore.canUseGlobalSuppliers();
+    }
+
+    Integer resolveInventoryCacheTtlMinutes(Store existingStore, Integer submittedTtl, boolean isSuperAdmin) {
+        return isSuperAdmin ? submittedTtl : existingStore.getInventoryCacheTtlMinutes().orElse(null);
     }
 
     List<StoreSupplierConnection> buildConnections(List<SupplierSelectionForm> selections, boolean canUseGlobal) {

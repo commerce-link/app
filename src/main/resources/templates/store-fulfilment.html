@@ -73,6 +73,13 @@
                         <p th:text="#{store.use.global.suppliers.description}"></p>
                     </div>
 
+                    <div class="field" th:if="${isSuperAdmin}">
+                        <label class="label" th:text="#{store.inventory.cache.ttl}"></label>
+                        <input class="input" type="number" min="1"
+                               th:field="*{store.fulfilmentConfiguration.inventoryCacheTtlMinutes}">
+                        <p th:text="#{store.inventory.cache.ttl.description}"></p>
+                    </div>
+
                     <div class="field">
                         <label class="label" th:text="#{store.enabled.providers}"></label>
                         <div th:each="sel, stat : *{supplierSelections}" class="field supplier-item">

@@ -189,4 +189,47 @@ class StoreSupplierConnectionServiceTest {
         assertThat(result.added()).containsExactly("B");
         assertThat(result.removed()).isEmpty();
     }
+
+    @Test
+    void superAdminCanSetInventoryCacheTtl() {
+        // given
+        Store store = new Store();
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+
+        // when
+        Integer resolved = service.resolveInventoryCacheTtlMinutes(store, 30, true);
+
+        // then
+        assertThat(resolved).isEqualTo(30);
+    }
+
+    @Test
+    void superAdminCanClearInventoryCacheTtl() {
+        // given
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setInventoryCacheTtlMinutes(45);
+        Store store = new Store();
+        store.setFulfilmentConfiguration(config);
+
+        // when
+        Integer resolved = service.resolveInventoryCacheTtlMinutes(store, null, true);
+
+        // then
+        assertThat(resolved).isNull();
+    }
+
+    @Test
+    void nonSuperAdminPreservesExistingInventoryCacheTtl() {
+        // given
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setInventoryCacheTtlMinutes(45);
+        Store store = new Store();
+        store.setFulfilmentConfiguration(config);
+
+        // when
+        Integer resolved = service.resolveInventoryCacheTtlMinutes(store, null, false);
+
+        // then
+        assertThat(resolved).isEqualTo(45);
+    }
 }
