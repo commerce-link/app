@@ -14,6 +14,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -22,10 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -42,8 +45,6 @@ class StoreInventoryProviderTest {
     @Mock
     private StoresRepository storesRepository;
     @Mock
-    private GlobalMatchedInventory globalInventory;
-    @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
@@ -51,6 +52,8 @@ class StoreInventoryProviderTest {
     private StoreFeedItemLoader storeFeedItemLoader;
     @Mock
     private ExchangeRates exchangeRates;
+    @Mock
+    private TaxonomyCache taxonomyCache;
 
     @InjectMocks
     private StoreInventoryProvider provider;
@@ -67,20 +70,16 @@ class StoreInventoryProviderTest {
 
         // when / then
         assertSame(cached, provider.get("store-1"));
-        verify(globalInventory, never()).itemsForSuppliers(any());
         verify(cache, never()).put(any(), any(), any());
     }
 
     @Test
-    void buildsFromGlobalAndOwnItemsThenStores() {
+    void buildsFromOwnItemsThenStores() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
-        when(storeEntity.canUseGlobalSuppliers()).thenReturn(true);
-        when(storeEntity.getGlobalSupplierNames()).thenReturn(List.of("Action"));
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of("Wortmann"));
-        when(globalInventory.itemsForSuppliers(List.of("Action"))).thenReturn(List.of(item("Action")));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
         when(supplierRegistry.getDescriptor("Wortmann")).thenReturn(Optional.of(descriptor));
@@ -94,16 +93,15 @@ class StoreInventoryProviderTest {
         // then
         assertEquals(List.of(matched), result.items());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
-        verify(autoDiscovery).run(argThat(list -> list.size() == 2));
+        verify(autoDiscovery).run(argThat(list -> list.size() == 1));
     }
 
     @Test
-    void excludesGlobalItemsWhenStoreCannotUseGlobalSuppliers() {
+    void buildsWithEmptyListWhenNoOwnSuppliers() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
-        when(storeEntity.canUseGlobalSuppliers()).thenReturn(false);
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         when(autoDiscovery.run(anyList())).thenReturn(List.of());
@@ -112,7 +110,6 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(globalInventory, never()).itemsForSuppliers(any());
         verify(autoDiscovery).run(argThat(List::isEmpty));
     }
 
@@ -167,5 +164,35 @@ class StoreInventoryProviderTest {
         // then
         assertEquals(0, result.items().size());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+    }
+
+    @Test
+    void buildLoadsOnlyOwnSuppliersAndIgnoresGlobal() {
+        // given
+        Store store = mock(Store.class);
+        when(store.canUseGlobalSuppliers()).thenReturn(true);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("Asbis"));
+        when(store.getOwnSupplierNames()).thenReturn(List.of("Action"));
+        when(store.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+        when(supplierRegistry.getDescriptor("Action")).thenReturn(Optional.of(descriptor));
+        InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
+        when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), anyMap())).thenReturn(List.of(ownItem));
+        when(autoDiscovery.run(anyList())).thenAnswer(inv -> {
+            List<InventoryItem> items = inv.getArgument(0);
+            return List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry));
+        });
+
+        // when
+        StoreInventory result = provider.get("store-1");
+
+        // then
+        List<String> loadedSuppliers = result.items().stream()
+                .flatMap(m -> m.getSuppliers().stream())
+                .toList();
+        assertThat(loadedSuppliers).containsExactly("Action");
     }
 }

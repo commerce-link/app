@@ -24,7 +24,6 @@ public class StoreInventoryProvider {
 
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
-    private final GlobalMatchedInventory globalInventory;
     private final SupplierRegistry supplierRegistry;
     private final InventoryAutoDiscovery autoDiscovery;
     private final StoreFeedItemLoader storeFeedItemLoader;
@@ -60,17 +59,13 @@ public class StoreInventoryProvider {
             return new StoreInventory(new ArrayList<>(), LocalDateTime.now());
         }
 
-        List<InventoryItem> combined = new ArrayList<>();
-        if (storeEntity.canUseGlobalSuppliers()) {
-            combined.addAll(globalInventory.itemsForSuppliers(storeEntity.getGlobalSupplierNames()));
-        }
-
+        List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         for (String supplierName : storeEntity.getOwnSupplierNames()) {
             supplierRegistry.getDescriptor(supplierName)
-                    .ifPresent(descriptor -> combined.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates)));
+                    .ifPresent(descriptor -> ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates)));
         }
 
-        return new StoreInventory(autoDiscovery.run(combined), LocalDateTime.now());
+        return new StoreInventory(autoDiscovery.run(ownItems), LocalDateTime.now());
     }
 }
