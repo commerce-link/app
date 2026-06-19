@@ -16,13 +16,17 @@ import pl.commercelink.stores.SupplierSelectionForm;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -122,10 +126,11 @@ class StoreSupplierConnectionServiceTest {
                 .thenReturn(List.of("Supplier Acme requires field Feed URL."));
 
         // when
-        List<String> errors = service.apply(existing, submitted, selections, Map.of(), true);
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.apply(existing, submitted, selections, Map.of(), true);
 
         // then
-        assertFalse(errors.isEmpty());
+        assertTrue(result.hasErrors());
         verify(persister, never()).persist(any(), any(), any());
     }
 
@@ -136,13 +141,15 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any())).thenReturn(true);
+        when(persister.persist(any(), any(), any()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
 
         // when
-        List<String> errors = service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
 
         // then
-        assertTrue(errors.isEmpty());
+        assertFalse(result.hasErrors());
         verify(persister).persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
     }
 
@@ -153,12 +160,33 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any())).thenReturn(false);
+        when(persister.persist(any(), any(), any()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(false, Set.of(), Set.of()));
 
         // when
-        List<String> errors = service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
 
         // then
-        assertFalse(errors.isEmpty());
+        assertTrue(result.hasErrors());
+    }
+
+    @Test
+    void applyReturnsAddedAndRemovedOnSuccess() {
+        // given
+        Store store = new Store();
+        FulfilmentConfiguration submitted = new FulfilmentConfiguration();
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of("B"), Set.of()));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.apply(store, submitted, List.of(), Map.of(), true);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.added()).containsExactly("B");
+        assertThat(result.removed()).isEmpty();
     }
 }

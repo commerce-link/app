@@ -26,8 +26,8 @@ public class StoreSupplierConnectionPersister {
     private final StoreFeedRepository storeFeedRepository;
     private final StoresRepository storesRepository;
 
-    public boolean persist(Store existingStore, FulfilmentConfiguration submitted,
-                           Map<String, Map<String, String>> submittedConfig) {
+    public PersistOutcome persist(Store existingStore, FulfilmentConfiguration submitted,
+                                  Map<String, Map<String, String>> submittedConfig) {
         ConnectionChanges changes = computeChanges(existingStore, submitted);
 
         Deque<Runnable> compensations = new ArrayDeque<>();
@@ -38,12 +38,22 @@ public class StoreSupplierConnectionPersister {
             saveStore(existingStore, submitted);
         } catch (RuntimeException e) {
             compensate(compensations);
-            return false;
+            return PersistOutcome.failure();
         }
 
         triggerImmediateImports(changes);
         deleteRemovedFeeds(changes);
-        return true;
+        return PersistOutcome.success(changes.added(), changes.removed());
+    }
+
+    public record PersistOutcome(boolean success, Set<String> added, Set<String> removed) {
+        static PersistOutcome failure() {
+            return new PersistOutcome(false, Set.of(), Set.of());
+        }
+
+        static PersistOutcome success(Set<String> added, Set<String> removed) {
+            return new PersistOutcome(true, added, removed);
+        }
     }
 
     private ConnectionChanges computeChanges(Store existingStore, FulfilmentConfiguration submitted) {

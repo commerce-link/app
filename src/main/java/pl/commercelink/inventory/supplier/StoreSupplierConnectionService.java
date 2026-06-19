@@ -59,17 +59,36 @@ public class StoreSupplierConnectionService {
         return selections;
     }
 
-    public List<String> apply(Store existingStore, FulfilmentConfiguration submitted,
-                              List<SupplierSelectionForm> selections,
-                              Map<String, Map<String, String>> submittedConfig, boolean isSuperAdmin) {
+    public ConnectionUpdateResult apply(Store existingStore, FulfilmentConfiguration submitted,
+                                        List<SupplierSelectionForm> selections,
+                                        Map<String, Map<String, String>> submittedConfig, boolean isSuperAdmin) {
         prepareSubmittedConfiguration(existingStore, submitted, selections, isSuperAdmin);
 
         List<String> errors = validate(existingStore, submitted, submittedConfig);
         if (!errors.isEmpty()) {
-            return errors;
+            return ConnectionUpdateResult.errors(errors);
         }
 
-        return persister.persist(existingStore, submitted, submittedConfig) ? List.of() : UPDATE_FAILED;
+        StoreSupplierConnectionPersister.PersistOutcome outcome =
+                persister.persist(existingStore, submitted, submittedConfig);
+        if (!outcome.success()) {
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+    }
+
+    public record ConnectionUpdateResult(List<String> errors, Set<String> added, Set<String> removed) {
+        static ConnectionUpdateResult errors(List<String> errors) {
+            return new ConnectionUpdateResult(errors, Set.of(), Set.of());
+        }
+
+        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed) {
+            return new ConnectionUpdateResult(List.of(), added, removed);
+        }
+
+        public boolean hasErrors() {
+            return !errors.isEmpty();
+        }
     }
 
     private void prepareSubmittedConfiguration(Store existingStore, FulfilmentConfiguration submitted,
