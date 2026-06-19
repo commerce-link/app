@@ -659,7 +659,10 @@ public class StoreController {
         StoreSupplierConnectionService.ConnectionUpdateResult result = storeSupplierConnectionService.apply(
                 existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
         if (result.hasErrors()) {
-            redirectAttributes.addFlashAttribute("errorMessage", String.join(" ", result.errors()));
+            String errorMessage = result.errors().stream()
+                    .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
+                    .collect(Collectors.joining(" "));
+            redirectAttributes.addFlashAttribute("errorMessage", errorMessage);
             return redirectToFulfilment(form.getStore().getStoreId());
         }
 

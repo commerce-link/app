@@ -55,6 +55,7 @@ public class InventoryView {
         return filterChain.apply(matchedInventory);
     }
 
+    // prioritize lookup by mfn as it's more reliable
     private MatchedInventory selectBestMatch(InventoryKey lookupKey, List<MatchedInventory> matchesByMfn, List<MatchedInventory> allMatches) {
         MatchedInventory bestMatch = selectBestMatch(matchesByMfn);
         if (bestMatch != null) {

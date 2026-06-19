@@ -20,7 +20,7 @@ public class InMemoryStoreInventoryCache implements StoreInventoryCache {
     private final Cache<String, CachedEntry> cache;
 
     public InMemoryStoreInventoryCache(
-            @Value("${inventory.store-cache.max-size:100}") long maxSize) {
+            @Value("${inventory.store-cache.max-size}") long maxSize) {
         this.cache = Caffeine.newBuilder()
                 .maximumSize(maxSize)
                 .expireAfter(new Expiry<String, CachedEntry>() {

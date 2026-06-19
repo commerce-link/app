@@ -52,7 +52,7 @@ public class StoreSupplierConnectionPersister {
         }
 
         static PersistOutcome success(Set<String> added, Set<String> removed) {
-            return new PersistOutcome(true, added, removed);
+            return new PersistOutcome(true, Set.copyOf(added), Set.copyOf(removed));
         }
     }
 

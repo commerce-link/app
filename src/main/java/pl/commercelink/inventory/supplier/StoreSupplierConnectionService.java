@@ -26,7 +26,7 @@ public class StoreSupplierConnectionService {
     private final SupplierConnectionValidator validator;
     private final StoreSupplierConnectionPersister persister;
 
-    private static final List<String> UPDATE_FAILED = List.of("Failed to update supplier connections. Please try again.");
+    private static final List<ErrorMessage> UPDATE_FAILED = List.of(ErrorMessage.of("store.supplier.connection.error.update.failed"));
 
     public Map<String, List<SupplierConfigField>> configurationFields() {
         Map<String, List<SupplierConfigField>> fields = new LinkedHashMap<>();
@@ -64,7 +64,7 @@ public class StoreSupplierConnectionService {
                                         Map<String, Map<String, String>> submittedConfig, boolean isSuperAdmin) {
         prepareSubmittedConfiguration(existingStore, submitted, selections, isSuperAdmin);
 
-        List<String> errors = validate(existingStore, submitted, submittedConfig);
+        List<ErrorMessage> errors = validate(existingStore, submitted, submittedConfig);
         if (!errors.isEmpty()) {
             return ConnectionUpdateResult.errors(errors);
         }
@@ -77,8 +77,8 @@ public class StoreSupplierConnectionService {
         return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
     }
 
-    public record ConnectionUpdateResult(List<String> errors, Set<String> added, Set<String> removed) {
-        static ConnectionUpdateResult errors(List<String> errors) {
+    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {
+        static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
             return new ConnectionUpdateResult(errors, Set.of(), Set.of());
         }
 
@@ -121,7 +121,7 @@ public class StoreSupplierConnectionService {
         return connections;
     }
 
-    List<String> validate(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
+    List<ErrorMessage> validate(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
         Set<String> suppliersWithStoredConfig = new HashSet<>();
         for (StoreSupplierConnection connection : submitted.getSupplierConnections()) {
             if (connection.getMode() == ConnectionMode.OWN

@@ -35,147 +35,151 @@ class CompositeMatchedInventorySource implements MatchedInventorySource {
 
     @Override
     public Collection<MatchedInventory> candidatesFor(InventoryKey key) {
-        List<MatchedInventory> matching = new ArrayList<>();
-        own.stream().filter(group -> group.matches(key)).forEach(matching::add);
-        narrow(global.candidatesFor(key)).forEach(matching::add);
-        return coalesce(matching);
+        List<MatchedInventory> ownMatches = ownGroupsMatching(key);
+        List<MatchedInventory> globalMatches = narrowToAllowedSuppliers(global.candidatesFor(key));
+
+        List<MatchedInventory> candidates = new ArrayList<>(ownMatches);
+        candidates.addAll(globalMatches);
+        return mergeGroupsDescribingSameProduct(candidates, identitySetOf(ownMatches));
     }
 
     @Override
     public Collection<MatchedInventory> all() {
-        List<MatchedInventory> narrowedGlobal = narrow(global.all());
-        Map<String, MatchedInventory> globalByEan = new HashMap<>();
-        Map<String, MatchedInventory> globalByMfn = new HashMap<>();
-        for (MatchedInventory group : narrowedGlobal) {
-            group.getEans().forEach(ean -> globalByEan.put(ean, group));
-            group.getMfnCodes().forEach(mfn -> globalByMfn.put(mfn, group));
-        }
-        List<MatchedInventory> ownList = new ArrayList<>(own);
-        List<MatchedInventory> globalList = new ArrayList<>(narrowedGlobal);
-        int ownSize = ownList.size();
-        int globalSize = globalList.size();
-        int[] parent = new int[ownSize + globalSize];
-        for (int i = 0; i < parent.length; i++) parent[i] = i;
-        Map<MatchedInventory, Integer> globalNodeIndex = new IdentityHashMap<>();
-        for (int i = 0; i < globalSize; i++) {
-            globalNodeIndex.put(globalList.get(i), ownSize + i);
-        }
-        for (int i = 0; i < ownSize; i++) {
-            MatchedInventory ownGroup = ownList.get(i);
-            int ownIdx = i;
-            ownGroup.getEans().forEach(ean -> {
-                MatchedInventory match = globalByEan.get(ean);
-                if (match != null) {
-                    union(parent, ownIdx, globalNodeIndex.get(match));
-                }
-            });
-            ownGroup.getMfnCodes().forEach(mfn -> {
-                MatchedInventory match = globalByMfn.get(mfn);
-                if (match != null) {
-                    union(parent, ownIdx, globalNodeIndex.get(match));
-                }
-            });
-        }
-        Map<Integer, List<Integer>> components = new HashMap<>();
-        for (int i = 0; i < ownSize + globalSize; i++) {
-            components.computeIfAbsent(find(parent, i), k -> new ArrayList<>()).add(i);
-        }
-        List<MatchedInventory> result = new ArrayList<>();
-        Set<MatchedInventory> consumed = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (List<Integer> component : components.values()) {
-            boolean hasOwn = component.stream().anyMatch(idx -> idx < ownSize);
-            if (!hasOwn) {
-                continue;
-            }
-            Set<InventoryItem> items = new LinkedHashSet<>();
-            InventoryKey mergedKey = null;
-            for (int idx : component) {
-                if (idx < ownSize) {
-                    MatchedInventory ownGroup = ownList.get(idx);
-                    if (mergedKey == null) {
-                        mergedKey = ownGroup.getInventoryKey().copy();
-                    }
-                    items.addAll(ownGroup.getInventoryItems());
-                } else {
-                    MatchedInventory globalGroup = globalList.get(idx - ownSize);
-                    items.addAll(globalGroup.getInventoryItems());
-                    consumed.add(globalGroup);
-                }
-            }
-            result.add(new MatchedInventory(mergedKey, items, taxonomyCache, supplierRegistry));
-        }
-        for (MatchedInventory group : narrowedGlobal) {
-            if (!consumed.contains(group)) {
-                result.add(group);
-            }
-        }
-        return result;
+        return mergeOwnGroupsWithMatchingGlobal(own, narrowToAllowedSuppliers(global.all()));
     }
 
-    private static int find(int[] parent, int i) {
-        while (parent[i] != i) {
-            parent[i] = parent[parent[i]];
-            i = parent[i];
-        }
-        return i;
+    private List<MatchedInventory> ownGroupsMatching(InventoryKey key) {
+        return own.stream()
+                .filter(group -> group.matches(key))
+                .collect(Collectors.toList());
     }
 
-    private static void union(int[] parent, int a, int b) {
-        int ra = find(parent, a);
-        int rb = find(parent, b);
-        if (ra != rb) {
-            parent[ra] = rb;
-        }
-    }
-
-    private List<MatchedInventory> narrow(Collection<MatchedInventory> globalGroups) {
+    private List<MatchedInventory> narrowToAllowedSuppliers(Collection<MatchedInventory> globalGroups) {
         List<MatchedInventory> narrowed = new ArrayList<>();
         for (MatchedInventory group : globalGroups) {
-            List<InventoryItem> allowed = group.getInventoryItems().stream()
+            List<InventoryItem> allowedItems = group.getInventoryItems().stream()
                     .filter(item -> allowedGlobalSuppliers.contains(item.supplier()))
                     .collect(Collectors.toList());
-            if (!allowed.isEmpty()) {
-                narrowed.add(new MatchedInventory(group.getInventoryKey().copy(), allowed, taxonomyCache, supplierRegistry));
+            if (!allowedItems.isEmpty()) {
+                narrowed.add(new MatchedInventory(group.getInventoryKey().copy(), allowedItems, taxonomyCache, supplierRegistry));
             }
         }
         return narrowed;
     }
 
-    private List<MatchedInventory> coalesce(List<MatchedInventory> groups) {
-        List<MatchedInventory> components = new ArrayList<>();
-        List<List<MatchedInventory>> buckets = new ArrayList<>();
-        for (MatchedInventory group : groups) {
-            List<List<MatchedInventory>> matching = new ArrayList<>();
-            for (List<MatchedInventory> bucket : buckets) {
-                if (bucket.stream().anyMatch(member -> member.matches(group.getInventoryKey()))) {
-                    matching.add(bucket);
+    private List<MatchedInventory> mergeGroupsDescribingSameProduct(List<MatchedInventory> groups, Set<MatchedInventory> ownGroups) {
+        SameProductGrouping grouping = new SameProductGrouping();
+        groups.forEach(grouping::add);
+        for (int i = 0; i < groups.size(); i++) {
+            for (int j = i + 1; j < groups.size(); j++) {
+                if (groups.get(i).matches(groups.get(j).getInventoryKey())) {
+                    grouping.merge(groups.get(i), groups.get(j));
                 }
             }
-            if (matching.isEmpty()) {
-                List<MatchedInventory> newBucket = new ArrayList<>();
-                newBucket.add(group);
-                buckets.add(newBucket);
+        }
+        return mergeEachComponent(grouping.components(), ownGroups);
+    }
+
+    private List<MatchedInventory> mergeOwnGroupsWithMatchingGlobal(Collection<MatchedInventory> ownGroups, List<MatchedInventory> globalGroups) {
+        Map<String, MatchedInventory> globalByEan = new HashMap<>();
+        Map<String, MatchedInventory> globalByMfn = new HashMap<>();
+        for (MatchedInventory group : globalGroups) {
+            group.getEans().forEach(ean -> globalByEan.put(ean, group));
+            group.getMfnCodes().forEach(mfn -> globalByMfn.put(mfn, group));
+        }
+
+        SameProductGrouping grouping = new SameProductGrouping();
+        Set<MatchedInventory> globalGroupsMerged = identitySetOf(List.of());
+        for (MatchedInventory ownGroup : ownGroups) {
+            grouping.add(ownGroup);
+            for (MatchedInventory globalGroup : globalGroupsMatching(ownGroup, globalByEan, globalByMfn)) {
+                grouping.merge(ownGroup, globalGroup);
+                globalGroupsMerged.add(globalGroup);
+            }
+        }
+
+        List<MatchedInventory> result = mergeEachComponent(grouping.components(), identitySetOf(ownGroups));
+        for (MatchedInventory globalGroup : globalGroups) {
+            if (!globalGroupsMerged.contains(globalGroup)) {
+                result.add(globalGroup);
+            }
+        }
+        return result;
+    }
+
+    private Set<MatchedInventory> globalGroupsMatching(MatchedInventory ownGroup,
+                                                       Map<String, MatchedInventory> globalByEan,
+                                                       Map<String, MatchedInventory> globalByMfn) {
+        Set<MatchedInventory> matches = new LinkedHashSet<>();
+        ownGroup.getEans().forEach(ean -> addIfPresent(matches, globalByEan.get(ean)));
+        ownGroup.getMfnCodes().forEach(mfn -> addIfPresent(matches, globalByMfn.get(mfn)));
+        return matches;
+    }
+
+    private void addIfPresent(Set<MatchedInventory> matches, MatchedInventory group) {
+        if (group != null) {
+            matches.add(group);
+        }
+    }
+
+    private List<MatchedInventory> mergeEachComponent(Collection<List<MatchedInventory>> components, Set<MatchedInventory> ownGroups) {
+        List<MatchedInventory> result = new ArrayList<>();
+        for (List<MatchedInventory> sameProduct : components) {
+            if (sameProduct.size() == 1) {
+                result.add(sameProduct.get(0));
             } else {
-                List<MatchedInventory> target = matching.get(0);
-                target.add(group);
-                for (int i = 1; i < matching.size(); i++) {
-                    target.addAll(matching.get(i));
-                    buckets.remove(matching.get(i));
-                }
+                result.add(mergeIntoSingleGroup(sameProduct, ownGroups));
             }
         }
-        for (List<MatchedInventory> bucket : buckets) {
-            if (bucket.size() == 1) {
-                components.add(bucket.get(0));
-                continue;
-            }
-            Set<InventoryItem> items = new LinkedHashSet<>();
-            InventoryKey mergedKey = bucket.get(0).getInventoryKey().copy();
-            for (MatchedInventory member : bucket) {
-                items.addAll(member.getInventoryItems());
-            }
-            components.add(new MatchedInventory(mergedKey, items, taxonomyCache, supplierRegistry));
+        return result;
+    }
+
+    private MatchedInventory mergeIntoSingleGroup(List<MatchedInventory> groups, Set<MatchedInventory> ownGroups) {
+        InventoryKey mergedKey = groups.stream()
+                .filter(ownGroups::contains)
+                .findFirst()
+                .orElse(groups.get(0))
+                .getInventoryKey()
+                .copy();
+        Set<InventoryItem> items = new LinkedHashSet<>();
+        groups.forEach(group -> items.addAll(group.getInventoryItems()));
+        return new MatchedInventory(mergedKey, items, taxonomyCache, supplierRegistry);
+    }
+
+    private static Set<MatchedInventory> identitySetOf(Collection<MatchedInventory> groups) {
+        Set<MatchedInventory> set = Collections.newSetFromMap(new IdentityHashMap<>());
+        set.addAll(groups);
+        return set;
+    }
+
+    private static final class SameProductGrouping {
+
+        private final Map<MatchedInventory, MatchedInventory> parent = new IdentityHashMap<>();
+
+        void add(MatchedInventory group) {
+            parent.putIfAbsent(group, group);
         }
-        return components;
+
+        void merge(MatchedInventory first, MatchedInventory second) {
+            add(first);
+            add(second);
+            parent.put(rootOf(first), rootOf(second));
+        }
+
+        Collection<List<MatchedInventory>> components() {
+            Map<MatchedInventory, List<MatchedInventory>> byRoot = new IdentityHashMap<>();
+            for (MatchedInventory group : parent.keySet()) {
+                byRoot.computeIfAbsent(rootOf(group), root -> new ArrayList<>()).add(group);
+            }
+            return byRoot.values();
+        }
+
+        private MatchedInventory rootOf(MatchedInventory group) {
+            MatchedInventory current = group;
+            while (parent.get(current) != current) {
+                current = parent.get(current);
+            }
+            return current;
+        }
     }
 }

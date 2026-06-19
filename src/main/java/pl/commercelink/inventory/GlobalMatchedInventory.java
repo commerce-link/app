@@ -15,44 +15,45 @@ import java.util.stream.Collectors;
 @Component
 public class GlobalMatchedInventory {
 
-    private volatile Collection<MatchedInventory> matched = new LinkedList<>();
-    private volatile Map<String, MatchedInventory> byEan = new HashMap<>();
-    private volatile Map<String, MatchedInventory> byMfn = new HashMap<>();
-    private volatile Map<String, MatchedInventory> byId = new HashMap<>();
+    private record Index(Collection<MatchedInventory> matched,
+                         Map<String, MatchedInventory> byEan,
+                         Map<String, MatchedInventory> byMfn,
+                         Map<String, MatchedInventory> byId) {
+    }
+
+    private volatile Index index = new Index(new LinkedList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
 
     public void replace(Collection<MatchedInventory> matched) {
-        Map<String, MatchedInventory> ean = new HashMap<>();
-        Map<String, MatchedInventory> mfn = new HashMap<>();
-        Map<String, MatchedInventory> id = new HashMap<>();
+        Map<String, MatchedInventory> byEan = new HashMap<>();
+        Map<String, MatchedInventory> byMfn = new HashMap<>();
+        Map<String, MatchedInventory> byId = new HashMap<>();
         for (MatchedInventory group : matched) {
-            group.getEans().forEach(e -> ean.put(e, group));
-            group.getMfnCodes().forEach(m -> mfn.put(m, group));
+            group.getEans().forEach(ean -> byEan.put(ean, group));
+            group.getMfnCodes().forEach(mfn -> byMfn.put(mfn, group));
             if (group.getInventoryKey() != null && group.getInventoryKey().getId() != null) {
-                id.put(group.getInventoryKey().getId(), group);
+                byId.put(group.getInventoryKey().getId(), group);
             }
         }
-        this.byEan = ean;
-        this.byMfn = mfn;
-        this.byId = id;
-        this.matched = matched;
+        this.index = new Index(matched, byEan, byMfn, byId);
     }
 
     public Collection<MatchedInventory> candidatesFor(InventoryKey key) {
+        Index current = this.index;
         Set<MatchedInventory> result = new LinkedHashSet<>();
         if (key.getId() != null) {
-            MatchedInventory byIdMatch = byId.get(key.getId());
+            MatchedInventory byIdMatch = current.byId().get(key.getId());
             if (byIdMatch != null) {
                 result.add(byIdMatch);
             }
         }
         for (String ean : key.getProductEans()) {
-            MatchedInventory match = byEan.get(ean);
+            MatchedInventory match = current.byEan().get(ean);
             if (match != null) {
                 result.add(match);
             }
         }
         for (String mfn : key.getProductCodes()) {
-            MatchedInventory match = byMfn.get(mfn);
+            MatchedInventory match = current.byMfn().get(mfn);
             if (match != null) {
                 result.add(match);
             }
@@ -61,16 +62,16 @@ public class GlobalMatchedInventory {
     }
 
     public Collection<MatchedInventory> all() {
-        return matched;
+        return index.matched();
     }
 
     public List<InventoryItem> allItems() {
-        return matched.stream()
+        return index.matched().stream()
                 .flatMap(i -> i.getInventoryItems().stream())
                 .collect(Collectors.toList());
     }
 
     public int size() {
-        return matched.size();
+        return index.matched().size();
     }
 }

@@ -123,7 +123,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any()))
-                .thenReturn(List.of("Supplier Acme requires field Feed URL."));
+                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Acme", "Feed URL")));
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result =

@@ -29,7 +29,7 @@ public class StoreInventoryProvider {
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
 
-    @Value("${inventory.store-cache.ttl-minutes:60}")
+    @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
