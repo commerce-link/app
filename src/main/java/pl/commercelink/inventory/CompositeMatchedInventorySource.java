@@ -103,18 +103,24 @@ class CompositeMatchedInventorySource implements MatchedInventorySource {
         List<MatchedInventory> components = new ArrayList<>();
         List<List<MatchedInventory>> buckets = new ArrayList<>();
         for (MatchedInventory group : groups) {
-            List<MatchedInventory> target = null;
+            List<List<MatchedInventory>> matching = new ArrayList<>();
             for (List<MatchedInventory> bucket : buckets) {
                 if (bucket.stream().anyMatch(member -> member.matches(group.getInventoryKey()))) {
-                    target = bucket;
-                    break;
+                    matching.add(bucket);
                 }
             }
-            if (target == null) {
-                target = new ArrayList<>();
-                buckets.add(target);
+            if (matching.isEmpty()) {
+                List<MatchedInventory> newBucket = new ArrayList<>();
+                newBucket.add(group);
+                buckets.add(newBucket);
+            } else {
+                List<MatchedInventory> target = matching.get(0);
+                target.add(group);
+                for (int i = 1; i < matching.size(); i++) {
+                    target.addAll(matching.get(i));
+                    buckets.remove(matching.get(i));
+                }
             }
-            target.add(group);
         }
         for (List<MatchedInventory> bucket : buckets) {
             if (bucket.size() == 1) {

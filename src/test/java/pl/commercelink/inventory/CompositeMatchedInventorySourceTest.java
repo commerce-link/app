@@ -78,6 +78,25 @@ class CompositeMatchedInventorySourceTest {
     }
 
     @Test
+    void coalescesMergesTransitiveBridgeGroupIntoSingleCandidate() {
+        // given
+        MatchedInventory ownA = group("111", "AAA", item("111", "AAA", "SupA"));
+        MatchedInventory ownB = group("222", "BBB", item("222", "BBB", "SupB"));
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "BBB", item("111", "BBB", "SupC"))));
+        CompositeMatchedInventorySource source = new CompositeMatchedInventorySource(
+                List.of(ownA, ownB), global, Set.of("SupC"), taxonomyCache, supplierRegistry);
+
+        // when
+        Collection<MatchedInventory> candidates = source.candidatesFor(new InventoryKey("111", "BBB"));
+
+        // then
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.iterator().next().getSuppliers())
+                .containsExactlyInAnyOrder("SupA", "SupB", "SupC");
+    }
+
+    @Test
     void allCoalescesOwnWithMatchingGlobalAndKeepsUnmatchedGlobal() {
         // given
         MatchedInventory own = group("111", "AAA", item("111", "AAA", "ActionOwn"));
