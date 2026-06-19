@@ -1,70 +1,76 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class GlobalMatchedInventoryTest {
 
-    private final GlobalMatchedInventory inventory = new GlobalMatchedInventory();
+    private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
+    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
 
-    private InventoryItem item(String supplier) {
-        return new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, supplier, true, true, false);
-    }
-
-    private MatchedInventory matchedWith(InventoryItem... items) {
-        MatchedInventory matched = mock(MatchedInventory.class);
-        when(matched.getInventoryItems()).thenReturn(List.of(items));
-        return matched;
+    private MatchedInventory group(String ean, String mfn, String supplier) {
+        InventoryItem item = new InventoryItem(ean, mfn, 100.0, "PLN", 5, 2, supplier, true, true, false);
+        return new MatchedInventory(new InventoryKey(ean, mfn), List.of(item), taxonomyCache, supplierRegistry);
     }
 
     @Test
-    void startsEmpty() {
-        // then
-        assertEquals(0, inventory.size());
-        assertTrue(inventory.all().isEmpty());
-        assertTrue(inventory.allItems().isEmpty());
-    }
-
-    @Test
-    void replaceSwapsState() {
-        // when
-        inventory.replace(List.of(matchedWith(item("Action"))));
-
-        // then
-        assertEquals(1, inventory.size());
-        assertEquals(1, inventory.allItems().size());
-    }
-
-    @Test
-    void itemsForSuppliersReturnsOnlyRequestedSuppliers() {
+    void findsCandidateByEan() {
         // given
-        inventory.replace(List.of(
-                matchedWith(item("Action"), item("Wortmann")),
-                matchedWith(item("Elko"))));
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action"), group("222", "BBB", "Asbis")));
 
         // when
-        List<InventoryItem> result = inventory.itemsForSuppliers(List.of("Action", "Elko"));
+        var candidates = global.candidatesFor(InventoryKey.fromEan("111"));
 
         // then
-        assertEquals(2, result.size());
-        assertTrue(result.stream().allMatch(i -> List.of("Action", "Elko").contains(i.supplier())));
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.iterator().next().getEans()).contains("111");
     }
 
     @Test
-    void allItemsFlattensEveryMatchedEntry() {
+    void findsCandidateByMfn() {
         // given
-        inventory.replace(List.of(
-                matchedWith(item("Action"), item("Wortmann")),
-                matchedWith(item("Elko"))));
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action")));
 
-        // when / then
-        assertEquals(3, inventory.allItems().size());
+        // when
+        var candidates = global.candidatesFor(InventoryKey.fromMfn("AAA"));
+
+        // then
+        assertThat(candidates).hasSize(1);
+    }
+
+    @Test
+    void returnsEmptyWhenNoMatch() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action")));
+
+        // when
+        var candidates = global.candidatesFor(InventoryKey.fromEan("999"));
+
+        // then
+        assertThat(candidates).isEmpty();
+    }
+
+    @Test
+    void rebuildsIndexOnReplace() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action")));
+
+        // when
+        global.replace(List.of(group("222", "BBB", "Asbis")));
+
+        // then
+        assertThat(global.candidatesFor(InventoryKey.fromEan("111"))).isEmpty();
+        assertThat(global.candidatesFor(InventoryKey.fromEan("222"))).hasSize(1);
     }
 }
