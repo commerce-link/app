@@ -31,10 +31,10 @@ public class GlobalMatchedInventory {
                 id.put(group.getInventoryKey().getId(), group);
             }
         }
-        this.matched = matched;
         this.byEan = ean;
         this.byMfn = mfn;
         this.byId = id;
+        this.matched = matched;
     }
 
     public Collection<MatchedInventory> candidatesFor(InventoryKey key) {

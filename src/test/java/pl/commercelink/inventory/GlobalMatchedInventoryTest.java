@@ -45,6 +45,25 @@ class GlobalMatchedInventoryTest {
 
         // then
         assertThat(candidates).hasSize(1);
+        assertThat(candidates.iterator().next().getMfnCodes()).contains("AAA");
+    }
+
+    @Test
+    void findsCandidateById() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        InventoryKey keyWithId = InventoryKey.fromPimId("PIM-1");
+        MatchedInventory groupWithId = new MatchedInventory(keyWithId, List.of(
+                new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false)
+        ), taxonomyCache, supplierRegistry);
+        global.replace(List.of(groupWithId));
+
+        // when
+        var candidates = global.candidatesFor(InventoryKey.fromPimId("PIM-1"));
+
+        // then
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.iterator().next().getInventoryKey().getId()).isEqualTo("PIM-1");
     }
 
     @Test
@@ -72,5 +91,57 @@ class GlobalMatchedInventoryTest {
         // then
         assertThat(global.candidatesFor(InventoryKey.fromEan("111"))).isEmpty();
         assertThat(global.candidatesFor(InventoryKey.fromEan("222"))).hasSize(1);
+    }
+
+    @Test
+    void allItemsFlattensItemsAcrossGroups() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action"), group("222", "BBB", "Asbis")));
+
+        // when
+        var items = global.allItems();
+
+        // then
+        assertThat(items).hasSize(2);
+    }
+
+    @Test
+    void itemsForSuppliersReturnsOnlyRequestedSupplier() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action"), group("222", "BBB", "Asbis")));
+
+        // when
+        var items = global.itemsForSuppliers(List.of("Action"));
+
+        // then
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).supplier()).isEqualTo("Action");
+    }
+
+    @Test
+    void sizeReturnsNumberOfGroups() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        global.replace(List.of(group("111", "AAA", "Action"), group("222", "BBB", "Asbis")));
+
+        // when / then
+        assertThat(global.size()).isEqualTo(2);
+    }
+
+    @Test
+    void allReflectsReplacedCollection() {
+        // given
+        GlobalMatchedInventory global = new GlobalMatchedInventory();
+        var first = List.of(group("111", "AAA", "Action"));
+        var second = List.of(group("222", "BBB", "Asbis"));
+        global.replace(first);
+
+        // when
+        global.replace(second);
+
+        // then
+        assertThat(global.all()).isEqualTo(second);
     }
 }
