@@ -2,9 +2,12 @@ package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedList;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,10 +20,22 @@ class InMemoryStoreInventoryCacheTest {
     }
 
     @Test
+    void storesAndReturnsInventoryWithProvidedTtl() {
+        // given
+        StoreInventory inventory = new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+
+        // when
+        cache.put("store-1", inventory, Duration.ofMinutes(15));
+
+        // then
+        assertThat(cache.get("store-1")).contains(inventory);
+    }
+
+    @Test
     void storesAndRetrievesByStoreId() {
         // given
         StoreInventory inventory = anyInventory();
-        cache.put("store-1", inventory);
+        cache.put("store-1", inventory, Duration.ofMinutes(60));
 
         // when / then
         assertEquals(inventory, cache.get("store-1").orElseThrow());
@@ -35,26 +50,12 @@ class InMemoryStoreInventoryCacheTest {
     @Test
     void invalidateRemovesEntry() {
         // given
-        cache.put("store-1", anyInventory());
+        cache.put("store-1", anyInventory(), Duration.ofMinutes(60));
 
         // when
         cache.invalidate("store-1");
 
         // then
         assertTrue(cache.get("store-1").isEmpty());
-    }
-
-    @Test
-    void invalidateAllRemovesEveryEntry() {
-        // given
-        cache.put("store-1", anyInventory());
-        cache.put("store-2", anyInventory());
-
-        // when
-        cache.invalidateAll();
-
-        // then
-        assertTrue(cache.get("store-1").isEmpty());
-        assertTrue(cache.get("store-2").isEmpty());
     }
 }

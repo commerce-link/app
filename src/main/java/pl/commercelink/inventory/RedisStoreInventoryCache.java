@@ -1,7 +1,6 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -15,22 +14,17 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "inventory.store-cache.type", havingValue = "redis")
 public class RedisStoreInventoryCache implements StoreInventoryCache {
 
-    private static final String GENERATION_KEY = "store-inventory:generation";
-
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
-    private final long ttlMinutes;
 
     public RedisStoreInventoryCache(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
-                                    TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
-                                    @Value("${inventory.store-cache.ttl-minutes:60}") long ttlMinutes) {
+                                    TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
-        this.ttlMinutes = ttlMinutes;
     }
 
     @Override
@@ -49,10 +43,10 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
     }
 
     @Override
-    public void put(String storeId, StoreInventory inventory) {
+    public void put(String storeId, StoreInventory inventory, Duration ttl) {
         try {
             String json = objectMapper.writeValueAsString(StoreInventorySnapshot.from(inventory));
-            redisTemplate.opsForValue().set(key(storeId), json, Duration.ofMinutes(ttlMinutes));
+            redisTemplate.opsForValue().set(key(storeId), json, ttl);
         } catch (Exception e) {
             System.err.println("Redis store-inventory put failed for " + storeId + ": " + e.getMessage());
         }
@@ -67,17 +61,7 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
         }
     }
 
-    @Override
-    public void invalidateAll() {
-        try {
-            redisTemplate.opsForValue().increment(GENERATION_KEY);
-        } catch (Exception e) {
-            System.err.println("Redis store-inventory invalidateAll failed: " + e.getMessage());
-        }
-    }
-
     private String key(String storeId) {
-        String generation = redisTemplate.opsForValue().get(GENERATION_KEY);
-        return "store-inventory:" + (generation == null ? "0" : generation) + ":" + storeId;
+        return "store-inventory:" + storeId;
     }
 }

@@ -7,9 +7,9 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -28,7 +28,6 @@ public class FeedReloaderScheduler {
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
-    private final StoreInventoryProvider storeInventoryProvider;
 
     @Scheduled(cron = "0 */5 * * * ?")
     public void reloadIfNewFeedsAvailable() {
@@ -52,7 +51,6 @@ public class FeedReloaderScheduler {
 
         if (!updatesBySupplier.isEmpty()) {
             inventory.update(updatesBySupplier);
-            storeInventoryProvider.invalidateAll();
         }
     }
 

@@ -15,6 +15,7 @@ import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
@@ -67,7 +68,7 @@ class StoreInventoryProviderTest {
         // when / then
         assertSame(cached, provider.get("store-1"));
         verify(globalInventory, never()).itemsForSuppliers(any());
-        verify(cache, never()).put(any(), any());
+        verify(cache, never()).put(any(), any(), any());
     }
 
     @Test
@@ -92,7 +93,7 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(List.of(matched), result.items());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
         verify(autoDiscovery).run(argThat(list -> list.size() == 2));
     }
 
@@ -116,15 +117,6 @@ class StoreInventoryProviderTest {
     }
 
     @Test
-    void invalidateAllDelegatesToCache() {
-        // when
-        provider.invalidateAll();
-
-        // then
-        verify(cache).invalidateAll();
-    }
-
-    @Test
     void buildsEmptyInventoryWhenStoreMissing() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
@@ -135,6 +127,6 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(0, result.items().size());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
     }
 }
