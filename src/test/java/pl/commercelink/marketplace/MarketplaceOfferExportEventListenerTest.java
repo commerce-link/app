@@ -1,6 +1,5 @@
 package pl.commercelink.marketplace;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,10 +9,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.test.util.ReflectionTestUtils;
-import pl.commercelink.products.ProductCategoryLocalization;
-import pl.commercelink.products.ProductGroupLocalization;
+import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -61,6 +58,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private Inventory inventory;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Mock private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
+    @Mock private EnumLocalizer enumLocalizer;
 
     @Mock private Store store;
     @Mock private ProductCatalog catalog;
@@ -70,15 +68,6 @@ class MarketplaceOfferExportEventListenerTest {
 
     @InjectMocks
     private MarketplaceOfferExportEventListener listener;
-
-    @BeforeAll
-    static void initMessageSource() {
-        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
-        messageSource.setBasenames("messages_pl", "messages_en");
-        messageSource.setDefaultEncoding("UTF-8");
-        new ProductCategoryLocalization(messageSource);
-        new ProductGroupLocalization(messageSource);
-    }
 
     @BeforeEach
     void setUpDefaults() {

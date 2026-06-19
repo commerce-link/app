@@ -4,8 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.starter.localization.EnumLocalizer;
 
-import java.util.Locale;
-
 class RMACarrierArrangeEmailNotification extends EmailNotification {
     @JsonProperty("rmaId")
     private String rmaId;
@@ -20,7 +18,7 @@ class RMACarrierArrangeEmailNotification extends EmailNotification {
         super(recipientEmail, recipientName);
         this.rmaId = rmaId;
         this.orderId = orderId;
-        this.status = enumLocalizer.localize(status, new Locale("pl"));
+        this.status = enumLocalizer.localize(status);
         this.rmaClientLink = rmaClientLink;
     }
 

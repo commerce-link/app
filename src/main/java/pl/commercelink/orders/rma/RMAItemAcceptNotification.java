@@ -5,7 +5,6 @@ import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.starter.localization.EnumLocalizer;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 class RMAItemAcceptNotification extends EmailNotification {
@@ -23,9 +22,9 @@ class RMAItemAcceptNotification extends EmailNotification {
         this.rmaItems = rmaItems.stream()
                 .map(i -> new ItemInfo(
                         i.getName(),
-                        enumLocalizer.localize(i.getStatus(), new Locale("pl")),
-                        enumLocalizer.localize(i.getDesiredResolution(), new Locale("pl")),
-                        i.getActualResolution() != null ? enumLocalizer.localize(i.getActualResolution(), new Locale("pl")) : "N/A",
+                        enumLocalizer.localize(i.getStatus()),
+                        enumLocalizer.localize(i.getDesiredResolution()),
+                        i.getActualResolution() != null ? enumLocalizer.localize(i.getActualResolution()) : "N/A",
                         i.getReason())
                 )
                 .collect(Collectors.toList());

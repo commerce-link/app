@@ -248,7 +248,7 @@
                             <a th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
                                th:text="${item.shortenedItemId}"></a>
                         </td>
-                        <td th:text="${pcl.name(item.category)}"></td>
+                        <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
                         <td>
                             <span th:if="${item.sku}" class="copyable truncate-sku" th:text="${item.sku}" th:title="${item.sku}" th:data-copy="${item.sku}" onclick="copyToClipboard(this)"></span>
                         </td>

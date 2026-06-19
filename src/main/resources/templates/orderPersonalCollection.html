@@ -70,7 +70,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="item : ${orderItems}" th:if="${item.category != T(pl.commercelink.taxonomy.ProductCategory).Services}">
-                                <td th:text="${pcl.name(item.category)}"></td>
+                                <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
                                 <td th:text="${item.name}"></td>
                                 <td th:text="${item.qty}"></td>
                                 <td th:text="${item.manufacturerCode}"></td>
