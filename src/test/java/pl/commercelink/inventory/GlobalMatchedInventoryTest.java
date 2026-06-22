@@ -43,21 +43,6 @@ class GlobalMatchedInventoryTest {
     }
 
     @Test
-    void itemsForSuppliersReturnsOnlyRequestedSuppliers() {
-        // given
-        inventory.replace(List.of(
-                matchedWith(item("Action"), item("Wortmann")),
-                matchedWith(item("Elko"))));
-
-        // when
-        List<InventoryItem> result = inventory.itemsForSuppliers(List.of("Action", "Elko"));
-
-        // then
-        assertEquals(2, result.size());
-        assertTrue(result.stream().allMatch(i -> List.of("Action", "Elko").contains(i.supplier())));
-    }
-
-    @Test
     void allItemsFlattensEveryMatchedEntry() {
         // given
         inventory.replace(List.of(

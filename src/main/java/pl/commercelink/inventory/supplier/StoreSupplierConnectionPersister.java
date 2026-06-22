@@ -2,7 +2,6 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -26,10 +25,9 @@ public class StoreSupplierConnectionPersister {
     private final StoreSupplierFeedScheduler feedScheduler;
     private final StoreFeedRepository storeFeedRepository;
     private final StoresRepository storesRepository;
-    private final StoreInventoryProvider storeInventoryProvider;
 
-    public boolean persist(Store existingStore, FulfilmentConfiguration submitted,
-                           Map<String, Map<String, String>> submittedConfig) {
+    public PersistOutcome persist(Store existingStore, FulfilmentConfiguration submitted,
+                                  Map<String, Map<String, String>> submittedConfig) {
         ConnectionChanges changes = computeChanges(existingStore, submitted);
 
         Deque<Runnable> compensations = new ArrayDeque<>();
@@ -40,20 +38,21 @@ public class StoreSupplierConnectionPersister {
             saveStore(existingStore, submitted);
         } catch (RuntimeException e) {
             compensate(compensations);
-            return false;
+            return PersistOutcome.failure();
         }
 
-        invalidateCache(changes);
         triggerImmediateImports(changes);
         deleteRemovedFeeds(changes);
-        return true;
+        return PersistOutcome.success(changes.added(), changes.removed());
     }
 
-    private void invalidateCache(ConnectionChanges changes) {
-        try {
-            storeInventoryProvider.invalidate(changes.storeId());
-        } catch (RuntimeException e) {
-            System.err.println("Failed to invalidate store inventory cache for " + changes.storeId() + ": " + e.getMessage());
+    public record PersistOutcome(boolean success, Set<String> added, Set<String> removed) {
+        static PersistOutcome failure() {
+            return new PersistOutcome(false, Set.of(), Set.of());
+        }
+
+        static PersistOutcome success(Set<String> added, Set<String> removed) {
+            return new PersistOutcome(true, Set.copyOf(added), Set.copyOf(removed));
         }
     }
 

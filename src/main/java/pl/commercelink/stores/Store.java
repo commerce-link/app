@@ -446,6 +446,12 @@ public class Store {
                 .orElse(false);
     }
 
+    @DynamoDBIgnore
+    public Optional<Integer> getInventoryCacheTtlMinutes() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getInventoryCacheTtlMinutes);
+    }
+
     private List<String> supplierNamesByMode(ConnectionMode mode) {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getSupplierConnections)

@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
@@ -22,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,8 +49,6 @@ class StoreSupplierConnectionPersisterTest {
     private StoreFeedRepository storeFeedRepository;
     @Mock
     private StoresRepository storesRepository;
-    @Mock
-    private StoreInventoryProvider storeInventoryProvider;
 
     @InjectMocks
     private StoreSupplierConnectionPersister persister;
@@ -91,17 +89,16 @@ class StoreSupplierConnectionPersisterTest {
         when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
 
         // then
-        assertTrue(result);
+        assertTrue(outcome.success());
         verify(feedScheduler).createSchedule("store-1", "Acme");
         verify(configurationManager).saveConfiguration(eq(existing), eq("Acme"), anyList(), any());
         verify(storesRepository).save(existing);
         verify(feedScheduler).triggerImmediateImport("store-1", "Acme");
         verify(feedScheduler, never()).deleteSchedule(anyString(), anyString());
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
-        verify(storeInventoryProvider).invalidate("store-1");
     }
 
     @Test
@@ -113,10 +110,10 @@ class StoreSupplierConnectionPersisterTest {
         when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of());
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
 
         // then
-        assertTrue(result);
+        assertTrue(outcome.success());
         verify(feedScheduler).deleteSchedule("store-1", "Acme");
         verify(configurationManager).deleteConfiguration(existing, "Acme");
         verify(storeFeedRepository).delete("store-1", "Acme");
@@ -136,16 +133,15 @@ class StoreSupplierConnectionPersisterTest {
         doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).createSchedule("store-1", "Acme");
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
 
         // then
-        assertFalse(result);
+        assertFalse(outcome.success());
         verify(storesRepository, never()).save(any());
         verify(configurationManager, never()).saveConfiguration(any(), anyString(), anyList(), any());
         verify(configurationManager).restore(eq(existing), eq("Acme"), any());
         verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
-        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 
     @Test
@@ -190,10 +186,10 @@ class StoreSupplierConnectionPersisterTest {
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of());
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
 
         // then
-        assertFalse(result);
+        assertFalse(outcome.success());
         InOrder inOrder = inOrder(feedScheduler);
         inOrder.verify(feedScheduler).createSchedule("store-1", "New");
         inOrder.verify(feedScheduler).deleteSchedule("store-1", "Old");
@@ -203,7 +199,6 @@ class StoreSupplierConnectionPersisterTest {
         verify(configurationManager).restore(eq(existing), eq("Old"), any());
         verify(feedScheduler, never()).triggerImmediateImport(any(), any());
         verify(storeFeedRepository, never()).delete(any(), any());
-        verify(storeInventoryProvider, never()).invalidate(any());
     }
 
     @Test
@@ -216,30 +211,13 @@ class StoreSupplierConnectionPersisterTest {
         doThrow(new RuntimeException("import boom")).when(feedScheduler).triggerImmediateImport(any(), any());
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
 
         // then
-        assertTrue(result);
+        assertTrue(outcome.success());
         verify(storesRepository).save(existing);
         verify(configurationManager, never()).restore(any(), any(), any());
         verify(feedScheduler, never()).deleteSchedule("store-1", "Acme");
-    }
-
-    @Test
-    void returnsTrueWhenCacheInvalidationFails() {
-        // given
-        Store existing = storeWith(true);
-        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
-        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of(acme));
-        doThrow(new RuntimeException("cache boom")).when(storeInventoryProvider).invalidate(any());
-
-        // when
-        boolean result = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
-
-        // then
-        assertTrue(result);
-        verify(storesRepository).save(existing);
     }
 
     @Test
@@ -250,14 +228,33 @@ class StoreSupplierConnectionPersisterTest {
         when(supplierRegistry.getAllDescriptors()).thenReturn(List.of());
 
         // when
-        boolean result = persister.persist(existing, submitted, Map.of());
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
 
         // then
-        assertTrue(result);
+        assertTrue(outcome.success());
         verify(feedScheduler).createSchedule("store-1", "New");
         verify(feedScheduler).deleteSchedule("store-1", "Old");
         verify(storeFeedRepository).delete("store-1", "Old");
         verify(feedScheduler).triggerImmediateImport("store-1", "New");
         verify(feedScheduler, never()).triggerImmediateImport("store-1", "Old");
+    }
+
+    @Test
+    void persistReturnsAddedAndRemovedSuppliers() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("A", ConnectionMode.OWN));
+        FulfilmentConfiguration submitted = configWith(true,
+                new StoreSupplierConnection("A", ConnectionMode.OWN),
+                new StoreSupplierConnection("B", ConnectionMode.OWN));
+        when(supplierRegistry.getAllDescriptors()).thenReturn(List.of());
+
+        // when
+        StoreSupplierConnectionPersister.PersistOutcome outcome =
+                persister.persist(store, submitted, Map.of());
+
+        // then
+        assertThat(outcome.success()).isTrue();
+        assertThat(outcome.added()).containsExactly("B");
+        assertThat(outcome.removed()).isEmpty();
     }
 }

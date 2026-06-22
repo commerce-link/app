@@ -27,13 +27,6 @@ public class GlobalMatchedInventory {
                 .collect(Collectors.toList());
     }
 
-    public List<InventoryItem> itemsForSuppliers(Collection<String> supplierNames) {
-        return matched.stream()
-                .flatMap(m -> m.getInventoryItems().stream())
-                .filter(item -> supplierNames.contains(item.supplier()))
-                .collect(Collectors.toList());
-    }
-
     public int size() {
         return matched.size();
     }

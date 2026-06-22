@@ -32,14 +32,6 @@ public class Inventory {
 
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
-    private Collection<MatchedInventory> baseInventoryFor(String storeId) {
-        Store store = storesRepository.findById(storeId);
-        if (store != null && store.hasOwnSupplierConnections()) {
-            return storeInventoryProvider.get(storeId).items();
-        }
-        return globalInventory.all();
-    }
-
     void init(List<List<InventoryItem>> rawFeeds) {
         load(
                 rawFeeds.stream()
@@ -80,19 +72,19 @@ public class Inventory {
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
-        return new InventoryView(new LinkedList<>(), new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+        return new InventoryView(new LinkedList<>(),
+                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(baseInventoryFor(storeId), new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
+        return new InventoryView(globalInventory.all(),
+                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
-        return new InventoryView(
-                baseInventoryFor(storeId),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry),
-                new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry)
-        );
+        return new InventoryView(globalInventory.all(),
+                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry),
+                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
     }
 
     public int size() {

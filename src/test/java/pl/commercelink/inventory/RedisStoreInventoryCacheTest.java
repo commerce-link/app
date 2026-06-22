@@ -16,6 +16,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,7 +42,7 @@ class RedisStoreInventoryCacheTest {
 
     private RedisStoreInventoryCache cache() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        return new RedisStoreInventoryCache(redisTemplate, objectMapper, taxonomyCache, supplierRegistry, 60);
+        return new RedisStoreInventoryCache(redisTemplate, objectMapper, taxonomyCache, supplierRegistry);
     }
 
     private StoreInventory sampleInventory() {
@@ -55,8 +56,7 @@ class RedisStoreInventoryCacheTest {
     void getReturnsEmptyOnMiss() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
-        when(valueOps.get("store-inventory:0:s1")).thenReturn(null);
+        when(valueOps.get("store-inventory:s1")).thenReturn(null);
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
@@ -67,8 +67,7 @@ class RedisStoreInventoryCacheTest {
         // given
         RedisStoreInventoryCache cache = cache();
         String json = objectMapper.writeValueAsString(StoreInventorySnapshot.from(sampleInventory()));
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
-        when(valueOps.get("store-inventory:0:s1")).thenReturn(json);
+        when(valueOps.get("store-inventory:s1")).thenReturn(json);
 
         // when
         Optional<StoreInventory> result = cache.get("s1");
@@ -80,122 +79,37 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
-    void putWritesSnapshotWithTtlUnderGenerationKey() {
+    void writesValueWithProvidedPerKeyTtl() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
+        StoreInventory inventory = new StoreInventory(new ArrayList<>(), LocalDateTime.now());
 
         // when
-        cache.put("s1", sampleInventory());
+        cache.put("store-1", inventory, Duration.ofMinutes(15));
 
         // then
-        verify(valueOps).set(eq("store-inventory:0:s1"), anyString(), eq(Duration.ofMinutes(60)));
-    }
-
-    @Test
-    void invalidateDeletesGenerationKey() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
-
-        // when
-        cache.invalidate("s1");
-
-        // then
-        verify(redisTemplate).delete("store-inventory:0:s1");
-    }
-
-    @Test
-    void invalidateAllIncrementsGeneration() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-
-        // when
-        cache.invalidateAll();
-
-        // then
-        verify(valueOps).increment("store-inventory:generation");
+        verify(valueOps).set(eq("store-inventory:store-1"), anyString(), eq(Duration.ofMinutes(15)));
     }
 
     @Test
     void getDegradesToMissWhenRedisFails() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenThrow(new RuntimeException("redis down"));
+        when(valueOps.get("store-inventory:s1")).thenThrow(new RuntimeException("redis down"));
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
     }
 
     @Test
-    void getUsesGenerationZeroWhenGenerationKeyUnset() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn(null);
-
-        // when
-        cache.get("s1");
-
-        // then
-        verify(valueOps).get("store-inventory:0:s1");
-    }
-
-    @Test
-    void bumpedGenerationChangesTheResolvedKey() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
-
-        // when
-        cache.get("s1");
-        cache.put("s1", sampleInventory());
-
-        // then
-        verify(valueOps).get("store-inventory:0:s1");
-        verify(valueOps).set(eq("store-inventory:0:s1"), anyString(), eq(Duration.ofMinutes(60)));
-
-        // given
-        when(valueOps.get("store-inventory:generation")).thenReturn("1");
-
-        // when
-        cache.get("s1");
-        cache.put("s1", sampleInventory());
-
-        // then
-        verify(valueOps).get("store-inventory:1:s1");
-        verify(valueOps).set(eq("store-inventory:1:s1"), anyString(), eq(Duration.ofMinutes(60)));
-    }
-
-    @Test
     void putSwallowsRedisFailure() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
         doThrow(new RuntimeException("redis down")).when(valueOps)
-                .set(eq("store-inventory:0:s1"), anyString(), eq(Duration.ofMinutes(60)));
+                .set(eq("store-inventory:s1"), anyString(), eq(Duration.ofMinutes(60)));
 
         // when / then
-        assertDoesNotThrow(() -> cache.put("s1", sampleInventory()));
+        assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60)));
     }
 
-    @Test
-    void invalidateSwallowsRedisFailure() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:generation")).thenReturn("0");
-        doThrow(new RuntimeException("redis down")).when(redisTemplate).delete("store-inventory:0:s1");
-
-        // when / then
-        assertDoesNotThrow(() -> cache.invalidate("s1"));
-    }
-
-    @Test
-    void invalidateAllSwallowsRedisFailure() {
-        // given
-        RedisStoreInventoryCache cache = cache();
-        when(valueOps.increment("store-inventory:generation")).thenThrow(new RuntimeException("redis down"));
-
-        // when / then
-        assertDoesNotThrow(() -> cache.invalidateAll());
-    }
 }

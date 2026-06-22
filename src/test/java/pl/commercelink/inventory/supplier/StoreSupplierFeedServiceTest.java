@@ -2,13 +2,11 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.stores.Store;
@@ -31,8 +29,6 @@ class StoreSupplierFeedServiceTest {
     private SupplierRegistry supplierRegistry;
     @Mock
     private StoreFeedRepository storeFeedRepository;
-    @Mock
-    private StoreInventoryProvider storeInventoryProvider;
 
     @InjectMocks
     private StoreSupplierFeedService service;
@@ -44,12 +40,11 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
-    void downloadsFeedToPerStoreKeyThenInvalidatesCache() throws ResourceDownloadException {
+    void downloadsFeedToPerStoreKey() throws ResourceDownloadException {
         // given
         Store store = storeWithId("store-1");
         Map<String, String> config = Map.of("url", "https://feed/x.csv");
         byte[] data = "rows".getBytes();
-
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(configurationManager.loadConfiguration(store, "Wortmann")).thenReturn(config);
         when(supplierRegistry.downloadFeed("Wortmann", config)).thenReturn(Optional.of(new FeedData(data, "csv")));
@@ -59,9 +54,7 @@ class StoreSupplierFeedServiceTest {
 
         // then
         verify(supplierRegistry).downloadFeed("Wortmann", config);
-        InOrder inOrder = inOrder(storeFeedRepository, storeInventoryProvider);
-        inOrder.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
-        inOrder.verify(storeInventoryProvider).invalidate("store-1");
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
     }
 
     @Test
@@ -75,7 +68,6 @@ class StoreSupplierFeedServiceTest {
         // then
         verifyNoInteractions(supplierRegistry);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
-        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 
     @Test
@@ -93,6 +85,5 @@ class StoreSupplierFeedServiceTest {
 
         // then
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
-        verify(storeInventoryProvider, never()).invalidate(anyString());
     }
 }

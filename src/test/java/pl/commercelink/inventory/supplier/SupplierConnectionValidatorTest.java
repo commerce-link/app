@@ -19,19 +19,19 @@ class SupplierConnectionValidatorTest {
     @Test
     void globalModeRejectedWhenStoreCannotUseGlobalSuppliers() {
         // when
-        List<String> errors = validator.validate(false,
+        List<ErrorMessage> errors = validator.validate(false,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.GLOBAL)),
                 Map.of(), Map.of(), Set.of());
 
         // then
         assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("Action"));
+        assertEquals("Action", errors.get(0).args()[0]);
     }
 
     @Test
     void ownModeAllowedWhenAllRequiredFieldsPresent() {
         // when
-        List<String> errors = validator.validate(false,
+        List<ErrorMessage> errors = validator.validate(false,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.OWN)),
                 Map.of("Action", List.of(SupplierConfigField.url())),
                 Map.of("Action", Map.of("url", "https://feed.example.com")),
@@ -44,7 +44,7 @@ class SupplierConnectionValidatorTest {
     @Test
     void globalModeAllowedWhenStoreCanUseGlobalSuppliers() {
         // when
-        List<String> errors = validator.validate(true,
+        List<ErrorMessage> errors = validator.validate(true,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.GLOBAL)),
                 Map.of(), Map.of(), Set.of());
 
@@ -55,7 +55,7 @@ class SupplierConnectionValidatorTest {
     @Test
     void ownModeRejectedWhenRequiredFieldMissing() {
         // when
-        List<String> errors = validator.validate(true,
+        List<ErrorMessage> errors = validator.validate(true,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.OWN)),
                 Map.of("Action", List.of(SupplierConfigField.url())),
                 Map.of("Action", Map.of("url", "")),
@@ -63,7 +63,7 @@ class SupplierConnectionValidatorTest {
 
         // then
         assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("Action"));
+        assertEquals("Action", errors.get(0).args()[0]);
     }
 
     @Test
@@ -73,7 +73,7 @@ class SupplierConnectionValidatorTest {
                 "password", "Password", SupplierConfigField.FieldType.PASSWORD, true, "");
 
         // when
-        List<String> errors = validator.validate(true,
+        List<ErrorMessage> errors = validator.validate(true,
                 List.of(new StoreSupplierConnection("Also", ConnectionMode.OWN)),
                 Map.of("Also", List.of(password)),
                 Map.of("Also", Map.of("password", "")),
@@ -90,7 +90,7 @@ class SupplierConnectionValidatorTest {
                 "password", "Password", SupplierConfigField.FieldType.PASSWORD, true, "");
 
         // when
-        List<String> errors = validator.validate(true,
+        List<ErrorMessage> errors = validator.validate(true,
                 List.of(new StoreSupplierConnection("Also", ConnectionMode.OWN)),
                 Map.of("Also", List.of(password)),
                 Map.of("Also", Map.of("password", "")),

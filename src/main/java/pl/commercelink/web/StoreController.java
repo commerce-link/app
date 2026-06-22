@@ -656,14 +656,25 @@ public class StoreController {
                 ? form.getStore().getFulfilmentConfiguration()
                 : new FulfilmentConfiguration();
 
-        List<String> errors = storeSupplierConnectionService.apply(
+        StoreSupplierConnectionService.ConnectionUpdateResult result = storeSupplierConnectionService.apply(
                 existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
-        if (!errors.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", String.join(" ", errors));
+        if (result.hasErrors()) {
+            String errorMessage = result.errors().stream()
+                    .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
+                    .collect(Collectors.joining(" "));
+            redirectAttributes.addFlashAttribute("errorMessage", errorMessage);
             return redirectToFulfilment(form.getStore().getStoreId());
         }
 
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
+        List<String> messages = new ArrayList<>();
+        messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
+        for (String supplier : result.added()) {
+            messages.add(messageSource.getMessage("store.fulfilment.supplier.connect.queued", new Object[]{supplier}, locale));
+        }
+        for (String supplier : result.removed()) {
+            messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
+        }
+        redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
 
         return redirectToFulfilment(form.getStore().getStoreId());
     }
