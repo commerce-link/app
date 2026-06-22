@@ -167,12 +167,93 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div th:if="${!#lists.isEmpty(form.suggestedItems)}" class="mt-6">
+                    <hr class="mb-5" style="height: 2px; background-color: #dbdbdb;"/>
+
+                    <div class="notification is-info is-light mb-4">
+                        <h2 class="title is-5 mb-2">
+                            <span class="icon mr-1"><i class="fas fa-lightbulb"></i></span>
+                            <span th:text="#{deliveries.create.suggestions.title}">Suggested restock products</span>
+                        </h2>
+                        <p th:text="#{deliveries.create.suggestions.note}">
+                            These products are expected in stock, currently unavailable and offered by this supplier.
+                        </p>
+                    </div>
+
+                    <div th:each="suggested, sStat : *{suggestedItems}" class="box mb-4"
+                         style="border-left: 4px solid #3273dc;">
+                        <input type="hidden" th:field="*{suggestedItems[__${sStat.index}__].name}"/>
+                        <input type="hidden" th:field="*{suggestedItems[__${sStat.index}__].ean}"/>
+                        <input type="hidden" th:field="*{suggestedItems[__${sStat.index}__].mfn}"/>
+
+                        <div class="columns is-vcentered mb-2">
+                            <div class="column">
+                                <p class="has-text-weight-semibold mb-0" th:text="${suggested.name}">Product Name</p>
+                                <p class="has-text-grey">
+                                    <span th:text="#{general.ean}">EAN</span>: <span th:text="${suggested.ean}"></span>
+                                    &nbsp;|&nbsp;
+                                    <span th:text="#{general.manufacturer.code}">MFN</span>: <span th:text="${suggested.mfn}"></span>
+                                </p>
+                            </div>
+                            <div class="column is-narrow has-text-centered">
+                                <label class="label mb-1" th:text="#{deliveries.create.suggestions.expected}">Expected</label>
+                                <span class="tag is-light is-medium" th:text="${suggested.expectedQty}">0</span>
+                            </div>
+                            <div class="column is-narrow has-text-centered">
+                                <label class="label mb-1" th:text="#{deliveries.requestedQty}">Requested Qty</label>
+                                <input class="input" type="number" style="width: 100px;"
+                                       th:field="*{suggestedItems[__${sStat.index}__].requestedQty}"
+                                       th:data-mfn="${suggested.mfn}"
+                                       oninput="updateSuggestionStock(this)"
+                                       min="0"/>
+                            </div>
+                            <div class="column is-narrow has-text-centered">
+                                <label class="label mb-1" th:text="#{general.net.cost}">Unit Cost</label>
+                                <input class="input" type="number" style="width: 120px;"
+                                       th:field="*{suggestedItems[__${sStat.index}__].unitCost}"
+                                       step="0.01" min="0"/>
+                            </div>
+                        </div>
+
+                        <table class="table is-fullwidth is-narrow">
+                            <tbody>
+                            <tr th:id="'extraStock-' + ${suggested.mfn}" class="has-background-success-light" style="display: none;">
+                                <td style="width: 60px;">
+                                    <span class="icon has-text-success"><i class="fas fa-plus"></i></span>
+                                </td>
+                                <td th:text="#{deliveries.create.warehouseAdjustment}">Warehouse adjustment</td>
+                                <td style="width: 80px;" th:id="'extraStockQty-' + ${suggested.mfn}">0</td>
+                                <td style="width: 100px;">
+                                    <span class="tag is-success">Warehouse</span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </form>
 
         </div>
     </section>
 
     <script>
+        function updateSuggestionStock(input) {
+            const mfn = input.dataset.mfn;
+            const qty = parseInt(input.value) || 0;
+            const row = document.getElementById('extraStock-' + mfn);
+            const qtyCell = document.getElementById('extraStockQty-' + mfn);
+            if (!row || !qtyCell) {
+                return;
+            }
+            if (qty > 0) {
+                qtyCell.textContent = '+' + qty;
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+
         function validateQty(input) {
             const min = parseInt(input.min);
             const value = parseInt(input.value);
