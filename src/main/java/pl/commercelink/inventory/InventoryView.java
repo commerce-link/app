@@ -5,22 +5,26 @@ import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class InventoryView {
 
-    private final Collection<MatchedInventory> autoDiscoveredInventory;
+    private final Collection<MatchedInventory> globalInventory;
+    private final Collection<MatchedInventory> ownInventory;
     private final InventoryFilterChain filterChain;
 
-    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory) {
-        this.autoDiscoveredInventory = autoDiscoveredInventory;
-        this.filterChain = new InventoryFilterChain(new LinkedList<>());
+    InventoryView(Collection<MatchedInventory> globalInventory) {
+        this(globalInventory, List.of());
     }
 
-    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory, InventoryFilter... filters) {
-        this.autoDiscoveredInventory = autoDiscoveredInventory;
+    InventoryView(Collection<MatchedInventory> globalInventory, InventoryFilter... filters) {
+        this(globalInventory, List.of(), filters);
+    }
+
+    InventoryView(Collection<MatchedInventory> globalInventory, Collection<MatchedInventory> ownInventory, InventoryFilter... filters) {
+        this.globalInventory = globalInventory;
+        this.ownInventory = ownInventory;
         this.filterChain = new InventoryFilterChain(Arrays.asList(filters));
     }
 
@@ -37,7 +41,7 @@ public class InventoryView {
     }
 
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
-        List<MatchedInventory> candidates = autoDiscoveredInventory.stream()
+        List<MatchedInventory> candidates = globalInventory.stream()
                 .filter(i -> i.matches(lookupKey))
                 .toList();
 
@@ -85,13 +89,14 @@ public class InventoryView {
     }
 
     public Collection<MatchedInventory> findAllWithPimId() {
-        return autoDiscoveredInventory.stream()
+        return new ListingInventory(globalInventory, ownInventory).stream()
                 .filter(i -> i.getInventoryKey().getId() != null)
+                .map(filterChain::apply)
                 .collect(Collectors.toList());
     }
 
     public Collection<MatchedInventory> findAllByProductCategory(ProductCategory productCategory) {
-        return autoDiscoveredInventory.stream()
+        return new ListingInventory(globalInventory, ownInventory).stream()
                 .filter(i -> i.getTaxonomy().category() == productCategory)
                 .map(filterChain::apply)
                 .collect(Collectors.toList());

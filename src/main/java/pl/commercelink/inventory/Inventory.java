@@ -77,14 +77,24 @@ public class Inventory {
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(globalInventory.all(),
-                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry));
+        Store store = storesRepository.findById(storeId);
+        Collection<MatchedInventory> ownInventory = storeInventoryProvider.ownInventory(store);
+        return new InventoryView(globalInventory.all(), ownInventory,
+                new GlobalSuppliersInventoryFilter(globalSupplierNames(store), taxonomyCache, supplierRegistry),
+                new StoreSuppliersInventoryFilter(ownInventory, taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
-        return new InventoryView(globalInventory.all(),
-                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry),
+        Store store = storesRepository.findById(storeId);
+        Collection<MatchedInventory> ownInventory = storeInventoryProvider.ownInventory(store);
+        return new InventoryView(globalInventory.all(), ownInventory,
+                new GlobalSuppliersInventoryFilter(globalSupplierNames(store), taxonomyCache, supplierRegistry),
+                new StoreSuppliersInventoryFilter(ownInventory, taxonomyCache, supplierRegistry),
                 new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+    }
+
+    private Collection<String> globalSupplierNames(Store store) {
+        return store != null ? store.getGlobalSupplierNames() : List.of();
     }
 
     public int size() {

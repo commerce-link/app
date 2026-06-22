@@ -13,13 +13,9 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,38 +41,37 @@ class InventoryStoreRoutingTest {
     @InjectMocks
     private Inventory inventory;
 
-    private Store store(boolean hasOwn) {
+    private Store store() {
         Store store = mock(Store.class);
-        when(store.hasOwnSupplierConnections()).thenReturn(hasOwn);
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         return store;
     }
 
     @Test
-    void withEnabledSuppliersOnlyReadsOwnInventoryWhenStoreHasOwnConnections() {
+    void withEnabledSuppliersOnlyDelegatesOwnInventoryToProvider() {
         // given
-        Store store = store(true);
+        Store store = store();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(storeInventoryProvider.get("store-1"))
-                .thenReturn(new StoreInventory(new ArrayList<>(), LocalDateTime.now()));
+        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
 
         // when
         inventory.withEnabledSuppliersOnly("store-1");
 
         // then
-        verify(storeInventoryProvider).get("store-1");
+        verify(storeInventoryProvider).ownInventory(store);
     }
 
     @Test
-    void withEnabledSuppliersOnlyDoesNotReadOwnInventoryWhenStoreHasNoOwnConnections() {
+    void withEnabledSuppliersAndWarehouseDataDelegatesOwnInventoryToProvider() {
         // given
-        Store store = store(false);
+        Store store = store();
         when(storesRepository.findById("store-1")).thenReturn(store);
+        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
 
         // when
-        inventory.withEnabledSuppliersOnly("store-1");
+        inventory.withEnabledSuppliersAndWarehouseData("store-1");
 
         // then
-        verify(storeInventoryProvider, never()).get(any());
+        verify(storeInventoryProvider).ownInventory(store);
     }
 }

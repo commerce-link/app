@@ -253,6 +253,7 @@ All paths relative to `src/main/java/pl/commercelink/`.
 ## Testing
 
 - JUnit 5 + Mockito 5.12.0
+- Prefer `@ExtendWith(MockitoExtension.class)` with `@Mock` / `@InjectMocks` fields over manual `Mockito.mock(...)` calls — always use the annotations when the collaborators map to fixed fields. Fall back to `mock(...)` only for mocks created dynamically (e.g. several instances of the same type produced by a helper)
 - Test files in `src/test/java` mirror source structure
 - Currently minimal coverage (4 test files: pricelist, products)
 - `mvn test -Dtest=ClassName#methodName`

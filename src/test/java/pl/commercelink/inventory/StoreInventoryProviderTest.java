@@ -184,6 +184,44 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void ownInventoryReturnsEmptyAndSkipsCacheWhenStoreHasNoOwnConnections() {
+        // given
+        Store store = mock(Store.class);
+        when(store.hasOwnSupplierConnections()).thenReturn(false);
+
+        // when
+        java.util.Collection<MatchedInventory> result = provider.ownInventory(store);
+
+        // then
+        assertThat(result).isEmpty();
+        verify(cache, never()).get(any());
+        verify(cache, never()).put(any(), any(), any());
+    }
+
+    @Test
+    void ownInventoryReturnsEmptyWhenStoreMissing() {
+        // when / then
+        assertThat(provider.ownInventory(null)).isEmpty();
+    }
+
+    @Test
+    void ownInventoryReturnsCachedOwnGroupsWhenStoreHasOwnConnections() {
+        // given
+        Store store = mock(Store.class);
+        when(store.getStoreId()).thenReturn("store-1");
+        when(store.hasOwnSupplierConnections()).thenReturn(true);
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(cache.get("store-1")).thenReturn(Optional.of(new StoreInventory(List.of(matched), LocalDateTime.now())));
+
+        // when
+        java.util.Collection<MatchedInventory> result = provider.ownInventory(store);
+
+        // then
+        assertThat(result).containsExactly(matched);
+        verify(storesRepository, never()).findById(any());
+    }
+
+    @Test
     void buildLoadsOnlyOwnSuppliersAndIgnoresGlobal() {
         // given
         Store store = mock(Store.class);

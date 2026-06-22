@@ -14,6 +14,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,13 +34,20 @@ public class StoreInventoryProvider {
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        Optional<StoreInventory> cached = cache.get(storeId);
-        if (cached.isPresent()) {
-            return cached.get();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
+    }
+
+    public Collection<MatchedInventory> ownInventory(Store store) {
+        if (store == null || !store.hasOwnSupplierConnections()) {
+            return List.of();
         }
-        Store storeEntity = storesRepository.findById(storeId);
-        StoreInventory built = build(storeId, storeEntity);
-        cache.put(storeId, built, resolveTtl(storeEntity));
+        String storeId = store.getStoreId();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId)).items();
+    }
+
+    private StoreInventory buildAndCache(Store store, String storeId) {
+        StoreInventory built = build(storeId, store);
+        cache.put(storeId, built, resolveTtl(store));
         return built;
     }
 
