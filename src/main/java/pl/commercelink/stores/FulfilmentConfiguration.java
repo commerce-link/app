@@ -5,8 +5,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.products.ProductGroupListConverter;
+import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,8 +26,6 @@ public class FulfilmentConfiguration {
     @DynamoDBAttribute(attributeName = "enabledProductGroups")
     @DynamoDBTypeConverted(converter = ProductGroupListConverter.class)
     private List<ProductGroup> enabledProductGroups;
-    @DynamoDBAttribute(attributeName = "enabledProviders")
-    private List<String> enabledProviders;
     @DynamoDBAttribute(attributeName = "canUseGlobalSuppliers")
     private boolean canUseGlobalSuppliers = false;
     @DynamoDBAttribute(attributeName = "supplierConnections")
@@ -74,14 +72,6 @@ public class FulfilmentConfiguration {
 
     public void setEnabledProductGroups(List<ProductGroup> enabledProductGroups) {
         this.enabledProductGroups = enabledProductGroups;
-    }
-
-    public List<String> getEnabledProviders() {
-        return enabledProviders;
-    }
-
-    public void setEnabledProviders(List<String> enabledProviders) {
-        this.enabledProviders = enabledProviders;
     }
 
     public boolean isCanUseGlobalSuppliers() {

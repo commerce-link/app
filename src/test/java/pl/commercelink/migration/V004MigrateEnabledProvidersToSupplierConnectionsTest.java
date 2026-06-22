@@ -1,5 +1,9 @@
 package pl.commercelink.migration;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.GetItemRequest;
+import com.amazonaws.services.dynamodbv2.model.GetItemResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,7 +19,9 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,23 +38,35 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
     @Mock
     private StoresRepository storesRepository;
 
+    @Mock
+    private AmazonDynamoDB dynamoDB;
+
     @InjectMocks
     private V004_MigrateEnabledProvidersToSupplierConnections migration;
 
-    private Store storeWith(FulfilmentConfiguration config) {
+    private Store storeWith(String storeId, FulfilmentConfiguration config) {
         Store store = new Store();
-        store.setStoreId("store-1");
+        store.setStoreId(storeId);
         store.setFulfilmentConfiguration(config);
         return store;
+    }
+
+    private GetItemResult itemWithProviders(String... providers) {
+        List<AttributeValue> list = Arrays.stream(providers)
+                .map(provider -> new AttributeValue().withS(provider))
+                .toList();
+        AttributeValue fulfilment = new AttributeValue()
+                .withM(Map.of("enabledProviders", new AttributeValue().withL(list)));
+        return new GetItemResult().withItem(Map.of("fulfilment", fulfilment));
     }
 
     @Test
     void enablesGlobalSuppliersAndMigratesProvidersForExistingStores() {
         // given
         FulfilmentConfiguration config = new FulfilmentConfiguration();
-        config.setEnabledProviders(List.of("Action", "Wortmann"));
-        Store store = storeWith(config);
+        Store store = storeWith("store-1", config);
         when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(dynamoDB.getItem(any())).thenReturn(itemWithProviders("Action", "Wortmann"));
 
         // when
         migration.migrate();
@@ -70,11 +88,10 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
     void doesNotOverwriteExistingConnectionsButStillEnablesGlobal() {
         // given
         FulfilmentConfiguration config = new FulfilmentConfiguration();
-        config.setEnabledProviders(List.of("Action", "Wortmann"));
         List<StoreSupplierConnection> existing = new ArrayList<>(List.of(
                 new StoreSupplierConnection("Elko", ConnectionMode.OWN)));
         config.setSupplierConnections(existing);
-        Store store = storeWith(config);
+        Store store = storeWith("store-1", config);
         when(storesRepository.findAll()).thenReturn(List.of(store));
 
         // when
@@ -86,15 +103,16 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
         assertEquals("Elko", config.getSupplierConnections().get(0).getSupplierName());
         assertEquals(ConnectionMode.OWN, config.getSupplierConnections().get(0).getMode());
         verify(storesRepository).save(store);
+        verify(dynamoDB, never()).getItem(any());
     }
 
     @Test
     void migratingTwiceDoesNotDuplicateConnections() {
         // given
         FulfilmentConfiguration config = new FulfilmentConfiguration();
-        config.setEnabledProviders(List.of("Action", "Wortmann"));
-        Store store = storeWith(config);
+        Store store = storeWith("store-1", config);
         when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(dynamoDB.getItem(any())).thenReturn(itemWithProviders("Action", "Wortmann"));
 
         // when
         migration.migrate();
@@ -114,16 +132,15 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
     void migratesMultipleStoresInOneRun() {
         // given
         FulfilmentConfiguration firstConfig = new FulfilmentConfiguration();
-        firstConfig.setEnabledProviders(List.of("Action"));
-        Store firstStore = new Store();
-        firstStore.setStoreId("store-1");
-        firstStore.setFulfilmentConfiguration(firstConfig);
+        Store firstStore = storeWith("store-1", firstConfig);
         FulfilmentConfiguration secondConfig = new FulfilmentConfiguration();
-        secondConfig.setEnabledProviders(List.of("Wortmann"));
-        Store secondStore = new Store();
-        secondStore.setStoreId("store-2");
-        secondStore.setFulfilmentConfiguration(secondConfig);
+        Store secondStore = storeWith("store-2", secondConfig);
         when(storesRepository.findAll()).thenReturn(List.of(firstStore, secondStore));
+        when(dynamoDB.getItem(any())).thenAnswer(invocation -> {
+            GetItemRequest request = invocation.getArgument(0);
+            String storeId = request.getKey().get("storeId").getS();
+            return "store-1".equals(storeId) ? itemWithProviders("Action") : itemWithProviders("Wortmann");
+        });
 
         // when
         migration.migrate();
@@ -145,8 +162,9 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
     void enablesGlobalSuppliersEvenWhenNoProvidersConfigured() {
         // given
         FulfilmentConfiguration config = new FulfilmentConfiguration();
-        Store store = storeWith(config);
+        Store store = storeWith("store-1", config);
         when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(dynamoDB.getItem(any())).thenReturn(new GetItemResult().withItem(Map.of()));
 
         // when
         migration.migrate();
@@ -169,5 +187,6 @@ class V004MigrateEnabledProvidersToSupplierConnectionsTest {
 
         // then
         verify(storesRepository, never()).save(any());
+        verify(dynamoDB, never()).getItem(any());
     }
 }
