@@ -2,9 +2,9 @@ package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import java.util.UUID;
@@ -123,7 +123,6 @@ public class OrderItem extends Item {
                 null,
                 confirmation.inStock() ? FulfilmentStatus.Delivered : FulfilmentStatus.Ordered
         );
-        this.setComment("Magazyn");
     }
 
     @DynamoDBIgnore

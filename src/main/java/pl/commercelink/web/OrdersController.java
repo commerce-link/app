@@ -15,12 +15,14 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
+import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
@@ -95,6 +97,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private GoodsOutEventPublisher goodsOutEventPublisher;
+
+    @Autowired
+    private TaxonomyCache taxonomyCache;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -488,6 +493,32 @@ public class OrdersController extends BaseController {
             order.setTotalPrice(new OrderFinancials(order, orderItems).getTotalPrice());
             orderLifecycle.update(order, orderItems);
         }
+
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/assign-supplier")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String assignSupplier(@PathVariable String orderId, @RequestParam String itemId,
+                                 @RequestParam String manufacturerCode, @RequestParam double cost,
+                                 @RequestParam String supplier, Model model, Locale locale) {
+        Order order = ordersRepository.findById(getStoreId(), orderId);
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+
+        orderItem.setManufacturerCode(manufacturerCode);
+        orderItem.setCost(cost);
+        orderItem.setDeliveryId(supplier);
+
+        Taxonomy taxonomy = taxonomyCache.findByMfn(orderItem.getManufacturerCode());
+        String resolvedEan = taxonomy != null ? taxonomy.ean() : null;
+
+        if (Strings.isBlank(resolvedEan)) {
+            model.addAttribute("errorMessage", messageSource.getMessage("order.item.ean.not.found", null, locale));
+            return showOrderItemDetails(order, orderItem, model);
+        }
+
+        orderItem.setEan(resolvedEan);
+        orderItemsRepository.save(orderItem);
 
         return "redirect:/dashboard/orders/" + orderId;
     }

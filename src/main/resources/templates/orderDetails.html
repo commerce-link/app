@@ -222,7 +222,6 @@
                     <thead>
                     <tr>
                         <th th:text="#{order.item.select}" style="width: 60px;"></th>
-                        <th style="width: 80px;">ID</th>
                         <th th:text="#{order.item.category}"></th>
                         <th th:text="#{order.item.sku}"></th>
                         <th th:text="#{order.item.name}"></th>
@@ -235,6 +234,7 @@
                         <th th:text="#{order.item.status}"></th>
                         <th th:text="#{order.item.consolidated}"></th>
                         <th th:text="#{order.item.comment}"></th>
+                        <th th:text="#{order.item.actions}" style="width: 60px;"></th>
                     </tr>
                     </thead>
                     <tbody id="orderItemsRows">
@@ -243,10 +243,6 @@
                             <input type="checkbox" th:field="*{orderItems[__${iterStat.index}__].selected}" th:disabled="${isCompletedOrder or hasWarehouseDocument}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].itemId}"/>
-                        </td>
-                        <td>
-                            <a th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
-                               th:text="${item.shortenedItemId}"></a>
                         </td>
                         <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
                         <td>
@@ -280,6 +276,34 @@
                             <span th:if="${item.consolidated}" class="icon has-text-success"><i class="fas fa-check"></i></span>
                         </td>
                         <td th:text="${item.comment}"></td>
+                        <td style="width: 60px;">
+                            <div class="dropdown is-hoverable is-right"
+                                 onmouseenter="allowTableOverflow(this, true)"
+                                 onmouseleave="allowTableOverflow(this, false)">
+                                <div class="dropdown-trigger">
+                                    <button class="button is-small is-ghost" aria-haspopup="true" aria-controls="dropdown-menu">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                        </span>
+                                    </button>
+                                </div>
+                                <div class="dropdown-menu" role="menu">
+                                    <div class="dropdown-content">
+                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId}"
+                                           onclick="openQuickAssignModal(this); return false;"
+                                           th:text="#{order.item.quick.assign}"></a>
+                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.quick.assign}"></span>
+                                        <hr class="dropdown-divider">
+                                        <a class="dropdown-item"
+                                           th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
+                                           th:text="#{order.item.edit}"></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     </tbody>
                 </table>
@@ -345,6 +369,50 @@
                 <footer class="modal-card-foot">
                     <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
                     <button class="button" type="button" onclick="toggleSerialUpdateModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div id="quickAssignModal" class="modal">
+        <div class="modal-background" onclick="toggleQuickAssignModal(false)"></div>
+        <div class="modal-card" style="width: 480px; max-width: 90vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.item.quick.assign}"></p>
+                <button class="delete" type="button" onclick="toggleQuickAssignModal(false)"></button>
+            </header>
+
+            <form id="quickAssignForm" method="post"
+                  th:action="@{/dashboard/orders/{orderId}/assign-supplier(orderId=${order.orderId})}">
+                <section class="modal-card-body">
+                    <input type="hidden" id="quickAssignItemId" name="itemId"/>
+
+                    <div class="field">
+                        <label class="label" th:text="#{general.manufacturer.code}"></label>
+                        <div class="control">
+                            <input class="input" type="text" id="quickAssignMfn" name="manufacturerCode" required
+                                   th:placeholder="#{inventory.product.code.placeholder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.price.net}"></label>
+                        <div class="control">
+                            <input class="input" type="text" id="quickAssignPrice" name="cost" required/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.supplier}"></label>
+                        <div class="control">
+                            <input class="input" type="text" id="quickAssignSupplier" name="supplier" required/>
+                        </div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    <button class="button" type="button" onclick="toggleQuickAssignModal(false)" th:text="#{general.cancel}"></button>
                 </footer>
             </form>
         </div>
@@ -1007,6 +1075,26 @@
             const modal = document.getElementById('serialUpdateModal');
             if (!modal) return;
             modal.classList.toggle('is-active', show);
+        }
+
+        function toggleQuickAssignModal(show) {
+            const modal = document.getElementById('quickAssignModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function allowTableOverflow(dropdown, show) {
+            const container = dropdown.closest('.table-container');
+            if (!container) return;
+            container.style.overflow = show ? 'visible' : '';
+        }
+
+        function openQuickAssignModal(button) {
+            document.getElementById('quickAssignItemId').value = button.getAttribute('data-item-id') || '';
+            document.getElementById('quickAssignMfn').value = '';
+            document.getElementById('quickAssignPrice').value = '';
+            document.getElementById('quickAssignSupplier').value = '';
+            toggleQuickAssignModal(true);
         }
     </script>
 
