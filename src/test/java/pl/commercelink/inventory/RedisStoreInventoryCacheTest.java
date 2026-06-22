@@ -1,15 +1,16 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -38,7 +39,7 @@ class RedisStoreInventoryCacheTest {
     @Mock private TaxonomyCache taxonomyCache;
     @Mock private SupplierRegistry supplierRegistry;
 
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private RedisStoreInventoryCache cache() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
@@ -63,11 +64,13 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
-    void getRehydratesStoredSnapshot() throws Exception {
+    void getRehydratesStoredSnapshot() {
         // given
         RedisStoreInventoryCache cache = cache();
-        String json = objectMapper.writeValueAsString(StoreInventorySnapshot.from(sampleInventory()));
-        when(valueOps.get("store-inventory:s1")).thenReturn(json);
+        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
+        verify(valueOps).set(eq("store-inventory:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
+        when(valueOps.get("store-inventory:s1")).thenReturn(stored.getValue());
 
         // when
         Optional<StoreInventory> result = cache.get("s1");
@@ -110,6 +113,33 @@ class RedisStoreInventoryCacheTest {
 
         // when / then
         assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60)));
+    }
+
+    @Test
+    void storesCompressedPayloadSmallerThanRawJson() throws Exception {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        StoreInventory inventory = largeInventory(2000);
+        String rawJson = objectMapper.writeValueAsString(StoreInventorySnapshot.from(inventory));
+        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
+
+        // when
+        cache.put("s1", inventory, Duration.ofMinutes(60));
+
+        // then
+        verify(valueOps).set(eq("store-inventory:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
+        assertTrue(stored.getValue().length() < rawJson.length());
+    }
+
+    private StoreInventory largeInventory(int count) {
+        List<MatchedInventory> matched = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            String ean = String.format("59%011d", i);
+            String mfn = "MFN-" + i;
+            InventoryItem item = new InventoryItem(ean, mfn, 10.0 + i, "PLN", 5, 1, "Acme", true, true, false);
+            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), List.of(item), taxonomyCache, supplierRegistry));
+        }
+        return new StoreInventory(matched, LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
 }

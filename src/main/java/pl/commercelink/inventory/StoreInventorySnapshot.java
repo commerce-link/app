@@ -34,7 +34,7 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
         }
     }
 
-    public record Entry(InventoryKey key, List<ItemData> items) {
+    public record Entry(String id, InventoryKey key, List<ItemData> items) {
     }
 
     public static StoreInventorySnapshot from(StoreInventory inventory) {
@@ -43,7 +43,7 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             List<ItemData> items = matched.getInventoryItems().stream()
                     .map(ItemData::from)
                     .toList();
-            entries.add(new Entry(matched.getInventoryKey(), items));
+            entries.add(new Entry(matched.getInventoryKey().getId(), matched.getInventoryKey(), items));
         }
         return new StoreInventorySnapshot(inventory.builtAt(), entries);
     }
@@ -54,8 +54,15 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             List<InventoryItem> items = entry.items().stream()
                     .map(ItemData::toInventoryItem)
                     .toList();
-            matched.add(new MatchedInventory(entry.key(), items, taxonomyCache, supplierRegistry));
+            matched.add(new MatchedInventory(restoreKey(entry), items, taxonomyCache, supplierRegistry));
         }
         return new StoreInventory(matched, builtAt);
+    }
+
+    private static InventoryKey restoreKey(Entry entry) {
+        InventoryKey key = new InventoryKey(entry.id());
+        entry.key().getProductEans().forEach(key::addEan);
+        entry.key().getProductCodes().forEach(key::addManufacturerCode);
+        return key;
     }
 }
