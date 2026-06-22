@@ -14,7 +14,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -48,18 +48,17 @@ class InventoryStoreRoutingTest {
     private Store store(boolean hasOwn) {
         Store store = mock(Store.class);
         when(store.hasOwnSupplierConnections()).thenReturn(hasOwn);
-        when(store.getEnabledProviders()).thenReturn(List.of());
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         return store;
     }
 
     @Test
-    void withEnabledSuppliersOnlyQueriesStoreCacheWhenStoreHasOwnConnections() {
+    void withEnabledSuppliersOnlyReadsOwnInventoryWhenStoreHasOwnConnections() {
         // given
         Store store = store(true);
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeInventoryProvider.get("store-1"))
-                .thenReturn(new StoreInventory(new LinkedList<>(), LocalDateTime.now()));
+                .thenReturn(new StoreInventory(new ArrayList<>(), LocalDateTime.now()));
 
         // when
         inventory.withEnabledSuppliersOnly("store-1");
@@ -69,7 +68,7 @@ class InventoryStoreRoutingTest {
     }
 
     @Test
-    void withEnabledSuppliersOnlyDoesNotQueryStoreCacheWhenStoreHasNoOwnConnections() {
+    void withEnabledSuppliersOnlyDoesNotReadOwnInventoryWhenStoreHasNoOwnConnections() {
         // given
         Store store = store(false);
         when(storesRepository.findById("store-1")).thenReturn(store);

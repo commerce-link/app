@@ -11,16 +11,16 @@ import java.util.stream.Collectors;
 
 public class InventoryView {
 
-    private final MatchedInventorySource source;
+    private final Collection<MatchedInventory> autoDiscoveredInventory;
     private final InventoryFilterChain filterChain;
 
-    InventoryView(MatchedInventorySource source) {
-        this.source = source;
+    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory) {
+        this.autoDiscoveredInventory = autoDiscoveredInventory;
         this.filterChain = new InventoryFilterChain(new LinkedList<>());
     }
 
-    InventoryView(MatchedInventorySource source, InventoryFilter... filters) {
-        this.source = source;
+    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory, InventoryFilter... filters) {
+        this.autoDiscoveredInventory = autoDiscoveredInventory;
         this.filterChain = new InventoryFilterChain(Arrays.asList(filters));
     }
 
@@ -37,7 +37,7 @@ public class InventoryView {
     }
 
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
-        List<MatchedInventory> candidates = source.candidatesFor(lookupKey).stream()
+        List<MatchedInventory> candidates = autoDiscoveredInventory.stream()
                 .filter(i -> i.matches(lookupKey))
                 .toList();
 
@@ -85,13 +85,13 @@ public class InventoryView {
     }
 
     public Collection<MatchedInventory> findAllWithPimId() {
-        return source.all().stream()
+        return autoDiscoveredInventory.stream()
                 .filter(i -> i.getInventoryKey().getId() != null)
                 .collect(Collectors.toList());
     }
 
     public Collection<MatchedInventory> findAllByProductCategory(ProductCategory productCategory) {
-        return source.all().stream()
+        return autoDiscoveredInventory.stream()
                 .filter(i -> i.getTaxonomy().category() == productCategory)
                 .map(filterChain::apply)
                 .collect(Collectors.toList());

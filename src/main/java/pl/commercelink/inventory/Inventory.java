@@ -12,11 +12,9 @@ import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -33,17 +31,6 @@ public class Inventory {
     private final GlobalMatchedInventory globalInventory;
 
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
-
-    private MatchedInventorySource sourceFor(String storeId) {
-        Store store = storesRepository.findById(storeId);
-        Collection<MatchedInventory> own = store != null && store.hasOwnSupplierConnections()
-                ? storeInventoryProvider.get(storeId).items()
-                : new LinkedList<>();
-        Set<String> allowedGlobalSuppliers = store != null
-                ? new HashSet<>(store.getGlobalSupplierNames())
-                : Set.of();
-        return new CompositeMatchedInventorySource(own, globalInventory, allowedGlobalSuppliers, taxonomyCache, supplierRegistry);
-    }
 
     void init(List<List<InventoryItem>> rawFeeds) {
         load(
@@ -81,23 +68,23 @@ public class Inventory {
     }
 
     public InventoryView withGlobalData() {
-        return new InventoryView(new SimpleMatchedInventorySource(globalInventory.all()));
+        return new InventoryView(globalInventory.all());
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
-        return new InventoryView(new SimpleMatchedInventorySource(new LinkedList<>()),
+        return new InventoryView(new LinkedList<>(),
                 new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(sourceFor(storeId),
-                new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
+        return new InventoryView(globalInventory.all(),
+                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
-        return new InventoryView(sourceFor(storeId),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry),
-                new EnabledSuppliersInventoryFilter(storeId, storesRepository, taxonomyCache, supplierRegistry));
+        return new InventoryView(globalInventory.all(),
+                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry),
+                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
     }
 
     public int size() {
