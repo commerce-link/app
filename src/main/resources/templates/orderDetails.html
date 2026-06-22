@@ -296,6 +296,13 @@
                                            th:text="#{order.item.quick.assign}"></a>
                                         <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.quick.assign}"></span>
+                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId}"
+                                           onclick="submitClearSupplier(this); return false;"
+                                           th:text="#{order.item.clear.assign}"></a>
+                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.clear.assign}"></span>
                                         <hr class="dropdown-divider">
                                         <a class="dropdown-item"
                                            th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
@@ -417,6 +424,11 @@
             </form>
         </div>
     </div>
+
+    <form id="clearSupplierForm" method="post"
+          th:action="@{/dashboard/orders/{orderId}/clear-supplier(orderId=${order.orderId})}">
+        <input type="hidden" id="clearSupplierItemId" name="itemId"/>
+    </form>
 
     <div class="columns">
         <div class="column">
@@ -1095,6 +1107,11 @@
             document.getElementById('quickAssignPrice').value = '';
             document.getElementById('quickAssignSupplier').value = '';
             toggleQuickAssignModal(true);
+        }
+
+        function submitClearSupplier(link) {
+            document.getElementById('clearSupplierItemId').value = link.getAttribute('data-item-id') || '';
+            document.getElementById('clearSupplierForm').submit();
         }
     </script>
 

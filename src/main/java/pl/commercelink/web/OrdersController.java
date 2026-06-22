@@ -523,6 +523,15 @@ public class OrdersController extends BaseController {
         return "redirect:/dashboard/orders/" + orderId;
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/clear-supplier")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId) {
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        orderItem.removeFulfilment();
+        orderItemsRepository.save(orderItem);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
     private String showOrderItemDetails(Order order, OrderItem orderItem, Model model) {
         Store store = storesRepository.findById(order.getStoreId());
 
