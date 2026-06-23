@@ -28,6 +28,8 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.context.MessageSource;
@@ -58,6 +60,9 @@ public class DeliveriesController {
 
     @Autowired
     private DeliveryCreationService deliveryCreationService;
+
+    @Autowired
+    private DeliverySuggestionService deliverySuggestionService;
 
     @Autowired
     private DeliveryReceptionService deliveryReceptionService;
@@ -363,6 +368,13 @@ public class DeliveriesController {
                 allocation.setSelected(true);
             }
         }
+
+        Set<String> existingMfns = delivery.getAllocations().stream()
+                .map(Allocation::getMfn)
+                .filter(Objects::nonNull)
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
+        form.setSuggestedItems(deliverySuggestionService.suggestFor(storeId, provider, existingMfns));
 
         model.addAttribute("form", form);
         model.addAttribute("delivery", delivery);

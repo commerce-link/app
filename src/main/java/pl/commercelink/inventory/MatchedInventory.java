@@ -113,7 +113,7 @@ public class MatchedInventory {
     public Price getLowestPrice(boolean skipLowestPriceIfFromForeignSupplier, @Nullable SupplierType supplierType) {
         List<InventoryItem> items = getInventoryItems(supplierType).stream()
                 .filter(i -> i.netPrice() > 0)
-                .collect(Collectors.toList());
+                .toList();
         if (items.isEmpty()) {
             return Price.fromNet(0);
         }
