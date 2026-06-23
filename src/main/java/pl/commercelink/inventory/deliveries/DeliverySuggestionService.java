@@ -14,7 +14,10 @@ import pl.commercelink.warehouse.StockLevels;
 import pl.commercelink.warehouse.StockProductLevel;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
 
 @Component
 @AllArgsConstructor
@@ -58,12 +61,23 @@ public class DeliverySuggestionService {
                     continue;
                 }
 
+                // can't use matched.getLowestPrice() as it filters out items with qty = 1 in certain conditions and
+                // since we are buying to fill the warehouse it's perfectly fine to get the last item
+                double lowestNetAcrossSuppliers = matched.getInventoryItems().stream()
+                        .map(InventoryItem::netPrice)
+                        .filter(price -> price > 0)
+                        .min(Double::compare)
+                        .orElse(offer.netPrice());
+                boolean isLowestPrice = offer.netPrice() <= lowestNetAcrossSuppliers;
+
                 suggestions.add(SuggestedDeliveryItem.of(
                         level.getCategory(),
                         level.getName(),
                         offer.ean(),
                         offer.mfn(),
                         level.getExpectedQuantity(),
+                        offer.qty(),
+                        isLowestPrice,
                         offer.netPrice()
                 ));
             }

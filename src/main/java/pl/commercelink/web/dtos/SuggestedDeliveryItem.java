@@ -12,6 +12,8 @@ public class SuggestedDeliveryItem {
     private String ean;
     private String mfn;
     private int expectedQty;
+    private int availableAtSupplier;
+    private boolean lowestPrice;
     private double unitCost;
     private int requestedQty;
 
@@ -19,13 +21,15 @@ public class SuggestedDeliveryItem {
     }
 
     public static SuggestedDeliveryItem of(ProductCategory category, String name, String ean, String mfn,
-                                           int expectedQty, double unitCost) {
+                                           int expectedQty, int availableAtSupplier, boolean lowestPrice, double unitCost) {
         SuggestedDeliveryItem item = new SuggestedDeliveryItem();
         item.category = category;
         item.name = name;
         item.ean = ean;
         item.mfn = mfn;
         item.expectedQty = expectedQty;
+        item.availableAtSupplier = availableAtSupplier;
+        item.lowestPrice = lowestPrice;
         item.unitCost = unitCost;
         item.requestedQty = 0;
         return item;
@@ -75,6 +79,22 @@ public class SuggestedDeliveryItem {
 
     public void setExpectedQty(int expectedQty) {
         this.expectedQty = expectedQty;
+    }
+
+    public int getAvailableAtSupplier() {
+        return availableAtSupplier;
+    }
+
+    public void setAvailableAtSupplier(int availableAtSupplier) {
+        this.availableAtSupplier = availableAtSupplier;
+    }
+
+    public boolean isLowestPrice() {
+        return lowestPrice;
+    }
+
+    public void setLowestPrice(boolean lowestPrice) {
+        this.lowestPrice = lowestPrice;
     }
 
     public double getUnitCost() {
