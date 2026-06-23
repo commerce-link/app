@@ -518,6 +518,7 @@ public class OrdersController extends BaseController {
         }
 
         orderItem.setEan(resolvedEan);
+        orderItem.markAsInAllocation();
         orderItemsRepository.save(orderItem);
 
         return "redirect:/dashboard/orders/" + orderId;
