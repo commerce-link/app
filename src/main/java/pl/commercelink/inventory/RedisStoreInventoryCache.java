@@ -1,7 +1,6 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -18,7 +17,6 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 @Component
-@ConditionalOnProperty(name = "inventory.store-cache.type", havingValue = "redis")
 public class RedisStoreInventoryCache implements StoreInventoryCache {
 
     private final StringRedisTemplate redisTemplate;
