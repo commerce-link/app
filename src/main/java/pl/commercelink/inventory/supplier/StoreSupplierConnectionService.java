@@ -2,8 +2,9 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.SupplierConfigField;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.provider.ProviderConfigurationManager;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -22,14 +23,14 @@ import java.util.Set;
 public class StoreSupplierConnectionService {
 
     private final SupplierRegistry supplierRegistry;
-    private final SupplierConfigurationManager configurationManager;
+    private final ProviderConfigurationManager configurationManager;
     private final SupplierConnectionValidator validator;
     private final StoreSupplierConnectionPersister persister;
 
     private static final List<ErrorMessage> UPDATE_FAILED = List.of(ErrorMessage.of("store.supplier.connection.error.update.failed"));
 
-    public Map<String, List<SupplierConfigField>> configurationFields() {
-        Map<String, List<SupplierConfigField>> fields = new LinkedHashMap<>();
+    public Map<String, List<ProviderField>> configurationFields() {
+        Map<String, List<ProviderField>> fields = new LinkedHashMap<>();
         for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
             fields.put(descriptor.supplierInfo().name(), descriptor.configurationFields());
         }
@@ -38,8 +39,10 @@ public class StoreSupplierConnectionService {
 
     public Map<String, Map<String, String>> configurationsForUI(Store store) {
         Map<String, Map<String, String>> configs = new LinkedHashMap<>();
-        configurationFields().forEach((name, fields) ->
-                configs.put(name, configurationManager.getConfigurationForUI(store, name, fields)));
+        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
+            String name = descriptor.supplierInfo().name();
+            configs.put(name, configurationManager.getConfigurationForUI(store, name, descriptor));
+        }
         return configs;
     }
 

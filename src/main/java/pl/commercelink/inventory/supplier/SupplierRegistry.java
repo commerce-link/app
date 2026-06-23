@@ -1,9 +1,11 @@
 package pl.commercelink.inventory.supplier;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
-import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.inventory.supplier.api.*;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
+import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.starter.secrets.SecretsManager;
 
 import java.util.*;
 
@@ -16,15 +18,17 @@ public class SupplierRegistry {
     private static final SupplierInfo OTHER_ENTITY = new SupplierInfo("Other", SupplierType.Retailer, Integer.MAX_VALUE, "XX",
             new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.FlatRate(1000000, 18))));
 
+    private final SupplierProviderFactory supplierProviderFactory;
+    private final SecretsManager secretsManager;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private final Map<String, SupplierDescriptor> descriptors = new LinkedHashMap<>();
     private final Map<String, SupplierInfo> suppliers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    private final SecretsManager secretsManager;
-    private final SupplierSecretCodec secretCodec;
 
-    public SupplierRegistry(SecretsManager secretsManager, SupplierSecretCodec secretCodec) {
+    public SupplierRegistry(SupplierProviderFactory supplierProviderFactory, SecretsManager secretsManager) {
+        this.supplierProviderFactory = supplierProviderFactory;
         this.secretsManager = secretsManager;
-        this.secretCodec = secretCodec;
-        for (SupplierDescriptor descriptor : ServiceLoader.load(SupplierDescriptor.class)) {
+        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             descriptors.put(descriptor.supplierInfo().name(), descriptor);
             suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
         }
@@ -45,22 +49,33 @@ public class SupplierRegistry {
         suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
     }
 
+    /** GLOBAL feed download (store-independent). Per-store downloads go through SupplierProviderFactory.get(store, name). */
     public Optional<FeedData> downloadFeed(String supplierName) throws ResourceDownloadException {
         SupplierDescriptor descriptor = descriptors.get(supplierName);
         if (descriptor == null) {
             return Optional.empty();
         }
         String secret = secretsManager.getSecret(supplierName);
-        return descriptor.download(secret);
+        Map<String, String> config = decodeGlobalSecret(descriptor, secret);
+        return descriptor.create(config).download();
     }
 
-    public Optional<FeedData> downloadFeed(String supplierName, Map<String, String> config) throws ResourceDownloadException {
-        SupplierDescriptor descriptor = descriptors.get(supplierName);
-        if (descriptor == null) {
-            return Optional.empty();
+    private Map<String, String> decodeGlobalSecret(SupplierDescriptor descriptor, String secret) {
+        if (secret == null || secret.isBlank()) {
+            return Map.of();
         }
-        String secret = secretCodec.toSecretString(config);
-        return descriptor.download(secret);
+        if (secret.trim().startsWith("{")) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, String> parsed = objectMapper.readValue(secret, Map.class);
+                return parsed;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to decode global supplier secret for " + descriptor.name(), e);
+            }
+        }
+        List<ProviderField> fields = descriptor.configurationFields();
+        String key = fields.isEmpty() ? "url" : fields.get(0).key();
+        return Map.of(key, secret);
     }
 
     public Optional<SupplierDescriptor> getDescriptor(String supplierName) {
