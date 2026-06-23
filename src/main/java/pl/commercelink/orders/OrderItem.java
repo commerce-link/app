@@ -191,6 +191,11 @@ public class OrderItem extends Item {
         this.selected = selected;
     }
 
+    @DynamoDBIgnore
+    public void toggleConsolidation() {
+        this.consolidated = !this.consolidated;
+    }
+
     public boolean isConsolidated() {
         return consolidated;
     }
