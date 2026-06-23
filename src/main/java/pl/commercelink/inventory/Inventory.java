@@ -12,7 +12,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,33 +68,39 @@ public class Inventory {
     }
 
     public InventoryView withGlobalData() {
-        return new InventoryView(globalInventory.all());
+        GlobalInventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, List.of(), taxonomyCache, supplierRegistry,
+                new GlobalInventorySource(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
-        return new InventoryView(new LinkedList<>(),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+        GlobalInventoryIndex globalIndex = GlobalInventoryIndex.of(List.of());
+        return new InventoryView(globalIndex, List.of(), taxonomyCache, supplierRegistry,
+                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
         Store store = storesRepository.findById(storeId);
         Collection<MatchedInventory> ownInventory = storeInventoryProvider.ownInventory(store);
-        return new InventoryView(globalInventory.all(), ownInventory,
-                new GlobalSuppliersInventoryFilter(globalSupplierNames(store), taxonomyCache, supplierRegistry),
-                new StoreSuppliersInventoryFilter(ownInventory, taxonomyCache, supplierRegistry));
+        GlobalInventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, ownInventory, taxonomyCache, supplierRegistry,
+                new GlobalInventorySource(globalIndex, enabledGlobalSupplier(store)),
+                new OwnInventorySource(ownInventory));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
         Store store = storesRepository.findById(storeId);
         Collection<MatchedInventory> ownInventory = storeInventoryProvider.ownInventory(store);
-        return new InventoryView(globalInventory.all(), ownInventory,
-                new GlobalSuppliersInventoryFilter(globalSupplierNames(store), taxonomyCache, supplierRegistry),
-                new StoreSuppliersInventoryFilter(ownInventory, taxonomyCache, supplierRegistry),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+        GlobalInventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, ownInventory, taxonomyCache, supplierRegistry,
+                new GlobalInventorySource(globalIndex, enabledGlobalSupplier(store)),
+                new OwnInventorySource(ownInventory),
+                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
-    private Collection<String> globalSupplierNames(Store store) {
-        return store != null ? store.getGlobalSupplierNames() : List.of();
+    private Predicate<String> enabledGlobalSupplier(Store store) {
+        Collection<String> names = store != null ? store.getGlobalSupplierNames() : List.of();
+        return names::contains;
     }
 
     public int size() {

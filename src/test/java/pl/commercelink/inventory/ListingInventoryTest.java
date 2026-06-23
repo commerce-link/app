@@ -24,24 +24,25 @@ class ListingInventoryTest {
     }
 
     @Test
-    void streamsGlobalOnlyWhenStoreHasNoOwnInventory() {
+    void streamsGlobalKeysOnlyWhenStoreHasNoOwnInventory() {
         // given
-        MatchedInventory global = group(new InventoryKey("5901234567890", "MFN-1"));
-        ListingInventory listing = new ListingInventory(List.of(global), List.of());
+        InventoryKey globalKey = new InventoryKey("5901234567890", "MFN-1");
+        ListingInventory listing = new ListingInventory(GlobalInventoryIndex.of(List.of(group(globalKey))), List.of());
 
         // when / then
-        assertThat(listing.stream()).containsExactly(global);
+        assertThat(listing.keys()).containsExactly(globalKey);
     }
 
     @Test
-    void appendsOwnGroupsAbsentFromGlobalAndSkipsOwnGroupsAlreadyInGlobal() {
+    void appendsOwnKeysAbsentFromGlobalAndSkipsOwnKeysAlreadyInGlobal() {
         // given
-        MatchedInventory global = group(new InventoryKey("5901234567890", "MFN-1"));
-        MatchedInventory ownSameProduct = group(new InventoryKey("5901234567890", "MFN-1"));
-        MatchedInventory ownOnly = group(new InventoryKey("4000000000009", "MFN-OWN"));
-        ListingInventory listing = new ListingInventory(List.of(global), List.of(ownSameProduct, ownOnly));
+        InventoryKey globalKey = new InventoryKey("5901234567890", "MFN-1");
+        InventoryKey ownSameProductKey = new InventoryKey("5901234567890", "MFN-1");
+        InventoryKey ownOnlyKey = new InventoryKey("4000000000009", "MFN-OWN");
+        ListingInventory listing = new ListingInventory(GlobalInventoryIndex.of(List.of(group(globalKey))),
+                List.of(group(ownSameProductKey), group(ownOnlyKey)));
 
         // when / then
-        assertThat(listing.stream()).containsExactly(global, ownOnly);
+        assertThat(listing.keys()).containsExactly(globalKey, ownOnlyKey);
     }
 }

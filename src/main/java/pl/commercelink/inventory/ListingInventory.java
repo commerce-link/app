@@ -5,20 +5,22 @@ import java.util.stream.Stream;
 
 class ListingInventory {
 
-    private final Collection<MatchedInventory> global;
+    private final GlobalInventoryIndex globalIndex;
     private final Collection<MatchedInventory> own;
 
-    ListingInventory(Collection<MatchedInventory> global, Collection<MatchedInventory> own) {
-        this.global = global;
+    ListingInventory(GlobalInventoryIndex globalIndex, Collection<MatchedInventory> own) {
+        this.globalIndex = globalIndex;
         this.own = own;
     }
 
-    Stream<MatchedInventory> stream() {
+    Stream<InventoryKey> keys() {
+        Stream<InventoryKey> globalKeys = globalIndex.all().stream().map(MatchedInventory::getInventoryKey);
         if (own.isEmpty()) {
-            return global.stream();
+            return globalKeys;
         }
-        ProductIdentifiers globalProducts = ProductIdentifiers.of(global);
-        return Stream.concat(global.stream(),
-                own.stream().filter(group -> !globalProducts.contains(group.getInventoryKey())));
+        Stream<InventoryKey> ownOnlyKeys = own.stream()
+                .map(MatchedInventory::getInventoryKey)
+                .filter(key -> !globalIndex.contains(key));
+        return Stream.concat(globalKeys, ownOnlyKeys);
     }
 }
