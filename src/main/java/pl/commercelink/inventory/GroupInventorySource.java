@@ -1,29 +1,38 @@
 package pl.commercelink.inventory;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 
 import java.util.List;
+import java.util.function.Predicate;
 
-abstract class GroupInventorySource implements InventorySource {
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+class GroupInventorySource implements InventorySource {
+
+    private final InventoryIndex index;
+    private final Predicate<String> enabledSupplier;
+
+    static GroupInventorySource global(InventoryIndex index, Predicate<String> enabledSupplier) {
+        return new GroupInventorySource(index, enabledSupplier);
+    }
+
+    static GroupInventorySource own(InventoryIndex index) {
+        return new GroupInventorySource(index, supplier -> true);
+    }
 
     @Override
     public void mergeInto(MatchedInventory result, InventoryKey lookupKey) {
-        MatchedInventory best = selectBest(findCandidates(lookupKey), lookupKey);
+        MatchedInventory best = selectBest(index.findMatching(lookupKey), lookupKey);
         if (best == null) {
             return;
         }
         result.getInventoryKey().merge(best.getInventoryKey());
         for (InventoryItem item : best.getInventoryItems()) {
-            if (accepts(item)) {
+            if (enabledSupplier.test(item.supplier())) {
                 result.addAlternativeInventoryItem(item);
             }
         }
-    }
-
-    abstract List<MatchedInventory> findCandidates(InventoryKey lookupKey);
-
-    boolean accepts(InventoryItem item) {
-        return true;
     }
 
     // prioritize lookup by mfn as it's more reliable

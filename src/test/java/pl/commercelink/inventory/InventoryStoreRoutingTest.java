@@ -52,13 +52,13 @@ class InventoryStoreRoutingTest {
         // given
         Store store = store();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
 
         // when
         inventory.withEnabledSuppliersOnly("store-1");
 
         // then
-        verify(storeInventoryProvider).ownInventory(store);
+        verify(storeInventoryProvider).ownIndex(store);
     }
 
     @Test
@@ -66,12 +66,12 @@ class InventoryStoreRoutingTest {
         // given
         Store store = store();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
 
         // when
         inventory.withEnabledSuppliersAndWarehouseData("store-1");
 
         // then
-        verify(storeInventoryProvider).ownInventory(store);
+        verify(storeInventoryProvider).ownIndex(store);
     }
 }

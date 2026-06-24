@@ -32,6 +32,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 
 ## Coding Conventions
 
+- **Lombok**: Prefer Lombok to remove boilerplate. Use `@RequiredArgsConstructor` (with `access = AccessLevel.PACKAGE`/`PRIVATE` to match the intended constructor visibility) for constructors that are pure `final`-field assignment, and `@Getter`/`@Value`/`@Builder` where they fit. Don't use it where the constructor has real logic (e.g. transforming varargs) or where a `record` already removes the boilerplate.
 - **No Logger**: We log all entries to Sentry automatically. Use `System.out`/`System.err` only in rare cases.
 - **No comments**: Code should be self-explanatory. Refactor instead of commenting.
 - **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.

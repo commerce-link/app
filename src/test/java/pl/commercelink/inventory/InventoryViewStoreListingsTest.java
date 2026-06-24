@@ -102,13 +102,13 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
     }
 
     private void stubGlobalIndex(Collection<MatchedInventory> groups) {
-        when(globalInventory.index()).thenReturn(GlobalInventoryIndex.of(groups));
+        when(globalInventory.index()).thenReturn(InventoryIndex.of(groups));
     }
 
     private double priceOf(MatchedInventory matched, String supplier) {
@@ -155,7 +155,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
@@ -180,7 +180,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
@@ -206,7 +206,7 @@ class InventoryViewStoreListingsTest {
         MatchedInventory ownGroup = new MatchedInventory(ownKey,
                 List.of(new InventoryItem("5907777777777", "MFN-OWN", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
                 taxonomyCache, supplierRegistry);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownGroup));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownGroup)));
         InventoryKey globalKey = new InventoryKey("PIM-1");
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
@@ -229,7 +229,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
@@ -270,7 +270,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
 
@@ -290,7 +290,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         InventoryKey globalKey = new InventoryKey("PIM-1");
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
@@ -312,7 +312,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
@@ -335,7 +335,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
@@ -376,7 +376,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of());
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of());
 
         // when
@@ -395,7 +395,7 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownInventory(store)).thenReturn(List.of(ownActionGroup()));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
 
         // when

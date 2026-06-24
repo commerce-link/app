@@ -14,7 +14,6 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,12 +36,12 @@ public class StoreInventoryProvider {
         return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
     }
 
-    public Collection<MatchedInventory> ownInventory(Store store) {
+    public InventoryIndex ownIndex(Store store) {
         if (store == null || !store.hasOwnSupplierConnections()) {
-            return List.of();
+            return InventoryIndex.of(List.of());
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId)).items();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId)).index();
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {
@@ -62,7 +61,7 @@ public class StoreInventoryProvider {
 
     private StoreInventory build(String storeId, Store storeEntity) {
         if (storeEntity == null) {
-            return new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+            return new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now());
         }
 
         List<InventoryItem> ownItems = new ArrayList<>();
@@ -72,6 +71,6 @@ public class StoreInventoryProvider {
                     .ifPresent(descriptor -> ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates)));
         }
 
-        return new StoreInventory(autoDiscovery.run(ownItems), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems)), LocalDateTime.now());
     }
 }

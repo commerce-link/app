@@ -13,7 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
-class GlobalInventorySourceTest {
+class GroupInventorySourceTest {
 
     @Mock
     private TaxonomyCache taxonomyCache;
@@ -38,7 +38,7 @@ class GlobalInventorySourceTest {
         MatchedInventory small = group(new InventoryKey("E1", "M1"), item("E1", "M1", "SupplierX", 100.0));
         MatchedInventory big = group(new InventoryKey("E2", "M1"),
                 item("E2", "M1", "SupplierY", 90.0), item("E2", "M1", "SupplierZ", 95.0));
-        GlobalInventorySource source = new GlobalInventorySource(GlobalInventoryIndex.of(List.of(small, big)), supplier -> true);
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(small, big)), supplier -> true);
         InventoryKey lookupKey = InventoryKey.fromMfn("M1");
         MatchedInventory result = accumulator(lookupKey);
 
@@ -54,7 +54,7 @@ class GlobalInventorySourceTest {
         // given
         MatchedInventory eanOnly = group(new InventoryKey("E1", null), item("E1", "M-OTHER", "SupplierX", 100.0));
         MatchedInventory mfnMatch = group(new InventoryKey(null, "M1"), item("E2", "M1", "SupplierY", 90.0));
-        GlobalInventorySource source = new GlobalInventorySource(GlobalInventoryIndex.of(List.of(eanOnly, mfnMatch)), supplier -> true);
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(eanOnly, mfnMatch)), supplier -> true);
         InventoryKey lookupKey = new InventoryKey("E1", "M1");
         MatchedInventory result = accumulator(lookupKey);
 
@@ -69,7 +69,7 @@ class GlobalInventorySourceTest {
     void fallsBackToEanMatchesWhenNoMfnMatch() {
         // given
         MatchedInventory eanOnly = group(new InventoryKey("E1", null), item("E1", "M-OTHER", "SupplierX", 100.0));
-        GlobalInventorySource source = new GlobalInventorySource(GlobalInventoryIndex.of(List.of(eanOnly)), supplier -> true);
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(eanOnly)), supplier -> true);
         InventoryKey lookupKey = InventoryKey.fromEan("E1");
         MatchedInventory result = accumulator(lookupKey);
 
@@ -85,7 +85,7 @@ class GlobalInventorySourceTest {
         // given
         MatchedInventory matched = group(new InventoryKey("E1", "M1"),
                 item("E1", "M1", "AB Group", 1399.0), item("E1", "M1", "Elko", 1300.0));
-        GlobalInventorySource source = new GlobalInventorySource(GlobalInventoryIndex.of(List.of(matched)), List.of("AB Group")::contains);
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(matched)), List.of("AB Group")::contains);
         InventoryKey lookupKey = InventoryKey.fromMfn("M1");
         MatchedInventory result = accumulator(lookupKey);
 
@@ -100,8 +100,85 @@ class GlobalInventorySourceTest {
     void mergesNothingWhenNoGroupMatches() {
         // given
         MatchedInventory matched = group(new InventoryKey("E1", "M1"), item("E1", "M1", "AB Group", 1399.0));
-        GlobalInventorySource source = new GlobalInventorySource(GlobalInventoryIndex.of(List.of(matched)), supplier -> true);
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(matched)), supplier -> true);
         InventoryKey lookupKey = InventoryKey.fromMfn("M-UNKNOWN");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).isEmpty();
+    }
+
+    @Test
+    void appendsItemsFromOwnGroupsMatchingLookupKey() {
+        // given
+        MatchedInventory own = group(new InventoryKey("E1", "M1"), item("E1", "M1", "Action", 1380.0));
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of(own)));
+        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("Action");
+    }
+
+    @Test
+    void selectsMfnMatchOverEanOnlyMatch() {
+        // given
+        MatchedInventory eanMatch = group(new InventoryKey("E1", null), item("E1", "M-OTHER", "SupplierX", 100.0));
+        MatchedInventory mfnMatch = group(new InventoryKey(null, "M1"), item("E2", "M1", "SupplierY", 90.0));
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of(eanMatch, mfnMatch)));
+        InventoryKey lookupKey = new InventoryKey("E1", "M1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("SupplierY");
+    }
+
+    @Test
+    void selectsLargestOwnGroupAmongMfnMatches() {
+        // given
+        MatchedInventory small = group(new InventoryKey("E1", "M1"), item("E1", "M1", "Action", 100.0));
+        MatchedInventory big = group(new InventoryKey("E2", "M1"),
+                item("E2", "M1", "Wortmann", 90.0), item("E2", "M1", "Asbis", 95.0));
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of(small, big)));
+        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactlyInAnyOrder("Wortmann", "Asbis");
+    }
+
+    @Test
+    void ignoresOwnGroupsThatDoNotMatch() {
+        // given
+        MatchedInventory unrelated = group(new InventoryKey("E2", "M2"), item("E2", "M2", "Action", 1380.0));
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of(unrelated)));
+        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).isEmpty();
+    }
+
+    @Test
+    void mergesNothingWhenOwnInventoryEmpty() {
+        // given
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of()));
+        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
         MatchedInventory result = accumulator(lookupKey);
 
         // when

@@ -1,5 +1,8 @@
 package pl.commercelink.inventory;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -7,24 +10,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-class GlobalInventoryIndex {
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+class InventoryIndex {
 
     private final List<MatchedInventory> groups;
     private final Map<String, Set<MatchedInventory>> byId;
     private final Map<String, Set<MatchedInventory>> byEan;
     private final Map<String, Set<MatchedInventory>> byProductCode;
 
-    private GlobalInventoryIndex(List<MatchedInventory> groups,
-                                 Map<String, Set<MatchedInventory>> byId,
-                                 Map<String, Set<MatchedInventory>> byEan,
-                                 Map<String, Set<MatchedInventory>> byProductCode) {
-        this.groups = groups;
-        this.byId = byId;
-        this.byEan = byEan;
-        this.byProductCode = byProductCode;
-    }
-
-    static GlobalInventoryIndex of(Collection<MatchedInventory> groups) {
+    static InventoryIndex of(Collection<MatchedInventory> groups) {
         Map<String, Set<MatchedInventory>> byId = new HashMap<>();
         Map<String, Set<MatchedInventory>> byEan = new HashMap<>();
         Map<String, Set<MatchedInventory>> byProductCode = new HashMap<>();
@@ -36,7 +30,7 @@ class GlobalInventoryIndex {
             key.getProductEans().forEach(ean -> byEan.computeIfAbsent(ean, k -> new LinkedHashSet<>()).add(group));
             key.getProductCodes().forEach(code -> byProductCode.computeIfAbsent(code, k -> new LinkedHashSet<>()).add(group));
         }
-        return new GlobalInventoryIndex(List.copyOf(groups), byId, byEan, byProductCode);
+        return new InventoryIndex(List.copyOf(groups), byId, byEan, byProductCode);
     }
 
     List<MatchedInventory> all() {

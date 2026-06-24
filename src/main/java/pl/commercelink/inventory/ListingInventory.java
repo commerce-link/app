@@ -1,24 +1,22 @@
 package pl.commercelink.inventory;
 
-import java.util.Collection;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import java.util.stream.Stream;
 
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ListingInventory {
 
-    private final GlobalInventoryIndex globalIndex;
-    private final Collection<MatchedInventory> own;
-
-    ListingInventory(GlobalInventoryIndex globalIndex, Collection<MatchedInventory> own) {
-        this.globalIndex = globalIndex;
-        this.own = own;
-    }
+    private final InventoryIndex globalIndex;
+    private final InventoryIndex ownIndex;
 
     Stream<InventoryKey> keys() {
         Stream<InventoryKey> globalKeys = globalIndex.all().stream().map(MatchedInventory::getInventoryKey);
-        if (own.isEmpty()) {
+        if (ownIndex.all().isEmpty()) {
             return globalKeys;
         }
-        Stream<InventoryKey> ownOnlyKeys = own.stream()
+        Stream<InventoryKey> ownOnlyKeys = ownIndex.all().stream()
                 .map(MatchedInventory::getInventoryKey)
                 .filter(key -> !globalIndex.contains(key));
         return Stream.concat(globalKeys, ownOnlyKeys);

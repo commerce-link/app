@@ -12,7 +12,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
-class GlobalInventoryIndexTest {
+class InventoryIndexTest {
 
     @Mock
     private TaxonomyCache taxonomyCache;
@@ -27,7 +27,7 @@ class GlobalInventoryIndexTest {
     void findsGroupByEan() {
         // given
         MatchedInventory matched = group(new InventoryKey("5901234567890", "MFN-1"));
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(matched));
+        InventoryIndex index = InventoryIndex.of(List.of(matched));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("5901234567890", "OTHER"))).containsExactly(matched);
@@ -37,7 +37,7 @@ class GlobalInventoryIndexTest {
     void findsGroupByProductCode() {
         // given
         MatchedInventory matched = group(new InventoryKey("5901234567890", "MFN-1"));
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(matched));
+        InventoryIndex index = InventoryIndex.of(List.of(matched));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("0000000000000", "MFN-1"))).containsExactly(matched);
@@ -47,7 +47,7 @@ class GlobalInventoryIndexTest {
     void findsGroupByPimId() {
         // given
         MatchedInventory matched = group(new InventoryKey("PIM-1"));
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(matched));
+        InventoryIndex index = InventoryIndex.of(List.of(matched));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("PIM-1"))).containsExactly(matched);
@@ -58,7 +58,7 @@ class GlobalInventoryIndexTest {
         // given
         InventoryKey key = new InventoryKey("5901234567890", "MFN-1");
         MatchedInventory matched = group(key);
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(matched));
+        InventoryIndex index = InventoryIndex.of(List.of(matched));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("5901234567890", "MFN-1"))).containsExactly(matched);
@@ -69,7 +69,7 @@ class GlobalInventoryIndexTest {
         // given
         MatchedInventory first = group(new InventoryKey("5901234567890", "MFN-1"));
         MatchedInventory second = group(new InventoryKey("4000000000009", "MFN-1"));
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(first, second));
+        InventoryIndex index = InventoryIndex.of(List.of(first, second));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("0000000000000", "MFN-1"))).containsExactlyInAnyOrder(first, second);
@@ -78,7 +78,7 @@ class GlobalInventoryIndexTest {
     @Test
     void returnsEmptyWhenNothingMatches() {
         // given
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
+        InventoryIndex index = InventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
 
         // when / then
         assertThat(index.findMatching(new InventoryKey("0000000000000", "OTHER"))).isEmpty();
@@ -89,7 +89,7 @@ class GlobalInventoryIndexTest {
         // given
         MatchedInventory first = group(new InventoryKey("5901234567890", "MFN-1"));
         MatchedInventory second = group(new InventoryKey("4000000000009", "MFN-2"));
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(first, second));
+        InventoryIndex index = InventoryIndex.of(List.of(first, second));
 
         // when / then
         assertThat(index.all()).containsExactly(first, second);
@@ -98,7 +98,7 @@ class GlobalInventoryIndexTest {
     @Test
     void containsReflectsWhetherAnyGroupMatches() {
         // given
-        GlobalInventoryIndex index = GlobalInventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
+        InventoryIndex index = InventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
 
         // when / then
         assertThat(index.contains(new InventoryKey("5901234567890", "OTHER"))).isTrue();

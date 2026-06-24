@@ -12,16 +12,16 @@ import java.util.stream.Stream;
 
 public class InventoryView {
 
-    private final GlobalInventoryIndex globalIndex;
-    private final Collection<MatchedInventory> ownInventory;
+    private final InventoryIndex globalIndex;
+    private final InventoryIndex ownIndex;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
-    InventoryView(GlobalInventoryIndex globalIndex, Collection<MatchedInventory> ownInventory,
-                  TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource...    sources) {
+    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
+                  TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
-        this.ownInventory = ownInventory;
+        this.ownIndex = ownIndex;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
@@ -58,7 +58,7 @@ public class InventoryView {
     }
 
     private Stream<InventoryKey> listedKeys() {
-        return new ListingInventory(globalIndex, ownInventory).keys();
+        return new ListingInventory(globalIndex, ownIndex).keys();
     }
 
     private MatchedInventory assemble(InventoryKey lookupKey) {
