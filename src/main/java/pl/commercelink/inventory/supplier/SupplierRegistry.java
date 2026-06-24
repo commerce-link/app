@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.*;
@@ -22,15 +24,13 @@ public class SupplierRegistry {
     private final SecretsManager secretsManager;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final Map<String, SupplierDescriptor> descriptors = new LinkedHashMap<>();
     private final Map<String, SupplierInfo> suppliers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
     public SupplierRegistry(SupplierProviderFactory supplierProviderFactory, SecretsManager secretsManager) {
         this.supplierProviderFactory = supplierProviderFactory;
         this.secretsManager = secretsManager;
         for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
-            descriptors.put(descriptor.supplierInfo().name(), descriptor);
-            suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
+            register(descriptor.supplierInfo());
         }
         register(new SupplierInfo("Amazon", SupplierType.Retailer, 1, "PL",
                 new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free())),
@@ -44,14 +44,9 @@ public class SupplierRegistry {
         suppliers.put(entity.name(), entity);
     }
 
-    void registerDescriptor(SupplierDescriptor descriptor) {
-        descriptors.put(descriptor.supplierInfo().name(), descriptor);
-        suppliers.put(descriptor.supplierInfo().name(), descriptor.supplierInfo());
-    }
-
     /** GLOBAL feed download (store-independent). Per-store downloads go through SupplierProviderFactory.get(store, name). */
     public Optional<FeedData> downloadFeed(String supplierName) throws ResourceDownloadException {
-        SupplierDescriptor descriptor = descriptors.get(supplierName);
+        SupplierDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
         if (descriptor == null) {
             return Optional.empty();
         }
@@ -66,10 +61,8 @@ public class SupplierRegistry {
         }
         if (secret.trim().startsWith("{")) {
             try {
-                @SuppressWarnings("unchecked")
-                Map<String, String> parsed = objectMapper.readValue(secret, Map.class);
-                return parsed;
-            } catch (Exception e) {
+                return objectMapper.readValue(secret, new TypeReference<Map<String, String>>() {});
+            } catch (JsonProcessingException e) {
                 throw new RuntimeException("Failed to decode global supplier secret for " + descriptor.name(), e);
             }
         }
@@ -79,11 +72,11 @@ public class SupplierRegistry {
     }
 
     public Optional<SupplierDescriptor> getDescriptor(String supplierName) {
-        return Optional.ofNullable(descriptors.get(supplierName));
+        return Optional.ofNullable(supplierProviderFactory.getDescriptor(supplierName));
     }
 
     public Collection<SupplierDescriptor> getAllDescriptors() {
-        return descriptors.values();
+        return supplierProviderFactory.availableProviders();
     }
 
     public SupplierInfo get(String supplierName) {
