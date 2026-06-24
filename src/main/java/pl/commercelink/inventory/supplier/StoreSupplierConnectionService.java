@@ -2,7 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
@@ -32,7 +32,7 @@ public class StoreSupplierConnectionService {
 
     public Map<String, List<ProviderField>> configurationFields() {
         Map<String, List<ProviderField>> fields = new LinkedHashMap<>();
-        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             fields.put(descriptor.supplierInfo().name(), descriptor.configurationFields());
         }
         return fields;
@@ -40,7 +40,7 @@ public class StoreSupplierConnectionService {
 
     public Map<String, Map<String, String>> configurationsForUI(Store store) {
         Map<String, Map<String, String>> configs = new LinkedHashMap<>();
-        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
             configs.put(name, configurationManager.getConfigurationForUI(store, name, descriptor));
         }

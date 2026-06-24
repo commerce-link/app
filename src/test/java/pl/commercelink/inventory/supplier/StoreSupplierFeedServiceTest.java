@@ -8,7 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.api.FeedData;
-import pl.commercelink.inventory.supplier.api.Supplier;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -42,7 +42,7 @@ class StoreSupplierFeedServiceTest {
         // given
         Store store = storeWithId("store-1");
         byte[] data = "rows".getBytes();
-        Supplier supplier = () -> Optional.of(new FeedData(data, "csv"));
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 
@@ -84,7 +84,7 @@ class StoreSupplierFeedServiceTest {
     void doesNotStoreWhenDownloadReturnsEmpty() throws ResourceDownloadException {
         // given
         Store store = storeWithId("store-1");
-        Supplier supplier = Optional::empty;
+        SupplierProvider supplier = Optional::empty;
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 

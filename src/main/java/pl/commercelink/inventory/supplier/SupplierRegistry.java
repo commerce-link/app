@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Supplier catalog: {@link SupplierInfo} metadata for every discovered supplier plus the
+ * SupplierProvider catalog: {@link SupplierInfo} metadata for every discovered supplier plus the
  * built-in non-plugin entities (Amazon, Warehouse, Other). The list of supplier providers
  * lives in {@link SupplierProviderFactory}; this registry only owns catalog metadata.
  */
@@ -25,7 +25,7 @@ public class SupplierRegistry {
     private final Map<String, SupplierInfo> suppliers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
     public SupplierRegistry(SupplierProviderFactory supplierProviderFactory) {
-        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             register(descriptor.supplierInfo());
         }
         register(new SupplierInfo("Amazon", SupplierType.Retailer, 1, "PL",

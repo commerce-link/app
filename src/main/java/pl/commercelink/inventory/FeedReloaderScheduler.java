@@ -9,7 +9,7 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -36,7 +36,7 @@ public class FeedReloaderScheduler {
         Map<String, List<InventoryItem>> updatesBySupplier = new LinkedHashMap<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
 
-        for (SupplierDescriptor supplierDescriptor : supplierProviderFactory.availableProviders()) {
+        for (SupplierProviderDescriptor supplierDescriptor : supplierProviderFactory.availableProviders()) {
             String supplierName = supplierDescriptor.supplierInfo().name();
             LocalDateTime lastUpdateDate = inventory.getLastUpdateDate(supplierName);
             LocalDateTime lastModified = latestModifiedPerSupplier.get(supplierName);
@@ -54,7 +54,7 @@ public class FeedReloaderScheduler {
         }
     }
 
-    private List<InventoryItem> fetchItems(SupplierDescriptor supplierDescriptor) {
+    private List<InventoryItem> fetchItems(SupplierProviderDescriptor supplierDescriptor) {
         return switch (supplierDescriptor.feedFormat()) {
             case FeedFormat.Csv csv -> csvProductFeedLoader.fetch(csv.parser(), csv.separator(), supplierDescriptor.supplierInfo().name());
             case FeedFormat.Xml xml -> xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierDescriptor.supplierInfo());

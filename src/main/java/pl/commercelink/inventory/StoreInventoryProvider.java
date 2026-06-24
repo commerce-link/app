@@ -8,7 +8,7 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -61,7 +61,7 @@ public class StoreInventoryProvider {
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         for (String supplierName : storeEntity.getOwnSupplierNames()) {
-            SupplierDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
+            SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
             if (descriptor != null) {
                 ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
             }

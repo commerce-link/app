@@ -8,7 +8,7 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 
@@ -38,7 +38,7 @@ class InventoryLoad {
         inventory.init(rawFeeds);
     }
 
-    private List<InventoryItem> fetchItems(SupplierDescriptor supplierDescriptor) {
+    private List<InventoryItem> fetchItems(SupplierProviderDescriptor supplierDescriptor) {
         return switch (supplierDescriptor.feedFormat()) {
             case FeedFormat.Csv csv -> csvProductFeedLoader.fetch(csv.parser(), csv.separator(), supplierDescriptor.supplierInfo().name());
             case FeedFormat.Xml xml -> xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierDescriptor.supplierInfo());

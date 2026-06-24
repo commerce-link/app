@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.starter.secrets.SecretsManager;
@@ -24,7 +24,7 @@ public class GlobalSupplierFeedService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void loadFeed(String supplierName) throws ResourceDownloadException {
-        SupplierDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
         if (descriptor == null) {
             return;
         }
@@ -34,7 +34,7 @@ public class GlobalSupplierFeedService {
                 inventoryRepository.store(supplierName, feedData.data(), feedData.extension()));
     }
 
-    private Map<String, String> decodeGlobalSecret(SupplierDescriptor descriptor, String secret) {
+    private Map<String, String> decodeGlobalSecret(SupplierProviderDescriptor descriptor, String secret) {
         if (secret == null || secret.isBlank()) {
             return Map.of();
         }

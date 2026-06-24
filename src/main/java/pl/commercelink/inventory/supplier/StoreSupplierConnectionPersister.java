@@ -2,7 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -108,7 +108,7 @@ public class StoreSupplierConnectionPersister {
     void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
         Set<String> newOwnSuppliers = ownSupplierNames(submitted);
 
-        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
             if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()) {
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());

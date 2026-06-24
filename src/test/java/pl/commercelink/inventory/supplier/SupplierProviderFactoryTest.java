@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.Supplier;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.stores.Store;
@@ -29,7 +29,7 @@ class SupplierProviderFactoryTest {
         SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
 
         // when
-        Supplier supplier = factory.get(store, "Stub");
+        SupplierProvider supplier = factory.get(store, "Stub");
 
         // then
         assertThat(supplier).isNotNull();

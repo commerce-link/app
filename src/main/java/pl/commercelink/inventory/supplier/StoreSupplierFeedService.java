@@ -2,7 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.Supplier;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -20,7 +20,7 @@ public class StoreSupplierFeedService {
         if (store == null) {
             return;
         }
-        Supplier supplier = supplierProviderFactory.get(store, supplierName);
+        SupplierProvider supplier = supplierProviderFactory.get(store, supplierName);
         if (supplier == null) {
             return;
         }

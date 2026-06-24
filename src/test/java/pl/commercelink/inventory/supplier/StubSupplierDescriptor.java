@@ -5,21 +5,21 @@ import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
-import pl.commercelink.inventory.supplier.api.Supplier;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 
 import java.util.Map;
 import java.util.Optional;
 
-public class StubSupplierDescriptor implements SupplierDescriptor {
+public class StubSupplierDescriptor implements SupplierProviderDescriptor {
 
     public static final SupplierInfo INFO = new SupplierInfo("Stub", SupplierType.Distributor, 1, "PL",
             new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())), null);
 
     @Override
-    public Supplier create(Map<String, String> config) {
+    public SupplierProvider create(Map<String, String> config) {
         return () -> Optional.of(FeedData.csv(config.getOrDefault("url", "x").getBytes()));
     }
 

@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
@@ -71,8 +71,8 @@ class StoreSupplierConnectionPersisterTest {
         return config;
     }
 
-    private SupplierDescriptor descriptor(String name, boolean hasFields) {
-        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+    private SupplierProviderDescriptor descriptor(String name, boolean hasFields) {
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         SupplierInfo info = mock(SupplierInfo.class);
         when(info.name()).thenReturn(name);
         when(descriptor.supplierInfo()).thenReturn(info);
@@ -88,7 +88,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
 
         // when
@@ -109,7 +109,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true);
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
 
         // when
@@ -129,7 +129,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
         when(configurationManager.snapshot(existing, "Acme"))
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
@@ -141,7 +141,7 @@ class StoreSupplierConnectionPersisterTest {
         // then
         assertFalse(outcome.success());
         verify(storesRepository, never()).save(any());
-        verify(configurationManager, never()).saveConfiguration(any(), anyString(), any(SupplierDescriptor.class), any());
+        verify(configurationManager, never()).saveConfiguration(any(), anyString(), any(SupplierProviderDescriptor.class), any());
         verify(configurationManager).restore(eq(existing), eq("Acme"), any());
         verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
@@ -152,7 +152,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
         Map<String, Map<String, String>> submittedConfig = Map.of("Acme", Map.of("url", "https://feed"));
 
@@ -169,7 +169,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL));
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
 
         // when
@@ -177,7 +177,7 @@ class StoreSupplierConnectionPersisterTest {
 
         // then
         verify(configurationManager).deleteConfiguration(existing, "Acme");
-        verify(configurationManager, never()).saveConfiguration(any(), anyString(), any(SupplierDescriptor.class), any());
+        verify(configurationManager, never()).saveConfiguration(any(), anyString(), any(SupplierProviderDescriptor.class), any());
     }
 
     @Test
@@ -209,7 +209,7 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
-        SupplierDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
         doThrow(new RuntimeException("import boom")).when(feedScheduler).triggerImmediateImport(any(), any());
 

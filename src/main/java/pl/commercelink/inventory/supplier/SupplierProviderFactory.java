@@ -1,20 +1,20 @@
 package pl.commercelink.inventory.supplier;
 
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.Supplier;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.ProviderFactory;
 
 @Service
-public class SupplierProviderFactory extends ProviderFactory<SupplierDescriptor, Supplier> {
+public class SupplierProviderFactory extends ProviderFactory<SupplierProviderDescriptor, SupplierProvider> {
 
     public SupplierProviderFactory(ProviderConfigurationManager configurationManager) {
-        super(SupplierDescriptor.class, null, configurationManager);
+        super(SupplierProviderDescriptor.class, null, configurationManager);
     }
 
     @Override
-    public String resolveCredentialName(SupplierDescriptor descriptor) {
+    public String resolveCredentialName(SupplierProviderDescriptor descriptor) {
         return descriptor.name();
     }
 }
