@@ -303,6 +303,11 @@
                                            th:text="#{order.item.clear.assign}"></a>
                                         <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
+                                        <a class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId}"
+                                           onclick="submitToggleConsolidation(this); return false;"
+                                           th:text="${item.consolidated} ? #{order.item.deconsolidate} : #{order.item.consolidate}"></a>
                                         <hr class="dropdown-divider">
                                         <a class="dropdown-item"
                                            th:href="@{/dashboard/orders/{orderId}/items/{itemId}(orderId=${item.orderId}, itemId=${item.itemId})}"
@@ -428,6 +433,11 @@
     <form id="clearSupplierForm" method="post"
           th:action="@{/dashboard/orders/{orderId}/clear-supplier(orderId=${order.orderId})}">
         <input type="hidden" id="clearSupplierItemId" name="itemId"/>
+    </form>
+
+    <form id="toggleConsolidationForm" method="post"
+          th:action="@{/dashboard/orders/{orderId}/toggle-consolidation(orderId=${order.orderId})}">
+        <input type="hidden" id="toggleConsolidationItemId" name="itemId"/>
     </form>
 
     <div class="columns">
@@ -1112,6 +1122,11 @@
         function submitClearSupplier(link) {
             document.getElementById('clearSupplierItemId').value = link.getAttribute('data-item-id') || '';
             document.getElementById('clearSupplierForm').submit();
+        }
+
+        function submitToggleConsolidation(link) {
+            document.getElementById('toggleConsolidationItemId').value = link.getAttribute('data-item-id') || '';
+            document.getElementById('toggleConsolidationForm').submit();
         }
     </script>
 

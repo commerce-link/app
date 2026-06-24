@@ -518,6 +518,7 @@ public class OrdersController extends BaseController {
         }
 
         orderItem.setEan(resolvedEan);
+        orderItem.markAsInAllocation();
         orderItemsRepository.save(orderItem);
 
         return "redirect:/dashboard/orders/" + orderId;
@@ -528,6 +529,15 @@ public class OrdersController extends BaseController {
     public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId) {
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
         orderItem.removeFulfilment();
+        orderItemsRepository.save(orderItem);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/toggle-consolidation")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String toggleConsolidation(@PathVariable String orderId, @RequestParam String itemId) {
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        orderItem.toggleConsolidation();
         orderItemsRepository.save(orderItem);
         return "redirect:/dashboard/orders/" + orderId;
     }

@@ -27,6 +27,7 @@ public class DeliveryCreationForm {
     private boolean removeUnselected;
 
     private List<DeliveryItem> items = new ArrayList<>();
+    private List<SuggestedDeliveryItem> suggestedItems = new ArrayList<>();
 
     public DeliveryCreationForm() {}
 
@@ -116,6 +117,14 @@ public class DeliveryCreationForm {
 
     public void setItems(List<DeliveryItem> items) {
         this.items = items;
+    }
+
+    public List<SuggestedDeliveryItem> getSuggestedItems() {
+        return suggestedItems;
+    }
+
+    public void setSuggestedItems(List<SuggestedDeliveryItem> suggestedItems) {
+        this.suggestedItems = suggestedItems;
     }
 
     public boolean hasDeliveryDetails() {

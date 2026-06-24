@@ -7,6 +7,7 @@ import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -27,6 +28,13 @@ public class DeliveryCreationService {
     private ExchangeRates exchangeRates;
 
     public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+
+        if (form.getSuggestedItems() != null) {
+            form.getSuggestedItems().stream()
+                    .filter(suggested -> suggested.getRequestedQty() > 0)
+                    .map(SuggestedDeliveryItem::toDeliveryItem)
+                    .forEach(form.getItems()::add);
+        }
 
         if (form.isRemoveUnselected()) {
             removeUnselectedAllocations(storeId, form.getItems());
