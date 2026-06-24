@@ -39,6 +39,8 @@ class StoreSupplierConnectionServiceTest {
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
+    private SupplierProviderFactory supplierProviderFactory;
+    @Mock
     private ProviderConfigurationManager configurationManager;
     @Mock
     private SupplierConnectionValidator validator;

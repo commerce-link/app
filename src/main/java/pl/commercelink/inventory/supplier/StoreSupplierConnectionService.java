@@ -23,6 +23,7 @@ import java.util.Set;
 public class StoreSupplierConnectionService {
 
     private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
     private final ProviderConfigurationManager configurationManager;
     private final SupplierConnectionValidator validator;
     private final StoreSupplierConnectionPersister persister;
@@ -31,7 +32,7 @@ public class StoreSupplierConnectionService {
 
     public Map<String, List<ProviderField>> configurationFields() {
         Map<String, List<ProviderField>> fields = new LinkedHashMap<>();
-        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
+        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             fields.put(descriptor.supplierInfo().name(), descriptor.configurationFields());
         }
         return fields;
@@ -39,7 +40,7 @@ public class StoreSupplierConnectionService {
 
     public Map<String, Map<String, String>> configurationsForUI(Store store) {
         Map<String, Map<String, String>> configs = new LinkedHashMap<>();
-        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
+        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
             configs.put(name, configurationManager.getConfigurationForUI(store, name, descriptor));
         }

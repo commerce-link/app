@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StoreSupplierConnectionPersister {
 
-    private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
     private final ProviderConfigurationManager configurationManager;
     private final StoreSupplierFeedScheduler feedScheduler;
     private final StoreFeedRepository storeFeedRepository;
@@ -108,7 +108,7 @@ public class StoreSupplierConnectionPersister {
     void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
         Set<String> newOwnSuppliers = ownSupplierNames(submitted);
 
-        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
+        for (SupplierDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
             if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()) {
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());

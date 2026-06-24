@@ -6,8 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -24,7 +25,7 @@ public class StoreInventoryProvider {
 
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
-    private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
     private final InventoryAutoDiscovery autoDiscovery;
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
@@ -60,8 +61,10 @@ public class StoreInventoryProvider {
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         for (String supplierName : storeEntity.getOwnSupplierNames()) {
-            supplierRegistry.getDescriptor(supplierName)
-                    .ifPresent(descriptor -> ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates)));
+            SupplierDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
+            if (descriptor != null) {
+                ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
+            }
         }
 
         return new StoreInventory(autoDiscovery.run(ownItems), LocalDateTime.now());

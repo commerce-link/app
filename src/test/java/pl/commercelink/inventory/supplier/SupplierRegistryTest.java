@@ -1,64 +1,65 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.FeedData;
-import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.starter.secrets.SecretsManager;
 
-import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class SupplierRegistryTest {
 
-    private SupplierRegistry registryFor(SecretsManager secrets) {
-        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
-        return new SupplierRegistry(factory, secrets);
+    private SupplierRegistry registry() {
+        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(mock(SecretsManager.class)));
+        return new SupplierRegistry(factory);
     }
 
     @Test
-    void downloadFeedDecodesSingleValueGlobalSecretIntoConfigMap() throws ResourceDownloadException {
+    void getReturnsSupplierInfoForDiscoveredSupplier() {
         // given
-        SecretsManager secrets = mock(SecretsManager.class);
-        when(secrets.getSecret("Stub")).thenReturn("feed");
-        SupplierRegistry registry = registryFor(secrets);
+        SupplierRegistry registry = registry();
 
         // when
-        Optional<FeedData> feed = registry.downloadFeed("Stub");
+        SupplierInfo info = registry.get("Stub");
 
         // then
-        assertThat(feed).isPresent();
-        assertThat(new String(feed.get().data())).isEqualTo("feed");
+        assertThat(info.name()).isEqualTo("Stub");
     }
 
     @Test
-    void downloadFeedDecodesJsonGlobalSecretIntoConfigMap() throws ResourceDownloadException {
+    void getFallsBackToOtherForUnknownSupplier() {
         // given
-        SecretsManager secrets = mock(SecretsManager.class);
-        when(secrets.getSecret("Stub")).thenReturn("{\"url\":\"feed\"}");
-        SupplierRegistry registry = registryFor(secrets);
+        SupplierRegistry registry = registry();
 
         // when
-        Optional<FeedData> feed = registry.downloadFeed("Stub");
+        SupplierInfo info = registry.get("does-not-exist");
 
         // then
-        assertThat(feed).isPresent();
-        assertThat(new String(feed.get().data())).isEqualTo("feed");
+        assertThat(info.name()).isEqualTo("Other");
     }
 
     @Test
-    void downloadFeedReturnsEmptyForUnknownSupplier() throws ResourceDownloadException {
+    void externalSupplierNamesExcludeWarehouseAndOther() {
         // given
-        SecretsManager secrets = mock(SecretsManager.class);
-        SupplierRegistry registry = registryFor(secrets);
+        SupplierRegistry registry = registry();
 
         // when
-        Optional<FeedData> feed = registry.downloadFeed("Unknown");
+        List<String> external = registry.getExternalSupplierNames();
 
         // then
-        assertThat(feed).isEmpty();
+        assertThat(external).contains("Stub", "Amazon").doesNotContain("Warehouse", "Other");
+    }
+
+    @Test
+    void existsReflectsCatalogMembership() {
+        // given
+        SupplierRegistry registry = registry();
+
+        // when / then
+        assertThat(registry.exists("Warehouse")).isTrue();
+        assertThat(registry.exists("does-not-exist")).isFalse();
     }
 }

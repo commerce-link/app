@@ -5,7 +5,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -24,7 +24,7 @@ public class FeedReloaderScheduler {
 
     private final Inventory inventory;
     private final InventoryRepository inventoryRepository;
-    private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
@@ -36,7 +36,7 @@ public class FeedReloaderScheduler {
         Map<String, List<InventoryItem>> updatesBySupplier = new LinkedHashMap<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
 
-        for (SupplierDescriptor supplierDescriptor : supplierRegistry.getAllDescriptors()) {
+        for (SupplierDescriptor supplierDescriptor : supplierProviderFactory.availableProviders()) {
             String supplierName = supplierDescriptor.supplierInfo().name();
             LocalDateTime lastUpdateDate = inventory.getLastUpdateDate(supplierName);
             LocalDateTime lastModified = latestModifiedPerSupplier.get(supplierName);

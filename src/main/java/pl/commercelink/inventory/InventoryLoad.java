@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 class InventoryLoad {
 
     private final Inventory inventory;
-    private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
     private final CsvProductFeedLoader csvProductFeedLoader;
     private final XmlProductFeedLoader xmlProductFeedLoader;
     private final ExchangeRates exchangeRates;
@@ -29,7 +29,7 @@ class InventoryLoad {
     @PostConstruct
     void onStartUp() {
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
-        List<List<InventoryItem>> rawFeeds = supplierRegistry.getAllDescriptors().stream()
+        List<List<InventoryItem>> rawFeeds = supplierProviderFactory.availableProviders().stream()
                 .map(this::fetchItems)
                 .map(items -> items.stream()
                         .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())

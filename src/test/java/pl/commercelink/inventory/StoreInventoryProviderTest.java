@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
@@ -47,6 +48,8 @@ class StoreInventoryProviderTest {
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
+    private SupplierProviderFactory supplierProviderFactory;
+    @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
     private StoreFeedItemLoader storeFeedItemLoader;
@@ -82,7 +85,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of("Wortmann"));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
-        when(supplierRegistry.getDescriptor("Wortmann")).thenReturn(Optional.of(descriptor));
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
         when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), any())).thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(autoDiscovery.run(anyList())).thenReturn(List.of(matched));
@@ -194,7 +197,7 @@ class StoreInventoryProviderTest {
         when(cache.get("store-1")).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
-        when(supplierRegistry.getDescriptor("Action")).thenReturn(Optional.of(descriptor));
+        when(supplierProviderFactory.getDescriptor("Action")).thenReturn(descriptor);
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
         when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), anyMap())).thenReturn(List.of(ownItem));
         when(autoDiscovery.run(anyList())).thenAnswer(inv -> {
