@@ -10,7 +10,7 @@ import pl.commercelink.provider.ProviderFactory;
 public class SupplierProviderFactory extends ProviderFactory<SupplierProviderDescriptor, SupplierProvider> {
 
     public SupplierProviderFactory(ProviderConfigurationManager configurationManager) {
-        super(SupplierProviderDescriptor.class, null, configurationManager);
+        super(SupplierProviderDescriptor.class, configurationManager);
     }
 
     @Override
