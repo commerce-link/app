@@ -56,7 +56,7 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
                     .toList();
             matched.add(new MatchedInventory(restoreKey(entry), items, taxonomyCache, supplierRegistry));
         }
-        return new StoreInventory(matched, builtAt);
+        return new StoreInventory(InventoryIndex.of(matched), builtAt);
     }
 
     private static InventoryKey restoreKey(Entry entry) {

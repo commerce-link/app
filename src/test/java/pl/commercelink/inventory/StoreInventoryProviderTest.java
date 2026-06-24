@@ -65,7 +65,7 @@ class StoreInventoryProviderTest {
     @Test
     void returnsCachedEntryWithoutBuilding() {
         // given
-        StoreInventory cached = new StoreInventory(new LinkedList<>(), LocalDateTime.now());
+        StoreInventory cached = new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now());
         when(cache.get("store-1")).thenReturn(Optional.of(cached));
 
         // when / then
@@ -85,6 +85,7 @@ class StoreInventoryProviderTest {
         when(supplierRegistry.getDescriptor("Wortmann")).thenReturn(Optional.of(descriptor));
         when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), any())).thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(autoDiscovery.run(anyList())).thenReturn(List.of(matched));
 
         // when
@@ -181,6 +182,48 @@ class StoreInventoryProviderTest {
         // then
         assertEquals(0, result.items().size());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+    }
+
+    @Test
+    void ownIndexReturnsEmptyIndexWhenStoreHasNoOwnConnections() {
+        // given
+        Store store = mock(Store.class);
+        when(store.hasOwnSupplierConnections()).thenReturn(false);
+
+        // when
+        InventoryIndex result = provider.ownIndex(store);
+
+        // then
+        assertThat(result.all()).isEmpty();
+        verify(cache, never()).get(any());
+    }
+
+    @Test
+    void ownIndexReturnsEmptyIndexWhenStoreIsNull() {
+        // when
+        InventoryIndex result = provider.ownIndex(null);
+
+        // then
+        assertThat(result.all()).isEmpty();
+        verify(cache, never()).get(any());
+        verify(cache, never()).put(any(), any(), any());
+    }
+
+    @Test
+    void ownIndexReturnsCachedIndexWhenStoreHasOwnConnections() {
+        // given
+        Store store = mock(Store.class);
+        when(store.getStoreId()).thenReturn("store-1");
+        when(store.hasOwnSupplierConnections()).thenReturn(true);
+        MatchedInventory matched = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), taxonomyCache, supplierRegistry);
+        when(cache.get("store-1")).thenReturn(Optional.of(new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.now())));
+
+        // when
+        InventoryIndex result = provider.ownIndex(store);
+
+        // then
+        assertThat(result.findMatching(InventoryKey.fromMfn("M1"))).containsExactly(matched);
+        verify(storesRepository, never()).findById(any());
     }
 
     @Test

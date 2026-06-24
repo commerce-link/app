@@ -73,7 +73,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         InventoryItem item = new InventoryItem("5900000000002", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true, true, false);
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
                 List.of(item), taxonomyCache, supplierRegistry);
-        return new StoreInventory(List.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
+        return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
     private StoreInventory largeInventory(int count) {
@@ -87,7 +87,7 @@ class RedisStoreInventoryCacheIntegrationTest {
                     new InventoryItem(ean, mfn, 12.0 + i, "PLN", 7, 1, "Gamma", true, true, false));
             matched.add(new MatchedInventory(new InventoryKey(ean, mfn), items, taxonomyCache, supplierRegistry));
         }
-        return new StoreInventory(matched, LocalDateTime.of(2026, 6, 17, 10, 0));
+        return new StoreInventory(InventoryIndex.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
     @Test

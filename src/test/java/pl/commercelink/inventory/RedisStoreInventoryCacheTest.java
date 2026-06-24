@@ -50,7 +50,7 @@ class RedisStoreInventoryCacheTest {
         InventoryItem item = new InventoryItem("5900000000002", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true, true, false);
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
                 List.of(item), taxonomyCache, supplierRegistry);
-        return new StoreInventory(List.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
+        return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
     @Test
@@ -85,7 +85,7 @@ class RedisStoreInventoryCacheTest {
     void writesValueWithProvidedPerKeyTtl() {
         // given
         RedisStoreInventoryCache cache = cache();
-        StoreInventory inventory = new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+        StoreInventory inventory = new StoreInventory(InventoryIndex.of(new ArrayList<>()), LocalDateTime.now());
 
         // when
         cache.put("store-1", inventory, Duration.ofMinutes(15));
@@ -139,7 +139,7 @@ class RedisStoreInventoryCacheTest {
             InventoryItem item = new InventoryItem(ean, mfn, 10.0 + i, "PLN", 5, 1, "Acme", true, true, false);
             matched.add(new MatchedInventory(new InventoryKey(ean, mfn), List.of(item), taxonomyCache, supplierRegistry));
         }
-        return new StoreInventory(matched, LocalDateTime.of(2026, 6, 17, 10, 0));
+        return new StoreInventory(InventoryIndex.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
 }
