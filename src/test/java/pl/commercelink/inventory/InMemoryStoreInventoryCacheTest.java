@@ -16,13 +16,13 @@ class InMemoryStoreInventoryCacheTest {
     private final InMemoryStoreInventoryCache cache = new InMemoryStoreInventoryCache(100);
 
     private StoreInventory anyInventory() {
-        return new StoreInventory(new LinkedList<>(), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now());
     }
 
     @Test
     void storesAndReturnsInventoryWithProvidedTtl() {
         // given
-        StoreInventory inventory = new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+        StoreInventory inventory = new StoreInventory(InventoryIndex.of(new ArrayList<>()), LocalDateTime.now());
 
         // when
         cache.put("store-1", inventory, Duration.ofMinutes(15));

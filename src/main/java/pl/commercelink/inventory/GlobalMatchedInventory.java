@@ -12,13 +12,29 @@ import java.util.stream.Collectors;
 public class GlobalMatchedInventory {
 
     private volatile Collection<MatchedInventory> matched = new LinkedList<>();
+    private volatile InventoryIndex index;
 
-    public void replace(Collection<MatchedInventory> matched) {
+    public synchronized void replace(Collection<MatchedInventory> matched) {
         this.matched = matched;
+        this.index = null;
     }
 
     public Collection<MatchedInventory> all() {
         return matched;
+    }
+
+    public InventoryIndex index() {
+        InventoryIndex current = index;
+        if (current == null) {
+            synchronized (this) {
+                current = index;
+                if (current == null) {
+                    current = InventoryIndex.of(matched);
+                    index = current;
+                }
+            }
+        }
+        return current;
     }
 
     public List<InventoryItem> allItems() {

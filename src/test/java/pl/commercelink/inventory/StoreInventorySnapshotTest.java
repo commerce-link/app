@@ -28,7 +28,7 @@ class StoreInventorySnapshotTest {
     private StoreInventory sampleInventory() {
         MatchedInventory matched = new MatchedInventory(new InventoryKey(KEY_EANS, KEY_CODES),
                 List.of(ITEM), taxonomyCache, supplierRegistry);
-        return new StoreInventory(List.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
+        return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
     private static void assertItemEquals(InventoryItem expected, InventoryItem actual) {

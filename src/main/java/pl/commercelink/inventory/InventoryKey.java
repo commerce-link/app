@@ -50,6 +50,14 @@ public class InventoryKey {
         this.productCodes.add(unifyMfn(manufacturerCode));
     }
 
+    public void merge(InventoryKey other) {
+        if (id == null) {
+            id = other.id;
+        }
+        eans.addAll(other.eans);
+        productCodes.addAll(other.productCodes);
+    }
+
     public boolean matches(InventoryKey other) {
         boolean matched = false;
 

@@ -12,7 +12,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,23 +68,39 @@ public class Inventory {
     }
 
     public InventoryView withGlobalData() {
-        return new InventoryView(globalInventory.all());
+        InventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
-        return new InventoryView(new LinkedList<>(),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+        InventoryIndex globalIndex = InventoryIndex.of(List.of());
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        return new InventoryView(globalInventory.all(),
-                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry));
+        Store store = storesRepository.findById(storeId);
+        InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
+        InventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store)),
+                GroupInventorySource.own(ownIndex));
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
-        return new InventoryView(globalInventory.all(),
-                new StoreSuppliersInventoryFilter(storeId, storesRepository, storeInventoryProvider, taxonomyCache, supplierRegistry),
-                new WarehouseInventoryFilter(storeId, warehouse.stockQueryService(storeId), taxonomyCache, supplierRegistry));
+        Store store = storesRepository.findById(storeId);
+        InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
+        InventoryIndex globalIndex = globalInventory.index();
+        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store)),
+                GroupInventorySource.own(ownIndex),
+                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+    }
+
+    private Predicate<String> enabledGlobalSupplier(Store store) {
+        Collection<String> names = store != null ? store.getGlobalSupplierNames() : List.of();
+        return names::contains;
     }
 
     public int size() {
