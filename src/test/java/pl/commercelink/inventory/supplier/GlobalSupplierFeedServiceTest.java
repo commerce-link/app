@@ -8,6 +8,7 @@ import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.starter.secrets.SecretsManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -69,5 +70,34 @@ class GlobalSupplierFeedServiceTest {
 
         // then
         verify(inventory, never()).store(anyString(), any(byte[].class), anyString());
+    }
+
+    @Test
+    void loadFeedTreatsBlankGlobalSecretAsEmptyConfig() throws ResourceDownloadException {
+        // given
+        SecretsManager secrets = mock(SecretsManager.class);
+        InventoryRepository inventory = mock(InventoryRepository.class);
+        when(secrets.getSecret("Stub")).thenReturn("  ");
+        GlobalSupplierFeedService service = serviceFor(secrets, inventory);
+
+        // when
+        service.loadFeed("Stub");
+
+        // then
+        ArgumentCaptor<byte[]> data = ArgumentCaptor.forClass(byte[].class);
+        verify(inventory).store(eq("Stub"), data.capture(), eq("csv"));
+        assertThat(new String(data.getValue())).isEqualTo("x");
+    }
+
+    @Test
+    void loadFeedFailsLoudlyOnMalformedJsonGlobalSecret() {
+        // given
+        SecretsManager secrets = mock(SecretsManager.class);
+        InventoryRepository inventory = mock(InventoryRepository.class);
+        when(secrets.getSecret("Stub")).thenReturn("{not-valid-json");
+        GlobalSupplierFeedService service = serviceFor(secrets, inventory);
+
+        // when / then
+        assertThatThrownBy(() -> service.loadFeed("Stub")).isInstanceOf(RuntimeException.class);
     }
 }
