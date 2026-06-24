@@ -4,272 +4,628 @@
       layout:decorate="~{layout}">
 <body>
 
-<div layout:fragment="content">
+<div layout:fragment="content"
+     th:with="type=${isSuperAdmin} ? 'orders' : ${form.fulfilmentType}, isWarehouse=${form.fulfilmentType == 'warehouse'}">
 
     <style>
-        .category-CPU {
-            background-color: #b2d8d8; /* Light pastel blue */
-        }
+        body { padding-bottom: 96px; }
 
-        .category-Cooler {
-            background-color: #ffd8bf; /* Light pastel orange */
-        }
+        .fl-toolbar { position: sticky; top: 0; z-index: 30; background: #fff;
+            border-bottom: 1px solid #e6e8eb; padding: .7rem 0 .55rem 0; box-shadow: 0 2px 6px rgba(0,0,0,.04); margin-bottom: 1rem; }
 
-        .category-GPU {
-            background-color: #d8b2d8; /* Light pastel purple */
-        }
+        .order-cov { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+        .order-chip { display: inline-flex; align-items: center; gap: .45rem; font-size: .78rem;
+            padding: .2rem .6rem; border-radius: 999px; border: 1px solid transparent; cursor: pointer; user-select: none;
+            background: #f1f3f5; color: #4a4a4a; }
+        .order-chip .bar { width: 46px; height: 6px; border-radius: 3px; background: #dfe3e7; overflow: hidden; }
+        .order-chip .bar > i { display: block; height: 100%; }
+        .order-chip.full { background: #e9f9f1; color: #1b8f5a; }
+        .order-chip.partial { background: #fff6e5; color: #b06f00; border-color: #ffd98a; }
+        .order-chip.none { background: #fdecec; color: #c0392b; }
+        .order-chip.active { outline: 2px solid #3273dc; outline-offset: 1px; }
+        .order-chip .frac { font-variant-numeric: tabular-nums; font-weight: 700; }
 
-        .category-Motherboard {
-            background-color: #c8f0c8; /* Light pastel green */
-        }
+        .cat-section { margin-bottom: 1.2rem; }
+        .cat-header { display: flex; align-items: center; gap: .55rem; padding: .5rem .9rem; background: #f4f5f7;
+            border-radius: 8px; cursor: pointer; margin-bottom: .65rem; border: 1px solid rgba(0,0,0,.05); }
+        .cat-header .cat-name { font-weight: 700; font-size: 1rem; color: #2d2d2d; }
+        .cat-header .cat-count { font-size: .72rem; font-weight: 600; color: #5a5a5a; background: rgba(255,255,255,.7); }
+        .cat-header .chevron { color: #7a7a7a; }
+        .cat-section.cat-collapsed .cat-header .chevron { transform: rotate(-90deg); }
+        .cat-section.cat-collapsed .cat-body { display: none; }
 
-        .category-PSU {
-            background-color: #f0c8c8; /* Light pastel pink */
+        .group-card { position: relative; background: #fff; border: 1px solid #e6e8eb;
+            border-left: 5px solid var(--accent, #b5b5b5); border-radius: 8px; margin-bottom: .85rem;
+            transition: box-shadow .15s, opacity .15s, background .15s, outline .1s; }
+        .group-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.07); }
+        .group-card.is-dimmed { opacity: .6; }
+        .group-card.is-redundant { margin-left: 2.6rem; }
+        .group-card.is-redundant::before {
+            content: ''; position: absolute; left: -1.5rem; top: -0.55rem; bottom: 50%;
+            width: 1.1rem; border-left: 2px solid #cfd3d8; border-bottom: 2px solid #cfd3d8;
+            border-bottom-left-radius: 7px; pointer-events: none;
         }
+        .group-card.is-hidden { display: none; }
+        .group-card.is-focus-match { outline: 2px solid #3273dc; outline-offset: 2px; }
 
-        .category-Storage {
-            background-color: #d8d8b2; /* Light pastel yellow */
-        }
+        .group-head { display: flex; align-items: center; gap: 1rem; padding: .85rem 1.1rem; }
+        .mini-row { display: none; align-items: center; gap: .6rem; padding: .45rem 1.1rem; }
+        .group-card.is-mini .group-head { display: none; }
+        .group-card.is-mini .mini-row { display: flex; }
+        .mini-row .mini-title { font-weight: 600; font-size: .85rem; }
+        .mini-row .provider-chip { font-size: .72rem; }
+        .mini-row .tag { font-size: .68rem; }
+        .mini-row .mini-state { font-size: .72rem; color: #9aa1ab; margin-left: auto; white-space: nowrap; }
+        .group-title { font-weight: 600; line-height: 1.2; }
+        .group-meta { color: #7a8290; font-size: .82rem; margin-top: .15rem; }
+        .group-metrics { display: flex; gap: 1.4rem; align-items: center; white-space: nowrap; }
+        .metric { text-align: right; }
+        .metric .lbl { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: #9aa1ab; }
+        .metric .val { font-weight: 600; font-size: .95rem; }
 
-        .category-Memory {
-            background-color: #f0d8f0; /* Light pastel lavender */
-        }
+        .provider-chip { display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; font-size: .8rem;
+            padding: .15rem .6rem; border-radius: 999px; color: #fff; background: var(--accent, #b5b5b5); }
 
-        .category-Case {
-            background-color: #b2b2d8; /* Light pastel indigo */
-        }
+        .group-body { display: none; }
+        .chevron { transition: transform .15s; color: #9aa1ab; }
 
-        .category-Fan {
-            background-color: #d8b2b2; /* Light pastel rose */
-        }
+        .accept-btn { min-width: 116px; }
+        .order-link { cursor: pointer; color: #3273dc; }
+        .head-orders { margin-top: .4rem; display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+        .head-orders .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: #9aa1ab; margin-right: .2rem; }
+        .ord-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 600;
+            padding: .12rem .5rem; border-radius: 999px; background: #eef0f2; color: #3a3f45; cursor: pointer; border: 1px solid #e0e2e6; }
+        .ord-pill:hover { background: #e6e8ec; }
+        .ord-pill .ord-price { margin-left: .4rem; padding-left: .4rem; border-left: 1px solid rgba(0,0,0,.12); font-weight: 700; }
+        .ord-pill.lost { background: #f3f3f3; color: #b0b0b0; border-color: #eaeaea; text-decoration: line-through; }
+        .ord-pill.lost .ord-price { border-left-color: rgba(0,0,0,.06); }
+        .covered-note { font-size: .78rem; color: #8a6d3b; background: #fcf8ef; border: 1px dashed #e6d3a3;
+            border-radius: 6px; padding: .35rem .6rem; margin-top: .4rem; }
+        .alt-tag { font-size: .68rem; }
 
-        .category-OS {
-            background-color: #b2d8b2; /* Light pastel lime */
-        }
-
-        .category-Other {
-            background-color: #d8d8d8; /* Light pastel grey */
-        }
-
-        /* Floating box styling */
-        #summary-box {
-            position: fixed;
-            right: 20px;
-            top: 20px;
-            width: 250px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border: 1px solid #ccc;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            overflow-y: auto; /* Scroll if content exceeds height */
-            max-height: 90vh; /* Adjust height for better visibility */
-        }
-
-        #total-summary-box {
-            position: fixed;
-            right: 20px;
-            top: 300px; /* Position below the first box */
-            width: 250px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border: 1px solid #ccc;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            overflow-y: auto;
-            max-height: 90vh;
-        }
-
-
-        /* Ensure the form content does not shift due to floating box */
-        body {
-            margin-right: 300px; /* Adjust according to the width of the summary box */
-        }
+        .footer-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff;
+            border-top: 1px solid #e6e8eb; box-shadow: 0 -2px 10px rgba(0,0,0,.06); padding: .7rem 0; }
+        .footer-inner { display: flex; align-items: center; gap: 1.5rem; }
+        .footer-total { font-size: 1.35rem; font-weight: 700; }
+        .footer-total small { font-size: .72rem; font-weight: 500; color: #9aa1ab; display: block; }
+        .prov-breakdown { display: flex; flex-wrap: wrap; gap: .4rem; flex: 1; }
+        .prov-pill { font-size: .78rem; padding: .15rem .55rem; border-radius: 6px; background: #f1f3f5;
+            color: #4a4a4a; border-left: 3px solid var(--accent, #b5b5b5); }
     </style>
 
-    <h1 th:text="#{fulfilment.title}"></h1>
-
-    <!-- Floating summary box -->
-    <div id="summary-box">
-        <h2 th:text="#{fulfilment.summary}"></h2>
-        <div id="provider-summary">
-            <!-- Net prices grouped by provider will be displayed here -->
-        </div>
+    <div class="container">
+        <h1 class="title is-4 is-spaced mb-2" th:text="#{fulfilment.title}"></h1>
+        <p class="is-size-7 has-text-grey" th:unless="${isWarehouse}">
+            <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
+            <span th:text="#{fulfilment.info.note}"></span>
+        </p>
     </div>
 
-    <!-- Total summary floating box -->
-    <div id="total-summary-box">
-        <div id="total-summary">
-            <!-- Total sum from all providers will be displayed here -->
-        </div>
-    </div>
-
-
-    <div th:with="type=${isSuperAdmin} ? 'orders' : ${form.fulfilmentType}, basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard'">
-
-        <form id="action-from" method="post" th:object="${form}">
-
-            <input type="hidden" id="isSuperAdmin" th:value="${isSuperAdmin}" />
-            <input type="hidden" id="storeId" th:value="${storeId}" />
-            <input type="hidden" id="fulfilmentType" th:value="${form.fulfilmentType}" />
-            <input type="hidden" th:name="redirectUrl" th:value="${form.redirectUrl}" />
-
-            <div th:each="order, stat : ${form.selectedOrders}">
-                <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />
-            </div>
-
-            <table class="table is-bordered is-narrow is-hoverable is-fullwidth is-narrowed">
-                <thead>
-                <tr>
-                    <th th:text="#{fulfilment.order.no}"></th>
-                    <th th:text="#{fulfilment.category}"></th>
-                    <th th:text="#{fulfilment.name}"></th>
-                    <th th:text="#{fulfilment.quantity}"></th>
-                    <th th:text="#{fulfilment.price}"></th>
-                    <th th:text="#{fulfilment.ean}"></th>
-                    <th th:text="#{fulfilment.product.code}"></th>
-                    <th th:text="#{fulfilment.provider}"></th>
-                    <th th:text="#{fulfilment.provider.quantity}"></th>
-                    <th th:text="#{fulfilment.net.price}"></th>
-                    <th th:text="#{fulfilment.gross.price}"></th>
-                    <th th:text="#{fulfilment.accepted}"></th>
-                </tr>
-                </thead>
-
-                <tbody>
-                <!-- Loop through items -->
-                <tr th:each="entry, itemStat : ${form.entries}" th:class="${'category-' + entry.source.category.name()}">
-                    <td>
-                        <span th:each="allocation, stat : ${entry.allocations}">
-                            <span th:if="${stat.index > 0}">, </span>
-                            <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.refName}" target="_blank"></a>
-                        </span>
-                    </td>
-                    <td th:text="${entry.source.category}"></td>
-                    <td th:text="${entry.source.name}"></td>
-                    <td th:text="${entry.targetQty}" class="target-qty"></td>
-                    <td th:text="${entry.targetPrice}"></td>
-                    <td th:text="${entry.source.ean}"></td>
-                    <td th:text="${entry.source.mfn}"></td>
-                    <td th:text="${entry.source.provider}" class="provider"></td>
-                    <td th:text="${entry.source.qty}"></td>
-                    <td th:text="${entry.source.priceNet}" class="net-price"></td>
-                    <td th:text="${entry.source.priceGross}"></td>
-                    <td>
-
-                        <div th:each="allocation, allocStat : ${entry.allocations}">
-                            <input type="hidden"
-                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderId"
-                                   th:value="${allocation.orderId}" />
-                            <input type="hidden"
-                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemId"
-                                   th:value="${allocation.orderItemId}" />
-                            <input type="hidden"
-                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemQty"
-                                   th:value="${allocation.orderItemQty}" />
-                            <input type="hidden"
-                                   th:name="entries[__${itemStat.index}__].allocations[__${allocStat.index}__].orderItemPrice"
-                                   th:value="${allocation.orderItemPrice}" />
-                        </div>
-
-                        <!-- Hidden fields for entire object -->
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.name" th:value="${entry.source.name}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.category" th:value="${entry.source.category}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.ean" th:value="${entry.source.ean}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.mfn" th:value="${entry.source.mfn}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.provider" th:value="${entry.source.provider}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.qty" th:value="${entry.source.qty}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.priceNet" th:value="${entry.source.priceNet}" />
-                        <input type="hidden" th:name="entries[__${itemStat.index}__].source.priceGross" th:value="${entry.source.priceGross}" />
-                        <input type="checkbox" th:checked="${entry.accepted}" th:id="'accepted_' + ${entry.id}" th:name="entries[__${itemStat.index}__].accepted" th:value="true" />
-                        <label th:for="'accepted_' + ${entry.id}"></label>
-                    </td>
-                </tr>
-                <!-- End Loop -->
-                </tbody>
-            </table>
-
-            <div class="field">
-                <div class="control">
-                    <div class="select is-small">
-                        <select id="action-select" th:disabled="${isCompletedOrder}">
-                            <option value="commit" th:text="#{general.save}"></option>
-                            <option value="commitAndContinue"
-                                    th:if="${form.fulfilmentType == 'orders'}"
-                                    th:text="#{general.saveAndContinue}"></option>
-                        </select>
-
+    <div class="fl-toolbar">
+        <div class="container">
+            <div class="level is-mobile mb-2">
+                <div class="level-left">
+                    <div class="level-item">
+                        <label class="checkbox is-size-7 mr-3"><input type="checkbox" id="fOnlyUnaccepted"> <span th:text="#{fulfilment.filter.unaccepted}"></span></label>
+                        <label class="checkbox is-size-7"><input type="checkbox" id="fAboveCost"> <span th:text="#{fulfilment.filter.above.cost}"></span></label>
                     </div>
-                    <button class="button is-primary is-small" type="button" onclick="submitFulfilmentForm()" th:text="#{general.submit}"></button>
+                </div>
+                <div class="level-right">
+                    <div class="level-item buttons are-small mb-0">
+                        <button type="button" class="button is-light" onclick="setAll(false)">
+                            <span class="icon"><i class="fas fa-eraser"></i></span><span th:text="#{fulfilment.clear.selection}"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </form>
+            <div class="level is-mobile mb-0" th:unless="${isWarehouse}">
+                <div class="level-left" style="flex:1;">
+                    <span class="is-size-7 has-text-grey mr-3" style="white-space:nowrap;"><i class="fas fa-receipt mr-1"></i><span th:text="#{fulfilment.coverage}"></span></span>
+                    <div class="order-cov" id="orderCoverage"></div>
+                </div>
+                <div class="level-right">
+                    <button type="button" class="button is-small is-light" id="clearFocus" style="display:none;" onclick="clearFocus()">
+                        <span class="icon"><i class="fas fa-times"></i></span><span th:text="#{fulfilment.show.all}"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script>
+    <input type="hidden" id="isSuperAdmin" th:value="${isSuperAdmin}" />
+    <input type="hidden" id="storeId" th:value="${storeId}" />
+    <input type="hidden" id="fulfilmentType" th:value="${form.fulfilmentType}" />
 
-        function submitFulfilmentForm() {
-            const form = document.getElementById('action-from');
+    <div class="container">
+    <div id="groups">
+        <div class="group-card"
+             th:each="entry : ${form.entries}"
+             th:data-provider="${entry.source.provider}"
+             th:data-name="${entry.source.name}"
+             th:data-ean="${entry.source.ean}"
+             th:data-mfn="${entry.source.mfn}"
+             th:data-sourceqty="${entry.source.qty}"
+             th:data-net="${entry.source.priceNet}"
+             th:data-gross="${entry.source.priceGross}"
+             th:data-category="${entry.source.category.name()}"
+             th:data-catindex="${entry.source.category.ordinal()}"
+             th:data-targetprice="${entry.targetPrice}"
+             th:data-accepted="${entry.accepted}">
+            <div class="group-head">
+                <div style="flex:1; min-width:0;">
+                    <div class="group-title" th:text="${entry.source.name}"></div>
+                    <div class="group-meta">
+                        <span>EAN <span th:text="${entry.source.ean}"></span></span>
+                        <span> &middot; <span th:text="#{fulfilment.product.code}"></span> <span th:text="${entry.source.mfn}"></span></span>
+                        <span> &middot; </span>
+                        <span class="provider-chip"><i class="fas fa-truck"></i><span th:text="${entry.source.provider}"></span></span>
+                    </div>
+                </div>
+                <div class="group-metrics">
+                    <span class="tag is-light">marża</span>
+                    <div class="metric"><span class="lbl" th:text="#{fulfilment.target}"></span><span class="val qty-val"></span></div>
+                    <div class="metric"><span class="lbl" th:text="#{fulfilment.net.per.unit}"></span><span class="val net-val"></span></div>
+                </div>
+                <button type="button" class="button accept-btn" onclick="event.stopPropagation(); toggleAccept(this)"></button>
+            </div>
+            <div class="group-body">
+                <table>
+                    <tbody>
+                    <tr th:each="allocation : ${entry.allocations}"
+                        th:data-order="${allocation.orderId ?: ''}"
+                        th:data-item="${(allocation.orderId ?: '') + '::' + allocation.orderItemId}"
+                        th:data-itemid="${allocation.orderItemId}"
+                        th:data-qty="${allocation.orderItemQty}"
+                        th:data-price="${allocation.orderItemPrice}"
+                        th:data-ref="${allocation.key.refName}"
+                        th:data-url="@{${allocation.key.url}}">
+                        <td><a th:href="@{${allocation.key.url}}" th:text="${allocation.key.refName}" target="_blank"></a></td>
+                        <td th:text="${allocation.orderItemQty}"></td>
+                        <td th:text="${allocation.orderItemPrice}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <form id="fulfilment-form" method="post" th:object="${form}">
+        <input type="hidden" th:name="redirectUrl" th:value="${form.redirectUrl}" />
+        <div th:each="order, stat : ${form.selectedOrders}">
+            <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />
+        </div>
+        <div id="payload-container"></div>
+
+        <div class="footer-bar">
+            <div class="container footer-inner">
+                <div class="footer-total"><small th:text="#{fulfilment.total.net}"></small><span id="grandTotal">0,00</span> PLN</div>
+                <div class="prov-breakdown" id="provBreakdown"></div>
+                <div id="partialWarn" class="has-text-danger has-text-weight-semibold is-size-7" style="display:none; white-space:nowrap;">
+                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span><span id="partialWarnText"></span>
+                </div>
+                <p id="emptyWarn" class="help is-danger has-text-weight-semibold mb-0" style="display:none; white-space:nowrap;" th:text="#{fulfilment.empty.selection}"></p>
+                <div class="field has-addons mb-0">
+                    <div class="control">
+                        <span class="select is-small">
+                            <select id="action-select" th:disabled="${isCompletedOrder}">
+                                <option value="commit" th:text="#{general.save}"></option>
+                                <option value="commitAndContinue" th:if="${form.fulfilmentType == 'orders'}" th:text="#{general.saveAndContinue}"></option>
+                            </select>
+                        </span>
+                    </div>
+                    <div class="control">
+                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment(this)">
+                            <span class="icon"><i class="fas fa-paper-plane"></i></span><span th:text="#{general.submit}"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <script th:inline="javascript">
+        const MSG = {
+            margin: /*[[#{fulfilment.margin}]]*/ 'margin',
+            profit: /*[[#{fulfilment.profit}]]*/ 'profit',
+            unit: /*[[#{fulfilment.unit}]]*/ 'pcs',
+            grossPerUnit: /*[[#{fulfilment.gross.per.unit}]]*/ 'gross / unit',
+            realizes: /*[[#{fulfilment.realizes}]]*/ 'Realizes',
+            order: /*[[#{fulfilment.order}]]*/ 'Order',
+            ordered: /*[[#{fulfilment.ordered}]]*/ 'Ordered',
+            redundant: /*[[#{fulfilment.redundant}]]*/ 'Redundant',
+            coveredCheaper: /*[[#{fulfilment.covered.cheaper}]]*/ 'Covered cheaper',
+            coveredBy: /*[[#{fulfilment.covered.by}]]*/ 'Covered by',
+            alsoOfferedBy: /*[[#{fulfilment.also.offered.by}]]*/ 'also offered by:',
+            coveredElsewhere: /*[[#{fulfilment.covered.elsewhere}]]*/ 'covered cheaper elsewhere',
+            nothingSelected: /*[[#{fulfilment.nothing.selected}]]*/ 'Nothing selected',
+            partialWarn: /*[[#{fulfilment.partial.warning}]]*/ '{0} partially covered',
+            splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers'
+        };
+        const IS_WAREHOUSE = /*[[${isWarehouse}]]*/ false;
+    </script>
+
+    <script>
+        const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const cards = () => Array.from(document.querySelectorAll('.group-card'));
+        let activeOrder = null;
+
+        const isAccepted = c => c.dataset.accepted === 'true';
+        const gross = c => parseFloat(c.dataset.gross) || 0;
+        const grossInt = c => Math.trunc(parseFloat(c.dataset.gross) || 0);
+        const net = c => parseFloat(c.dataset.net) || 0;
+        const vat = c => (net(c) > 0 ? gross(c) / net(c) : 1);
+        const cardOrders = c => [...new Set(Array.from(c.querySelectorAll('tr[data-item]')).map(r => r.dataset.order))];
+
+        function provColor(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+            return 'hsl(' + (h % 360) + ', 52%, 45%)';
+        }
+
+        function setAccept(card, v) { card.dataset.accepted = v; }
+        function toggleAccept(btn) { const c = btn.closest('.group-card'); setAccept(c, !isAccepted(c)); render(); }
+        function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); render(); }
+
+        function focusOrder(ord) {
+            if (!ord) return;
+            activeOrder = (activeOrder === ord) ? null : ord;
+            const cf = document.getElementById('clearFocus');
+            if (cf) cf.style.display = activeOrder ? '' : 'none';
+            if (activeOrder) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
+            render();
+        }
+        function clearFocus() {
+            activeOrder = null;
+            const cf = document.getElementById('clearFocus');
+            if (cf) cf.style.display = 'none';
+            render();
+        }
+
+        /* winner per order-item = cheapest (by truncated gross, matching backend (int)priceGross) ACCEPTED card containing it */
+        function computeWinners() {
+            const winner = {}, winnerGross = {};
+            cards().forEach(c => {
+                if (!isAccepted(c)) return;
+                c.querySelectorAll('tr[data-item]').forEach(r => {
+                    const it = r.dataset.item;
+                    if (winner[it] === undefined || grossInt(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = grossInt(c); }
+                });
+            });
+            return winner;
+        }
+        function offerCount() {
+            const m = {};
+            document.querySelectorAll('tr[data-item]').forEach(r => {
+                m[r.dataset.item] = m[r.dataset.item] || new Set();
+                m[r.dataset.item].add(r.closest('.group-card'));
+            });
+            return m;
+        }
+
+        function render() {
+            const winner = computeWinners();
+            const offers = offerCount();
+
+            cards().forEach(c => {
+                let effQty = 0, visibleRows = 0, visibleQty = 0, profitNet = 0, allQty = 0, allProfit = 0;
+                const coveredAway = []; const headChips = [];
+                const v = vat(c);
+                c.querySelectorAll('tr[data-item]').forEach(r => {
+                    const it = r.dataset.item, w = winner[it];
+                    const price = parseFloat(r.dataset.price) || 0;
+                    const qty = parseInt(r.dataset.qty) || 0;
+                    allQty += qty;
+                    allProfit += (price / v - net(c)) * qty;
+                    r.querySelectorAll('.alt-tag').forEach(t => t.remove());
+                    if (w && w !== c) {
+                        coveredAway.push({ qty: qty, order: r.dataset.order, by: w.dataset.provider });
+                        headChips.push({ row: r, qty: qty, price: price, lost: true, by: w.dataset.provider });
+                    } else {
+                        headChips.push({ row: r, qty: qty, price: price, lost: false });
+                        visibleRows++;
+                        visibleQty += qty;
+                        profitNet += (price / v - net(c)) * qty;
+                        if (w === c) effQty += qty;
+                    }
+                });
+
+                const old = c.querySelector('.covered-note'); if (old) old.remove();
+                if (coveredAway.length) {
+                    const by = {};
+                    coveredAway.forEach(x => { by[x.by] = (by[x.by] || 0) + x.qty; });
+                    const txt = Object.keys(by).map(p => p + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
+                    const note = document.createElement('div');
+                    note.className = 'covered-note';
+                    note.innerHTML = '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span> ' +
+                        coveredAway.length + ' ' + MSG.coveredElsewhere + ': <strong>' + txt + '</strong>';
+                    c.querySelector('.group-body').appendChild(note);
+                }
+
+                const titleBlock = c.querySelector('.group-meta').parentElement;
+                let ho = titleBlock.querySelector('.head-orders');
+                if (!ho) { ho = document.createElement('div'); ho.className = 'head-orders'; titleBlock.appendChild(ho); }
+                ho.innerHTML = '<span class="lbl">' + MSG.realizes + '</span>';
+                headChips.forEach(ch => {
+                    const ord = ch.row.dataset.order;
+                    const ref = ch.row.dataset.ref;
+                    const isWh = !ord;
+                    const pill = document.createElement('span');
+                    pill.className = 'ord-pill' + (ch.lost ? ' lost' : '');
+                    pill.title = ch.lost ? (MSG.coveredCheaper + ' — ' + ch.by) : '';
+                    if (!isWh) pill.onclick = (e) => { e.stopPropagation(); focusOrder(ord); };
+                    else pill.style.cursor = 'default';
+                    pill.innerHTML = (isWh ? ref : '#' + ref) + ' <span style="opacity:.6;">&times;' + ch.qty + '</span>' +
+                        '<span class="ord-price">' + fmt(ch.price) + ' zł</span>' +
+                        (ch.lost ? '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span>' : '');
+                    ho.appendChild(pill);
+                });
+
+                c.dataset.effqty = effQty;
+                c.dataset.effvalue = effQty * net(c);
+                c.querySelector('.qty-val').textContent = effQty + ' ' + MSG.unit;
+                c.querySelector('.net-val').textContent = fmt(net(c));
+
+                let gm = c.querySelector('.gross-metric');
+                if (!gm) {
+                    gm = document.createElement('div');
+                    gm.className = 'metric gross-metric';
+                    gm.innerHTML = '<span class="lbl">' + MSG.grossPerUnit + '</span><span class="val gross-val"></span>';
+                    c.querySelector('.group-metrics').appendChild(gm);
+                }
+                gm.querySelector('.gross-val').textContent = fmt(gross(c));
+
+                const costNet = net(c) * visibleQty;
+                const marginPct = costNet > 0 ? profitNet / costNet : 0;
+                const redundant = headChips.length > 0 && visibleRows === 0;
+                const allCostNet = net(c) * allQty;
+                const allMarginPct = allCostNet > 0 ? allProfit / allCostNet : 0;
+                c.dataset.margin = redundant ? allMarginPct : marginPct;
+
+                const mtag = c.querySelector('.group-metrics > .tag:not(.profit-tag)');
+                if (visibleQty === 0) {
+                    mtag.className = 'tag is-light';
+                    mtag.textContent = MSG.margin + ' —';
+                } else {
+                    const mcls = marginPct > 0 ? 'is-success' : (marginPct < 0 ? 'is-danger' : 'is-light');
+                    mtag.className = 'tag ' + mcls + ' is-light';
+                    mtag.textContent = MSG.margin + ' ' + (marginPct >= 0 ? '+' : '−') + Math.abs(marginPct * 100).toFixed(0) + '%';
+                }
+
+                let pt = c.querySelector('.profit-tag');
+                if (!pt) { pt = document.createElement('span'); pt.className = 'tag profit-tag'; mtag.after(pt); }
+                if (visibleQty === 0) {
+                    pt.className = 'tag profit-tag is-light';
+                    pt.innerHTML = '<span class="icon is-small"><i class="fas fa-coins"></i></span><span>' + MSG.profit + ' —</span>';
+                } else {
+                    const pcls = profitNet > 1 ? 'is-success' : (profitNet < -1 ? 'is-danger' : 'is-light');
+                    pt.className = 'tag profit-tag ' + pcls + ' is-light';
+                    pt.innerHTML = '<span class="icon is-small"><i class="fas fa-coins"></i></span><span>' + MSG.profit + ' ' + (profitNet >= 0 ? '+' : '−') + fmt(Math.abs(profitNet)) + ' zł</span>';
+                }
+
+                c.dataset.redundant = redundant ? '1' : '0';
+                c.classList.toggle('is-redundant', redundant);
+                c.classList.toggle('is-dimmed', !isAccepted(c) || redundant);
+
+                const btn = c.querySelector('.accept-btn');
+                if (redundant) {
+                    btn.className = 'button accept-btn is-light';
+                    btn.innerHTML = '<span class="icon"><i class="fas fa-ban"></i></span><span>' + (isAccepted(c) ? MSG.redundant : MSG.coveredCheaper) + '</span>';
+                } else if (isAccepted(c)) {
+                    btn.className = 'button accept-btn is-success';
+                    btn.innerHTML = '<span class="icon"><i class="fas fa-check"></i></span><span>' + MSG.ordered + '</span>';
+                } else {
+                    btn.className = 'button accept-btn is-light';
+                    btn.innerHTML = '<span class="icon"><i class="far fa-square"></i></span><span>' + MSG.order + '</span>';
+                }
+
+                let mini = c.querySelector('.mini-row');
+                if (!mini) { mini = document.createElement('div'); mini.className = 'mini-row'; c.querySelector('.group-head').after(mini); }
+                c.classList.toggle('is-mini', redundant);
+                if (redundant) {
+                    const winnerProv = coveredAway.length ? coveredAway[0].by : '';
+                    mini.innerHTML =
+                        '<span class="mini-title">' + c.dataset.name + '</span>' +
+                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + c.dataset.provider + '</span>' +
+                        '<span class="tag is-light">' + MSG.margin + ' ' + (allMarginPct >= 0 ? '+' : '−') + Math.abs(allMarginPct * 100).toFixed(0) + '%</span>' +
+                        '<span class="mini-state">' + (winnerProv ? MSG.coveredBy + ' ' + winnerProv : '') + '</span>';
+                }
+            });
+
+            reorderClusters(winner);
+            recalcFooter();
+            if (!IS_WAREHOUSE) renderCoverage(winner);
+            applyFilters();
+        }
+
+        function reorderClusters(winner) {
+            document.querySelectorAll('.cat-body').forEach(body => {
+                const cs = Array.from(body.querySelectorAll('.group-card'));
+                const childrenOf = new Map(), primaries = [];
+                cs.forEach(c => {
+                    if (c.dataset.redundant === '1') {
+                        const row = c.querySelector('tr[data-item]');
+                        const w = row ? winner[row.dataset.item] : null;
+                        if (w && w !== c) { if (!childrenOf.has(w)) childrenOf.set(w, []); childrenOf.get(w).push(c); }
+                        else primaries.push(c);
+                    } else primaries.push(c);
+                });
+                primaries.forEach(p => {
+                    body.appendChild(p);
+                    (childrenOf.get(p) || []).forEach(ch => body.appendChild(ch));
+                });
+                childrenOf.forEach((arr, w) => { if (!primaries.includes(w)) arr.forEach(ch => body.appendChild(ch)); });
+            });
+        }
+
+        function recalcFooter() {
+            let total = 0; const byProv = {};
+            cards().forEach(c => {
+                const v = parseFloat(c.dataset.effvalue || 0);
+                if (isAccepted(c) && v > 0) {
+                    total += v;
+                    byProv[c.dataset.provider] = (byProv[c.dataset.provider] || 0) + v;
+                }
+            });
+            document.getElementById('grandTotal').textContent = fmt(total);
+            const bd = document.getElementById('provBreakdown'); bd.innerHTML = '';
+            Object.keys(byProv).sort().forEach(p => {
+                const el = document.createElement('span');
+                el.className = 'prov-pill'; el.style.setProperty('--accent', provColor(p));
+                el.innerHTML = '<strong>' + p + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
+            });
+            if (!Object.keys(byProv).length) bd.innerHTML = '<span class="has-text-grey is-size-7">' + MSG.nothingSelected + '</span>';
+        }
+
+        function renderCoverage(winner) {
+            const bar = document.getElementById('orderCoverage');
+            if (!bar) return;
+            const orders = {};
+            document.querySelectorAll('tr[data-item]').forEach(r => {
+                const ord = r.dataset.order, it = r.dataset.item;
+                if (!ord) return;
+                orders[ord] = orders[ord] || { items: new Set(), ref: r.dataset.ref };
+                orders[ord].items.add(it);
+            });
+            bar.innerHTML = '';
+            let partial = 0;
+            Object.keys(orders).sort().forEach(ord => {
+                const items = [...orders[ord].items];
+                const accepted = items.filter(it => winner[it]).length;
+                const total = items.length;
+                const ratio = accepted / total;
+                const cls = ratio === 1 ? 'full' : (ratio === 0 ? 'none' : 'partial');
+                if (cls === 'partial') partial++;
+                const winnerProviders = new Set(items.map(it => winner[it]).filter(Boolean).map(c => c.dataset.provider));
+                const split = winnerProviders.size > 1;
+                const icon = cls === 'full' ? 'fa-check-circle' : (cls === 'none' ? 'fa-circle' : 'fa-exclamation-circle');
+                const chip = document.createElement('span');
+                chip.className = 'order-chip ' + cls + (activeOrder === ord ? ' active' : '');
+                chip.onclick = () => focusOrder(ord);
+                chip.innerHTML = '<i class="fas ' + icon + '"></i><strong>#' + orders[ord].ref + '</strong>' +
+                    (split ? '<span class="icon is-small" title="' + MSG.splitProviders + '"><i class="fas fa-code-branch"></i></span>' : '') +
+                    '<span class="bar"><i style="width:' + (ratio * 100) + '%; background:' + (cls === 'full' ? '#2ecc71' : cls === 'none' ? '#e74c3c' : '#f5a623') + ';"></i></span>' +
+                    '<span class="frac">' + accepted + '/' + total + '</span>';
+                bar.appendChild(chip);
+            });
+            const warn = document.getElementById('partialWarn');
+            if (partial > 0) { warn.style.display = ''; document.getElementById('partialWarnText').textContent = ' ' + MSG.partialWarn.replace('{0}', partial); }
+            else warn.style.display = 'none';
+        }
+
+        function applyFilters() {
+            const onlyUn = document.getElementById('fOnlyUnaccepted').checked;
+            const aboveCost = document.getElementById('fAboveCost').checked;
+            cards().forEach(c => {
+                let show = true;
+                if (onlyUn && (isAccepted(c) || c.dataset.redundant === '1')) show = false;
+                if (aboveCost && parseFloat(c.dataset.margin) <= 0) show = false;
+                if (activeOrder && !cardOrders(c).includes(activeOrder)) show = false;
+                c.classList.toggle('is-hidden', !show);
+                c.classList.toggle('is-focus-match', !!activeOrder && cardOrders(c).includes(activeOrder));
+            });
+            document.querySelectorAll('.cat-section').forEach(sec => {
+                const visible = sec.querySelectorAll('.group-card:not(.is-hidden)').length;
+                sec.style.display = visible ? '' : 'none';
+            });
+        }
+
+        /* meta-grouping by product category (ordered by category ordinal); within a category sort by highest margin */
+        function buildGroups() {
+            const wrap = document.getElementById('groups');
+            const initMargin = c => { const n = net(c); if (n <= 0) return 0; const tp = parseFloat(c.dataset.targetprice) || 0; return ((tp / vat(c)) - n) / n; };
+            const byCat = {};
+            cards().forEach(c => {
+                c.style.setProperty('--accent', provColor(c.dataset.provider));
+                const cat = c.dataset.category || 'Other';
+                (byCat[cat] = byCat[cat] || []).push(c);
+            });
+            const catIndex = cat => parseInt(byCat[cat][0].dataset.catindex);
+            const cats = Object.keys(byCat).sort((a, b) => catIndex(a) - catIndex(b));
+            wrap.innerHTML = '';
+            cats.forEach((cat, ci) => {
+                const list = byCat[cat].sort((a, b) => initMargin(b) - initMargin(a));
+                const sec = document.createElement('div');
+                sec.className = 'cat-section' + (ci === 0 ? '' : ' cat-collapsed');
+                sec.dataset.category = cat;
+                const head = document.createElement('div');
+                head.className = 'cat-header';
+                head.innerHTML = '<span class="icon chevron"><i class="fas fa-chevron-down"></i></span>' +
+                    '<span class="cat-name">' + cat + '</span>' +
+                    '<span class="tag cat-count">' + list.length + '</span>';
+                head.onclick = () => sec.classList.toggle('cat-collapsed');
+                const body = document.createElement('div');
+                body.className = 'cat-body';
+                list.forEach(c => body.appendChild(c));
+                sec.appendChild(head); sec.appendChild(body); wrap.appendChild(sec);
+            });
+        }
+
+        function submitFulfilment(btn) {
+            const winner = computeWinners();
+            const container = document.getElementById('payload-container');
+            container.innerHTML = '';
+            const emptyWarn = document.getElementById('emptyWarn');
+            emptyWarn.style.display = 'none';
+
+            let entryIdx = 0;
+            cards().forEach(c => {
+                if (!isAccepted(c)) return;
+                const wonRows = Array.from(c.querySelectorAll('tr[data-item]')).filter(r => winner[r.dataset.item] === c);
+                if (wonRows.length === 0) return;
+
+                const ep = 'entries[' + entryIdx + ']';
+                addHidden(container, ep + '.accepted', 'true');
+                addHidden(container, ep + '.source.name', c.dataset.name);
+                addHidden(container, ep + '.source.category', c.dataset.category);
+                addHidden(container, ep + '.source.ean', c.dataset.ean);
+                addHidden(container, ep + '.source.mfn', c.dataset.mfn);
+                addHidden(container, ep + '.source.provider', c.dataset.provider);
+                addHidden(container, ep + '.source.qty', c.dataset.sourceqty);
+                addHidden(container, ep + '.source.priceNet', c.dataset.net);
+                addHidden(container, ep + '.source.priceGross', c.dataset.gross);
+
+                wonRows.forEach((r, j) => {
+                    const ap = ep + '.allocations[' + j + ']';
+                    addHidden(container, ap + '.orderId', r.dataset.order);
+                    addHidden(container, ap + '.orderItemId', r.dataset.itemid);
+                    addHidden(container, ap + '.orderItemQty', r.dataset.qty);
+                    addHidden(container, ap + '.orderItemPrice', r.dataset.price);
+                });
+                entryIdx++;
+            });
+
+            if (entryIdx === 0) {
+                container.innerHTML = '';
+                emptyWarn.style.display = '';
+                return;
+            }
+
+            const form = document.getElementById('fulfilment-form');
             const action = document.getElementById('action-select').value;
             const isSuperAdmin = document.getElementById('isSuperAdmin').value === 'true';
             const storeId = document.getElementById('storeId').value;
             const fulfilmentType = document.getElementById('fulfilmentType').value;
+            const type = isSuperAdmin ? 'orders' : fulfilmentType;
+            const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
+            form.action = basePath + '/' + type + '/fulfilment/' + action;
 
-            let type = isSuperAdmin ? 'orders' : fulfilmentType;
-            let basePath = isSuperAdmin ? `/dashboard/store/${storeId}` : '/dashboard';
-
-            form.action = `${basePath}/${type}/fulfilment/${action}`;
-            form.method = 'POST';
-            form.submit();
+            confirmSave(btn);
         }
 
-        function updateTotalNetPrice() {
-            let checkboxes = document.querySelectorAll('input[type="checkbox"][name^="entries"]:checked');
-            let providerSummary = {};
-            let totalSum = 0;
-
-            checkboxes.forEach(function(checkbox) {
-                let row = checkbox.closest('tr');
-                let provider = row.querySelector('.provider').textContent.trim();
-                let netPriceElement = row.querySelector('.net-price');
-                let qtyElement = row.querySelector('.target-qty');
-                let netPrice = parseFloat(netPriceElement.textContent.trim().replace(',', '.'));
-                let qty = parseInt(qtyElement.textContent.trim(), 10);
-
-                if (!isNaN(netPrice) && !isNaN(qty)) {
-                    if (!providerSummary[provider]) {
-                        providerSummary[provider] = 0;
-                    }
-                    let itemTotal = netPrice * qty;
-                    providerSummary[provider] += itemTotal;
-                    totalSum += itemTotal;
-                }
-            });
-
-            // Aktualizacja podsumowania dostawców
-            let providerSummaryDiv = document.getElementById('provider-summary');
-            providerSummaryDiv.innerHTML = '';
-
-            // Wyświetl grupowane ceny netto według dostawcy
-            for (let provider in providerSummary) {
-                let summaryItem = document.createElement('p');
-                summaryItem.textContent = provider + ': ' + providerSummary[provider].toFixed(2) + ' PLN';
-                providerSummaryDiv.appendChild(summaryItem);
-            }
-
-            // Aktualizacja sumy całkowitej
-            let totalSummaryDiv = document.getElementById('total-summary');
-            totalSummaryDiv.innerHTML = '<p><strong>Razem: ' + totalSum.toFixed(2) + ' PLN</strong></p>';
+        function addHidden(container, name, value) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value == null ? '' : value;
+            container.appendChild(input);
         }
 
+        document.getElementById('fOnlyUnaccepted').addEventListener('change', applyFilters);
+        document.getElementById('fAboveCost').addEventListener('change', applyFilters);
 
-        // Dodaj nasłuchiwacze zdarzeń do wszystkich checkboxów, aby uruchamiać funkcję aktualizacji
-        document.querySelectorAll('input[type="checkbox"][name^="entries"]').forEach(function(checkbox) {
-            checkbox.addEventListener('change', updateTotalNetPrice);
-        });
-
-        // Początkowe obliczenie przy załadowaniu strony
-        window.onload = updateTotalNetPrice;
+        buildGroups();
+        render();
     </script>
 
 </div>
