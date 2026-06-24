@@ -9,6 +9,8 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.StockLevels;
 import pl.commercelink.warehouse.StockProductLevel;
@@ -26,8 +28,14 @@ public class DeliverySuggestionService {
     private final Inventory inventory;
     private final StockLevels stockLevels;
     private final ProductCatalogRepository productCatalogRepository;
+    private final StoresRepository storesRepository;
 
     public List<SuggestedDeliveryItem> suggestFor(String storeId, String supplier, Set<String> excludedMfns) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !store.isEnabledSupplier(supplier)) {
+            return new ArrayList<>();
+        }
+
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
 
         List<SuggestedDeliveryItem> suggestions = new ArrayList<>();

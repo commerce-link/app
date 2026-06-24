@@ -32,6 +32,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 
 ## Coding Conventions
 
+- **Lombok**: Prefer Lombok to remove boilerplate. Use `@RequiredArgsConstructor` (with `access = AccessLevel.PACKAGE`/`PRIVATE` to match the intended constructor visibility) for constructors that are pure `final`-field assignment, and `@Getter`/`@Value`/`@Builder` where they fit. Don't use it where the constructor has real logic (e.g. transforming varargs) or where a `record` already removes the boilerplate.
 - **No Logger**: We log all entries to Sentry automatically. Use `System.out`/`System.err` only in rare cases.
 - **No comments**: Code should be self-explanatory. Refactor instead of commenting.
 - **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.
@@ -253,6 +254,7 @@ All paths relative to `src/main/java/pl/commercelink/`.
 ## Testing
 
 - JUnit 5 + Mockito 5.12.0
+- Prefer `@ExtendWith(MockitoExtension.class)` with `@Mock` / `@InjectMocks` fields over manual `Mockito.mock(...)` calls — always use the annotations when the collaborators map to fixed fields. Fall back to `mock(...)` only for mocks created dynamically (e.g. several instances of the same type produced by a helper)
 - Test files in `src/test/java` mirror source structure
 - Currently minimal coverage (4 test files: pricelist, products)
 - `mvn test -Dtest=ClassName#methodName`

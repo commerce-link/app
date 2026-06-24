@@ -1,27 +1,30 @@
 package pl.commercelink.inventory;
 
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class InventoryView {
 
-    private final Collection<MatchedInventory> autoDiscoveredInventory;
-    private final InventoryFilterChain filterChain;
+    private final InventoryIndex globalIndex;
+    private final InventoryIndex ownIndex;
+    private final TaxonomyCache taxonomyCache;
+    private final SupplierRegistry supplierRegistry;
+    private final List<InventorySource> sources;
 
-    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory) {
-        this.autoDiscoveredInventory = autoDiscoveredInventory;
-        this.filterChain = new InventoryFilterChain(new LinkedList<>());
-    }
-
-    InventoryView(Collection<MatchedInventory> autoDiscoveredInventory, InventoryFilter... filters) {
-        this.autoDiscoveredInventory = autoDiscoveredInventory;
-        this.filterChain = new InventoryFilterChain(Arrays.asList(filters));
+    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
+                  TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
+        this.globalIndex = globalIndex;
+        this.ownIndex = ownIndex;
+        this.taxonomyCache = taxonomyCache;
+        this.supplierRegistry = supplierRegistry;
+        this.sources = List.of(sources);
     }
 
     public MatchedInventory findByEan(String ean) {
@@ -37,64 +40,32 @@ public class InventoryView {
     }
 
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
-        List<MatchedInventory> candidates = autoDiscoveredInventory.stream()
-                .filter(i -> i.matches(lookupKey))
-                .toList();
-
-        MatchedInventory matchedInventory;
-        if (candidates.size() == 1) {
-            matchedInventory = candidates.getFirst();
-        } else {
-            List<MatchedInventory> closeMatches = candidates.stream()
-                    .filter(i -> i.matchedByMfn(lookupKey))
-                    .toList();
-
-            matchedInventory = selectBestMatch(lookupKey, closeMatches, candidates);
-        }
-
-        return filterChain.apply(matchedInventory);
-    }
-
-    // prioritize lookup by mfn as it's more reliable
-    private MatchedInventory selectBestMatch(InventoryKey lookupKey, List<MatchedInventory> matchesByMfn, List<MatchedInventory> allMatches) {
-        MatchedInventory bestMatch = selectBestMatch(matchesByMfn);
-        if (bestMatch != null) {
-            return bestMatch;
-        }
-
-        bestMatch = selectBestMatch(allMatches);
-        if (bestMatch != null) {
-            return bestMatch;
-        }
-
-        return MatchedInventory.empty(lookupKey);
-    }
-
-    private MatchedInventory selectBestMatch(List<MatchedInventory> candidates) {
-        MatchedInventory bestMatch = null;
-
-        int bestMatchSize = 0;
-        for (MatchedInventory candidate : candidates) {
-            if (candidate.size() > bestMatchSize) {
-                bestMatchSize = candidate.size();
-                bestMatch = candidate;
-            }
-        }
-
-        return bestMatch;
+        return assemble(lookupKey);
     }
 
     public Collection<MatchedInventory> findAllWithPimId() {
-        return autoDiscoveredInventory.stream()
-                .filter(i -> i.getInventoryKey().getId() != null)
+        return listedKeys()
+                .filter(key -> key.getId() != null)
+                .map(this::assemble)
                 .collect(Collectors.toList());
     }
 
     public Collection<MatchedInventory> findAllByProductCategory(ProductCategory productCategory) {
-        return autoDiscoveredInventory.stream()
-                .filter(i -> i.getTaxonomy().category() == productCategory)
-                .map(filterChain::apply)
+        return listedKeys()
+                .filter(key -> taxonomyCache.find(key).category() == productCategory)
+                .map(this::assemble)
                 .collect(Collectors.toList());
     }
 
+    private Stream<InventoryKey> listedKeys() {
+        return new ListingInventory(globalIndex, ownIndex).keys();
+    }
+
+    private MatchedInventory assemble(InventoryKey lookupKey) {
+        MatchedInventory result = new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        for (InventorySource source : sources) {
+            source.mergeInto(result, result.getInventoryKey());
+        }
+        return result;
+    }
 }

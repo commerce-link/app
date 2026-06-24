@@ -34,13 +34,20 @@ public class StoreInventoryProvider {
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        Optional<StoreInventory> cached = cache.get(storeId);
-        if (cached.isPresent()) {
-            return cached.get();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
+    }
+
+    public InventoryIndex ownIndex(Store store) {
+        if (store == null || !store.hasOwnSupplierConnections()) {
+            return InventoryIndex.of(List.of());
         }
-        Store storeEntity = storesRepository.findById(storeId);
-        StoreInventory built = build(storeId, storeEntity);
-        cache.put(storeId, built, resolveTtl(storeEntity));
+        String storeId = store.getStoreId();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId)).index();
+    }
+
+    private StoreInventory buildAndCache(Store store, String storeId) {
+        StoreInventory built = build(storeId, store);
+        cache.put(storeId, built, resolveTtl(store));
         return built;
     }
 
@@ -55,7 +62,7 @@ public class StoreInventoryProvider {
 
     private StoreInventory build(String storeId, Store storeEntity) {
         if (storeEntity == null) {
-            return new StoreInventory(new ArrayList<>(), LocalDateTime.now());
+            return new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now());
         }
 
         List<InventoryItem> ownItems = new ArrayList<>();
@@ -67,6 +74,6 @@ public class StoreInventoryProvider {
             }
         }
 
-        return new StoreInventory(autoDiscovery.run(ownItems), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems)), LocalDateTime.now());
     }
 }

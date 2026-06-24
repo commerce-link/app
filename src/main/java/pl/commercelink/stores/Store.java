@@ -425,6 +425,11 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isEnabledSupplier(String supplier) {
+        return getEnabledProviders().stream().anyMatch(supplier::equalsIgnoreCase);
+    }
+
+    @DynamoDBIgnore
     public List<String> getOwnSupplierNames() {
         return supplierNamesByMode(ConnectionMode.OWN);
     }
