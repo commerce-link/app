@@ -209,7 +209,7 @@ class GoldenMarketplaceBreadcrumbTest {
     private void priceFor(Product product, long price, int deliveryDays) {
         AvailabilityAndPrice ap = new AvailabilityAndPrice(
                 product.getPimId(), product.getEan(), product.getManufacturerCode(),
-                product.getBrand(), product.getLabel(), product.getName(),
+                product.getBrand(), product.getSubcategory(), product.getName(),
                 product.getCategory(), price, 0L, deliveryDays, 0L
         );
         when(pricelist.findByPimId(product.getPimId())).thenReturn(Optional.of(ap));

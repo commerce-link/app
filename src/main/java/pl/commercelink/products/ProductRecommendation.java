@@ -20,7 +20,7 @@ public class ProductRecommendation {
     private String pimId;
     private String brand;
     private String name;
-    private String label;
+    private String subcategory;
     private String pricingGroup;
 
     private String ean;
@@ -43,16 +43,16 @@ public class ProductRecommendation {
             this.pimId = entry.pimId();
             this.brand = entry.brand();
             this.name = entry.name();
-            this.label = StringUtils.isNotBlank(entry.subcategory()) ? entry.subcategory() : entry.name();
+            this.subcategory = StringUtils.isNotBlank(entry.subcategory()) ? entry.subcategory() : entry.name();
         } else {
             this.pimId = null;
             this.brand = taxonomy.brand();
             this.name = taxonomy.name();
-            this.label = taxonomy.name();
+            this.subcategory = taxonomy.name();
         }
 
         this.lowestGrossPrice = matchedInventory.getLowestPrice().grossValue();
-        this.pricingGroup = assignPricingGroup(categoryDefinition.getPriceDefinitions(), label, lowestGrossPrice);
+        this.pricingGroup = assignPricingGroup(categoryDefinition.getPriceDefinitions(), subcategory, lowestGrossPrice);
 
         this.ean = taxonomy.ean();
         this.manufacturerCode = taxonomy.mfn();
@@ -63,9 +63,9 @@ public class ProductRecommendation {
 
     }
 
-    private String assignPricingGroup(List<PriceDefinition> priceDefinitions, String label, double lowestGrossPrice) {
+    private String assignPricingGroup(List<PriceDefinition> priceDefinitions, String subcategory, double lowestGrossPrice) {
         for (PriceDefinition priceDefinition : priceDefinitions) {
-            if (priceDefinition.matches(label, lowestGrossPrice)) {
+            if (priceDefinition.matches(subcategory, lowestGrossPrice)) {
                 return priceDefinition.getPricingGroup();
             }
         }
@@ -79,7 +79,7 @@ public class ProductRecommendation {
                 ean,
                 manufacturerCode,
                 brand,
-                label,
+                subcategory,
                 name,
                 productCategory,
                 pricingGroup
@@ -94,8 +94,8 @@ public class ProductRecommendation {
         return name;
     }
 
-    public String getLabel() {
-        return label;
+    public String getSubcategory() {
+        return subcategory;
     }
 
     public String getBrand() {

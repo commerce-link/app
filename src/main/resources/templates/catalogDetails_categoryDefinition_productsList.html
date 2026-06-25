@@ -76,7 +76,7 @@
                     <input class="input" type="text" name="brand" th:placeholder="#{product.brand}" th:value="${param.brand}">
                 </div>
                 <div class="control">
-                    <input class="input" type="text" name="label" th:placeholder="#{product.label}" th:value="${param.label}">
+                    <input class="input" type="text" name="label" th:placeholder="#{product.subcategory}" th:value="${param.label}">
                 </div>
                 <div class="control">
                     <input class="input" type="text" name="pimId" th:placeholder="#{product.pim.id}" th:value="${param.pimId}">
@@ -102,7 +102,7 @@
                         <th th:text="#{product.ean}"></th>
                         <th th:text="#{product.manufacturer.code}"></th>
                         <th th:text="#{product.brand}"></th>
-                        <th th:text="#{product.label}"></th>
+                        <th th:text="#{product.subcategory}"></th>
                         <th th:text="#{product.name}"></th>
                         <th th:text="#{product.compatibility.filter}"></th>
                         <th th:text="#{product.compatibility.tags}"></th>
@@ -121,7 +121,7 @@
                         <td th:text="${product.ean}"></td>
                         <td th:text="${product.manufacturerCode}"></td>
                         <td th:text="${product.brand}"></td>
-                        <td th:text="${product.label}"></td>
+                        <td th:text="${product.subcategory}"></td>
                         <td th:text="${product.name}"></td>
                         <td>
                             <ul>

@@ -62,7 +62,7 @@ public class ProductsList {
                 product.getPimId(),
                 product.getManufacturerCode(),
                 product.getBrand(),
-                product.getLabel(),
+                product.getSubcategory(),
                 product.getName()
         );
     }

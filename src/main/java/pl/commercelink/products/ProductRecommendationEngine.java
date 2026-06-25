@@ -61,7 +61,7 @@ public class ProductRecommendationEngine {
 
     private boolean matchesGroupingOrder(ProductRecommendation recommendation, CategoryDefinition categoryDefinition) {
         if (categoryDefinition.hasGrouping()) {
-            return categoryDefinition.getGroupingOrder().contains(recommendation.getLabel());
+            return categoryDefinition.getGroupingOrder().contains(recommendation.getSubcategory());
         }
         return true;
     }

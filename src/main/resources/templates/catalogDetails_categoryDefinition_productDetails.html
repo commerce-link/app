@@ -62,12 +62,12 @@
         <div class="field">
             <div class="control">
                 <div th:if="${#lists.isEmpty(labels)}">
-                    <label class="label" for="label_input" th:text="#{product.label}"></label>
-                    <input class="input" type="text" id="label_input" th:field="*{label}" />
+                    <label class="label" for="label_input" th:text="#{product.subcategory}"></label>
+                    <input class="input" type="text" id="label_input" th:field="*{subcategory}" />
                 </div>
                 <div th:if="${!#lists.isEmpty(labels)}" class="select">
-                    <label class="label" for="label_select" th:text="#{product.label}"></label>
-                    <select id="label_select" th:field="*{label}">
+                    <label class="label" for="label_select" th:text="#{product.subcategory}"></label>
+                    <select id="label_select" th:field="*{subcategory}">
                         <option th:each="label : ${labels}" th:value="${label}" th:text="${label}"></option>
                     </select>
                 </div>

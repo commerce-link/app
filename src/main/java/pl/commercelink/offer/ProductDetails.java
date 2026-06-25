@@ -68,7 +68,7 @@ public class ProductDetails {
                 product.getPimId(),
                 product.getManufacturerCode(),
                 product.getBrand(),
-                product.getLabel(),
+                product.getSubcategory(),
                 product.getName(),
                 product.getCategory().getProductGroup(),
                 product.getCategory()

@@ -153,7 +153,7 @@ public class StoreCopyService {
                 target.setEan(source.getEan());
                 target.setManufacturerCode(source.getManufacturerCode());
                 target.setBrand(source.getBrand());
-                target.setLabel(source.getLabel());
+                target.setSubcategory(source.getSubcategory());
                 target.setName(source.getName());
                 target.setCategory(source.getCategory());
                 target.setEnabled(source.isEnabled());

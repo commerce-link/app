@@ -229,7 +229,7 @@ public class ProductCatalogController {
         // Apply filtering similar to showProducts
         List<ProductRecommendation> filteredRecommendations = recommendations.stream()
                 .filter(r -> !isNotBlank(brand) || StringUtils.equalsIgnoreCase(r.getBrand(), brand))
-                .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getLabel(), label))
+                .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getSubcategory(), label))
                 .filter(r -> !isNotBlank(pimId) || StringUtils.equalsIgnoreCase(r.getPimId(), pimId))
                 .filter(r -> !isNotBlank(ean) || StringUtils.equalsIgnoreCase(r.getEan(), ean))
                 .filter(r -> !isNotBlank(mfn) || StringUtils.equalsIgnoreCase(r.getManufacturerCode(), mfn))
@@ -309,10 +309,10 @@ public class ProductCatalogController {
                 products = new LinkedList<>();
             }
             List<Product> sortedProducts = products.stream()
-                    .sorted(Comparator.comparing(Product::getLabel, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .sorted(Comparator.comparing(Product::getSubcategory, Comparator.nullsLast(Comparator.naturalOrder()))
                             .thenComparing(Product::getName, Comparator.nullsLast(Comparator.naturalOrder())))
                     .filter(p -> !isNotBlank(brand) || StringUtils.equalsIgnoreCase(p.getBrand(), brand))
-                    .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getLabel(), label))
+                    .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getSubcategory(), label))
                     .filter(p -> !isNotBlank(pimId) || StringUtils.equalsIgnoreCase(p.getPimId(), pimId))
                     .filter(p -> !isNotBlank(ean) || StringUtils.equalsIgnoreCase(p.getEan(), ean))
                     .filter(p -> !isNotBlank(mfn) || StringUtils.equalsIgnoreCase(p.getManufacturerCode(), mfn))
@@ -378,7 +378,7 @@ public class ProductCatalogController {
         Set<String> unmappedLabels = new HashSet<>();
         if (categoryDefinition.hasGrouping()) {
             unmappedLabels = products.stream()
-                    .map(Product::getLabel)
+                    .map(Product::getSubcategory)
                     .filter(l -> !categoryDefinition.getGroupingOrder().contains(l))
                     .collect(Collectors.toSet());
         }
@@ -515,7 +515,7 @@ public class ProductCatalogController {
         // Check if EAN requires PIM ID change
         validateIfPimChangeIsRequired(product, existingProduct);
 
-        existingProduct.setLabel(product.getLabel());
+        existingProduct.setSubcategory(product.getSubcategory());
         existingProduct.setName(product.getName());
         existingProduct.setRecommendation(product.getRecommendation());
         existingProduct.setEnabled(product.isEnabled());

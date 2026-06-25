@@ -33,7 +33,7 @@ public class Product {
     @DynamoDBAttribute(attributeName = "brand")
     private String brand;
     @DynamoDBAttribute(attributeName = "label")
-    private String label;
+    private String subcategory;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "category")
@@ -84,14 +84,14 @@ public class Product {
         this.category = category;
     }
 
-    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String label, String name, ProductCategory category, String pricingGroup) {
+    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String subcategory, String name, ProductCategory category, String pricingGroup) {
         this(categoryId, category);
 
         this.pimId = pimId;
         this.ean = ean;
         this.manufacturerCode = manufacturerCode;
         this.brand = brand;
-        this.label = label;
+        this.subcategory = subcategory;
         this.name = name;
         this.pricingGroup = pricingGroup;
 
@@ -158,12 +158,12 @@ public class Product {
         this.brand = brand;
     }
 
-    public String getLabel() {
-        return label;
+    public String getSubcategory() {
+        return subcategory;
     }
 
-    public void setLabel(String label) {
-        this.label = label;
+    public void setSubcategory(String subcategory) {
+        this.subcategory = subcategory;
     }
 
     public String getName() {

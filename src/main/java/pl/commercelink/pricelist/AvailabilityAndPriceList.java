@@ -108,7 +108,7 @@ public class AvailabilityAndPriceList {
                 p.getEan(),
                 p.getManufacturerCode(),
                 p.getBrand(),
-                p.getLabel(),
+                p.getSubcategory(),
                 p.getName(),
                 p.getCategory(),
                 grossPrice,
