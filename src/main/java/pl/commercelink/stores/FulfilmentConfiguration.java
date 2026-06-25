@@ -2,6 +2,7 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
@@ -9,7 +10,9 @@ import pl.commercelink.products.ProductGroupListConverter;
 import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @DynamoDBDocument
 public class FulfilmentConfiguration {
@@ -74,6 +77,14 @@ public class FulfilmentConfiguration {
 
     public void setEnabledProductGroups(List<ProductGroup> enabledProductGroups) {
         this.enabledProductGroups = enabledProductGroups;
+    }
+
+    @DynamoDBIgnore
+    public List<String> getEnabledProductGroupKeys() {
+        if (enabledProductGroups == null) {
+            return Collections.emptyList();
+        }
+        return enabledProductGroups.stream().map(ProductGroup::name).collect(Collectors.toList());
     }
 
     public boolean isCanUseGlobalSuppliers() {

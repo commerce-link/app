@@ -415,6 +415,16 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public List<String> getEnabledProductGroupKeys() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getEnabledProductGroups)
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(ProductGroup::name)
+                .collect(Collectors.toList());
+    }
+
+    @DynamoDBIgnore
     public List<String> getEnabledProviders() {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getSupplierConnections)

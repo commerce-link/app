@@ -73,7 +73,7 @@ public class TaxonomyCache {
 
     private static Taxonomy withWeights(Taxonomy t, Integer net, Integer gross) {
         return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
-                            t.category(), t.dataAccuracyScore(), net, gross);
+                            t.category(), t.dataAccuracyScore(), net, gross, t.categoryKey());
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {

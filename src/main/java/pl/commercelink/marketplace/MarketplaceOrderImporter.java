@@ -124,8 +124,17 @@ public class MarketplaceOrderImporter {
 
     private ProductCategory resolveProductCategory(String mfn) {
         return pimCatalog.findByMpn(mfn)
-                .map(PimEntry::category)
+                .map(PimEntry::categoryKey)
+                .map(MarketplaceOrderImporter::toCategory)
                 .orElse(ProductCategory.Other);
+    }
+
+    private static ProductCategory toCategory(String categoryKey) {
+        try {
+            return ProductCategory.valueOf(categoryKey);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return ProductCategory.Other;
+        }
     }
 
     private PaymentSource resolvePaymentSource(String paymentType) {
