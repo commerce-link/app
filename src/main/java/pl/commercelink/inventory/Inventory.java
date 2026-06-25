@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
@@ -96,6 +98,31 @@ public class Inventory {
                 GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store)),
                 GroupInventorySource.own(ownIndex),
                 new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+    }
+
+    public InventoryView withEnabledSuppliersOnly(String storeId, SupplierScope scope) {
+        return scopedView(storeId, scope, false);
+    }
+
+    public InventoryView withEnabledSuppliersAndWarehouseData(String storeId, SupplierScope scope) {
+        return scopedView(storeId, scope, true);
+    }
+
+    private InventoryView scopedView(String storeId, SupplierScope scope, boolean withWarehouse) {
+        Store store = storesRepository.findById(storeId);
+        InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
+        InventoryIndex globalIndex = globalInventory.index();
+        GroupInventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope));
+        GroupInventorySource own = GroupInventorySource.own(ownIndex, scopedSupplier(store, ConnectionMode.OWN, scope));
+        return withWarehouse
+                ? new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry, global, own,
+                        new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)))
+                : new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry, global, own);
+    }
+
+    private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {
+        Collection<String> names = store != null ? store.supplierNames(mode, scope) : List.of();
+        return names::contains;
     }
 
     private Predicate<String> enabledGlobalSupplier(Store store) {

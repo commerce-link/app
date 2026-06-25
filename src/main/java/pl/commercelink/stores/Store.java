@@ -440,6 +440,18 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public List<String> supplierNames(ConnectionMode mode, SupplierScope scope) {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getSupplierConnections)
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(connection -> connection.getMode() == mode)
+                .filter(scope::includes)
+                .map(StoreSupplierConnection::getSupplierName)
+                .collect(Collectors.toList());
+    }
+
+    @DynamoDBIgnore
     public boolean hasOwnSupplierConnections() {
         return !getOwnSupplierNames().isEmpty();
     }

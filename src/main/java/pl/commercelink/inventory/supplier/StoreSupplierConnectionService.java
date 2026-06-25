@@ -58,7 +58,9 @@ public class StoreSupplierConnectionService {
             selections.add(new SupplierSelectionForm(
                     name,
                     connection != null,
-                    connection != null ? connection.getMode() : ConnectionMode.GLOBAL));
+                    connection != null ? connection.getMode() : ConnectionMode.GLOBAL,
+                    connection == null || connection.isIncludeInPricing(),
+                    connection == null || connection.isIncludeInFulfilment()));
         }
         return selections;
     }
@@ -119,7 +121,9 @@ public class StoreSupplierConnectionService {
                 ConnectionMode mode = canUseGlobal
                         ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
                         : ConnectionMode.OWN;
-                connections.add(new StoreSupplierConnection(selection.getSupplierName(), mode));
+                connections.add(new StoreSupplierConnection(
+                        selection.getSupplierName(), mode,
+                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
             }
         }
         return connections;

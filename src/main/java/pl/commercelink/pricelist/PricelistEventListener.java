@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.stores.SupplierScope;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,7 +33,7 @@ class PricelistEventListener {
             pollTimeoutSeconds = "20"
     )
     void handlePricelistEvent(PricelistEventPayload payload) throws IOException {
-        InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(payload.getStoreId());
+        InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(payload.getStoreId(), SupplierScope.PRICING);
 
         List<AvailabilityAndPrice> pricelist = availabilityAndPriceListFactory
                 .create(enrichedInventory)

@@ -13,6 +13,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.web.dtos.ObjectIdDto;
 
 import java.util.List;
@@ -72,7 +73,7 @@ public class ProductCatalogRestApi {
             @PathVariable("storeId") String storeId,
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId) {
-        return new ProductsList(recommendationEngine, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
+        return new ProductsList(recommendationEngine, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.PRICING))
                 .generate(storeId, catalogId, categoryId);
     }
 
@@ -83,7 +84,7 @@ public class ProductCatalogRestApi {
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId,
             @PathVariable("productId") String productId) {
-        return new ProductDetails(pimCatalog, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
+        return new ProductDetails(pimCatalog, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.PRICING))
                 .generate(storeId, catalogId, categoryId, productId);
     }
 

@@ -24,6 +24,7 @@ import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.*;
@@ -224,7 +225,7 @@ public class ProductCatalogController {
         ProductCatalog catalog = productCatalogRepository.findById(getStoreId(),catalogId);
         CategoryDefinition categoryDefinition = catalog.findCategoryDefinition(categoryId);
 
-        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendations(categoryDefinition, inventory.withEnabledSuppliersOnly(getStoreId()));
+        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendations(categoryDefinition, inventory.withEnabledSuppliersOnly(getStoreId(), SupplierScope.PRICING));
 
         // Apply filtering similar to showProducts
         List<ProductRecommendation> filteredRecommendations = recommendations.stream()
@@ -281,7 +282,7 @@ public class ProductCatalogController {
 
         List<Product> products = new LinkedList<>();
         if (categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
-            InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
+            InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId(), SupplierScope.PRICING);
 
             if ("Enabled".equalsIgnoreCase(status)) {
                 products = recommendationEngine.getRecommendationsForMappedProducts(categoryDefinition, enabledInventory).stream()

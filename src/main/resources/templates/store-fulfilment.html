@@ -102,6 +102,20 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox"
+                                               th:field="*{supplierSelections[__${stat.index}__].includeInPricing}" />
+                                        <span th:text="#{store.supplier.include.pricing}"></span>
+                                    </label>
+                                </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox"
+                                               th:field="*{supplierSelections[__${stat.index}__].includeInFulfilment}" />
+                                        <span th:text="#{store.supplier.include.fulfilment}"></span>
+                                    </label>
+                                </div>
                                 <div class="supplier-own-fields"
                                      th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
                                     <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">

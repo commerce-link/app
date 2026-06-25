@@ -17,6 +17,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
@@ -49,7 +50,7 @@ class OfferItemReloaderTest {
 
     @BeforeEach
     void setupInventory() {
-        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
         when(inventoryView.findByProductCode(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
     }
 
