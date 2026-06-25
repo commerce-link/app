@@ -24,10 +24,10 @@ public class OrderFinancials {
     private double unpaidAmount;
 
     public OrderFinancials(Order order, List<OrderItem> orderItems) {
-        this.totalItemsPrice = orderItems.stream().filter(i -> !i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalPrice).sum();
-        this.totalItemsCost = orderItems.stream().filter(i -> !i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalCost).sum();
-        this.totalServicesPrice = orderItems.stream().filter(i -> i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalPrice).sum();
-        this.totalServicesCost = orderItems.stream().filter(i -> i.hasGroup(ProductGroup.Services)).mapToDouble(OrderItem::getTotalCost).sum();
+        this.totalItemsPrice = orderItems.stream().filter(OrderItem::isProduct).mapToDouble(OrderItem::getTotalPrice).sum();
+        this.totalItemsCost = orderItems.stream().filter(OrderItem::isProduct).mapToDouble(OrderItem::getTotalCost).sum();
+        this.totalServicesPrice = orderItems.stream().filter(OrderItem::isService).mapToDouble(OrderItem::getTotalPrice).sum();
+        this.totalServicesCost = orderItems.stream().filter(OrderItem::isService).mapToDouble(OrderItem::getTotalCost).sum();
         this.totalProcessingFeesCost = order.getPayments().stream().mapToDouble(Payment::getFee).sum();
 
         this.totalPrice = totalItemsPrice + totalServicesPrice;

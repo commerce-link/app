@@ -9,8 +9,6 @@ import pl.commercelink.starter.localization.EnumLocalizer;
 @Getter(AccessLevel.PACKAGE)
 class LocalizedOrderItem {
 
-    @JsonProperty("category")
-    private String category;
     @JsonProperty("name")
     private String name;
     @JsonProperty("quantity")
@@ -20,7 +18,6 @@ class LocalizedOrderItem {
 
     static LocalizedOrderItem fromOrderItem(OrderItem orderItem, EnumLocalizer enumLocalizer) {
         LocalizedOrderItem localizedOrderItem = new LocalizedOrderItem();
-        localizedOrderItem.category = enumLocalizer.localize(orderItem.getCategory(), "singular");
         localizedOrderItem.name = orderItem.getName();
         localizedOrderItem.quantity = orderItem.getQty();
         localizedOrderItem.price = orderItem.getPrice();

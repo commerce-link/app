@@ -51,7 +51,7 @@ class DataCorrection {
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight, categoryKey);
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight, categoryKey, taxonomy.signals());
     }
 
     private static ProductCategory toEnumOrKeep(String categoryKey, ProductCategory current) {

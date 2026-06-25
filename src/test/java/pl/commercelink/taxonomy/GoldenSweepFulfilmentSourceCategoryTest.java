@@ -37,7 +37,8 @@ class GoldenSweepFulfilmentSourceCategoryTest {
 
     private static FulfilmentSource source(ProductCategory category, String ean, String mfn) {
         FulfilmentSource s = new FulfilmentSource();
-        s.setCategory(category);
+        s.setSequenceNumber(category.ordinal());
+        s.setItemType(CategorySnapshot.typeOf(category));
         s.setProvider("Action");
         s.setEan(ean);
         s.setMfn(mfn);
@@ -65,7 +66,7 @@ class GoldenSweepFulfilmentSourceCategoryTest {
     }
 
     /** Runs the REAL run() against a mocked inventory that returns {@code offers} for the item's SKU. */
-    private static List<ProductCategory> runEligibilityGates(OrderItem orderItem, List<InventoryItem> offers) {
+    private static List<Integer> runEligibilityGates(OrderItem orderItem, List<InventoryItem> offers) {
         InventoryView inventory = mock(InventoryView.class);
         if (orderItem.hasSKU()) {
             MatchedInventory matched = mock(MatchedInventory.class);
@@ -77,7 +78,7 @@ class GoldenSweepFulfilmentSourceCategoryTest {
                 .build();
         return generator.run(List.of(orderItem)).stream()
                 .map(FulfilmentItem::getSource)
-                .map(FulfilmentSource::getCategory)
+                .map(FulfilmentSource::getSequenceNumber)
                 .collect(Collectors.toList());
     }
 
@@ -114,11 +115,11 @@ class GoldenSweepFulfilmentSourceCategoryTest {
         OrderItem service = servicesOrderItem();
 
         // when (REAL run() eligibility gates)
-        List<ProductCategory> passing = runEligibilityGates(service, List.of());
+        List<Integer> passing = runEligibilityGates(service, List.of());
 
         // then
         // Services short-circuits both gates to true despite missing ean/mfn -> it survives run().
-        assertThat(passing).containsExactly(ProductCategory.Services);
+        assertThat(passing).containsExactly(ProductCategory.Services.ordinal());
     }
 
     @Test
@@ -130,7 +131,7 @@ class GoldenSweepFulfilmentSourceCategoryTest {
 
         // when / then (REAL run() eligibility gates)
         // fully identified offer passes both gates.
-        assertThat(runEligibilityGates(withBoth, List.of(offer("111", "M")))).containsExactly(ProductCategory.CPU);
+        assertThat(runEligibilityGates(withBoth, List.of(offer("111", "M")))).containsExactly(ProductCategory.CPU.ordinal());
         // missing ean fails the ean gate (no Services bypass) -> rejected.
         assertThat(runEligibilityGates(noEan, List.of(offer(null, "M")))).isEmpty();
         // missing mfn fails the mfn gate (no Services bypass) -> rejected.
@@ -142,7 +143,7 @@ class GoldenSweepFulfilmentSourceCategoryTest {
         // given
         // four order items fed through the REAL run() one by one (run() collapses a Services item to an
         // internal warehouse source, and a SKU item to the matched inventory offers).
-        List<List<ProductCategory>> results = List.of(
+        List<List<Integer>> results = List.of(
                 runEligibilityGates(servicesOrderItem(), List.of()),                                 // service, bypasses
                 runEligibilityGates(productOrderItem(ProductCategory.CPU, "M"), List.of(offer("111", "M"))), // fully identified
                 runEligibilityGates(productOrderItem(ProductCategory.CPU, "M"), List.of(offer(null, "M"))),  // missing ean -> rejected
@@ -150,11 +151,11 @@ class GoldenSweepFulfilmentSourceCategoryTest {
         );
 
         // when
-        List<ProductCategory> passing = results.stream()
+        List<Integer> passing = results.stream()
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
 
         // then
-        assertThat(passing).containsExactly(ProductCategory.Services, ProductCategory.CPU);
+        assertThat(passing).containsExactly(ProductCategory.Services.ordinal(), ProductCategory.CPU.ordinal());
     }
 }

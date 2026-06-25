@@ -60,7 +60,8 @@ public class WarehouseFulfilmentService {
                 fulfilledOrderItems.add(
                         new OrderItem(
                                 orderItem.getOrderId(),
-                                orderItem.getCategory(),
+                                orderItem.getSequenceNumber(),
+                                orderItem.getItemType(),
                                 orderItem.getName(),
                                 reservationItem.getRemainingQty(),
                                 orderItem.getPrice(),
@@ -86,7 +87,8 @@ public class WarehouseFulfilmentService {
     private OrderItem createOrderItemForReservation(OrderItem orderItem, ReservationConfirmation confirmation) {
         OrderItem newItem = new OrderItem(
                 orderItem.getOrderId(),
-                orderItem.getCategory(),
+                orderItem.getSequenceNumber(),
+                orderItem.getItemType(),
                 orderItem.getName(),
                 confirmation.qty(),
                 orderItem.getPrice(),

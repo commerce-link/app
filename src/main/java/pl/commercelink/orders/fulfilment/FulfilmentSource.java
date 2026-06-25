@@ -3,14 +3,15 @@ package pl.commercelink.orders.fulfilment;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.ItemType;
 
 import java.util.Objects;
 
 public class FulfilmentSource {
 
     private String name;
-    private ProductCategory category;
+    private int sequenceNumber;
+    private ItemType itemType;
 
     private String provider;
     private String ean;
@@ -25,7 +26,8 @@ public class FulfilmentSource {
 
     public FulfilmentSource(OrderItem orderItem, InventoryItem inventoryItem) {
         this.name = orderItem.getName();
-        this.category = orderItem.getCategory();
+        this.sequenceNumber = orderItem.getSequenceNumber();
+        this.itemType = orderItem.getItemType();
 
         this.provider = inventoryItem.supplier();
         this.ean = inventoryItem.ean();
@@ -39,12 +41,12 @@ public class FulfilmentSource {
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         FulfilmentSource that = (FulfilmentSource) o;
-        return qty == that.qty && Double.compare(priceNet, that.priceNet) == 0 && Double.compare(priceGross, that.priceGross) == 0 && Objects.equals(provider, that.provider) && Objects.equals(ean, that.ean) && Objects.equals(mfn, that.mfn) && category == that.category;
+        return qty == that.qty && Double.compare(priceNet, that.priceNet) == 0 && Double.compare(priceGross, that.priceGross) == 0 && Objects.equals(provider, that.provider) && Objects.equals(ean, that.ean) && Objects.equals(mfn, that.mfn) && sequenceNumber == that.sequenceNumber && itemType == that.itemType;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(provider, ean, mfn, category, qty, priceNet, priceGross);
+        return Objects.hash(provider, ean, mfn, sequenceNumber, itemType, qty, priceNet, priceGross);
     }
 
     public String getProvider() {
@@ -79,12 +81,24 @@ public class FulfilmentSource {
         this.name = name;
     }
 
-    public ProductCategory getCategory() {
-        return category;
+    public int getSequenceNumber() {
+        return sequenceNumber;
     }
 
-    public void setCategory(ProductCategory category) {
-        this.category = category;
+    public void setSequenceNumber(int sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
+    }
+
+    public ItemType getItemType() {
+        return itemType;
+    }
+
+    public void setItemType(ItemType itemType) {
+        this.itemType = itemType;
+    }
+
+    public boolean isService() {
+        return itemType == ItemType.SERVICE;
     }
 
     public int getQty() {

@@ -4,6 +4,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.taxonomy.CategorySnapshot;
+import pl.commercelink.taxonomy.ItemType;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
@@ -30,6 +32,12 @@ public class OrderItem extends Item {
     @DynamoDBVersionAttribute
     private Long version;
 
+    // frozen at creation; the order item no longer persists the category enum (product/service via itemType,
+    // sort via sequenceNumber). legacyCategoryKey reads the pre-cut "category" attribute for old rows (no migration).
+    private Integer sequenceNumber;
+    private ItemType itemType;
+    private String legacyCategoryKey;
+
     @DynamoDBIgnore
     private boolean selected;
 
@@ -38,7 +46,13 @@ public class OrderItem extends Item {
     }
 
     public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
-        super(category, name, qty, null);
+        this(orderId, CategorySnapshot.sequenceOf(category), CategorySnapshot.typeOf(category), name, qty, price, sku, consolidated);
+    }
+
+    public OrderItem(String orderId, int sequenceNumber, ItemType itemType, String name, int qty, double price, String sku, boolean consolidated) {
+        super(name, qty, null);
+        this.sequenceNumber = sequenceNumber;
+        this.itemType = itemType;
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = sku;
@@ -47,7 +61,9 @@ public class OrderItem extends Item {
     }
 
     public OrderItem(String orderId, OrderItem source, int qty) {
-        super(source.getCategory(), source.getName(), qty, source.getComment());
+        super(source.getName(), qty, source.getComment());
+        this.sequenceNumber = source.getSequenceNumber();
+        this.itemType = source.getItemType();
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = source.getSku();
@@ -67,7 +83,7 @@ public class OrderItem extends Item {
     }
 
     public void markAsWarehouseFulfilled() {
-        if (hasCategory(ProductCategory.Services)) {
+        if (isService()) {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
@@ -86,7 +102,6 @@ public class OrderItem extends Item {
     }
 
     public void updateAllFields(OrderItem other) {
-        this.setCategory(other.getCategory());
         this.setSku(other.getSku());
         this.setName(other.getName());
         this.setPrice(other.getPrice());
@@ -105,7 +120,6 @@ public class OrderItem extends Item {
     }
 
     public void updateLimitedFields(OrderItem other) {
-        this.setCategory(other.getCategory());
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
@@ -227,14 +241,43 @@ public class OrderItem extends Item {
         return sku != null && !sku.isEmpty();
     }
 
+    @DynamoDBAttribute(attributeName = "sequenceNumber")
+    public Integer getSequenceNumber() {
+        return sequenceNumber != null ? sequenceNumber : CategorySnapshot.sequenceOfKey(legacyCategoryKey);
+    }
+
+    public void setSequenceNumber(Integer sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
+    }
+
+    @DynamoDBAttribute(attributeName = "itemType")
+    @DynamoDBTypeConvertedEnum
+    public ItemType getItemType() {
+        return itemType != null ? itemType : CategorySnapshot.typeOfKey(legacyCategoryKey);
+    }
+
+    public void setItemType(ItemType itemType) {
+        this.itemType = itemType;
+    }
+
+    @DynamoDBAttribute(attributeName = "category")
+    public String getLegacyCategoryKey() {
+        return legacyCategoryKey;
+    }
+
+    public void setLegacyCategoryKey(String legacyCategoryKey) {
+        this.legacyCategoryKey = legacyCategoryKey;
+    }
+
     @DynamoDBIgnore
-    public int getSequenceNumber() {
-        return getCategory().ordinal();
+    @Override
+    public boolean isService() {
+        return getItemType() == ItemType.SERVICE;
     }
 
     @DynamoDBIgnore
     public boolean canBeFulfilledInternally() {
-        return getCategory() == ProductCategory.Services && isWarehouseFulfilled();
+        return isService() && isWarehouseFulfilled();
     }
 
     @DynamoDBIgnore
@@ -246,7 +289,8 @@ public class OrderItem extends Item {
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
         return new OrderItem(
                 orderId,
-                basketItem.getCategory(),
+                CategorySnapshot.sequenceOfKey(basketItem.getCategoryKey()),
+                CategorySnapshot.typeOfKey(basketItem.getCategoryKey()),
                 basketItem.getName(),
                 (int) basketItem.getQty(),
                 basketItem.getUnitPrice(),

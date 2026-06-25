@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.taxonomy.CategorySnapshot;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -163,10 +164,10 @@ public class OfferItemReloader {
     }
 
     private int getCategoryOrdinal(BasketItem basketItem) {
-        if (basketItem == null || basketItem.getCategory() == null) {
+        if (basketItem == null || basketItem.getCategoryKey() == null) {
             return Integer.MAX_VALUE;
         }
-        return basketItem.getCategory().ordinal();
+        return CategorySnapshot.sequenceOfKey(basketItem.getCategoryKey());
     }
 
 }

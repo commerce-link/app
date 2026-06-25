@@ -109,12 +109,12 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(i -> !i.hasCategory(ProductCategory.Services)).collect(Collectors.toList());
+        return basketItems.stream().filter(BasketItem::isProduct).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForServices() {
-        return basketItems.stream().filter(i -> i.hasCategory(ProductCategory.Services)).collect(Collectors.toList());
+        return basketItems.stream().filter(BasketItem::isService).collect(Collectors.toList());
     }
 
     public void setBasketItems(List<BasketItem> basketItems) {
@@ -247,7 +247,7 @@ public class Basket {
     @DynamoDBIgnore
     public Optional<BasketItem> getShippingItem() {
         return basketItems.stream()
-                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .filter(BasketItem::isService)
                 .filter(BasketItem::isShippingItem)
                 .findFirst();
     }

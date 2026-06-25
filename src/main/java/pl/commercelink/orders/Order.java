@@ -281,7 +281,7 @@ public class Order {
 
     @DynamoDBIgnore
     public void increaseRealizationDays(OrderItem orderItem, int estimatedDeliveryDays) {
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.isService()) {
             this.orderRealizationDays = Math.max(orderRealizationDays, estimatedDeliveryDays);
         }
     }
@@ -300,14 +300,14 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> !i.hasCategory(ProductCategory.Services))
+                .filter(OrderItem::isProduct)
                 .allMatch(OrderItem::isReturned);
     }
 
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
         orderItems.stream()
-                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .filter(OrderItem::isService)
                 .forEach(OrderItem::markAsReturned);
 
         this.totalPrice = orderItems.stream()

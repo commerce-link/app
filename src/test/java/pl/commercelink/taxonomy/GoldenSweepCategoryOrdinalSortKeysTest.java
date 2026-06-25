@@ -55,7 +55,7 @@ class GoldenSweepCategoryOrdinalSortKeysTest {
 
     private static FulfilmentSource sourceWithCategory(ProductCategory category, double priceGross) {
         FulfilmentSource source = new FulfilmentSource();
-        source.setCategory(category);
+        source.setSequenceNumber(category.ordinal());
         source.setPriceGross(priceGross);
         source.setPriceNet(priceGross);
         return source;
@@ -94,14 +94,15 @@ class GoldenSweepCategoryOrdinalSortKeysTest {
         injectMapper(repository, mapper);
 
         // when (REAL production sort path)
-        List<ProductCategory> sorted = repository.scanAndSort(new DynamoDBScanExpression()).stream()
-                .map(OrderItem::getCategory)
+        List<Integer> sorted = repository.scanAndSort(new DynamoDBScanExpression()).stream()
+                .map(OrderItem::getSequenceNumber)
                 .collect(Collectors.toList());
 
         // then
-        // ascending ordinal: CPU(0) < Other(10) < Services(11) < Laptops(12).
+        // ascending sequence: CPU(0) < Other(10) < Services(11) < Laptops(12).
         assertThat(sorted).containsExactly(
-                ProductCategory.CPU, ProductCategory.Other, ProductCategory.Services, ProductCategory.Laptops
+                ProductCategory.CPU.ordinal(), ProductCategory.Other.ordinal(),
+                ProductCategory.Services.ordinal(), ProductCategory.Laptops.ordinal()
         );
     }
 
@@ -160,8 +161,8 @@ class GoldenSweepCategoryOrdinalSortKeysTest {
 
         // then
         // CPU(ordinal 0) first regardless of its high price; within Laptops the cheaper one precedes.
-        assertThat(sorted.stream().map(i -> i.getSource().getCategory()).collect(Collectors.toList()))
-                .containsExactly(ProductCategory.CPU, ProductCategory.Laptops, ProductCategory.Laptops);
+        assertThat(sorted.stream().map(i -> i.getSource().getSequenceNumber()).collect(Collectors.toList()))
+                .containsExactly(ProductCategory.CPU.ordinal(), ProductCategory.Laptops.ordinal(), ProductCategory.Laptops.ordinal());
         assertThat(sorted.stream().map(FulfilmentItem::getSecondSortNumber).collect(Collectors.toList()))
                 .containsExactly(999, 50, 900);
     }
@@ -232,7 +233,7 @@ class GoldenSweepCategoryOrdinalSortKeysTest {
 
     private static BasketItem basketItem(ProductCategory category) {
         BasketItem item = new BasketItem();
-        item.setCategory(category);
+        item.setCategoryKey(category != null ? category.name() : null);
         return item;
     }
 }

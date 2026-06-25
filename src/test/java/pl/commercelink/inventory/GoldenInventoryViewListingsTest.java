@@ -79,8 +79,8 @@ class GoldenInventoryViewListingsTest {
         InventoryView view = viewOver(cache, List.of(cpuGroup, gpuGroup));
 
         // when
-        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU);
-        Collection<MatchedInventory> gpuResult = view.findAllByProductCategory(ProductCategory.GPU);
+        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU.name());
+        Collection<MatchedInventory> gpuResult = view.findAllByProductCategory(ProductCategory.GPU.name());
 
         // then
         assertThat(codeSetsOf(cpuResult)).containsExactly(Set.of(CPU_MFN));
@@ -101,8 +101,8 @@ class GoldenInventoryViewListingsTest {
         assertThat(resolved.category()).isEqualTo(ProductCategory.CPU);
 
         // when
-        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU);
-        Collection<MatchedInventory> gpuResult = view.findAllByProductCategory(ProductCategory.GPU);
+        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU.name());
+        Collection<MatchedInventory> gpuResult = view.findAllByProductCategory(ProductCategory.GPU.name());
 
         // then
         // The tie key joins CPU (its find-winner) alongside the plain CPU group...
@@ -127,8 +127,8 @@ class GoldenInventoryViewListingsTest {
         assertThat(resolved.category()).isEqualTo(ProductCategory.Other);
 
         // when
-        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU);
-        Collection<MatchedInventory> otherResult = view.findAllByProductCategory(ProductCategory.Other);
+        Collection<MatchedInventory> cpuResult = view.findAllByProductCategory(ProductCategory.CPU.name());
+        Collection<MatchedInventory> otherResult = view.findAllByProductCategory(ProductCategory.Other.name());
 
         // then
         assertThat(codeSetsOf(cpuResult)).containsExactly(Set.of(CPU_MFN));

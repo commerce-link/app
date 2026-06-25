@@ -1,7 +1,6 @@
 package pl.commercelink.taxonomy;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.orders.Item;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 
@@ -11,12 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ProductGroupKeyMirrorTest {
 
-    private static class TestItem extends Item {
-        TestItem(ProductCategory category) {
-            super(category, "name", 1, null);
-        }
-    }
-
     @Test
     void itemTypeOfGroupKeyMirrorsOfEnumForEveryGroup() {
         // given / then
@@ -25,26 +18,6 @@ class ProductGroupKeyMirrorTest {
         }
         assertThat(ItemType.of("Services")).isEqualTo(ItemType.SERVICE);
         assertThat(ItemType.of("PcComponents")).isEqualTo(ItemType.PRODUCT);
-    }
-
-    @Test
-    void itemHasGroupByKeyMirrorsHasGroupByEnumForEveryCategory() {
-        // given / then
-        for (ProductCategory category : ProductCategory.values()) {
-            Item item = new TestItem(category);
-            for (ProductGroup group : ProductGroup.values()) {
-                assertThat(item.hasGroup(group.name())).isEqualTo(item.hasGroup(group));
-            }
-        }
-    }
-
-    @Test
-    void itemGroupKeyEqualsCategoryProductGroupName() {
-        // given / then
-        for (ProductCategory category : ProductCategory.values()) {
-            Item item = new TestItem(category);
-            assertThat(item.getGroupKey()).isEqualTo(category.getProductGroup().name());
-        }
     }
 
     @Test

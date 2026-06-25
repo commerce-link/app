@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,7 @@ public class Inventory {
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
+    private final CategoryReverseIndex categoryReverseIndex;
 
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
@@ -65,6 +67,11 @@ public class Inventory {
     private void load(List<InventoryItem> items) {
         Collection<MatchedInventory> autoDiscoveredItems = autoDiscovery.run(items);
         globalInventory.replace(autoDiscoveredItems);
+        categoryReverseIndex.rebuild(autoDiscoveredItems);
+    }
+
+    public Set<InventoryKey> keysForCategory(String categoryKey) {
+        return categoryReverseIndex.keysFor(categoryKey);
     }
 
     public InventoryView withGlobalData() {

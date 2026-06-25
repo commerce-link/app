@@ -45,11 +45,11 @@ class OrderConfirmationEmailNotification extends EmailNotification {
         this.personalCollection = personalCollection;
 
         this.products = orderItems.stream()
-                .filter(o -> !o.hasCategory(ProductCategory.Services))
+                .filter(OrderItem::isProduct)
                 .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
                 .collect(Collectors.toList());
         this.services = orderItems.stream()
-                .filter(o -> o.hasCategory(ProductCategory.Services))
+                .filter(OrderItem::isService)
                 .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
                 .collect(Collectors.toList());
     }

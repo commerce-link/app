@@ -222,7 +222,7 @@
                     <thead>
                     <tr>
                         <th th:text="#{order.item.select}" style="width: 60px;"></th>
-                        <th th:text="#{order.item.category}"></th>
+                        <th th:text="#{order.item.type}"></th>
                         <th th:text="#{order.item.sku}"></th>
                         <th th:text="#{order.item.name}"></th>
                         <th th:text="#{order.item.unit.price}"></th>
@@ -244,7 +244,7 @@
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].itemId}"/>
                         </td>
-                        <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
+                        <td th:text="${item.service} ? #{order.item.service} : #{order.item.product}"></td>
                         <td>
                             <span th:if="${item.sku}" class="copyable truncate-sku" th:text="${item.sku}" th:title="${item.sku}" th:data-copy="${item.sku}" onclick="copyToClipboard(this)"></span>
                         </td>

@@ -59,29 +59,30 @@ class GoldenSweepServicesBranchingTest {
     }
 
     @Test
-    void hasCategoryIsReferenceEquality() {
+    void basketCategoryKeyHoldsTheSelectedCategoryName() {
         // given
         BasketItem cpu = basketItem(ProductCategory.CPU, "M");
 
         // then
-        assertThat(cpu.hasCategory(ProductCategory.CPU)).isTrue();
-        assertThat(cpu.hasCategory(ProductCategory.Services)).isFalse();
-        // null category never matches a concrete constant.
-        assertThat(basketItem(null, "M").hasCategory(ProductCategory.CPU)).isFalse();
+        // the basket carries the decoupled string key (no enum); a null category yields a null key.
+        assertThat(cpu.getCategoryKey()).isEqualTo("CPU");
+        assertThat(cpu.getCategoryKey()).isNotEqualTo("Services");
+        assertThat(basketItem(null, "M").getCategoryKey()).isNull();
     }
 
     @Test
-    void itemHasGroupComparesProductGroupOfCategory() {
+    void orderItemDistinguishesOnlyServiceFromProduct() {
         // given
         OrderItem services = orderItem(ProductCategory.Services);
         OrderItem cpu = orderItem(ProductCategory.CPU);
 
         // then
-        assertThat(services.hasGroup(ProductGroup.Services)).isTrue();
-        assertThat(cpu.hasGroup(ProductGroup.Services)).isFalse();
-        // CPU's group is PcComponents (the same group that hosts Other).
-        assertThat(cpu.hasGroup(ProductGroup.PcComponents)).isTrue();
-        assertThat(orderItem(ProductCategory.Other).hasGroup(ProductGroup.PcComponents)).isTrue();
+        // order items no longer carry the fine-grained group, only the product/service flag.
+        assertThat(services.isService()).isTrue();
+        assertThat(cpu.isService()).isFalse();
+        assertThat(cpu.isProduct()).isTrue();
+        // Other lives in a product group, so it is a product (not a service).
+        assertThat(orderItem(ProductCategory.Other).isProduct()).isTrue();
     }
 
     @Test
@@ -142,15 +143,15 @@ class GoldenSweepServicesBranchingTest {
         ));
 
         // when
-        List<ProductCategory> products = basket.getBasketItemsForProducts().stream()
-                .map(BasketItem::getCategory).collect(Collectors.toList());
-        List<ProductCategory> services = basket.getBasketItemsForServices().stream()
-                .map(BasketItem::getCategory).collect(Collectors.toList());
+        List<String> products = basket.getBasketItemsForProducts().stream()
+                .map(BasketItem::getCategoryKey).collect(Collectors.toList());
+        List<String> services = basket.getBasketItemsForServices().stream()
+                .map(BasketItem::getCategoryKey).collect(Collectors.toList());
 
         // then
         // products = everything that is NOT Services (Other counts as a product); services = only Services.
-        assertThat(products).containsExactly(ProductCategory.CPU, ProductCategory.Other);
-        assertThat(services).containsExactly(ProductCategory.Services, ProductCategory.Services);
+        assertThat(products).containsExactly("CPU", "Other");
+        assertThat(services).containsExactly("Services", "Services");
     }
 
     @Test

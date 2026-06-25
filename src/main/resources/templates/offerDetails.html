@@ -147,7 +147,7 @@
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
                         <td>
                             <div class="select">
-                                <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
+                                <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].categoryKey}">
                                     <option value=""></option>
                                     <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
                                 </select>

@@ -1,7 +1,6 @@
 package pl.commercelink.warehouse.api;
 
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 public class ReservationRemovalItem {
 
@@ -9,7 +8,6 @@ public class ReservationRemovalItem {
     private String ean;
     private String mfn;
     private String name;
-    private ProductCategory category;
     private int qty;
     private double unitPrice;
     private double tax;
@@ -22,7 +20,6 @@ public class ReservationRemovalItem {
         item.ean = orderItem.getEan();
         item.mfn = orderItem.getManufacturerCode();
         item.name = orderItem.getName();
-        item.category = orderItem.getCategory();
         item.qty = orderItem.getQty();
         item.unitPrice = orderItem.getCost();
         item.tax = orderItem.getTax();
@@ -45,10 +42,6 @@ public class ReservationRemovalItem {
 
     public String getName() {
         return name;
-    }
-
-    public ProductCategory getCategory() {
-        return category;
     }
 
     public int getQty() {

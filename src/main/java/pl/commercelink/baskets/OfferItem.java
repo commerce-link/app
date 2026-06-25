@@ -63,7 +63,7 @@ public class OfferItem {
     public int getSequenceNumber() { return sequenceNumber; }
 
     public String getCostRangeDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.isService()) {
             return "";
         }
 
@@ -71,7 +71,7 @@ public class OfferItem {
     }
 
     public String getQtyDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.isService()) {
             return "";
         }
 
@@ -79,7 +79,7 @@ public class OfferItem {
     }
 
     public String getSuppliersDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.isService()) {
             return "";
         }
 

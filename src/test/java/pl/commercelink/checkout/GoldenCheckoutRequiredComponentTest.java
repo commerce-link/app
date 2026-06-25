@@ -134,7 +134,7 @@ class GoldenCheckoutRequiredComponentTest {
 
     private BasketItem item(ProductCategory category, long qty) {
         BasketItem item = new BasketItem();
-        item.setCategory(category);
+        item.setCategoryKey(category != null ? category.name() : null);
         item.setQty(qty);
         return item;
     }

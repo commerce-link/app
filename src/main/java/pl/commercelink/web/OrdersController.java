@@ -305,7 +305,7 @@ public class OrdersController extends BaseController {
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
-                .filter(i -> i.getCategory() != ProductCategory.Services)
+                .filter(OrderItem::isProduct)
                 .collect(Collectors.toList());
 
         model.addAttribute("order", order);
@@ -543,11 +543,8 @@ public class OrdersController extends BaseController {
     }
 
     private String showOrderItemDetails(Order order, OrderItem orderItem, Model model) {
-        Store store = storesRepository.findById(order.getStoreId());
-
         model.addAttribute("orderId", order.getOrderId());
         model.addAttribute("orderItem", orderItem);
-        model.addAttribute("categories", store.getEnabledProductCategories());
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
 
@@ -624,7 +621,7 @@ public class OrdersController extends BaseController {
                 ));
 
         for (OrderItem item : orderItemsRepository.findByOrderId(orderId)) {
-            if (item.getCategory() != ProductCategory.Services) {
+            if (item.isProduct()) {
                 item.setSerialNo(serialByItemId.get(item.getItemId()));
                 orderItemsRepository.save(item);
             }

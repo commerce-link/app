@@ -16,17 +16,6 @@
                       th:action="@{/dashboard/orders/{orderId}/items/{itemId}/save(orderId=${orderId}, itemId=${orderItem.itemId})}">
 
                     <div class="field">
-                        <label class="label" th:text="#{order.item.category}">Category</label>
-                        <div class="control">
-                            <div class="select">
-                                <select th:field="*{category}" th:disabled="${isCompletedOrder}">
-                                    <option th:each="category : ${categories}" th:value="${category}" th:text="${enumI18n.localize(category, 'plural')}"></option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
                         <label class="label" th:text="#{order.item.sku}">SKU</label>
                         <div class="control">
                             <input class="input" type="text" th:field="*{sku}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>

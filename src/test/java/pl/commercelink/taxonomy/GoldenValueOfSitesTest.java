@@ -122,7 +122,7 @@ class GoldenValueOfSitesTest {
         List<BasketItem> items = importer.importOffer(dto);
 
         // then
-        assertEquals(ProductCategory.CPU, items.get(0).getCategory());
+        assertEquals(ProductCategory.CPU.name(), items.get(0).getCategoryKey());
     }
 
     // ---- SITE 3: TaxonomyParser (unknown -> Other) -- CONTRAST: does NOT throw ----

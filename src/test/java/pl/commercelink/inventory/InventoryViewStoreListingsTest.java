@@ -124,7 +124,7 @@ class InventoryViewStoreListingsTest {
         storeWithGlobalAbGroupAndOwnAction();
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory(ProductCategory.CPU);
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory(ProductCategory.CPU.name());
 
         // then
         assertThat(result).hasSize(1);
@@ -215,7 +215,7 @@ class InventoryViewStoreListingsTest {
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", ProductCategory.CPU, 1));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory(ProductCategory.CPU);
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory(ProductCategory.CPU.name());
 
         // then
         assertThat(result).hasSize(1);
@@ -237,7 +237,7 @@ class InventoryViewStoreListingsTest {
         when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory(ProductCategory.CPU);
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory(ProductCategory.CPU.name());
 
         // then
         assertThat(result).hasSize(1);
@@ -346,7 +346,7 @@ class InventoryViewStoreListingsTest {
         when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory(ProductCategory.CPU);
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory(ProductCategory.CPU.name());
 
         // then
         assertThat(result).hasSize(1);

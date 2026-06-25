@@ -12,8 +12,11 @@ class TaxonomyParser {
 
     static final String[] COLUMNS = {
             "ean", "mfn", "brand", "name", "category", "data_accuracy_score",
-            "net_weight_g", "gross_weight_g", "category_key"
+            "net_weight_g", "gross_weight_g", "category_key", "signals"
     };
+
+    // Unit Separator: separates the signal list inside the single CSV cell; never appears in vendor text.
+    private static final String SIGNAL_DELIMITER = String.valueOf((char) 0x1F);
 
     static Taxonomy fromCsvRow(String[] row) {
         String ean = row[0];
@@ -25,7 +28,8 @@ class TaxonomyParser {
         Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
         Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
         String categoryKey = row.length > 8 ? row[8] : category.name();
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight, categoryKey);
+        List<String> signals = row.length > 9 ? decodeSignals(row[9]) : List.of();
+        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight, categoryKey, signals);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -65,6 +69,17 @@ class TaxonomyParser {
         }
     }
 
+    private static String encodeSignals(List<String> signals) {
+        return (signals == null || signals.isEmpty()) ? "" : String.join(SIGNAL_DELIMITER, signals);
+    }
+
+    private static List<String> decodeSignals(String cell) {
+        if (cell == null || cell.isBlank()) {
+            return List.of();
+        }
+        return List.of(cell.split(SIGNAL_DELIMITER));
+    }
+
     private static String[] toStringArray(Taxonomy t) {
         return new String[]{
                 t.ean() != null ? t.ean() : "",
@@ -75,7 +90,8 @@ class TaxonomyParser {
                 String.valueOf(t.dataAccuracyScore()),
                 t.netWeightInGrams() != null ? t.netWeightInGrams().toString() : "",
                 t.grossWeightInGrams() != null ? t.grossWeightInGrams().toString() : "",
-                t.categoryKey() != null ? t.categoryKey() : ""
+                t.categoryKey() != null ? t.categoryKey() : "",
+                encodeSignals(t.signals())
         };
     }
 }

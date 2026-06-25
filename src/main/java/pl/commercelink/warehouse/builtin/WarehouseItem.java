@@ -1,13 +1,16 @@
 package pl.commercelink.warehouse.builtin;
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.ProductGroup;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -27,6 +30,11 @@ public class WarehouseItem extends Item {
     @DynamoDBVersionAttribute
     private Long version;
 
+    // kept in the warehouse for fast category-based searching
+    @DynamoDBAttribute(attributeName = "category")
+    @DynamoDBTypeConvertedEnum
+    private ProductCategory category = ProductCategory.Other;
+
     // required for DynamoDB
     public WarehouseItem() {
     }
@@ -36,7 +44,8 @@ public class WarehouseItem extends Item {
     }
 
     public WarehouseItem(String storeId, String deliveryId, ProductCategory category, String name, String ean, String mfn, double unitCost, int qty) {
-        super(category, name, qty, null);
+        super(name, qty, null);
+        this.category = category;
 
         this.storeId = storeId;
         this.itemId = UUID.randomUUID().toString();
@@ -162,5 +171,24 @@ public class WarehouseItem extends Item {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public ProductCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(ProductCategory category) {
+        this.category = category;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasCategory(ProductCategory category) {
+        return this.category == category;
+    }
+
+    @DynamoDBIgnore
+    @Override
+    public boolean isService() {
+        return category != null && category.getProductGroup() == ProductGroup.Services;
     }
 }

@@ -66,11 +66,11 @@ class GoldenSweepOtherFallbackResolutionTest {
         TaxonomyResolver resolver = new TaxonomyResolver(cache);
 
         // when
-        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("MFN1", "fallbackName", ProductCategory.Other);
+        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("MFN1", "fallbackName", ProductCategory.Other.name());
 
         // then
         // taxonomy category (Laptops) is non-null and != Other, so it overrides the Other fallback.
-        assertThat(resolved.category()).isEqualTo(ProductCategory.Laptops);
+        assertThat(resolved.categoryKey()).isEqualTo(ProductCategory.Laptops.name());
         assertThat(resolved.name()).isEqualTo("Real Name");
     }
 
@@ -82,11 +82,11 @@ class GoldenSweepOtherFallbackResolutionTest {
         TaxonomyResolver resolver = new TaxonomyResolver(cache);
 
         // when
-        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("MFN1", "fallbackName", ProductCategory.CPU);
+        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("MFN1", "fallbackName", ProductCategory.CPU.name());
 
         // then
         // Other from the taxonomy does NOT override; the caller's fallback (CPU) is kept.
-        assertThat(resolved.category()).isEqualTo(ProductCategory.CPU);
+        assertThat(resolved.categoryKey()).isEqualTo(ProductCategory.CPU.name());
     }
 
     @Test
@@ -97,11 +97,11 @@ class GoldenSweepOtherFallbackResolutionTest {
 
         // when
         // findByMfn returns null for an unseeded mfn -> fallback name + fallback category verbatim.
-        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("UNKNOWN", "fb", ProductCategory.GPU);
+        TaxonomyResolver.ResolvedProduct resolved = resolver.resolve("UNKNOWN", "fb", ProductCategory.GPU.name());
 
         // then
         assertThat(resolved.name()).isEqualTo("fb");
-        assertThat(resolved.category()).isEqualTo(ProductCategory.GPU);
+        assertThat(resolved.categoryKey()).isEqualTo(ProductCategory.GPU.name());
     }
 
     @Test

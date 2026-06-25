@@ -12,23 +12,23 @@ public class TaxonomyResolver {
         this.taxonomyCache = taxonomyCache;
     }
 
-    public ResolvedProduct resolve(String mfn, String fallbackName, ProductCategory fallbackCategory) {
+    public ResolvedProduct resolve(String mfn, String fallbackName, String fallbackCategoryKey) {
         Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
 
         if (taxonomy == null) {
-            return new ResolvedProduct(mfn, fallbackName, fallbackCategory);
+            return new ResolvedProduct(mfn, fallbackName, fallbackCategoryKey);
         }
 
         String name = taxonomy.name() != null && !taxonomy.name().isEmpty()
                 ? taxonomy.name()
                 : fallbackName;
 
-        ProductCategory category = taxonomy.category() != null && taxonomy.category() != ProductCategory.Other
-                ? taxonomy.category()
-                : fallbackCategory;
+        String categoryKey = taxonomy.categoryKey() != null && !ProductCategory.Other.name().equals(taxonomy.categoryKey())
+                ? taxonomy.categoryKey()
+                : fallbackCategoryKey;
 
-        return new ResolvedProduct(mfn, name, category);
+        return new ResolvedProduct(mfn, name, categoryKey);
     }
 
-    public record ResolvedProduct(String mfn, String name, ProductCategory category) {}
+    public record ResolvedProduct(String mfn, String name, String categoryKey) {}
 }

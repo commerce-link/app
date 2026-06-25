@@ -73,7 +73,8 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("test-product");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getSequenceNumber()).isEqualTo(ProductCategory.Laptops.ordinal());
+        assertThat(itemCaptor.getValue().isProduct()).isTrue();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(150.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-1");
 
@@ -100,7 +101,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Other);
+        assertThat(itemCaptor.getValue().getSequenceNumber()).isEqualTo(ProductCategory.Other.ordinal());
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");
@@ -124,7 +125,8 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("product-name");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getSequenceNumber()).isEqualTo(ProductCategory.Laptops.ordinal());
+        assertThat(itemCaptor.getValue().isProduct()).isTrue();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(200.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-2");
 
@@ -151,7 +153,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getCategory()).isEqualTo(ProductCategory.Services);
+        assertThat(savedItem.isService()).isTrue();
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
