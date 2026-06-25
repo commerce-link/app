@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.SupplierConfigField;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.StoreSupplierConnection;
 
@@ -17,7 +17,7 @@ public class SupplierConnectionValidator {
 
     public List<ErrorMessage> validate(boolean canUseGlobalSuppliers,
                                        List<StoreSupplierConnection> connections,
-                                       Map<String, List<SupplierConfigField>> supplierFields,
+                                       Map<String, List<ProviderField>> supplierFields,
                                        Map<String, Map<String, String>> submittedConfig,
                                        Set<String> suppliersWithStoredConfig) {
         List<ErrorMessage> errors = new ArrayList<>();
@@ -31,15 +31,15 @@ public class SupplierConnectionValidator {
                 continue;
             }
             if (connection.getMode() == ConnectionMode.OWN) {
-                List<SupplierConfigField> fields = supplierFields.getOrDefault(name, List.of());
+                List<ProviderField> fields = supplierFields.getOrDefault(name, List.of());
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
                 boolean hasStored = suppliersWithStoredConfig.contains(name);
-                for (SupplierConfigField field : fields) {
+                for (ProviderField field : fields) {
                     if (!field.required()) {
                         continue;
                     }
                     boolean submitted = !isBlank(config.get(field.key()));
-                    boolean preservedPassword = field.type() == SupplierConfigField.FieldType.PASSWORD && hasStored;
+                    boolean preservedPassword = field.type() == ProviderField.FieldType.PASSWORD && hasStored;
                     if (!submitted && !preservedPassword) {
                         errors.add(ErrorMessage.of("store.supplier.connection.error.requires.field", name, field.label()));
                     }

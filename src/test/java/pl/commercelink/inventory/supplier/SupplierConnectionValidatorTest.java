@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.SupplierConfigField;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.StoreSupplierConnection;
 
@@ -15,6 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SupplierConnectionValidatorTest {
 
     private final SupplierConnectionValidator validator = new SupplierConnectionValidator();
+
+    private static ProviderField urlField() {
+        return new ProviderField("url", "Feed URL", ProviderField.FieldType.URL, true, "https://...");
+    }
 
     @Test
     void globalModeRejectedWhenStoreCannotUseGlobalSuppliers() {
@@ -33,7 +37,7 @@ class SupplierConnectionValidatorTest {
         // when
         List<ErrorMessage> errors = validator.validate(false,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.OWN)),
-                Map.of("Action", List.of(SupplierConfigField.url())),
+                Map.of("Action", List.of(urlField())),
                 Map.of("Action", Map.of("url", "https://feed.example.com")),
                 Set.of());
 
@@ -57,7 +61,7 @@ class SupplierConnectionValidatorTest {
         // when
         List<ErrorMessage> errors = validator.validate(true,
                 List.of(new StoreSupplierConnection("Action", ConnectionMode.OWN)),
-                Map.of("Action", List.of(SupplierConfigField.url())),
+                Map.of("Action", List.of(urlField())),
                 Map.of("Action", Map.of("url", "")),
                 Set.of());
 
@@ -69,8 +73,8 @@ class SupplierConnectionValidatorTest {
     @Test
     void ownModeAllowsBlankPasswordWhenSecretAlreadyStored() {
         // given
-        SupplierConfigField password = new SupplierConfigField(
-                "password", "Password", SupplierConfigField.FieldType.PASSWORD, true, "");
+        ProviderField password = new ProviderField(
+                "password", "Password", ProviderField.FieldType.PASSWORD, true, "");
 
         // when
         List<ErrorMessage> errors = validator.validate(true,
@@ -86,8 +90,8 @@ class SupplierConnectionValidatorTest {
     @Test
     void ownModeRejectsBlankPasswordWhenNoStoredSecret() {
         // given
-        SupplierConfigField password = new SupplierConfigField(
-                "password", "Password", SupplierConfigField.FieldType.PASSWORD, true, "");
+        ProviderField password = new ProviderField(
+                "password", "Password", ProviderField.FieldType.PASSWORD, true, "");
 
         // when
         List<ErrorMessage> errors = validator.validate(true,
