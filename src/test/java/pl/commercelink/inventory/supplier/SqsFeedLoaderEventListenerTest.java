@@ -10,10 +10,12 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.SqsFeedLoaderEventListener.FeedLoaderEventPayload;
 import pl.commercelink.inventory.supplier.api.FeedData;
+import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 
 import java.lang.reflect.Field;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,5 +70,25 @@ class SqsFeedLoaderEventListenerTest {
         // then
         verify(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
         verify(supplierRegistry, never()).downloadFeed(anyString());
+    }
+
+    @Test
+    void propagatesExceptionOnStoreFeedFailure() throws Exception {
+        // given
+        doThrow(new ResourceDownloadException("timeout", new RuntimeException()))
+                .when(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
+
+        // when / then
+        assertThrows(Exception.class, () -> listener.handleMessage(payload("Wortmann", "store-1")));
+    }
+
+    @Test
+    void propagatesExceptionOnGlobalFeedFailure() throws Exception {
+        // given
+        when(supplierRegistry.downloadFeed("Wortmann"))
+                .thenThrow(new ResourceDownloadException("connection refused", new RuntimeException()));
+
+        // when / then
+        assertThrows(Exception.class, () -> listener.handleMessage(payload("Wortmann", null)));
     }
 }

@@ -24,18 +24,14 @@ public class SqsFeedLoaderEventListener {
             maxMessagesPerPoll = "1",
             pollTimeoutSeconds = "20"
     )
-    public void handleMessage(FeedLoaderEventPayload payload) {
-        try {
-            if (isNotBlank(payload.getStoreId())) {
-                storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
-                return;
-            }
-            supplierRegistry.downloadFeed(payload.getSupplierName()).ifPresent(feedData ->
-                    inventoryRepository.store(payload.getSupplierName(), feedData.data(), feedData.extension())
-            );
-        } catch (Exception e) {
-            System.err.println("Failed to download feed: " + e.getMessage());
+    public void handleMessage(FeedLoaderEventPayload payload) throws Exception {
+        if (isNotBlank(payload.getStoreId())) {
+            storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+            return;
         }
+        supplierRegistry.downloadFeed(payload.getSupplierName()).ifPresent(feedData ->
+                inventoryRepository.store(payload.getSupplierName(), feedData.data(), feedData.extension())
+        );
     }
 
     public static class FeedLoaderEventPayload {

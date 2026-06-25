@@ -27,6 +27,18 @@ awslocal s3 sync /local/s3/pricelists s3://pricelists/ --exclude ".gitkeep"
 awslocal sqs create-queue --queue-name order-goods-out-queue.fifo \
   --attributes FifoQueue=true,ContentBasedDeduplication=false
 
+## SQS Queues - supplier-feed-import with DLQ
+awslocal sqs create-queue --queue-name supplier-feed-import-queue-dlq
+
+DLQ_ARN=$(awslocal sqs get-queue-attributes \
+  --queue-url http://localhost:4566/000000000000/supplier-feed-import-queue-dlq \
+  --attribute-names QueueArn \
+  --query 'Attributes.QueueArn' --output text)
+
+printf '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"%s\",\"maxReceiveCount\":\"3\"}"}' "$DLQ_ARN" > /tmp/supplier-feed-import-attrs.json
+awslocal sqs create-queue --queue-name supplier-feed-import-queue \
+  --attributes file:///tmp/supplier-feed-import-attrs.json
+
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
