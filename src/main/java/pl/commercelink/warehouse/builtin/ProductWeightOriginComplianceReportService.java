@@ -6,7 +6,6 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,12 +57,12 @@ public class ProductWeightOriginComplianceReportService {
     private void accumulate(WarehouseDocumentItem item, String country, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
         Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
-        ProductCategory category = pim.map(PimEntry::category).orElse(null);
+        String categoryKey = pim.map(PimEntry::categoryKey).orElse(null);
         String brand = pim.map(PimEntry::brand).orElse(null);
         Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);
         Integer grossG = pim.map(PimEntry::grossWeightInGrams).orElse(null);
 
-        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(category, item.getMfn(), country), k -> new Aggregate());
+        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(categoryKey, item.getMfn(), country), k -> new Aggregate());
         agg.qty += item.getQty();
         if (netG != null) agg.totalNetG += (long) item.getQty() * netG;
         if (grossG != null) agg.totalGrossG += (long) item.getQty() * grossG;
@@ -84,7 +83,7 @@ public class ProductWeightOriginComplianceReportService {
         Aggregate a = entry.getValue();
         return new ProductWeightOriginComplianceReportRow(
                 k.country(),
-                k.category() != null ? k.category().name() : UNKNOWN,
+                k.categoryKey() != null ? k.categoryKey() : UNKNOWN,
                 a.latestBrand,
                 a.latestName,
                 k.mfn(),
@@ -95,7 +94,7 @@ public class ProductWeightOriginComplianceReportService {
                 a.unitGrossG != null ? a.totalGrossG : null);
     }
 
-    private record AggregateKey(ProductCategory category, String mfn, String country) {}
+    private record AggregateKey(String categoryKey, String mfn, String country) {}
 
     private static class Aggregate {
         String latestName;

@@ -45,7 +45,7 @@ class GoldenSweepOtherFallbackResolutionTest {
     private MarketplaceOrderImporter marketplaceOrderImporter;
 
     private static PimEntry pimEntry(ProductCategory category, boolean approved) {
-        return new PimEntry("pid", List.of(), "brand", "name", category, null, approved, null, null);
+        return new PimEntry("pid", List.of(), "brand", "name", category.name(), null, approved, null, null);
     }
 
     private TaxonomyCache seededCache(Taxonomy... taxonomies) {

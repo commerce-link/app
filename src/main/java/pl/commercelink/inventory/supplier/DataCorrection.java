@@ -32,6 +32,7 @@ class DataCorrection {
         String brand = brandMapper.unifyBrand(taxonomy.brand());
         String name = taxonomy.name();
         ProductCategory category = taxonomy.category();
+        String categoryKey = taxonomy.categoryKey();
         int score = taxonomy.dataAccuracyScore();
         Integer netWeight = taxonomy.netWeightInGrams();
         Integer grossWeight = taxonomy.grossWeightInGrams();
@@ -41,13 +42,24 @@ class DataCorrection {
             PimEntry entry = pim.get();
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
-            if (entry.category() != null && entry.category() != ProductCategory.Other) category = entry.category();
+            if (isNotBlank(entry.categoryKey()) && !"Other".equals(entry.categoryKey())) {
+                categoryKey = entry.categoryKey();
+                category = toEnumOrKeep(entry.categoryKey(), category);
+            }
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight);
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight, categoryKey);
+    }
+
+    private static ProductCategory toEnumOrKeep(String categoryKey, ProductCategory current) {
+        try {
+            return ProductCategory.valueOf(categoryKey);
+        } catch (IllegalArgumentException e) {
+            return current;
+        }
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {

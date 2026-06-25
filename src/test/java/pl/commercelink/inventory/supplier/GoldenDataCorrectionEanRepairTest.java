@@ -59,7 +59,7 @@ class GoldenDataCorrectionEanRepairTest {
         List<PimIdentifier> ids = java.util.Arrays.stream(gtins)
                 .map(g -> new PimIdentifier(g, PimIdentifierType.GTIN))
                 .toList();
-        return new PimEntry("pim-id", ids, "PimBrand", "PimName", category,
+        return new PimEntry("pim-id", ids, "PimBrand", "PimName", category.name(),
                 "subcategory", approved, null, null);
     }
 

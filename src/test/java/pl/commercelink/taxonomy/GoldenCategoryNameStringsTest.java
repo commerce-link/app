@@ -250,7 +250,7 @@ class GoldenCategoryNameStringsTest {
         // given / when / then (mirrors toRow: k.category() != null ? k.category().name() : "Unknown")
         for (ProductCategory category : ProductCategory.values()) {
             PimEntry entry = pimEntry(category);
-            String rendered = entry.category() != null ? entry.category().name() : "Unknown";
+            String rendered = entry.categoryKey() != null ? entry.categoryKey() : "Unknown";
             assertThat(rendered).isEqualTo(category.name());
         }
     }
@@ -269,6 +269,6 @@ class GoldenCategoryNameStringsTest {
 
     private static PimEntry pimEntry(ProductCategory category) {
         return new PimEntry("pim1", Collections.emptyList(), "Brand", "Name",
-                category, null, true, null, null);
+                category.name(), null, true, null, null);
     }
 }

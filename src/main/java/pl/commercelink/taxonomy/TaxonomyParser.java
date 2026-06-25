@@ -12,7 +12,7 @@ class TaxonomyParser {
 
     static final String[] COLUMNS = {
             "ean", "mfn", "brand", "name", "category", "data_accuracy_score",
-            "net_weight_g", "gross_weight_g"
+            "net_weight_g", "gross_weight_g", "category_key"
     };
 
     static Taxonomy fromCsvRow(String[] row) {
@@ -24,7 +24,8 @@ class TaxonomyParser {
         int dataAccuracyScore = parseScore(row[5]);
         Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
         Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight);
+        String categoryKey = row.length > 8 ? row[8] : category.name();
+        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight, categoryKey);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -73,7 +74,8 @@ class TaxonomyParser {
                 t.category() != null ? t.category().name() : "",
                 String.valueOf(t.dataAccuracyScore()),
                 t.netWeightInGrams() != null ? t.netWeightInGrams().toString() : "",
-                t.grossWeightInGrams() != null ? t.grossWeightInGrams().toString() : ""
+                t.grossWeightInGrams() != null ? t.grossWeightInGrams().toString() : "",
+                t.categoryKey() != null ? t.categoryKey() : ""
         };
     }
 }

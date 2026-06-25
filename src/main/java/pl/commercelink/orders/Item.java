@@ -218,6 +218,16 @@ public abstract class Item implements Delivered {
     }
 
     @DynamoDBIgnore
+    public boolean hasGroup(String groupKey) {
+        return category.getProductGroup().name().equals(groupKey);
+    }
+
+    @DynamoDBIgnore
+    public String getGroupKey() {
+        return category.getProductGroup().name();
+    }
+
+    @DynamoDBIgnore
     public boolean hasCategory(ProductCategory category) {
         return this.category == category;
     }

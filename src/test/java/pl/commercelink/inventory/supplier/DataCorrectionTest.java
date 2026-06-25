@@ -112,7 +112,7 @@ class DataCorrectionTest {
                 List.of(),
                 "PimBrand",
                 "PimName",
-                ProductCategory.Other,
+                "Other",
                 "subcategory",
                 approved,
                 net,
