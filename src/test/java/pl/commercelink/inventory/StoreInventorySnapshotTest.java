@@ -1,8 +1,8 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -18,7 +18,7 @@ class StoreInventorySnapshotTest {
 
     private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
     private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private static final InventoryItem ITEM =
             new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true);
@@ -80,5 +80,24 @@ class StoreInventorySnapshotTest {
         assertEquals(List.of("MFN-1"), List.copyOf(m.getInventoryKey().getProductCodes()));
         assertEquals(KEY_EANS, Set.copyOf(m.getInventoryKey().getProductEans()));
         assertEquals(LocalDateTime.of(2026, 6, 17, 10, 0), restored.builtAt());
+    }
+
+    @Test
+    void jsonRoundTripPreservesPimId() throws Exception {
+        // given
+        InventoryKey keyWithId = new InventoryKey("PIM-123");
+        keyWithId.addEan("5900000000002");
+        keyWithId.addManufacturerCode("MFN-1");
+        MatchedInventory matched = new MatchedInventory(keyWithId, List.of(ITEM), taxonomyCache, supplierRegistry);
+        StoreInventorySnapshot snapshot =
+                StoreInventorySnapshot.from(new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+        // when
+        StoreInventorySnapshot back =
+                objectMapper.readValue(objectMapper.writeValueAsString(snapshot), StoreInventorySnapshot.class);
+
+        // then
+        StoreInventory restored = back.toStoreInventory(taxonomyCache, supplierRegistry);
+        assertEquals("PIM-123", restored.items().iterator().next().getInventoryKey().getId());
     }
 }
