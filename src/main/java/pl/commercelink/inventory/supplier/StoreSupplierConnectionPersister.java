@@ -2,7 +2,8 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
+import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -20,8 +21,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StoreSupplierConnectionPersister {
 
-    private final SupplierRegistry supplierRegistry;
-    private final SupplierConfigurationManager configurationManager;
+    private final SupplierProviderFactory supplierProviderFactory;
+    private final ProviderConfigurationManager configurationManager;
     private final StoreSupplierFeedScheduler feedScheduler;
     private final StoreFeedRepository storeFeedRepository;
     private final StoresRepository storesRepository;
@@ -107,11 +108,11 @@ public class StoreSupplierConnectionPersister {
     void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
         Set<String> newOwnSuppliers = ownSupplierNames(submitted);
 
-        for (SupplierDescriptor descriptor : supplierRegistry.getAllDescriptors()) {
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
             if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()) {
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
-                configurationManager.saveConfiguration(existingStore, name, descriptor.configurationFields(), config);
+                configurationManager.saveConfiguration(existingStore, name, descriptor, config);
             }
         }
 
@@ -124,7 +125,7 @@ public class StoreSupplierConnectionPersister {
 
     private void snapshotSecrets(Store store, Set<String> suppliers, Deque<Runnable> compensations) {
         for (String supplier : suppliers) {
-            SupplierConfigurationManager.SecretSnapshot snapshot = configurationManager.snapshot(store, supplier);
+            ProviderConfigurationManager.SecretSnapshot snapshot = configurationManager.snapshot(store, supplier);
             compensations.push(() -> configurationManager.restore(store, supplier, snapshot));
         }
     }

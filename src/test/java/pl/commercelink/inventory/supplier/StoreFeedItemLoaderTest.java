@@ -13,7 +13,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.XmlItem;
@@ -51,15 +51,15 @@ class StoreFeedItemLoaderTest {
                 new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())));
     }
 
-    private SupplierDescriptor csvDescriptor(String name) {
-        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+    private SupplierProviderDescriptor csvDescriptor(String name) {
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo(name));
         when(descriptor.feedFormat()).thenReturn(new FeedFormat.Csv(mock(CsvRowParser.class), ';'));
         return descriptor;
     }
 
-    private SupplierDescriptor xmlDescriptor(String name) {
-        SupplierDescriptor descriptor = mock(SupplierDescriptor.class);
+    private SupplierProviderDescriptor xmlDescriptor(String name) {
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo(name));
         when(descriptor.feedFormat()).thenReturn(new FeedFormat.Xml(XmlItem.class, "Item"));
         return descriptor;
@@ -68,7 +68,7 @@ class StoreFeedItemLoaderTest {
     @Test
     void loadsCsvFeedFromStoreScopedKeyAndConvertsToLocalCurrency() {
         // given
-        SupplierDescriptor descriptor = csvDescriptor("Action");
+        SupplierProviderDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), eq(1000))).thenReturn(List.of(eurItem));
 
@@ -84,7 +84,7 @@ class StoreFeedItemLoaderTest {
     @Test
     void loadsXmlFeedFromStoreScopedKeyAndPassesPenalty() {
         // given
-        SupplierDescriptor descriptor = xmlDescriptor("Action");
+        SupplierProviderDescriptor descriptor = xmlDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
         when(xmlLoader.load(any(), eq("Item"), any(), eq("store-1"), eq(1000))).thenReturn(List.of(eurItem));
 
@@ -100,7 +100,7 @@ class StoreFeedItemLoaderTest {
     @Test
     void dropsItemsWithoutAnExchangeRate() {
         // given
-        SupplierDescriptor descriptor = csvDescriptor("Action");
+        SupplierProviderDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
 

@@ -4,7 +4,6 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.InventoryRepository;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -14,9 +13,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @RequiredArgsConstructor
 public class SqsFeedLoaderEventListener {
 
-    private final SupplierRegistry supplierRegistry;
-    private final InventoryRepository inventoryRepository;
     private final StoreSupplierFeedService storeSupplierFeedService;
+    private final GlobalSupplierFeedService globalSupplierFeedService;
 
     @SqsListener(
             value = "supplier-feed-import-queue",
@@ -29,9 +27,7 @@ public class SqsFeedLoaderEventListener {
             storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
             return;
         }
-        supplierRegistry.downloadFeed(payload.getSupplierName()).ifPresent(feedData ->
-                inventoryRepository.store(payload.getSupplierName(), feedData.data(), feedData.extension())
-        );
+        globalSupplierFeedService.loadFeed(payload.getSupplierName());
     }
 
     public static class FeedLoaderEventPayload {

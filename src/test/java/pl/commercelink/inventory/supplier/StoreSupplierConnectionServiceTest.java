@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -38,7 +39,9 @@ class StoreSupplierConnectionServiceTest {
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
-    private SupplierConfigurationManager configurationManager;
+    private SupplierProviderFactory supplierProviderFactory;
+    @Mock
+    private ProviderConfigurationManager configurationManager;
     @Mock
     private SupplierConnectionValidator validator;
     @Mock

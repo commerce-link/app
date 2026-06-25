@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.SupplierDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 
 import java.util.List;
 import java.util.Map;
@@ -25,7 +25,7 @@ public class StoreFeedItemLoader {
         this.taxonomyPenalty = taxonomyPenalty;
     }
 
-    public List<InventoryItem> load(String storeId, SupplierDescriptor descriptor, Map<String, Double> sellRates) {
+    public List<InventoryItem> load(String storeId, SupplierProviderDescriptor descriptor, Map<String, Double> sellRates) {
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
                     csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, descriptor.supplierInfo().name(), taxonomyPenalty);

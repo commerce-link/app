@@ -7,13 +7,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.SqsFeedLoaderEventListener.FeedLoaderEventPayload;
-import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 
 import java.lang.reflect.Field;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
@@ -23,11 +20,9 @@ import static org.mockito.Mockito.*;
 class SqsFeedLoaderEventListenerTest {
 
     @Mock
-    private SupplierRegistry supplierRegistry;
-    @Mock
-    private InventoryRepository inventoryRepository;
-    @Mock
     private StoreSupplierFeedService storeSupplierFeedService;
+    @Mock
+    private GlobalSupplierFeedService globalSupplierFeedService;
 
     @InjectMocks
     private SqsFeedLoaderEventListener listener;
@@ -48,17 +43,12 @@ class SqsFeedLoaderEventListenerTest {
     }
 
     @Test
-    void globalPayloadUsesGlobalDownloadPath() throws Exception {
-        // given
-        when(supplierRegistry.downloadFeed("Wortmann"))
-                .thenReturn(Optional.of(FeedData.csv("rows".getBytes())));
-
+    void globalPayloadUsesGlobalFeedService() throws Exception {
         // when
         listener.handleMessage(payload("Wortmann", null));
 
         // then
-        verify(supplierRegistry).downloadFeed("Wortmann");
-        verify(inventoryRepository).store(eq("Wortmann"), any(byte[].class), eq("csv"));
+        verify(globalSupplierFeedService).loadFeed("Wortmann");
         verifyNoInteractions(storeSupplierFeedService);
     }
 
@@ -69,7 +59,7 @@ class SqsFeedLoaderEventListenerTest {
 
         // then
         verify(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
-        verify(supplierRegistry, never()).downloadFeed(anyString());
+        verify(globalSupplierFeedService, never()).loadFeed(anyString());
     }
 
     @Test
@@ -85,8 +75,8 @@ class SqsFeedLoaderEventListenerTest {
     @Test
     void propagatesExceptionOnGlobalFeedFailure() throws Exception {
         // given
-        when(supplierRegistry.downloadFeed("Wortmann"))
-                .thenThrow(new ResourceDownloadException("connection refused", new RuntimeException()));
+        doThrow(new ResourceDownloadException("connection refused", new RuntimeException()))
+                .when(globalSupplierFeedService).loadFeed("Wortmann");
 
         // when / then
         assertThrows(Exception.class, () -> listener.handleMessage(payload("Wortmann", null)));

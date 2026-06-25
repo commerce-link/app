@@ -35,6 +35,10 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         }
     }
 
+    public ProviderFactory(Class<D> descriptorClass, ProviderConfigurationManager configurationManager) {
+        this(descriptorClass, null, configurationManager);
+    }
+
     protected ProviderFactory(Class<D> descriptorClass, IntegrationType integrationType,
             ProviderConfigurationManager configurationManager,
             OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,

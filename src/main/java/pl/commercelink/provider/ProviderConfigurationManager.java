@@ -87,4 +87,31 @@ public class ProviderConfigurationManager {
         }
         return new HashMap<>();
     }
+
+    public SecretSnapshot snapshot(Store store, String configName) {
+        String secretName = store.getSecretesName(configName);
+        if (secretsManager.exists(secretName)) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> value = secretsManager.getSecret(secretName, Map.class);
+            return new SecretSnapshot(true, value);
+        }
+        return new SecretSnapshot(false, null);
+    }
+
+    public void restore(Store store, String configName, SecretSnapshot snapshot) {
+        String secretName = store.getSecretesName(configName);
+        if (snapshot.existed()) {
+            if (secretsManager.exists(secretName)) {
+                secretsManager.updateSecret(secretName, snapshot.value());
+            } else {
+                secretsManager.createSecret(secretName, snapshot.value());
+            }
+        } else if (secretsManager.exists(secretName)) {
+            secretsManager.deleteSecret(secretName);
+        }
+        cache.remove(secretName);
+    }
+
+    public record SecretSnapshot(boolean existed, Map<String, String> value) {
+    }
 }

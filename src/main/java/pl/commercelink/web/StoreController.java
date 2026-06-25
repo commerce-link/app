@@ -12,7 +12,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.SupplierConfigField;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.orders.ShipmentType;
@@ -380,7 +380,7 @@ public class StoreController {
             store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         }
 
-        Map<String, List<SupplierConfigField>> supplierFields = storeSupplierConnectionService.configurationFields();
+        Map<String, List<ProviderField>> supplierFields = storeSupplierConnectionService.configurationFields();
 
         StoreForm form = new StoreForm(store);
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
