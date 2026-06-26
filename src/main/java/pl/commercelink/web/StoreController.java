@@ -12,6 +12,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
@@ -70,6 +71,9 @@ public class StoreController {
 
     @Autowired
     private PrintProviderRegistry printProviderRegistry;
+
+    @Autowired
+    private ManualSupplierService manualSupplierService;
 
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
@@ -393,6 +397,7 @@ public class StoreController {
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", ConnectionMode.values());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("manualSuppliers", manualSupplierService.list(store));
 
         return "store-fulfilment";
     }

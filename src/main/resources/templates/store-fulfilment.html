@@ -180,6 +180,54 @@
                 </div>
             </form>
 
+            <div class="box mt-5">
+                <h4 class="title is-5" th:text="#{store.manual.section.title}">Manual suppliers</h4>
+
+                <div th:each="ms : ${manualSuppliers}" class="box">
+                    <div class="is-flex is-justify-content-space-between">
+                        <strong th:text="${ms.label()}">label</strong>
+                        <span th:text="${ms.hasFeed()} ? #{store.manual.feed.present} : #{store.manual.feed.missing}"
+                              th:classappend="${ms.hasFeed()} ? 'tag is-success' : 'tag is-warning'">status</span>
+                    </div>
+
+                    <form th:action="@{'/dashboard/store/manual-supplier/' + ${ms.identity()} + '/feed'}"
+                          method="post" enctype="multipart/form-data" class="field has-addons mt-2">
+                        <div class="control"><input class="input" type="file" name="file" accept=".csv" /></div>
+                        <div class="control">
+                            <button class="button is-link" type="submit" th:text="#{store.manual.upload.button}">Upload</button>
+                        </div>
+                    </form>
+                    <p class="help" th:text="#{store.manual.upload.hint}"></p>
+
+                    <form th:action="@{'/dashboard/store/manual-supplier/' + ${ms.identity()} + '/flags'}"
+                          method="post" class="mt-2">
+                        <label class="checkbox mr-3">
+                            <input type="checkbox" name="includeInPricing" th:checked="${ms.includeInPricing()}" />
+                            <span th:text="#{store.manual.flag.pricing}">pricing</span>
+                        </label>
+                        <label class="checkbox mr-3">
+                            <input type="checkbox" name="includeInFulfilment" th:checked="${ms.includeInFulfilment()}" />
+                            <span th:text="#{store.manual.flag.fulfilment}">fulfilment</span>
+                        </label>
+                        <button class="button is-small" type="submit" th:text="#{store.manual.flag.save}">Save</button>
+                    </form>
+
+                    <form th:action="@{'/dashboard/store/manual-supplier/' + ${ms.identity()} + '/delete'}"
+                          method="post" class="mt-2">
+                        <button class="button is-danger is-small" type="submit" th:text="#{store.manual.delete.button}">Delete</button>
+                    </form>
+                </div>
+
+                <form action="/dashboard/store/manual-supplier" method="post" class="field has-addons mt-3">
+                    <div class="control">
+                        <input class="input" type="text" name="name" th:placeholder="#{store.manual.add.label}" />
+                    </div>
+                    <div class="control">
+                        <button class="button is-primary" type="submit" th:text="#{store.manual.add.button}">Add</button>
+                    </div>
+                </form>
+            </div>
+
         </div>
     </section>
 
