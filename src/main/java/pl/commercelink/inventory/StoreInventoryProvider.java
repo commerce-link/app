@@ -38,7 +38,7 @@ public class StoreInventoryProvider {
     }
 
     public InventoryIndex ownIndex(Store store) {
-        if (store == null || !store.hasOwnSupplierConnections()) {
+        if (store == null || !store.hasOwnOrManualSupplierConnections()) {
             return InventoryIndex.of(List.of());
         }
         String storeId = store.getStoreId();
@@ -67,7 +67,7 @@ public class StoreInventoryProvider {
 
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
-        for (String supplierName : storeEntity.getOwnSupplierNames()) {
+        for (String supplierName : storeEntity.getOwnAndManualSupplierNames()) {
             SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
             if (descriptor != null) {
                 ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
