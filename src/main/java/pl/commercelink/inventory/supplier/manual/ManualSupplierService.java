@@ -93,11 +93,14 @@ public class ManualSupplierService {
 
     public void delete(String storeId, String identity) {
         Store store = storesRepository.findById(storeId);
-        if (store == null) {
+        if (store == null || !ManualSupplierNames.isManual(identity)) {
             return;
         }
-        connections(store).removeIf(connection ->
+        boolean removed = connections(store).removeIf(connection ->
                 connection.getMode() == ConnectionMode.MANUAL && connection.getSupplierName().equals(identity));
+        if (!removed) {
+            return;
+        }
         storeFeedRepository.delete(storeId, identity);
         storesRepository.save(store);
     }

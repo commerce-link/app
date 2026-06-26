@@ -19,6 +19,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -146,6 +147,20 @@ class ManualSupplierServiceTest {
         assertFalse(store.getManualSupplierNames().contains("manual:Hurtownia A"));
         verify(storeFeedRepository).delete("store-1", "manual:Hurtownia A");
         verify(storesRepository).save(store);
+    }
+
+    @Test
+    void deleteWithNonManualIdentityDoesNotDeleteFeedOrSave() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("Action", ConnectionMode.OWN));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        service.delete("store-1", "Action");
+
+        // then
+        verify(storeFeedRepository, never()).delete(anyString(), anyString());
+        verify(storesRepository, never()).save(any());
     }
 
     @Test
