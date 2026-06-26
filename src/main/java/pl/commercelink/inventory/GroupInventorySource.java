@@ -18,7 +18,11 @@ class GroupInventorySource implements InventorySource {
     }
 
     static GroupInventorySource own(InventoryIndex index) {
-        return new GroupInventorySource(index, supplier -> true);
+        return own(index, supplier -> true);
+    }
+
+    static GroupInventorySource own(InventoryIndex index, Predicate<String> enabledSupplier) {
+        return new GroupInventorySource(index, enabledSupplier);
     }
 
     @Override

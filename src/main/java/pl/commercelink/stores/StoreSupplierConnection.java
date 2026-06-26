@@ -14,12 +14,25 @@ public class StoreSupplierConnection {
     @DynamoDBTypeConvertedEnum
     private ConnectionMode mode = ConnectionMode.GLOBAL;
 
+    @DynamoDBAttribute(attributeName = "includeInPricing")
+    private boolean includeInPricing = true;
+
+    @DynamoDBAttribute(attributeName = "includeInFulfilment")
+    private boolean includeInFulfilment = true;
+
     public StoreSupplierConnection() {
     }
 
     public StoreSupplierConnection(String supplierName, ConnectionMode mode) {
+        this(supplierName, mode, true, true);
+    }
+
+    public StoreSupplierConnection(String supplierName, ConnectionMode mode,
+                                   boolean includeInPricing, boolean includeInFulfilment) {
         this.supplierName = supplierName;
         this.mode = mode;
+        this.includeInPricing = includeInPricing;
+        this.includeInFulfilment = includeInFulfilment;
     }
 
     public String getSupplierName() {
@@ -36,5 +49,21 @@ public class StoreSupplierConnection {
 
     public void setMode(ConnectionMode mode) {
         this.mode = mode;
+    }
+
+    public boolean isIncludeInPricing() {
+        return includeInPricing;
+    }
+
+    public void setIncludeInPricing(boolean includeInPricing) {
+        this.includeInPricing = includeInPricing;
+    }
+
+    public boolean isIncludeInFulfilment() {
+        return includeInFulfilment;
+    }
+
+    public void setIncludeInFulfilment(boolean includeInFulfilment) {
+        this.includeInFulfilment = includeInFulfilment;
     }
 }

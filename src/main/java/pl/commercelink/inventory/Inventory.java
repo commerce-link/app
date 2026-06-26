@@ -5,18 +5,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -80,22 +84,49 @@ public class Inventory {
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
-        Store store = storesRepository.findById(storeId);
-        InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
-        InventoryIndex globalIndex = globalInventory.index();
-        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry,
-                GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store)),
-                GroupInventorySource.own(ownIndex));
+        return enabledView(storeId);
     }
 
     public InventoryView withEnabledSuppliersAndWarehouseData(String storeId) {
+        return enabledView(storeId, new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+    }
+
+    public InventoryView withEnabledSuppliersOnly(String storeId, SupplierScope scope) {
+        return scopedView(storeId, scope);
+    }
+
+    public InventoryView withEnabledSuppliersAndWarehouseData(String storeId, SupplierScope scope) {
+        return scopedView(storeId, scope, new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+    }
+
+    private InventoryView enabledView(String storeId, InventorySource... additionalSources) {
         Store store = storesRepository.findById(storeId);
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
-        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry,
-                GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store)),
-                GroupInventorySource.own(ownIndex),
-                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+        InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store));
+        InventorySource own = GroupInventorySource.own(ownIndex);
+        return view(globalIndex, ownIndex, global, own, additionalSources);
+    }
+
+    private InventoryView scopedView(String storeId, SupplierScope scope, InventorySource... additionalSources) {
+        Store store = storesRepository.findById(storeId);
+        InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
+        InventoryIndex globalIndex = globalInventory.index();
+        InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope));
+        InventorySource own = GroupInventorySource.own(ownIndex, scopedSupplier(store, ConnectionMode.OWN, scope));
+        return view(globalIndex, ownIndex, global, own, additionalSources);
+    }
+
+    private InventoryView view(InventoryIndex globalIndex, InventoryIndex ownIndex,
+                               InventorySource global, InventorySource own, InventorySource... additionalSources) {
+        InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
+                .toArray(InventorySource[]::new);
+        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry, sources);
+    }
+
+    private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {
+        Collection<String> names = store != null ? store.supplierNames(mode, scope) : List.of();
+        return names::contains;
     }
 
     private Predicate<String> enabledGlobalSupplier(Store store) {

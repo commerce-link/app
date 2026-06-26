@@ -175,6 +175,22 @@ class GroupInventorySourceTest {
     }
 
     @Test
+    void narrowsOwnGroupToConfiguredSuppliers() {
+        // given
+        MatchedInventory matched = group(new InventoryKey("E1", "M1"),
+                item("E1", "M1", "Action", 1380.0), item("E1", "M1", "Wortmann", 1300.0));
+        GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of(matched)), List.of("Action")::contains);
+        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("Action");
+    }
+
+    @Test
     void mergesNothingWhenOwnInventoryEmpty() {
         // given
         GroupInventorySource source = GroupInventorySource.own(InventoryIndex.of(List.of()));
