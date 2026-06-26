@@ -218,7 +218,7 @@
                     </form>
                 </div>
 
-                <form action="/dashboard/store/manual-supplier" method="post" class="field has-addons mt-3">
+                <form th:action="@{/dashboard/store/manual-supplier}" method="post" class="field has-addons mt-3">
                     <div class="control">
                         <input class="input" type="text" name="name" th:placeholder="#{store.manual.add.label}" />
                     </div>
