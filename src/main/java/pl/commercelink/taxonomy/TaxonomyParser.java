@@ -23,13 +23,13 @@ class TaxonomyParser {
         String mfn = row[1];
         String brand = row[2];
         String name = row[3];
-        ProductCategory category = parseCategory(row[4]);
         int dataAccuracyScore = parseScore(row[5]);
         Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
         Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
-        String categoryKey = row.length > 8 ? row[8] : category.name();
+        String categoryKey = row.length > 8 ? row[8] : CategoryCatalog.legacyCategoryOf(row[4]).name();
         List<String> signals = row.length > 9 ? decodeSignals(row[9]) : List.of();
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight, categoryKey, signals);
+        return new Taxonomy(ean, mfn, brand, name, CategoryCatalog.legacyCategoryOf(row[4]),
+                dataAccuracyScore, netWeight, grossWeight, categoryKey, signals);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -40,14 +40,6 @@ class TaxonomyParser {
             return new CSVWriter().writeAllRowsToBytes(rows, COLUMNS);
         } catch (IOException e) {
             throw new RuntimeException("Failed to generate CSV", e);
-        }
-    }
-
-    private static ProductCategory parseCategory(String value) {
-        try {
-            return ProductCategory.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            return ProductCategory.Other;
         }
     }
 

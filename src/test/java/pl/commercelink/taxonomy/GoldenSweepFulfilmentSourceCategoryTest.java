@@ -38,7 +38,7 @@ class GoldenSweepFulfilmentSourceCategoryTest {
     private static FulfilmentSource source(ProductCategory category, String ean, String mfn) {
         FulfilmentSource s = new FulfilmentSource();
         s.setSequenceNumber(category.ordinal());
-        s.setItemType(CategorySnapshot.typeOf(category));
+        s.setItemType(CategorySnapshot.typeOfKey(category.name()));
         s.setProvider("Action");
         s.setEan(ean);
         s.setMfn(mfn);
@@ -52,12 +52,12 @@ class GoldenSweepFulfilmentSourceCategoryTest {
 
     private static OrderItem productOrderItem(ProductCategory category, String sku) {
         // non-Services category with a SKU -> run() takes the inventory-lookup path.
-        return new OrderItem(null, category, "name", 1, 0, sku, false);
+        return new OrderItem(null, category.name(), "name", 1, 0, sku, false);
     }
 
     private static OrderItem servicesOrderItem() {
         // Services category -> run()/createFulfilments short-circuits to an internal warehouse item.
-        return new OrderItem(null, ProductCategory.Services, "service", 1, 0, null, false);
+        return new OrderItem(null, ProductCategory.Services.name(), "service", 1, 0, null, false);
     }
 
     private static InventoryItem offer(String ean, String mfn) {

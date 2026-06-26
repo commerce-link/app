@@ -50,7 +50,7 @@ import static org.mockito.Mockito.when;
 class GoldenSweepCategoryOrdinalSortKeysTest {
 
     private static OrderItem orderItemWithCategory(ProductCategory category) {
-        return new OrderItem(null, category, "n", 1, 0, null, false);
+        return new OrderItem(null, category.name(), "n", 1, 0, null, false);
     }
 
     private static FulfilmentSource sourceWithCategory(ProductCategory category, double priceGross) {
@@ -143,9 +143,9 @@ class GoldenSweepCategoryOrdinalSortKeysTest {
         //   comparing(getFirstSortNumber).thenComparing(getSecondSortNumber)
         // sorts genuine FulfilmentItems (second key = (int) source.getPriceNet()). Each SKU item maps to a
         // single accepted "Action" offer; ProductCategory.CPU(0) must precede Laptops(12), cheaper first.
-        OrderItem dearLaptopItem = new OrderItem(null, ProductCategory.Laptops, "n", 1, 0, "L1", false);
-        OrderItem cheapLaptopItem = new OrderItem(null, ProductCategory.Laptops, "n", 1, 0, "L2", false);
-        OrderItem cpuItem = new OrderItem(null, ProductCategory.CPU, "n", 1, 0, "C1", false);
+        OrderItem dearLaptopItem = new OrderItem(null, ProductCategory.Laptops.name(), "n", 1, 0, "L1", false);
+        OrderItem cheapLaptopItem = new OrderItem(null, ProductCategory.Laptops.name(), "n", 1, 0, "L2", false);
+        OrderItem cpuItem = new OrderItem(null, ProductCategory.CPU.name(), "n", 1, 0, "C1", false);
 
         InventoryView inventory = mock(InventoryView.class);
         stubSingleOffer(inventory, "L1", 900);

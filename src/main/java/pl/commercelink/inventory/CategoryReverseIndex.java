@@ -2,7 +2,7 @@ package pl.commercelink.inventory;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.taxonomy.SignalCategoryResolver;
 
 import java.util.Collection;
@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class CategoryReverseIndex {
 
-    private static final String OTHER = ProductCategory.Other.name();
+    private static final String OTHER = CategoryCatalog.defaultKey();
 
     private final SignalCategoryResolver signalCategoryResolver;
 

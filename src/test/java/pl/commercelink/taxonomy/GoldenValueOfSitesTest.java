@@ -74,7 +74,7 @@ class GoldenValueOfSitesTest {
         Pricelist pricelist = repository.find("catalogId", "pricelistId");
 
         // then
-        assertEquals(ProductCategory.Software, pricelist.getAvailabilityAndPrices().get(0).getCategory());
+        assertEquals(ProductCategory.Software.name(), pricelist.getAvailabilityAndPrices().get(0).getCategory());
     }
 
     // ---- SITE 1b: PricelistRepository (unknown -> THROW) ----
@@ -186,7 +186,7 @@ class GoldenValueOfSitesTest {
         when(basketsRepository.findById(any(), eq("offer1"))).thenReturn(Optional.of(new Basket()));
         when(pricelistRepository.find("cat1", "pl1")).thenReturn(new Pricelist("pl1", List.of(
                 new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name",
-                        ProductCategory.CPU, 100L, 5L, 1, 90L))));
+                        ProductCategory.CPU.name(), 100L, 5L, 1, 90L))));
         setField(controller, "basketsRepository", basketsRepository);
         setField(controller, "pricelistRepository", pricelistRepository);
 
@@ -204,7 +204,7 @@ class GoldenValueOfSitesTest {
         PricelistRepository pricelistRepository = mock(PricelistRepository.class);
         when(pricelistRepository.find("cat1", "pl1")).thenReturn(new Pricelist("pl1", List.of(
                 new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name",
-                        ProductCategory.CPU, 100L, 5L, 1, 90L))));
+                        ProductCategory.CPU.name(), 100L, 5L, 1, 90L))));
         setField(controller, "storesRepository", storesRepository);
         setField(controller, "ordersRepository", ordersRepository);
         setField(controller, "pricelistRepository", pricelistRepository);
@@ -228,7 +228,7 @@ class GoldenValueOfSitesTest {
         when(ordersRepository.findById(any(), eq("order1"))).thenReturn(order);
         when(pricelistRepository.find("cat1", "pl1")).thenReturn(new Pricelist("pl1", List.of(
                 new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name",
-                        ProductCategory.GPU, 100L, 5L, 1, 90L))));
+                        ProductCategory.GPU.name(), 100L, 5L, 1, 90L))));
         setField(controller, "storesRepository", storesRepository);
         setField(controller, "ordersRepository", ordersRepository);
         setField(controller, "pricelistRepository", pricelistRepository);

@@ -129,7 +129,7 @@ class GoldenCategoryNameStringsTest {
                 repoClass.getDeclaredMethod("findAllCategories", String.class);
         findAllCategories.setAccessible(true);
 
-        // when (REAL production loop body collecting item.getCategory().name())
+        // when (REAL production loop body collecting item.getCategoryKey())
         Set<String> collected = (Set<String>) findAllCategories.invoke(repository, "store1");
 
         // then
@@ -143,7 +143,7 @@ class GoldenCategoryNameStringsTest {
 
     private static pl.commercelink.warehouse.builtin.WarehouseItem warehouseItem(ProductCategory category) {
         return new pl.commercelink.warehouse.builtin.WarehouseItem(
-                "store1", "delivery1", category, "name", "ean", "mfn", 10, 1);
+                "store1", "delivery1", category.name(), "name", "ean", "mfn", 10, 1);
     }
 
     // ------------------------------------------------------------------
@@ -166,7 +166,7 @@ class GoldenCategoryNameStringsTest {
 
         // when / then (CPU.name()="CPU" sorts before Laptops.name()="Laptops")
         assertThat(suggestions).extracting(SuggestedDeliveryItem::getCategory)
-                .containsExactly(ProductCategory.CPU, ProductCategory.Laptops);
+                .containsExactly("CPU", "Laptops");
         assertThat("CPU".compareTo("Laptops")).isNegative();
     }
 
@@ -181,7 +181,7 @@ class GoldenCategoryNameStringsTest {
 
         // when / then (null -> "" sorts before CPU)
         assertThat(suggestions).extracting(SuggestedDeliveryItem::getCategory)
-                .containsExactly(null, ProductCategory.CPU);
+                .containsExactly(null, "CPU");
     }
 
     /**
@@ -229,7 +229,7 @@ class GoldenCategoryNameStringsTest {
 
     private static StockProductLevel stockLevel(ProductCategory category, String name, String mfn) {
         // restockPricePromo high enough that the offer's gross price clears the budget gate.
-        return new StockProductLevel(category, mfn, name, 100000, 100000, 1);
+        return new StockProductLevel(category != null ? category.name() : null, mfn, name, 100000, 100000, 1);
     }
 
     // ------------------------------------------------------------------

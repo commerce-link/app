@@ -79,13 +79,13 @@ public class SignalCategoryResolver {
             return Optional.of(synonym);
         }
 
-        return matchingEnumName(value);
+        return matchingCategoryKey(value);
     }
 
-    private Optional<String> matchingEnumName(String value) {
-        for (ProductCategory category : ProductCategory.values()) {
-            if (category != ProductCategory.Other && category.name().equalsIgnoreCase(value)) {
-                return Optional.of(category.name());
+    private Optional<String> matchingCategoryKey(String value) {
+        for (String key : CategoryCatalog.orderedKeys()) {
+            if (!key.equals(CategoryCatalog.defaultKey()) && key.equalsIgnoreCase(value)) {
+                return Optional.of(key);
             }
         }
         return Optional.empty();

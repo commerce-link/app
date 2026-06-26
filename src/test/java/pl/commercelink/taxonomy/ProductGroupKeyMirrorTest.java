@@ -14,7 +14,8 @@ class ProductGroupKeyMirrorTest {
     void itemTypeOfGroupKeyMirrorsOfEnumForEveryGroup() {
         // given / then
         for (ProductGroup group : ProductGroup.values()) {
-            assertThat(ItemType.of(group.name())).isEqualTo(ItemType.of(group));
+            ItemType expected = group == ProductGroup.Services ? ItemType.SERVICE : ItemType.PRODUCT;
+            assertThat(ItemType.of(group.name())).isEqualTo(expected);
         }
         assertThat(ItemType.of("Services")).isEqualTo(ItemType.SERVICE);
         assertThat(ItemType.of("PcComponents")).isEqualTo(ItemType.PRODUCT);
@@ -24,7 +25,7 @@ class ProductGroupKeyMirrorTest {
     void enabledProductGroupKeysMirrorEnabledGroupsInOrder() {
         // given
         FulfilmentConfiguration configuration = new FulfilmentConfiguration();
-        configuration.setEnabledProductGroups(List.of(ProductGroup.Peripherals, ProductGroup.Furniture));
+        configuration.setEnabledProductGroups(List.of("Peripherals", "Furniture"));
         Store store = new Store();
         store.setFulfilmentConfiguration(configuration);
 

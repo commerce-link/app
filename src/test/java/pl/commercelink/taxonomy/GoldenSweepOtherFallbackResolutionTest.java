@@ -26,11 +26,11 @@ import static org.mockito.Mockito.when;
  *    overrides the fallback ONLY when it is non-null AND != Other. Other coming FROM the taxonomy is
  *    treated as no info -> the caller's fallback wins.
  *
- *  - MarketplaceOrderImporter.resolveProductCategory(mfn): pimCatalog.findByMpn(mfn).map(category)
- *    .orElse(Other). Here Other is the DEFAULT when PIM has no entry, and PIM's category is taken
- *    VERBATIM (NOT approved-gated, NOT Other-filtered) — even an Other or a non-approved entry's
- *    category flows straight through. This contrasts with surface 13 (DataCorrection), where the
- *    category override IS approved-gated and Other-guarded.
+ *  - MarketplaceOrderImporter.resolveCategoryKey(mfn): pimCatalog.findByMpn(mfn).map(categoryKey)
+ *    .map(knownOrDefault).orElse(Other). Here Other is the DEFAULT when PIM has no entry, and PIM's
+ *    category key is taken VERBATIM for any known category (NOT approved-gated, NOT Other-filtered) —
+ *    even an Other or a non-approved entry's category flows straight through. This contrasts with
+ *    surface 13 (DataCorrection), where the category override IS approved-gated and Other-guarded.
  */
 @ExtendWith(MockitoExtension.class)
 class GoldenSweepOtherFallbackResolutionTest {
@@ -110,11 +110,11 @@ class GoldenSweepOtherFallbackResolutionTest {
         when(pimCatalog.findByMpn("MISSING")).thenReturn(Optional.empty());
 
         // when
-        ProductCategory category = invokeResolveProductCategory("MISSING");
+        String category = invokeResolveCategoryKey("MISSING");
 
         // then
         // empty Optional -> Other default.
-        assertThat(category).isEqualTo(ProductCategory.Other);
+        assertThat(category).isEqualTo(ProductCategory.Other.name());
     }
 
     @Test
@@ -124,11 +124,11 @@ class GoldenSweepOtherFallbackResolutionTest {
         when(pimCatalog.findByMpn("MFN")).thenReturn(Optional.of(pimEntry(ProductCategory.Laptops, false)));
 
         // when
-        ProductCategory category = invokeResolveProductCategory("MFN");
+        String category = invokeResolveCategoryKey("MFN");
 
         // then
         // category flows through verbatim despite approved=false (NOT approved-gated, unlike DataCorrection).
-        assertThat(category).isEqualTo(ProductCategory.Laptops);
+        assertThat(category).isEqualTo(ProductCategory.Laptops.name());
     }
 
     @Test
@@ -138,15 +138,15 @@ class GoldenSweepOtherFallbackResolutionTest {
         when(pimCatalog.findByMpn("MFN")).thenReturn(Optional.of(pimEntry(ProductCategory.Other, true)));
 
         // when
-        ProductCategory category = invokeResolveProductCategory("MFN");
+        String category = invokeResolveCategoryKey("MFN");
 
         // then
-        assertThat(category).isEqualTo(ProductCategory.Other);
+        assertThat(category).isEqualTo(ProductCategory.Other.name());
     }
 
-    private ProductCategory invokeResolveProductCategory(String mfn) throws Exception {
-        Method method = MarketplaceOrderImporter.class.getDeclaredMethod("resolveProductCategory", String.class);
+    private String invokeResolveCategoryKey(String mfn) throws Exception {
+        Method method = MarketplaceOrderImporter.class.getDeclaredMethod("resolveCategoryKey", String.class);
         method.setAccessible(true);
-        return (ProductCategory) method.invoke(marketplaceOrderImporter, mfn);
+        return (String) method.invoke(marketplaceOrderImporter, mfn);
     }
 }

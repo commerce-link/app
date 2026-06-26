@@ -23,7 +23,7 @@ public class TaxonomyResolver {
                 ? taxonomy.name()
                 : fallbackName;
 
-        String categoryKey = taxonomy.categoryKey() != null && !ProductCategory.Other.name().equals(taxonomy.categoryKey())
+        String categoryKey = taxonomy.categoryKey() != null && !CategoryCatalog.defaultKey().equals(taxonomy.categoryKey())
                 ? taxonomy.categoryKey()
                 : fallbackCategoryKey;
 

@@ -36,11 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GoldenSweepServicesBranchingTest {
 
     private static BasketItem basketItem(ProductCategory category, String mfn) {
-        return new BasketItem("id", "name", mfn, category, 10.0, 0, 1, null, 1, false);
+        return new BasketItem("id", "name", mfn, category == null ? null : category.name(), 10.0, 0, 1, null, 1, false);
     }
 
     private static OrderItem orderItem(ProductCategory category) {
-        return new OrderItem(null, category, "n", 1, 0, null, false);
+        return new OrderItem(null, category.name(), "n", 1, 0, null, false);
     }
 
     @Test
@@ -158,9 +158,9 @@ class GoldenSweepServicesBranchingTest {
     void invoicePositionNameDropsServicesPositions() {
         // given
         List<OrderItem> orderItems = List.of(
-                new OrderItem(null, ProductCategory.CPU, "Procesor", 2, 0, null, false),
-                new OrderItem(null, ProductCategory.Services, "Dostawa", 1, 0, null, false),
-                new OrderItem(null, ProductCategory.Laptops, "Laptop", 1, 0, null, false)
+                new OrderItem(null, ProductCategory.CPU.name(), "Procesor", 2, 0, null, false),
+                new OrderItem(null, ProductCategory.Services.name(), "Dostawa", 1, 0, null, false),
+                new OrderItem(null, ProductCategory.Laptops.name(), "Laptop", 1, 0, null, false)
         );
 
         // when

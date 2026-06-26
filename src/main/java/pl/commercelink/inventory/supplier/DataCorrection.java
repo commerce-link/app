@@ -5,7 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.products.brand.BrandMapper;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -31,8 +31,8 @@ class DataCorrection {
         String ean = resolveCorrectEanForMfn(taxonomy.ean(), taxonomy.mfn()).orElse(taxonomy.ean());
         String brand = brandMapper.unifyBrand(taxonomy.brand());
         String name = taxonomy.name();
-        ProductCategory category = taxonomy.category();
         String categoryKey = taxonomy.categoryKey();
+        boolean categoryKeyOverridden = false;
         int score = taxonomy.dataAccuracyScore();
         Integer netWeight = taxonomy.netWeightInGrams();
         Integer grossWeight = taxonomy.grossWeightInGrams();
@@ -44,22 +44,16 @@ class DataCorrection {
             if (isNotBlank(entry.name())) name = entry.name();
             if (isNotBlank(entry.categoryKey()) && !"Other".equals(entry.categoryKey())) {
                 categoryKey = entry.categoryKey();
-                category = toEnumOrKeep(entry.categoryKey(), category);
+                categoryKeyOverridden = true;
             }
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight, categoryKey, taxonomy.signals());
-    }
-
-    private static ProductCategory toEnumOrKeep(String categoryKey, ProductCategory current) {
-        try {
-            return ProductCategory.valueOf(categoryKey);
-        } catch (IllegalArgumentException e) {
-            return current;
-        }
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name,
+                categoryKeyOverridden ? CategoryCatalog.legacyCategoryOrKeep(categoryKey, taxonomy.category()) : taxonomy.category(),
+                score, netWeight, grossWeight, categoryKey, taxonomy.signals());
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {
