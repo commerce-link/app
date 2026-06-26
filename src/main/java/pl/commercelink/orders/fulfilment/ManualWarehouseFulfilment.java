@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public class ManualWarehouseFulfilment {
 
     public FulfilmentForm init(String storeId, List<OrderItem> orderItems) {
         FulfilmentGroupsGenerator generator = FulfilmentGroupsGenerator.builder()
-                .withInventory(inventory.withEnabledSuppliersOnly(storeId))
+                .withInventory(inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT))
                 .withAcceptedSuppliers(supplierRegistry.getExternalSupplierNames())
                 .withFulfilmentUnderCost()
                 .build();

@@ -15,6 +15,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
@@ -54,7 +55,7 @@ public class StockLevels {
                 .filter(c -> categoryId == null || categoryId.isEmpty() || categoryId.equals(c.getCategoryId()))
                 .toList();
 
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 
         List<StockProductLevel> stockProductLevels = new LinkedList<>();
 

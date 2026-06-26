@@ -11,6 +11,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.StockLevels;
 import pl.commercelink.warehouse.StockProductLevel;
@@ -36,7 +37,7 @@ public class DeliverySuggestionService {
             return new ArrayList<>();
         }
 
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 
         List<SuggestedDeliveryItem> suggestions = new ArrayList<>();
 

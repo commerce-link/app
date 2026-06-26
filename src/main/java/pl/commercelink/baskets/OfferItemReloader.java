@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.stores.SupplierScope;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,11 +32,11 @@ public class OfferItemReloader {
     }
 
     public List<OfferItem> reload(String storeId, Basket basket) {
-        return reload(inventory.withEnabledSuppliersOnly(storeId), basket);
+        return reload(inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING), basket);
     }
 
     public List<OfferItem> recalculate(String storeId, Basket basket) {
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId);
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
 
         updatePrices(basket.getBasketItems());
         updateCosts(enabledInventory, basket.getBasketItems());

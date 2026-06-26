@@ -235,4 +235,60 @@ class StoreSupplierConnectionServiceTest {
         // then
         assertThat(resolved).isEqualTo(45);
     }
+
+    @Test
+    void selectionsForReadsStoredFlagsAndDefaultsTrueForUnconnected() {
+        // given
+        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of("Acme", "Bravo"));
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL, false, true));
+
+        // when
+        List<SupplierSelectionForm> selections = service.selectionsFor(store);
+
+        // then
+        SupplierSelectionForm acme = selections.stream()
+                .filter(s -> "Acme".equals(s.getSupplierName())).findFirst().orElseThrow();
+        assertThat(acme.isEnabled()).isTrue();
+        assertThat(acme.isIncludeInPricing()).isFalse();
+        assertThat(acme.isIncludeInFulfilment()).isTrue();
+
+        SupplierSelectionForm bravo = selections.stream()
+                .filter(s -> "Bravo".equals(s.getSupplierName())).findFirst().orElseThrow();
+        assertThat(bravo.isEnabled()).isFalse();
+        assertThat(bravo.isIncludeInPricing()).isTrue();
+        assertThat(bravo.isIncludeInFulfilment()).isTrue();
+    }
+
+    @Test
+    void buildConnectionsForcesOwnButPreservesFlags() {
+        // given
+        List<SupplierSelectionForm> selections = List.of(
+                new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL, false, true));
+
+        // when
+        List<StoreSupplierConnection> result = service.buildConnections(selections, false);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMode()).isEqualTo(ConnectionMode.OWN);
+        assertThat(result.get(0).isIncludeInPricing()).isFalse();
+        assertThat(result.get(0).isIncludeInFulfilment()).isTrue();
+    }
+
+    @Test
+    void buildConnectionsCarriesIncludeFlags() {
+        // given
+        List<SupplierSelectionForm> selections = List.of(
+                new SupplierSelectionForm("AbGroup", true, ConnectionMode.GLOBAL, false, true));
+
+        // when
+        List<StoreSupplierConnection> connections = service.buildConnections(selections, true);
+
+        // then
+        assertThat(connections).hasSize(1);
+        assertThat(connections.get(0).getSupplierName()).isEqualTo("AbGroup");
+        assertThat(connections.get(0).isIncludeInPricing()).isFalse();
+        assertThat(connections.get(0).isIncludeInFulfilment()).isTrue();
+    }
 }

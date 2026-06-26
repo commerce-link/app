@@ -13,6 +13,7 @@ import pl.commercelink.taxonomy.ProductGroup;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -426,12 +427,7 @@ public class Store {
 
     @DynamoDBIgnore
     public List<String> getEnabledProviders() {
-        return Optional.ofNullable(fulfilmentConfiguration)
-                .map(FulfilmentConfiguration::getSupplierConnections)
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(StoreSupplierConnection::getSupplierName)
-                .collect(Collectors.toList());
+        return supplierNamesMatching(connection -> true);
     }
 
     @DynamoDBIgnore
@@ -447,6 +443,11 @@ public class Store {
     @DynamoDBIgnore
     public List<String> getGlobalSupplierNames() {
         return supplierNamesByMode(ConnectionMode.GLOBAL);
+    }
+
+    @DynamoDBIgnore
+    public List<String> supplierNames(ConnectionMode mode, SupplierScope scope) {
+        return supplierNamesMatching(connection -> connection.getMode() == mode && scope.includes(connection));
     }
 
     @DynamoDBIgnore
@@ -468,11 +469,15 @@ public class Store {
     }
 
     private List<String> supplierNamesByMode(ConnectionMode mode) {
+        return supplierNamesMatching(connection -> connection.getMode() == mode);
+    }
+
+    private List<String> supplierNamesMatching(Predicate<StoreSupplierConnection> filter) {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getSupplierConnections)
                 .orElse(Collections.emptyList())
                 .stream()
-                .filter(connection -> connection.getMode() == mode)
+                .filter(filter)
                 .map(StoreSupplierConnection::getSupplierName)
                 .collect(Collectors.toList());
     }

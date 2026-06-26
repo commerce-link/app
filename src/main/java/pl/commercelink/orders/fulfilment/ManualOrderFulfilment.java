@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.*;
+import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
 import java.util.LinkedList;
@@ -39,7 +40,7 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         }
 
         FulfilmentGroupsGenerator.Builder builder = FulfilmentGroupsGenerator.builder()
-                .withInventory(inventory.withEnabledSuppliersAndWarehouseData(storeId));
+                .withInventory(inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.FULFILMENT));
         if (orderItems.stream().map(OrderItem::getOrderId).filter(StringUtils::isNotBlank).distinct().count() > 1) {
             // in the case of multiple orders show only options that can satisfy demand
             builder.withCompleteFulfilmentOnly();
