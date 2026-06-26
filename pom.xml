@@ -83,6 +83,11 @@
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
+            <artifactId>supplier-manual</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
             <artifactId>provider-api</artifactId>
             <version>0.1.4</version>
         </dependency>
