@@ -436,6 +436,29 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public List<String> getManualSupplierNames() {
+        return supplierNamesByMode(ConnectionMode.MANUAL);
+    }
+
+    @DynamoDBIgnore
+    public List<String> getOwnAndManualSupplierNames() {
+        return supplierNamesMatching(connection ->
+                connection.getMode() == ConnectionMode.OWN || connection.getMode() == ConnectionMode.MANUAL);
+    }
+
+    @DynamoDBIgnore
+    public List<String> ownAndManualSupplierNames(SupplierScope scope) {
+        return supplierNamesMatching(connection ->
+                (connection.getMode() == ConnectionMode.OWN || connection.getMode() == ConnectionMode.MANUAL)
+                        && scope.includes(connection));
+    }
+
+    @DynamoDBIgnore
+    public boolean hasOwnOrManualSupplierConnections() {
+        return !getOwnAndManualSupplierNames().isEmpty();
+    }
+
+    @DynamoDBIgnore
     public List<String> supplierNames(ConnectionMode mode, SupplierScope scope) {
         return supplierNamesMatching(connection -> connection.getMode() == mode && scope.includes(connection));
     }
