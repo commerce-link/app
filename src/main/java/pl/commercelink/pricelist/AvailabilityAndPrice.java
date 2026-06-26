@@ -2,7 +2,6 @@ package pl.commercelink.pricelist;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.starter.csv.CSVReady;
-import pl.commercelink.taxonomy.ProductCategory;
 
 public class AvailabilityAndPrice  implements CSVReady {
 
@@ -21,7 +20,7 @@ public class AvailabilityAndPrice  implements CSVReady {
     @JsonProperty("name")
     private String name;
     @JsonProperty("category")
-    private ProductCategory category;
+    private String category;
     @JsonProperty("price")
     private long price;
     @JsonProperty("qty")
@@ -36,7 +35,7 @@ public class AvailabilityAndPrice  implements CSVReady {
     
 
     public AvailabilityAndPrice(String pimId, String ean,  String manufacturerCode,
-                                String brand, String label, String name, ProductCategory category,
+                                String brand, String label, String name, String category,
                                 long price, long qty, int estimatedDeliveryDays, long lowest30DaysPrice) {
         this.ean = ean;
         this.pimId = pimId;
@@ -75,7 +74,7 @@ public class AvailabilityAndPrice  implements CSVReady {
         return name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
@@ -104,7 +103,7 @@ public class AvailabilityAndPrice  implements CSVReady {
                 brand,
                 label,
                 name,
-                category.toString(),
+                category,
                 String.valueOf(price),
                 String.valueOf(qty),
                 String.valueOf(estimatedDeliveryDays),

@@ -10,7 +10,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -25,12 +24,12 @@ import static org.mockito.Mockito.when;
  *    {@code category.toString()} (AvailabilityAndPrice.java:107). For a Java enum without an
  *    overridden toString(), {@code toString() == name()}, so the serialized token equals the
  *    constant name for all 52 {@link ProductCategory} constants.
- *  - READ side: {@code PricelistRepository#mapFieldsToObject} (PricelistRepository.java:111)
- *    deserializes via {@code "OS".equals(token) ? Software : ProductCategory.valueOf(token)}.
+ *  - READ side: {@code PricelistRepository#mapFieldsToObject} deserializes via
+ *    {@code "OS".equals(token) ? "Software" : CategoryCatalog.isKnown(token) ? token : throw}.
  *
- * Therefore the round-trip {@code valueOf(asStringArray()[6])} is the identity for every constant.
+ * Therefore the round-trip {@code read(asStringArray()[6])} is the identity for every constant.
  * The "OS" alias is a one-way READ-only mapping (no constant serializes to "OS"); unknown tokens
- * throw {@link IllegalArgumentException} via {@code valueOf}.
+ * throw {@link IllegalArgumentException} via the {@code CategoryCatalog.isKnown} guard.
  *
  * Pure logic over real enum objects (no Spring context, no AWS clients). MockitoExtension is wired
  * per project convention even though this surface needs no collaborators.
@@ -76,16 +75,16 @@ class GoldenPricelistRoundTripTest {
         for (ProductCategory category : ProductCategory.values()) {
             // given
             AvailabilityAndPrice row = new AvailabilityAndPrice(
-                    "pim", "ean", "mfn", "brand", "label", "name", category, 100L, 5L, 1, 90L);
+                    "pim", "ean", "mfn", "brand", "label", "name", category.name(), 100L, 5L, 1, 90L);
 
             // when
             String serializedCategory = row.asStringArray()[CATEGORY_FIELD_INDEX];
-            ProductCategory deserialized = readCategory(serializedCategory);
+            String deserialized = readCategory(serializedCategory);
 
             // then
             assertEquals(category.name(), serializedCategory);
-            assertSame(category, deserialized,
-                    "round-trip must return the same constant for " + category.name());
+            assertEquals(category.name(), deserialized,
+                    "round-trip must return the same key for " + category.name());
         }
     }
 
@@ -99,10 +98,10 @@ class GoldenPricelistRoundTripTest {
         String osToken = "OS";
 
         // when
-        ProductCategory deserialized = readCategory(osToken);
+        String deserialized = readCategory(osToken);
 
         // then
-        assertSame(ProductCategory.Software, deserialized);
+        assertEquals("Software", deserialized);
         assertEquals("Software", ProductCategory.Software.toString());
         assertTrue(!osToken.equals(ProductCategory.Software.name()),
                 "OS is an alias, not the Software constant name");
@@ -140,7 +139,7 @@ class GoldenPricelistRoundTripTest {
      * through PricelistRepository.find() (which calls the private mapFieldsToObject:111 deserialization
      * branch). Returns the deserialized category of the single row. No production code touched.
      */
-    private static ProductCategory readCategory(String token) {
+    private static String readCategory(String token) {
         FileStorage fileStorage = mock(FileStorage.class);
         PricelistRepository repository = new PricelistRepository(fileStorage, "bucket");
         String key = "catalogId/pricelistId.csv";

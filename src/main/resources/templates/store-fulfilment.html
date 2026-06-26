@@ -59,7 +59,7 @@
                                 <input type="checkbox"
                                        th:value="${type}"
                                        th:field="*{store.fulfilmentConfiguration.enabledProductGroups}" />
-                                <span th:text="${enumI18n.localize(type)}"></span>
+                                <span th:text="${T(pl.commercelink.taxonomy.CategoryCatalog).displayNameOfGroup(enumI18n, type)}"></span>
                             </label>
                         </div>
                     </div>

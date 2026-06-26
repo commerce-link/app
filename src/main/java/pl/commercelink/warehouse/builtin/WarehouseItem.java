@@ -5,12 +5,11 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
-import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.taxonomy.ProductGroup;
+import pl.commercelink.taxonomy.CategoryCatalog;
+import pl.commercelink.taxonomy.ItemType;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -32,20 +31,19 @@ public class WarehouseItem extends Item {
 
     // kept in the warehouse for fast category-based searching
     @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private ProductCategory category = ProductCategory.Other;
+    private String categoryKey = CategoryCatalog.defaultKey();
 
     // required for DynamoDB
     public WarehouseItem() {
     }
 
     public static WarehouseItem empty(String storeId) {
-        return new WarehouseItem(storeId, "Other", ProductCategory.Other, null, null, null, 0, 1);
+        return new WarehouseItem(storeId, "Other", CategoryCatalog.defaultKey(), null, null, null, 0, 1);
     }
 
-    public WarehouseItem(String storeId, String deliveryId, ProductCategory category, String name, String ean, String mfn, double unitCost, int qty) {
+    public WarehouseItem(String storeId, String deliveryId, String categoryKey, String name, String ean, String mfn, double unitCost, int qty) {
         super(name, qty, null);
-        this.category = category;
+        this.categoryKey = categoryKey;
 
         this.storeId = storeId;
         this.itemId = UUID.randomUUID().toString();
@@ -63,7 +61,7 @@ public class WarehouseItem extends Item {
 
     @DynamoDBIgnore
     public void update(WarehouseItem other) {
-        this.setCategory(other.getCategory());
+        this.setCategoryKey(other.getCategoryKey());
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
@@ -133,7 +131,7 @@ public class WarehouseItem extends Item {
         WarehouseItem splitItem = new WarehouseItem();
         splitItem.setStoreId(this.storeId);
         splitItem.setItemId(UUID.randomUUID().toString());
-        splitItem.setCategory(getCategory());
+        splitItem.setCategoryKey(getCategoryKey());
         splitItem.setName(getName());
         splitItem.setComment(getComment());
         splitItem.setQty(qtyToSplit);
@@ -173,22 +171,17 @@ public class WarehouseItem extends Item {
         this.version = version;
     }
 
-    public ProductCategory getCategory() {
-        return category;
+    public String getCategoryKey() {
+        return categoryKey;
     }
 
-    public void setCategory(ProductCategory category) {
-        this.category = category;
-    }
-
-    @DynamoDBIgnore
-    public boolean hasCategory(ProductCategory category) {
-        return this.category == category;
+    public void setCategoryKey(String categoryKey) {
+        this.categoryKey = categoryKey;
     }
 
     @DynamoDBIgnore
     @Override
     public boolean isService() {
-        return category != null && category.getProductGroup() == ProductGroup.Services;
+        return CategoryCatalog.itemTypeOf(categoryKey) == ItemType.SERVICE;
     }
 }

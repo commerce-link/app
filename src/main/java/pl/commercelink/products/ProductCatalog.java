@@ -1,7 +1,5 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
@@ -105,13 +103,6 @@ public class ProductCatalog implements DeletionProtection {
     public CategoryDefinition findCategoryDefinition(String categoryId) {
         return categories.stream()
                 .filter(c -> c.getCategoryId().equals(categoryId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Category definition not found"));
-    }
-
-    public CategoryDefinition findCategoryDefinition(ProductCategory category) {
-        return categories.stream()
-                .filter(c -> c.getName().equals(category.name()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Category definition not found"));
     }

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.starter.csv.CSVWriter;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -108,12 +108,22 @@ public class PricelistRepository {
                 fields[3],                            // brand
                 fields[4],                            // label
                 fields[5],                            // name
-                "OS".equals(fields[6]) ? ProductCategory.Software : ProductCategory.valueOf(fields[6]),   // category
+                toKnownCategory(fields[6]),             // category
                 price,                                // price
                 Long.parseLong(fields[8]),             // qty
                 parseEstimatedDeliveryDays(fields, 9),  // estimatedDeliveryDays
                 lowest30DaysPrice                       // lowest30DaysPrice
         );
+    }
+
+    private static String toKnownCategory(String token) {
+        if ("OS".equals(token)) {
+            return "Software";
+        }
+        if (!CategoryCatalog.isKnown(token)) {
+            throw new IllegalArgumentException("Unknown category in pricelist: " + token);
+        }
+        return token;
     }
 
     private int parseEstimatedDeliveryDays(String[] fields, int index) {

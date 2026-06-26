@@ -8,8 +8,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.taxonomy.ProductGroup;
+import pl.commercelink.taxonomy.CategoryCatalog;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -406,22 +405,19 @@ public class Store {
     }
 
     @DynamoDBIgnore
-    public List<ProductCategory> getEnabledProductCategories() {
-        List<ProductGroup> enabledProductGroups = Optional.ofNullable(fulfilmentConfiguration)
+    public List<String> getEnabledProductCategories() {
+        List<String> enabledGroupKeys = Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getEnabledProductGroups)
                 .orElse(Collections.emptyList());
 
-        return ProductCategory.values(enabledProductGroups);
+        return CategoryCatalog.keysInGroups(enabledGroupKeys);
     }
 
     @DynamoDBIgnore
     public List<String> getEnabledProductGroupKeys() {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getEnabledProductGroups)
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(ProductGroup::name)
-                .collect(Collectors.toList());
+                .orElse(Collections.emptyList());
     }
 
     @DynamoDBIgnore

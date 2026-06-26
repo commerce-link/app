@@ -58,7 +58,7 @@ class GoldenProductSubcategoryAttributeTest {
     void fullConstructorPopulatesSubcategory() {
         // given / when
         Product product = new Product("cat-1", "pim-1", "ean-1", "mfn-1", "Brand", "Gaming Laptops", "Name",
-                ProductCategory.Laptops, "default");
+                ProductCategory.Laptops.name(), "default");
 
         // then
         assertEquals("Gaming Laptops", product.getSubcategory());

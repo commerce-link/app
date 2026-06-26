@@ -3,46 +3,50 @@ package pl.commercelink.stores;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * GOLDEN characterization of {@link Store#getEnabledProductCategories()}. Phase B retyped both the
+ * enabled-groups storage and this method from the {@code ProductGroup}/{@code ProductCategory} enums
+ * to string keys; this freezes that the SAME category keys are returned, in the SAME enum-declaration
+ * order, for the enabled group keys.
+ */
 @ExtendWith(MockitoExtension.class)
 class GoldenStoreEnabledCategoriesTest {
 
     @Test
-    void returnsCategoriesOfEnabledGroupsInEnumDeclarationOrder() {
+    void returnsCategoryKeysOfEnabledGroupsInEnumDeclarationOrder() {
         // given
         FulfilmentConfiguration configuration = new FulfilmentConfiguration();
-        configuration.setEnabledProductGroups(List.of(ProductGroup.Peripherals, ProductGroup.Furniture));
+        configuration.setEnabledProductGroups(List.of("Peripherals", "Furniture"));
         Store store = new Store();
         store.setFulfilmentConfiguration(configuration);
 
         // when
-        List<ProductCategory> categories = store.getEnabledProductCategories();
+        List<String> categories = store.getEnabledProductCategories();
 
         // then
         assertThat(categories).containsExactly(
-                ProductCategory.Displays,
-                ProductCategory.Keyboards,
-                ProductCategory.Mice,
-                ProductCategory.KeyboardsAndMice,
-                ProductCategory.Headphones,
-                ProductCategory.Microphones,
-                ProductCategory.Webcams,
-                ProductCategory.Speakers,
-                ProductCategory.MousePads,
-                ProductCategory.GamingChairs,
-                ProductCategory.OfficeChairs,
-                ProductCategory.GamingDesks,
-                ProductCategory.OfficeDesks,
-                ProductCategory.StandingDesks,
-                ProductCategory.MonitorMounts,
-                ProductCategory.Footrests);
+                "Displays",
+                "Keyboards",
+                "Mice",
+                "KeyboardsAndMice",
+                "Headphones",
+                "Microphones",
+                "Webcams",
+                "Speakers",
+                "MousePads",
+                "GamingChairs",
+                "OfficeChairs",
+                "GamingDesks",
+                "OfficeDesks",
+                "StandingDesks",
+                "MonitorMounts",
+                "Footrests");
     }
 
     @Test
@@ -54,7 +58,7 @@ class GoldenStoreEnabledCategoriesTest {
         store.setFulfilmentConfiguration(configuration);
 
         // when
-        List<ProductCategory> categories = store.getEnabledProductCategories();
+        List<String> categories = store.getEnabledProductCategories();
 
         // then
         assertThat(categories).isEmpty();
@@ -66,7 +70,7 @@ class GoldenStoreEnabledCategoriesTest {
         Store store = new Store();
 
         // when
-        List<ProductCategory> categories = store.getEnabledProductCategories();
+        List<String> categories = store.getEnabledProductCategories();
 
         // then
         assertThat(categories).isEmpty();

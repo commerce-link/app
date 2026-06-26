@@ -7,12 +7,10 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductGroupListConverter;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @DynamoDBDocument
 public class FulfilmentConfiguration {
@@ -26,9 +24,12 @@ public class FulfilmentConfiguration {
     @DynamoDBAttribute(attributeName = "defaultFulfilmentType")
     @DynamoDBTypeConvertedEnum
     private FulfilmentType defaultFulfilmentType = FulfilmentType.WarehouseFulfilment;
+    // category-group keys (stable enum names); the offer/category UI binds checkbox values here.
+    // Converter pins the stored shape as a list of strings — byte-identical to the previous
+    // enum-list converter output, so existing rows read back without migration.
     @DynamoDBAttribute(attributeName = "enabledProductGroups")
     @DynamoDBTypeConverted(converter = ProductGroupListConverter.class)
-    private List<ProductGroup> enabledProductGroups;
+    private List<String> enabledProductGroups;
     @DynamoDBAttribute(attributeName = "canUseGlobalSuppliers")
     private boolean canUseGlobalSuppliers = false;
     @DynamoDBAttribute(attributeName = "supplierConnections")
@@ -71,11 +72,11 @@ public class FulfilmentConfiguration {
         this.defaultFulfilmentType = defaultFulfilmentType;
     }
 
-    public List<ProductGroup> getEnabledProductGroups() {
+    public List<String> getEnabledProductGroups() {
         return enabledProductGroups;
     }
 
-    public void setEnabledProductGroups(List<ProductGroup> enabledProductGroups) {
+    public void setEnabledProductGroups(List<String> enabledProductGroups) {
         this.enabledProductGroups = enabledProductGroups;
     }
 
@@ -84,7 +85,7 @@ public class FulfilmentConfiguration {
         if (enabledProductGroups == null) {
             return Collections.emptyList();
         }
-        return enabledProductGroups.stream().map(ProductGroup::name).collect(Collectors.toList());
+        return new ArrayList<>(enabledProductGroups);
     }
 
     public boolean isCanUseGlobalSuppliers() {
