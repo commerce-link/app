@@ -51,12 +51,12 @@ public class ManualSupplierService {
             return Result.error("store.manual.error.store.notfound");
         }
         String trimmed = label == null ? "" : label.trim();
+        if (!VALID_LABEL.matcher(trimmed).matches()) {
+            return Result.error("store.manual.error.name.invalid");
+        }
         String identity = ManualSupplierNames.identityFor(trimmed);
         if (collidesWithStatic(trimmed) || alreadyExists(store, identity)) {
             return Result.error("store.manual.error.name.taken");
-        }
-        if (!VALID_LABEL.matcher(trimmed).matches()) {
-            return Result.error("store.manual.error.name.invalid");
         }
         connections(store).add(new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true));
         storesRepository.save(store);

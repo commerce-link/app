@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -89,7 +91,7 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of());
+        lenient().when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of());
 
         // when
         ManualSupplierService.Result result = service.create("store-1", "bad/name:x");
@@ -144,5 +146,36 @@ class ManualSupplierServiceTest {
         assertFalse(store.getManualSupplierNames().contains("manual:Hurtownia A"));
         verify(storeFeedRepository).delete("store-1", "manual:Hurtownia A");
         verify(storesRepository).save(store);
+    }
+
+    @Test
+    void setFlagsUpdatesFlags() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.setFlags("store-1", "manual:Hurtownia A", false, true);
+
+        // then
+        assertTrue(result.ok());
+        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
+        assertFalse(connection.isIncludeInPricing());
+        assertTrue(connection.isIncludeInFulfilment());
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void setFlagsRejectsUnknownIdentity() {
+        // given
+        Store store = storeWith();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.setFlags("store-1", "manual:Nope", false, false);
+
+        // then
+        assertFalse(result.ok());
+        verify(storesRepository, never()).save(any());
     }
 }

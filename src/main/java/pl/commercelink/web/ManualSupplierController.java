@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -19,7 +20,7 @@ import java.util.Locale;
 public class ManualSupplierController {
 
     private final ManualSupplierService manualSupplierService;
-    private final org.springframework.context.MessageSource messageSource;
+    private final MessageSource messageSource;
 
     @PostMapping("/dashboard/store/manual-supplier")
     @PreAuthorize("hasRole('ADMIN')")
