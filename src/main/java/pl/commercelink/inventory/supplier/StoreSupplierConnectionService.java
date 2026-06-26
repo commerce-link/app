@@ -101,7 +101,9 @@ public class StoreSupplierConnectionService {
                                                List<SupplierSelectionForm> selections, boolean isSuperAdmin) {
         boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
         submitted.setCanUseGlobalSuppliers(canUseGlobal);
-        submitted.setSupplierConnections(buildConnections(selections, canUseGlobal));
+        List<StoreSupplierConnection> connections = buildConnections(selections, canUseGlobal);
+        connections.addAll(existingManualConnections(existingStore));
+        submitted.setSupplierConnections(connections);
         submitted.setInventoryCacheTtlMinutes(
                 resolveInventoryCacheTtlMinutes(existingStore, submitted.getInventoryCacheTtlMinutes(), isSuperAdmin));
     }
@@ -127,6 +129,16 @@ public class StoreSupplierConnectionService {
             }
         }
         return connections;
+    }
+
+    private List<StoreSupplierConnection> existingManualConnections(Store existingStore) {
+        FulfilmentConfiguration config = existingStore.getFulfilmentConfiguration();
+        if (config == null) {
+            return List.of();
+        }
+        return config.getSupplierConnections().stream()
+                .filter(connection -> connection.getMode() == ConnectionMode.MANUAL)
+                .toList();
     }
 
     List<ErrorMessage> validate(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
