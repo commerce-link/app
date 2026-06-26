@@ -42,7 +42,7 @@ class DataCorrection {
             PimEntry entry = pim.get();
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
-            if (isNotBlank(entry.categoryKey()) && !"Other".equals(entry.categoryKey())) {
+            if (isNotBlank(entry.categoryKey()) && !Taxonomy.OTHER_CATEGORY_KEY.equals(entry.categoryKey())) {
                 categoryKey = entry.categoryKey();
                 category = toEnumOrKeep(entry.categoryKey(), category);
             }
