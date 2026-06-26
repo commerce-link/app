@@ -20,7 +20,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.printing.PrintProviderRegistry;
-import pl.commercelink.taxonomy.ProductGroup;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.stores.*;
@@ -388,7 +388,7 @@ public class StoreController {
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("productGroupTypes", ProductGroup.values());
+        model.addAttribute("productGroupTypes", CategoryCatalog.orderedGroupKeys());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", ConnectionMode.values());

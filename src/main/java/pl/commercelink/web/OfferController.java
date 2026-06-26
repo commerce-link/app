@@ -21,9 +21,9 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -307,10 +307,13 @@ public class OfferController {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
         Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
+        if (!CategoryCatalog.isKnown(category)) {
+            throw new IllegalArgumentException("Unknown category: " + category);
+        }
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
 
         AvailabilityAndPrice itemAvailabilityAndPrice = availabilityAndPrices.stream()
-                .filter(a -> a.getCategory() == ProductCategory.valueOf(category) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
+                .filter(a -> Objects.equals(a.getCategory(), category) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
                 .findFirst().get();
 
         BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());

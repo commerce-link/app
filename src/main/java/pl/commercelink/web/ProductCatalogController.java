@@ -201,8 +201,8 @@ public class ProductCatalogController {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
         CategoryDefinition removedCategoryDefinition = productCatalog.removeCategoryDefinition(categoryId);
 
-        // if no other CategoryDefinition is associated with same ProductCategory, then delete all products associated with this category
-        if (productCatalog.getCategories().stream().noneMatch(c -> c.getCategory() == removedCategoryDefinition.getCategory())) {
+        // if no other CategoryDefinition is associated with the same category, then delete all products associated with this category
+        if (productCatalog.getCategories().stream().noneMatch(c -> Objects.equals(c.getCategory(), removedCategoryDefinition.getCategory()))) {
             List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
             productRepository.delete(products);
         }

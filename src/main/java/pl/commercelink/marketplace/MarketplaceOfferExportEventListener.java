@@ -17,6 +17,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
 import pl.commercelink.starter.localization.EnumLocalizer;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -89,8 +90,8 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
-        String categoryName = enumLocalizer.localize(category.getCategory().getProductGroup())
-                + " / " + enumLocalizer.localize(category.getCategory(), "plural");
+        String categoryName = CategoryCatalog.groupDisplayNameOfCategory(enumLocalizer, category.getCategory())
+                + " / " + CategoryCatalog.displayNameOfCategory(enumLocalizer, category.getCategory(), "plural");
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 

@@ -131,7 +131,7 @@ class MarketplaceOfferExportEventListenerTest {
 
     private Product product(String pimId, String ean) {
         Product p = new Product(CATEGORY_ID, pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name-" + pimId,
-                ProductCategory.Laptops, "default");
+                ProductCategory.Laptops.name(), "default");
         return p;
     }
 
@@ -144,7 +144,7 @@ class MarketplaceOfferExportEventListenerTest {
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory(ProductCategory.Laptops);
+        category.setCategory(ProductCategory.Laptops.name());
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));

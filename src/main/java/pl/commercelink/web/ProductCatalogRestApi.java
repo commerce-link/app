@@ -11,6 +11,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.starter.localization.EnumLocalizer;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.web.dtos.ObjectIdDto;
@@ -60,9 +61,9 @@ public class ProductCatalogRestApi {
         return categoryDefinitions.stream()
                 .map(c -> new ProductCategoryTree(
                         c,
-                        categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory()),
-                        enumLocalizer.localize(c.getCategory(), "plural"),
-                        enumLocalizer.localize(c.getCategory().getProductGroup())))
+                        categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(d.getCategory(), c.getCategory())),
+                        CategoryCatalog.displayNameOfCategory(enumLocalizer, c.getCategory(), "plural"),
+                        CategoryCatalog.groupDisplayNameOfCategory(enumLocalizer, c.getCategory())))
                 .collect(Collectors.toList());
     }
 

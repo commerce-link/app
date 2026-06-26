@@ -8,7 +8,7 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.orders.*;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.CountryCodeConverter;
@@ -42,7 +42,7 @@ public class MarketplaceOrderImporter {
                     UUID.randomUUID().toString(),
                     product.name(),
                     product.manufacturerCode(),
-                    resolveProductCategory(product.manufacturerCode()),
+                    resolveCategoryKey(product.manufacturerCode()),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -122,19 +122,11 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    private ProductCategory resolveProductCategory(String mfn) {
+    private String resolveCategoryKey(String mfn) {
         return pimCatalog.findByMpn(mfn)
                 .map(PimEntry::categoryKey)
-                .map(MarketplaceOrderImporter::toCategory)
-                .orElse(ProductCategory.Other);
-    }
-
-    private static ProductCategory toCategory(String categoryKey) {
-        try {
-            return ProductCategory.valueOf(categoryKey);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            return ProductCategory.Other;
-        }
+                .map(CategoryCatalog::knownOrDefault)
+                .orElse(CategoryCatalog.defaultKey());
     }
 
     private PaymentSource resolvePaymentSource(String paymentType) {

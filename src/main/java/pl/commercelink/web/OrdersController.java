@@ -22,6 +22,7 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -29,7 +30,6 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.api.ShippingException;
@@ -264,7 +264,10 @@ public class OrdersController extends BaseController {
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
         Pricelist pricelist = pricelistRepository.find(itemCatalogId, itemPricelistId);
-        Optional<AvailabilityAndPrice> op = pricelist.findByCategoryLabelAndName(ProductCategory.valueOf(category), itemLabel, itemName);
+        if (!CategoryCatalog.isKnown(category)) {
+            throw new IllegalArgumentException("Unknown category: " + category);
+        }
+        Optional<AvailabilityAndPrice> op = pricelist.findByCategoryLabelAndName(category, itemLabel, itemName);
 
         op.ifPresent(availabilityAndPrice -> ordersManager.addOrderItem(store, order, availabilityAndPrice));
 

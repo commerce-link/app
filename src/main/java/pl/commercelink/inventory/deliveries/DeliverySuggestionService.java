@@ -92,7 +92,7 @@ public class DeliverySuggestionService {
         }
 
         suggestions.sort(Comparator
-                .comparing((SuggestedDeliveryItem s) -> s.getCategory() != null ? s.getCategory().name() : "")
+                .comparing((SuggestedDeliveryItem s) -> s.getCategory() != null ? s.getCategory() : "")
                 .thenComparing(s -> s.getName() != null ? s.getName() : ""));
 
         return suggestions;

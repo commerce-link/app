@@ -2,8 +2,7 @@ package pl.commercelink.offer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.taxonomy.ProductGroup;
+import pl.commercelink.taxonomy.CategoryCatalog;
 
 import java.util.List;
 
@@ -24,9 +23,9 @@ public class ProductCategoryTree {
     private int maxQty;
 
     @JsonProperty("productCategory")
-    private ProductCategory productCategory;
+    private String productCategory;
     @JsonProperty("productGroup")
-    private ProductGroup productGroup;
+    private String productGroup;
 
     @JsonProperty("categoryTree")
     private String categoryTree;
@@ -47,7 +46,7 @@ public class ProductCategoryTree {
         this.maxQty = categoryDefinition.getMaxQty();
 
         this.productCategory = categoryDefinition.getCategory();
-        this.productGroup = categoryDefinition.getCategory().getProductGroup();
+        this.productGroup = CategoryCatalog.groupKeyOf(categoryDefinition.getCategory());
 
         if (isDuplicated) {
             this.categoryTree = productGroupLocalizedName + "/" + productCategoryLocalizedName + "/" + name;
@@ -80,11 +79,11 @@ public class ProductCategoryTree {
         return maxQty;
     }
 
-    public ProductCategory getProductCategory() {
+    public String getProductCategory() {
         return productCategory;
     }
 
-    public ProductGroup getProductGroup() {
+    public String getProductGroup() {
         return productGroup;
     }
 

@@ -170,7 +170,7 @@ class GoldenMarketplaceBreadcrumbTest {
 
     private Product product(String pimId, String ean) {
         return new Product(CATEGORY_ID, pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name-" + pimId,
-                ProductCategory.Laptops, "default");
+                ProductCategory.Laptops.name(), "default");
     }
 
     private MarketplaceDefinition warehouseDefinition(int minWarehouseQty) {
@@ -186,7 +186,7 @@ class GoldenMarketplaceBreadcrumbTest {
     private void configureCategoryWith(ProductCategory productCategory, MarketplaceDefinition def, int warehouseQty, Product... products) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory(productCategory);
+        category.setCategory(productCategory.name());
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));
