@@ -5,9 +5,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.taxonomy.CategorySnapshot;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.taxonomy.ItemType;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
@@ -44,12 +43,12 @@ public class BasketItem {
     }
 
     public BasketItem(String id, String name, String mfn,
-                      ProductCategory category, double unitPrice, double unitCost, long qty,
+                      String categoryKey, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
         this.mfn = mfn;
-        this.categoryKey = category != null ? category.name() : null;
+        this.categoryKey = categoryKey;
         this.qty = qty;
         this.unitPrice = unitPrice;
         this.unitCost = unitCost;
@@ -70,7 +69,7 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public boolean isService() {
-        return CategorySnapshot.typeOfKey(categoryKey) == ItemType.SERVICE;
+        return CategoryCatalog.itemTypeOf(categoryKey) == ItemType.SERVICE;
     }
 
     public String getId() {
@@ -162,7 +161,7 @@ public class BasketItem {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
-                ProductCategory.Services,
+                "Services",
                 shippingPrice,
                 0,
                 1,
@@ -200,7 +199,7 @@ public class BasketItem {
                     "",
                     taxonomy.name(),
                     taxonomy.mfn(),
-                    taxonomy.category(),
+                    taxonomy.categoryKey(),
                     matchedInventory.getMedianPrice().grossValue(),
                     matchedInventory.getLowestPrice().grossValue(),
                     qty,
@@ -215,7 +214,7 @@ public class BasketItem {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 "Brak produktu",
                 mfn,
-                ProductCategory.Other,
+                CategoryCatalog.defaultKey(),
                 0,
                 0,
                 qty,

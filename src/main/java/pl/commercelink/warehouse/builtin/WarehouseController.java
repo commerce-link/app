@@ -17,6 +17,7 @@ import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.warehouse.RestockScope;
@@ -104,7 +105,7 @@ class WarehouseController {
         warehouseItems =  warehouseRepository.findAllFiltered(getStoreId(), categories, statusEnums)
                 .stream()
                 .filter(item -> item.getStatus() != FulfilmentStatus.Destroyed)
-                .sorted(Comparator.comparing(WarehouseItem::getCategory))
+                .sorted(Comparator.comparingInt(item -> CategoryCatalog.sequenceOf(item.getCategoryKey())))
                 .collect(Collectors.toList());
 
         double warehouseNetValue = warehouseItems.stream()

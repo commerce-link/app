@@ -3,7 +3,6 @@ package pl.commercelink.orders.fulfilment;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.*;
 import java.util.stream.Collectors;

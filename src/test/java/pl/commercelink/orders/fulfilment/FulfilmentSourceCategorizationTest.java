@@ -22,8 +22,8 @@ class FulfilmentSourceCategorizationTest {
     @Test
     void copiesFrozenSequenceFromOrderItem() {
         // given
-        OrderItem cpu = new OrderItem(null, ProductCategory.CPU, "n", 1, 0, "S", false);
-        OrderItem laptops = new OrderItem(null, ProductCategory.Laptops, "n", 1, 0, "S", false);
+        OrderItem cpu = new OrderItem(null, ProductCategory.CPU.name(), "n", 1, 0, "S", false);
+        OrderItem laptops = new OrderItem(null, ProductCategory.Laptops.name(), "n", 1, 0, "S", false);
 
         // when
         FulfilmentSource cpuSource = new FulfilmentSource(cpu, offer());
@@ -37,8 +37,8 @@ class FulfilmentSourceCategorizationTest {
     @Test
     void copiesItemTypeFromOrderItem() {
         // given
-        OrderItem service = new OrderItem(null, ProductCategory.Services, "n", 1, 0, "S", false);
-        OrderItem product = new OrderItem(null, ProductCategory.CPU, "n", 1, 0, "S", false);
+        OrderItem service = new OrderItem(null, ProductCategory.Services.name(), "n", 1, 0, "S", false);
+        OrderItem product = new OrderItem(null, ProductCategory.CPU.name(), "n", 1, 0, "S", false);
 
         // when / then
         assertThat(new FulfilmentSource(service, offer()).getItemType()).isEqualTo(ItemType.SERVICE);

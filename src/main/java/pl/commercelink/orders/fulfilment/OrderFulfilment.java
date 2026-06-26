@@ -1,7 +1,6 @@
 package pl.commercelink.orders.fulfilment;
 
 import pl.commercelink.orders.*;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
 import java.util.LinkedList;

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.stores.Store;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
@@ -41,12 +41,12 @@ public class OrdersManager {
         OrderItem orderItem;
         if (!matchedInventory.hasAnyOffers()) {
             String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            orderItem = new OrderItem(order.getOrderId(), ProductCategory.Other, "", 1, 0, mfn, store.isPositionConsolidationEnabled());
+            orderItem = new OrderItem(order.getOrderId(), CategoryCatalog.defaultKey(), "", 1, 0, mfn, store.isPositionConsolidationEnabled());
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
-                    taxonomy.category(),
+                    taxonomy.categoryKey(),
                     taxonomy.name(),
                     1,
                     matchedInventory.getMedianPrice().grossValue(),

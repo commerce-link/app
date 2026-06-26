@@ -17,7 +17,6 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -61,7 +60,7 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(item);
         AvailabilityAndPrice freshPriceData = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
-                ProductCategory.Laptops, 250L, 5L, 3, 0L);
+                "Laptops", 250L, 5L, 3, 0L);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached("cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find("cat-1", "pricelist-1")).thenReturn(pricelist);
@@ -120,13 +119,13 @@ class OfferItemReloaderTest {
 
     private BasketItem basketItemWithCatalog(String pimId, String catalogId, String mfn, double unitPrice) {
         BasketItem item = new BasketItem(pimId, "Test Product", mfn,
-                ProductCategory.Laptops, unitPrice, 0, 1, catalogId, 3, false);
+                "Laptops", unitPrice, 0, 1, catalogId, 3, false);
         return item;
     }
 
     private BasketItem basketItemWithMfn(String mfn, double unitCost) {
         BasketItem item = new BasketItem("pim-id", "Other Product", mfn,
-                ProductCategory.Laptops, 100.0, unitCost, 1, null, 3, false);
+                "Laptops", 100.0, unitCost, 1, null, 3, false);
         return item;
     }
 }

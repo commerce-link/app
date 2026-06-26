@@ -11,7 +11,6 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;

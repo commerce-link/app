@@ -4,9 +4,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
-import pl.commercelink.taxonomy.CategorySnapshot;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.taxonomy.ItemType;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import java.util.UUID;
@@ -45,8 +44,8 @@ public class OrderItem extends Item {
     public OrderItem() {
     }
 
-    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
-        this(orderId, CategorySnapshot.sequenceOf(category), CategorySnapshot.typeOf(category), name, qty, price, sku, consolidated);
+    public OrderItem(String orderId, String categoryKey, String name, int qty, double price, String sku, boolean consolidated) {
+        this(orderId, CategoryCatalog.sequenceOf(categoryKey), CategoryCatalog.itemTypeOf(categoryKey), name, qty, price, sku, consolidated);
     }
 
     public OrderItem(String orderId, int sequenceNumber, ItemType itemType, String name, int qty, double price, String sku, boolean consolidated) {
@@ -243,7 +242,7 @@ public class OrderItem extends Item {
 
     @DynamoDBAttribute(attributeName = "sequenceNumber")
     public Integer getSequenceNumber() {
-        return sequenceNumber != null ? sequenceNumber : CategorySnapshot.sequenceOfKey(legacyCategoryKey);
+        return sequenceNumber != null ? sequenceNumber : CategoryCatalog.sequenceOf(legacyCategoryKey);
     }
 
     public void setSequenceNumber(Integer sequenceNumber) {
@@ -253,7 +252,7 @@ public class OrderItem extends Item {
     @DynamoDBAttribute(attributeName = "itemType")
     @DynamoDBTypeConvertedEnum
     public ItemType getItemType() {
-        return itemType != null ? itemType : CategorySnapshot.typeOfKey(legacyCategoryKey);
+        return itemType != null ? itemType : CategoryCatalog.itemTypeOf(legacyCategoryKey);
     }
 
     public void setItemType(ItemType itemType) {
@@ -289,8 +288,8 @@ public class OrderItem extends Item {
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
         return new OrderItem(
                 orderId,
-                CategorySnapshot.sequenceOfKey(basketItem.getCategoryKey()),
-                CategorySnapshot.typeOfKey(basketItem.getCategoryKey()),
+                CategoryCatalog.sequenceOf(basketItem.getCategoryKey()),
+                CategoryCatalog.itemTypeOf(basketItem.getCategoryKey()),
                 basketItem.getName(),
                 (int) basketItem.getQty(),
                 basketItem.getUnitPrice(),
@@ -302,7 +301,7 @@ public class OrderItem extends Item {
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
         return new OrderItem(
                 orderId,
-                ProductCategory.Services,
+                "Services",
                 opt.getName(),
                 1,
                 opt.getPrice(),

@@ -74,7 +74,7 @@ class GoldenCheckoutRequiredComponentTest {
     void nonRequiredCategoryIsNotValidated() {
         // given
         CategoryDefinition optional = new CategoryDefinition();
-        optional.setCategory(ProductCategory.CPU);
+        optional.setCategory(ProductCategory.CPU.name());
         optional.setRequiredDuringOrder(false);
         ProductCatalog catalog = new ProductCatalog();
         catalog.getCategories().add(optional);
@@ -104,7 +104,7 @@ class GoldenCheckoutRequiredComponentTest {
         // given
         CategoryDefinition required = new CategoryDefinition();
         required.setName("Procesory");
-        required.setCategory(ProductCategory.CPU);
+        required.setCategory(ProductCategory.CPU.name());
         required.setRequiredDuringOrder(true);
         ProductCatalog catalog = new ProductCatalog();
         catalog.getCategories().add(required);
@@ -127,7 +127,7 @@ class GoldenCheckoutRequiredComponentTest {
 
     private CategoryDefinition required(ProductCategory category) {
         CategoryDefinition definition = new CategoryDefinition();
-        definition.setCategory(category);
+        definition.setCategory(category.name());
         definition.setRequiredDuringOrder(true);
         return definition;
     }

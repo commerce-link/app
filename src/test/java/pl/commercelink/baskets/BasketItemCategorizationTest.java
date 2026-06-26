@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BasketItemCategorizationTest {
 
     private static BasketItem basketItem(ProductCategory category) {
-        return new BasketItem("id", "name", "M", category, 10.0, 0, 1, null, 1, false);
+        return new BasketItem("id", "name", "M", category == null ? null : category.name(), 10.0, 0, 1, null, 1, false);
     }
 
     @Test
@@ -65,7 +65,7 @@ class BasketItemCategorizationTest {
     @Test
     void isCompleteRequiresACategoryKey() {
         // given
-        BasketItem withoutKey = new BasketItem("id", "name", "M", (ProductCategory) null, 10.0, 0, 1, null, 1, false);
+        BasketItem withoutKey = new BasketItem("id", "name", "M", (String) null, 10.0, 0, 1, null, 1, false);
         BasketItem withKey = basketItem(ProductCategory.CPU);
 
         // then

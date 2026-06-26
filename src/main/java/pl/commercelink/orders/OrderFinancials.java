@@ -1,7 +1,6 @@
 package pl.commercelink.orders;
 
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

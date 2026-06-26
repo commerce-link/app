@@ -2,7 +2,6 @@ package pl.commercelink.invoicing;
 
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.List;
 import java.util.stream.Collectors;

@@ -8,7 +8,6 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;

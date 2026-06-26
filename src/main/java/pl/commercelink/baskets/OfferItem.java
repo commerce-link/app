@@ -1,7 +1,6 @@
 package pl.commercelink.baskets;
 
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
 import java.util.List;

@@ -5,7 +5,7 @@ import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 import pl.commercelink.taxonomy.TaxonomyResolver;
 import pl.commercelink.taxonomy.TaxonomyResolver.ResolvedProduct;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -23,7 +23,7 @@ class WarehouseItemFactory {
     WarehouseItem create(String storeId, ReservationRemovalItem item) {
         ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), null);
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), toEnum(resolved.categoryKey()), resolved.name(),
+                storeId, item.getDeliveryId(), CategoryCatalog.knownOrDefault(resolved.categoryKey()), resolved.name(),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -33,9 +33,9 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, GoodsReceiptItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), keyOf(item.getCategory()));
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), item.getCategoryKey());
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), toEnum(resolved.categoryKey()), resolved.name(),
+                storeId, item.getDeliveryId(), CategoryCatalog.knownOrDefault(resolved.categoryKey()), resolved.name(),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -50,7 +50,7 @@ class WarehouseItemFactory {
         return new WarehouseItem(
                 storeId,
                 source.getProvider(),
-                toEnum(resolved.categoryKey()),
+                CategoryCatalog.knownOrDefault(resolved.categoryKey()),
                 resolved.name(),
                 source.getEan(),
                 source.getMfn(),
@@ -60,25 +60,10 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, String provider, DeliveryItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), ProductCategory.Other.name());
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), CategoryCatalog.defaultKey());
         return new WarehouseItem(
-                storeId, provider, toEnum(resolved.categoryKey()), resolved.name(),
+                storeId, provider, CategoryCatalog.knownOrDefault(resolved.categoryKey()), resolved.name(),
                 item.getEan(), item.getMfn(), item.getUnitCost(), item.getWarehouseQtyAdjustment()
         );
-    }
-
-    private static String keyOf(ProductCategory category) {
-        return category != null ? category.name() : null;
-    }
-
-    private static ProductCategory toEnum(String categoryKey) {
-        if (categoryKey == null) {
-            return ProductCategory.Other;
-        }
-        try {
-            return ProductCategory.valueOf(categoryKey);
-        } catch (IllegalArgumentException e) {
-            return ProductCategory.Other;
-        }
     }
 }

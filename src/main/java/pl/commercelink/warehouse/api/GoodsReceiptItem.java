@@ -1,7 +1,7 @@
 package pl.commercelink.warehouse.api;
 
 import pl.commercelink.orders.rma.RMAItem;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.CategoryCatalog;
 
 public class GoodsReceiptItem {
 
@@ -9,18 +9,18 @@ public class GoodsReceiptItem {
     private final String ean;
     private final String mfn;
     private final String name;
-    private final ProductCategory category;
+    private final String categoryKey;
     private final int qty;
     private final double unitPrice;
     private final double tax;
     private final String serialNo;
 
-    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, ProductCategory category, int qty, double unitPrice, double tax, String serialNo) {
+    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, String categoryKey, int qty, double unitPrice, double tax, String serialNo) {
         this.deliveryId = deliveryId;
         this.ean = ean;
         this.mfn = mfn;
         this.name = name;
-        this.category = category;
+        this.categoryKey = categoryKey;
         this.qty = qty;
         this.unitPrice = unitPrice;
         this.tax = tax;
@@ -33,7 +33,7 @@ public class GoodsReceiptItem {
                 rmaItem.getEan(),
                 rmaItem.getMfn(),
                 rmaItem.getName(),
-                ProductCategory.Other,
+                CategoryCatalog.defaultKey(),
                 rmaItem.getQty(),
                 rmaItem.getCost(),
                 rmaItem.getTax(),
@@ -57,8 +57,8 @@ public class GoodsReceiptItem {
         return name;
     }
 
-    public ProductCategory getCategory() {
-        return category;
+    public String getCategoryKey() {
+        return categoryKey;
     }
 
     public int getQty() {

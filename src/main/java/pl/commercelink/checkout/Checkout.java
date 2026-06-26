@@ -183,7 +183,7 @@ public class Checkout {
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
                     if (items.stream().noneMatch(item -> category.getCategory() != null
-                            && category.getCategory().name().equals(item.getCategoryKey()) && item.getQty() > 0)) {
+                            && category.getCategory().equals(item.getCategoryKey()) && item.getQty() > 0)) {
                         throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + category.getCategory());
                     }
                 });

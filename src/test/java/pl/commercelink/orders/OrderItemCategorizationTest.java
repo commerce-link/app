@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderItemCategorizationTest {
 
     private static OrderItem orderItem(ProductCategory category) {
-        return new OrderItem(null, category, "n", 1, 0, null, false);
+        return new OrderItem(null, category.name(), "n", 1, 0, null, false);
     }
 
     @Test
