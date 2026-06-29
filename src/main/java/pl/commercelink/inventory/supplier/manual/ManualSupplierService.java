@@ -41,7 +41,7 @@ public class ManualSupplierService {
         }
     }
 
-    public record ManualSupplierView(String identity, String label, boolean includeInPricing,
+    public record ManualSupplierView(String identity, String label, boolean enabled, boolean includeInPricing,
                                      boolean includeInFulfilment, boolean hasFeed) {
     }
 
@@ -117,6 +117,7 @@ public class ManualSupplierService {
                 views.add(new ManualSupplierView(
                         identity,
                         ManualSupplierNames.label(identity),
+                        connection.isEnabled(),
                         connection.isIncludeInPricing(),
                         connection.isIncludeInFulfilment(),
                         storeFeedRepository.canRead(store.getStoreId(), identity, "csv")));

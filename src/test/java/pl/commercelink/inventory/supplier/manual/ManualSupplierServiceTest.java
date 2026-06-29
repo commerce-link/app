@@ -239,4 +239,19 @@ class ManualSupplierServiceTest {
         assertFalse(result.ok());
         verify(storesRepository, never()).save(any());
     }
+
+    @Test
+    void listExposesEnabledFlagFromConnection() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true);
+        connection.setEnabled(false);
+        Store store = storeWith(connection);
+
+        // when
+        ManualSupplierService.ManualSupplierView view = service.list(store).get(0);
+
+        // then
+        assertFalse(view.enabled());
+        assertEquals("Hurtownia A", view.label());
+    }
 }
