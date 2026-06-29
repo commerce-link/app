@@ -407,7 +407,9 @@ public class StoreController {
         model.addAttribute("productGroupTypes", ProductGroup.values());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
-        model.addAttribute("connectionModes", ConnectionMode.values());
+        model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
+                .filter(mode -> mode != ConnectionMode.MANUAL)
+                .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "store-fulfilment";
