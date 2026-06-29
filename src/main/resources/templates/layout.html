@@ -189,17 +189,27 @@
         notification.parentNode.removeChild(notification);
     }
 
-    function confirmDelete(button) {
+    function confirmDelete(button, callback = null) {
+        onConfirmCallback = callback;
         formToSubmit = button.closest('form');
         document.getElementById('deleteModal').classList.add('is-active');
     }
 
     function closeDelete() {
+        onConfirmCallback = null;
+        formToSubmit = null;
         document.getElementById('deleteModal').classList.remove('is-active');
     }
 
     document.getElementById('confirmDeleteButton').addEventListener('click', function() {
-        formToSubmit.submit();
+        var savedCallback = onConfirmCallback;
+        var savedForm = formToSubmit;
+        closeDelete();
+        if (savedCallback) {
+            savedCallback();
+        } else if (savedForm) {
+            savedForm.submit();
+        }
     });
 
     function confirmSave(button, callback = null) {
@@ -220,7 +230,9 @@
         if (onConfirmCallback) {
             onConfirmCallback();
         }
-        formToSubmit.submit();
+        if (formToSubmit) {
+            formToSubmit.submit();
+        }
     });
 
     function validateInputField(inputSelector, errorMessage) {
