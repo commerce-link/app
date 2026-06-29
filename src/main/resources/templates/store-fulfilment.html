@@ -236,7 +236,6 @@
                 <script th:inline="javascript">
                     (function () {
                         var list = document.getElementById('manual-supplier-list');
-                        var template = document.getElementById('manual-row-template');
                         var addButton = document.getElementById('manual-add-button');
                         var nameInput = document.getElementById('manual-new-name');
                         var addError = document.getElementById('manual-add-error');
@@ -280,6 +279,7 @@
                                         addError.classList.remove('is-hidden');
                                         return;
                                     }
+                                    var template = document.getElementById('manual-row-template');
                                     var html = template.innerHTML.replace(/__INDEX__/g, nextIndex++);
                                     var wrap = document.createElement('div');
                                     wrap.innerHTML = html.trim();
@@ -291,6 +291,7 @@
                                     list.appendChild(row);
                                     wireRow(row);
                                     nameInput.value = '';
+                                    closeSave();
                                 });
                         }
 
