@@ -226,6 +226,11 @@
                     (function () {
                         var list = document.getElementById('manual-supplier-list');
                         var nextIndex = list.querySelectorAll('.manual-item').length;
+                        var storeId = /*[[${form.store.storeId}]]*/ '';
+                        var isSuperAdmin = /*[[${isSuperAdmin}]]*/ false;
+                        var manualBase = isSuperAdmin
+                            ? '/dashboard/store/' + encodeURIComponent(storeId) + '/manual-supplier'
+                            : '/dashboard/store/manual-supplier';
 
                         var presentLabel = /*[[#{store.manual.feed.present}]]*/ 'Plik wgrany';
                         var noFileMessage = /*[[#{store.manual.error.csv.empty}]]*/ 'Nie wybrano pliku.';
@@ -292,7 +297,7 @@
                         }
 
                         function deleteManual(identity, row) {
-                            fetch('/dashboard/store/manual-supplier/' + encodeURIComponent(identity) + '/delete',
+                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/delete',
                                   { method: 'POST' })
                                 .then(function (r) { if (r.ok) { row.remove(); } })
                                 .catch(function () {});
@@ -303,7 +308,7 @@
                             addError.classList.add('is-hidden');
                             if (!name) { return; }
                             var body = new URLSearchParams(); body.append('name', name);
-                            fetch('/dashboard/store/manual-supplier', { method: 'POST', body: body })
+                            fetch(manualBase, { method: 'POST', body: body })
                                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                                 .then(function (res) {
                                     if (!res.ok) {
@@ -341,7 +346,7 @@
                             var pickedName = uploadInput.files[0].name;
                             var fd = new FormData();
                             fd.append('file', uploadInput.files[0]);
-                            fetch('/dashboard/store/manual-supplier/' + encodeURIComponent(identity) + '/feed',
+                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/feed',
                                   { method: 'POST', body: fd })
                                 .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                                 .then(function (res) {

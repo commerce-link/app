@@ -29,7 +29,51 @@ public class ManualSupplierController {
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> create(@RequestParam("name") String name, Locale locale) {
-        ManualSupplierService.Result result = manualSupplierService.create(currentStoreId(), name);
+        return doCreate(currentStoreId(), name, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/manual-supplier")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> createForStore(@PathVariable String storeId, @RequestParam("name") String name, Locale locale) {
+        return doCreate(storeId, name, locale);
+    }
+
+    @PostMapping("/dashboard/store/manual-supplier/{identity}/feed")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> uploadFeed(@PathVariable String identity,
+                                                          @RequestParam("file") MultipartFile file,
+                                                          Locale locale) throws IOException {
+        return doUploadFeed(currentStoreId(), identity, file, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/manual-supplier/{identity}/feed")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> uploadFeedForStore(@PathVariable String storeId,
+                                                                  @PathVariable String identity,
+                                                                  @RequestParam("file") MultipartFile file,
+                                                                  Locale locale) throws IOException {
+        return doUploadFeed(storeId, identity, file, locale);
+    }
+
+    @PostMapping("/dashboard/store/manual-supplier/{identity}/delete")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable String identity, Locale locale) {
+        return doDelete(currentStoreId(), identity, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/manual-supplier/{identity}/delete")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteForStore(@PathVariable String storeId, @PathVariable String identity, Locale locale) {
+        return doDelete(storeId, identity, locale);
+    }
+
+    private ResponseEntity<Map<String, Object>> doCreate(String storeId, String name, Locale locale) {
+        ManualSupplierService.Result result = manualSupplierService.create(storeId, name);
         if (!result.ok()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
         }
@@ -37,17 +81,12 @@ public class ManualSupplierController {
         return ResponseEntity.ok(Map.of("ok", true, "identity", identity, "label", ManualSupplierNames.label(identity)));
     }
 
-    @PostMapping("/dashboard/store/manual-supplier/{identity}/feed")
-    @PreAuthorize("hasRole('ADMIN')")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> uploadFeed(@PathVariable String identity,
-                                                           @RequestParam("file") MultipartFile file,
-                                                           Locale locale) throws IOException {
+    private ResponseEntity<Map<String, Object>> doUploadFeed(String storeId, String identity, MultipartFile file, Locale locale) throws IOException {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false,
                     "message", messageSource.getMessage("store.manual.error.csv.empty", null, locale)));
         }
-        ManualSupplierService.Result result = manualSupplierService.uploadFeed(currentStoreId(), identity, file.getBytes());
+        ManualSupplierService.Result result = manualSupplierService.uploadFeed(storeId, identity, file.getBytes());
         if (!result.ok()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false,
                     "message", messageSource.getMessage(result.messageCode(), null, locale)));
@@ -56,11 +95,8 @@ public class ManualSupplierController {
         return ResponseEntity.ok(Map.of("ok", true, "fileName", fileName));
     }
 
-    @PostMapping("/dashboard/store/manual-supplier/{identity}/delete")
-    @PreAuthorize("hasRole('ADMIN')")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> delete(@PathVariable String identity, Locale locale) {
-        ManualSupplierService.Result result = manualSupplierService.delete(currentStoreId(), identity);
+    private ResponseEntity<Map<String, Object>> doDelete(String storeId, String identity, Locale locale) {
+        ManualSupplierService.Result result = manualSupplierService.delete(storeId, identity);
         if (!result.ok()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
         }
