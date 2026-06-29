@@ -1,7 +1,5 @@
 package pl.commercelink.stores;
 
-import org.springframework.web.multipart.MultipartFile;
-
 public class ManualSupplierSelectionForm {
 
     private String identity;
@@ -10,7 +8,6 @@ public class ManualSupplierSelectionForm {
     private boolean includeInPricing;
     private boolean includeInFulfilment;
     private boolean hasFeed;
-    private MultipartFile feed;
 
     public String getIdentity() {
         return identity;
@@ -60,11 +57,4 @@ public class ManualSupplierSelectionForm {
         this.hasFeed = hasFeed;
     }
 
-    public MultipartFile getFeed() {
-        return feed;
-    }
-
-    public void setFeed(MultipartFile feed) {
-        this.feed = feed;
-    }
 }

@@ -9,10 +9,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierNames;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
+import java.io.IOException;
 import java.util.Locale;
 import java.util.Map;
 
@@ -33,6 +35,25 @@ public class ManualSupplierController {
         }
         String identity = ManualSupplierNames.identityFor(name.trim());
         return ResponseEntity.ok(Map.of("ok", true, "identity", identity, "label", ManualSupplierNames.label(identity)));
+    }
+
+    @PostMapping("/dashboard/store/manual-supplier/{identity}/feed")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> uploadFeed(@PathVariable String identity,
+                                                           @RequestParam("file") MultipartFile file,
+                                                           Locale locale) throws IOException {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false,
+                    "message", messageSource.getMessage("store.manual.error.csv.empty", null, locale)));
+        }
+        ManualSupplierService.Result result = manualSupplierService.uploadFeed(currentStoreId(), identity, file.getBytes());
+        if (!result.ok()) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false,
+                    "message", messageSource.getMessage(result.messageCode(), null, locale)));
+        }
+        String fileName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        return ResponseEntity.ok(Map.of("ok", true, "fileName", fileName));
     }
 
     @PostMapping("/dashboard/store/manual-supplier/{identity}/delete")

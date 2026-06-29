@@ -684,19 +684,11 @@ public class StoreController {
 
         List<ManualSupplierService.ManualSelection> manualSelections = new ArrayList<>();
         for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
-            byte[] feedBytes = null;
-            if (selection.getFeed() != null && !selection.getFeed().isEmpty()) {
-                try {
-                    feedBytes = selection.getFeed().getBytes();
-                } catch (IOException e) {
-                    feedBytes = null;
-                }
-            }
             manualSelections.add(new ManualSupplierService.ManualSelection(
                     selection.getIdentity(), selection.isEnabled(),
-                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment(), feedBytes));
+                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
         }
-        List<String> rejectedFeeds = manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
+        manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
 
         List<String> messages = new ArrayList<>();
         messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
@@ -705,9 +697,6 @@ public class StoreController {
         }
         for (String supplier : result.removed()) {
             messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
-        }
-        for (String supplierLabel : rejectedFeeds) {
-            messages.add(messageSource.getMessage("store.manual.feed.rejected", new Object[]{supplierLabel}, locale));
         }
         redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
 

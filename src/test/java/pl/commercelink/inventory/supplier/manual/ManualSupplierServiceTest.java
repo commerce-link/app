@@ -179,56 +179,104 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
+        lenient().when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true);
 
         // when
-        List<String> rejected = service.applySelections("store-1", List.of(selection));
+        service.applySelections("store-1", List.of(selection));
 
         // then
-        assertTrue(rejected.isEmpty());
         StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
         assertFalse(connection.isEnabled());
         assertFalse(connection.isIncludeInPricing());
         assertTrue(connection.isIncludeInFulfilment());
         verify(storesRepository).save(store);
-        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
     }
 
     @Test
-    void applySelectionsStoresValidFeed() {
+    void applySelectionsForcesEnabledFalseWhenNoFeed() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(false);
+        ManualSupplierService.ManualSelection selection =
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true);
+
+        // when
+        service.applySelections("store-1", List.of(selection));
+
+        // then
+        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
+        assertFalse(connection.isEnabled());
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void applySelectionsKeepsEnabledTrueWhenFeedPresent() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
+        ManualSupplierService.ManualSelection selection =
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true);
+
+        // when
+        service.applySelections("store-1", List.of(selection));
+
+        // then
+        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
+        assertTrue(connection.isEnabled());
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void uploadFeedStoresValidCsv() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
         String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
                 + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;7;2\n";
-        ManualSupplierService.ManualSelection selection = new ManualSupplierService.ManualSelection(
-                "manual:Hurtownia A", true, true, true, csv.getBytes(StandardCharsets.UTF_8));
+        byte[] csvBytes = csv.getBytes(StandardCharsets.UTF_8);
 
         // when
-        List<String> rejected = service.applySelections("store-1", List.of(selection));
+        ManualSupplierService.Result result = service.uploadFeed("store-1", "manual:Hurtownia A", csvBytes);
 
         // then
-        assertTrue(rejected.isEmpty());
+        assertTrue(result.ok());
         verify(storeFeedRepository).store(eq("store-1"), eq("manual:Hurtownia A"), any(), eq("csv"));
     }
 
     @Test
-    void applySelectionsRejectsUnloadableFeedButStillSavesSettings() {
+    void uploadFeedRejectsUnloadableCsv() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
         String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
                 + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;0;2\n";
-        ManualSupplierService.ManualSelection selection = new ManualSupplierService.ManualSelection(
-                "manual:Hurtownia A", true, true, true, csv.getBytes(StandardCharsets.UTF_8));
+        byte[] csvBytes = csv.getBytes(StandardCharsets.UTF_8);
 
         // when
-        List<String> rejected = service.applySelections("store-1", List.of(selection));
+        ManualSupplierService.Result result = service.uploadFeed("store-1", "manual:Hurtownia A", csvBytes);
 
         // then
-        assertEquals(List.of("Hurtownia A"), rejected);
+        assertFalse(result.ok());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
-        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void uploadFeedRejectsUnknownIdentity() {
+        // given
+        Store store = storeWith();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        byte[] csvBytes = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n".getBytes(StandardCharsets.UTF_8);
+
+        // when
+        ManualSupplierService.Result result = service.uploadFeed("store-1", "manual:Nope", csvBytes);
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.supplier.notfound", result.messageCode());
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
     }
 }

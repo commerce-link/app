@@ -46,7 +46,7 @@ public class ManualSupplierService {
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment, byte[] feed) {
+                                  boolean includeInFulfilment) {
     }
 
     public Result create(String storeId, String label) {
@@ -82,31 +82,35 @@ public class ManualSupplierService {
         return Result.success();
     }
 
-    public List<String> applySelections(String storeId, List<ManualSelection> selections) {
+    public Result uploadFeed(String storeId, String identity, byte[] csvBytes) {
         Store store = storesRepository.findById(storeId);
-        List<String> rejected = new ArrayList<>();
+        if (store == null || !ManualSupplierNames.isManual(identity) || !alreadyExists(store, identity)) {
+            return Result.error("store.manual.error.supplier.notfound");
+        }
+        if (!hasAtLeastOneLoadableRow(identity, csvBytes)) {
+            return Result.error("store.manual.error.csv.invalid");
+        }
+        storeFeedRepository.store(storeId, identity, csvBytes, "csv");
+        return Result.success();
+    }
+
+    public void applySelections(String storeId, List<ManualSelection> selections) {
+        Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return rejected;
+            return;
         }
         for (ManualSelection selection : selections) {
             for (StoreSupplierConnection connection : connections(store)) {
                 if (connection.getMode() == ConnectionMode.MANUAL
                         && connection.getSupplierName().equals(selection.identity())) {
-                    connection.setEnabled(selection.enabled());
+                    boolean hasFeed = storeFeedRepository.canRead(storeId, selection.identity(), "csv");
+                    connection.setEnabled(selection.enabled() && hasFeed);
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
-                    if (selection.feed() != null && selection.feed().length > 0) {
-                        if (hasAtLeastOneLoadableRow(selection.identity(), selection.feed())) {
-                            storeFeedRepository.store(storeId, selection.identity(), selection.feed(), "csv");
-                        } else {
-                            rejected.add(ManualSupplierNames.label(selection.identity()));
-                        }
-                    }
                 }
             }
         }
         storesRepository.save(store);
-        return rejected;
     }
 
     public List<ManualSupplierView> list(Store store) {
