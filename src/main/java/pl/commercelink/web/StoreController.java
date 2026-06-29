@@ -389,6 +389,18 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
         form.setSupplierSelections(storeSupplierConnectionService.selectionsFor(store));
+        List<ManualSupplierSelectionForm> manualSelections = new ArrayList<>();
+        for (ManualSupplierService.ManualSupplierView view : manualSupplierService.list(store)) {
+            ManualSupplierSelectionForm selection = new ManualSupplierSelectionForm();
+            selection.setIdentity(view.identity());
+            selection.setLabel(view.label());
+            selection.setEnabled(view.enabled());
+            selection.setIncludeInPricing(view.includeInPricing());
+            selection.setIncludeInFulfilment(view.includeInFulfilment());
+            selection.setHasFeed(view.hasFeed());
+            manualSelections.add(selection);
+        }
+        form.setManualSupplierSelections(manualSelections);
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
@@ -397,7 +409,6 @@ public class StoreController {
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", ConnectionMode.values());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("manualSuppliers", manualSupplierService.list(store));
 
         return "store-fulfilment";
     }
@@ -671,6 +682,22 @@ public class StoreController {
             return redirectToFulfilment(form.getStore().getStoreId());
         }
 
+        List<ManualSupplierService.ManualSelection> manualSelections = new ArrayList<>();
+        for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
+            byte[] feedBytes = null;
+            if (selection.getFeed() != null && !selection.getFeed().isEmpty()) {
+                try {
+                    feedBytes = selection.getFeed().getBytes();
+                } catch (IOException e) {
+                    feedBytes = null;
+                }
+            }
+            manualSelections.add(new ManualSupplierService.ManualSelection(
+                    selection.getIdentity(), selection.isEnabled(),
+                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment(), feedBytes));
+        }
+        List<String> rejectedFeeds = manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
+
         List<String> messages = new ArrayList<>();
         messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
         for (String supplier : result.added()) {
@@ -678,6 +705,9 @@ public class StoreController {
         }
         for (String supplier : result.removed()) {
             messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
+        }
+        for (String supplierLabel : rejectedFeeds) {
+            messages.add(messageSource.getMessage("store.manual.feed.rejected", new Object[]{supplierLabel}, locale));
         }
         redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
 
