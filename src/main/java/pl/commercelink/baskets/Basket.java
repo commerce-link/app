@@ -1,7 +1,5 @@
 package pl.commercelink.baskets;
 
-import pl.commercelink.taxonomy.Categorized;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
@@ -110,12 +108,12 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(i -> !i.hasCategoryKey(Categorized.SERVICES)).collect(Collectors.toList());
+        return basketItems.stream().filter(i -> i.isProduct()).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForServices() {
-        return basketItems.stream().filter(i -> i.hasCategoryKey(Categorized.SERVICES)).collect(Collectors.toList());
+        return basketItems.stream().filter(i -> i.isService()).collect(Collectors.toList());
     }
 
     public void setBasketItems(List<BasketItem> basketItems) {
@@ -248,7 +246,7 @@ public class Basket {
     @DynamoDBIgnore
     public Optional<BasketItem> getShippingItem() {
         return basketItems.stream()
-                .filter(i -> i.hasCategoryKey(Categorized.SERVICES))
+                .filter(i -> i.isService())
                 .filter(BasketItem::isShippingItem)
                 .findFirst();
     }

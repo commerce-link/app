@@ -51,7 +51,7 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey");
+        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
     }
 
     @Test
@@ -114,7 +114,7 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey");
+        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
     }
 
     @Test
@@ -135,7 +135,7 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(nested.get("category").getS()).isEqualTo("Laptop");
         assertThat(nested.get("category").getN()).isNull();
-        assertThat(nested).doesNotContainKeys("sequenceNumber", "categoryKey");
+        assertThat(nested).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
     }
 
     private DynamoDBMapperTableModel<OrderItem> orderItemModel() {

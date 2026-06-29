@@ -1,7 +1,5 @@
 package pl.commercelink.orders;
 
-import pl.commercelink.taxonomy.Categorized;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.baskets.Basket;
@@ -281,7 +279,7 @@ public class Order {
 
     @DynamoDBIgnore
     public void increaseRealizationDays(OrderItem orderItem, int estimatedDeliveryDays) {
-        if (orderItem.hasCategoryKey(Categorized.SERVICES)) {
+        if (orderItem.isService()) {
             this.orderRealizationDays = Math.max(orderRealizationDays, estimatedDeliveryDays);
         }
     }
@@ -300,14 +298,14 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> !i.hasCategoryKey(Categorized.SERVICES))
+                .filter(i -> i.isProduct())
                 .allMatch(OrderItem::isReturned);
     }
 
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
         orderItems.stream()
-                .filter(i -> i.hasCategoryKey(Categorized.SERVICES))
+                .filter(i -> i.isService())
                 .forEach(OrderItem::markAsReturned);
 
         this.totalPrice = orderItems.stream()

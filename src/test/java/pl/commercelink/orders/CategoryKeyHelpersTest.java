@@ -90,6 +90,81 @@ class CategoryKeyHelpersTest {
         assertThat(item.hasCategoryKey("Services")).isFalse();
     }
 
+    @Test
+    void isServiceMatchesEnumCategoryCheck() {
+        // given
+        OrderItem service = orderItemWithCategory(ProductCategory.Services);
+        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+
+        // when / then
+        assertThat(service.isService())
+                .isEqualTo(service.getCategory() == ProductCategory.Services)
+                .isTrue();
+        assertThat(laptop.isService())
+                .isEqualTo(laptop.getCategory() == ProductCategory.Services)
+                .isFalse();
+    }
+
+    @Test
+    void isProductIsExactInverseOfIsServiceCategory() {
+        // given
+        OrderItem service = orderItemWithCategory(ProductCategory.Services);
+        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+
+        // when / then
+        assertThat(service.isProduct())
+                .isEqualTo(service.getCategory() != ProductCategory.Services)
+                .isFalse();
+        assertThat(laptop.isProduct())
+                .isEqualTo(laptop.getCategory() != ProductCategory.Services)
+                .isTrue();
+    }
+
+    @Test
+    void isServiceGroupMatchesEnumGroupCheck() {
+        // given
+        OrderItem service = orderItemWithCategory(ProductCategory.Services);
+        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+
+        // when / then
+        assertThat(service.isServiceGroup())
+                .isEqualTo(service.getCategory().getProductGroup() == ProductGroup.Services)
+                .isTrue();
+        assertThat(laptop.isServiceGroup())
+                .isEqualTo(laptop.getCategory().getProductGroup() == ProductGroup.Services)
+                .isFalse();
+    }
+
+    @Test
+    void serviceCategoryAndServiceGroupStayDistinctPredicates() {
+        // given
+        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+        OrderItem service = orderItemWithCategory(ProductCategory.Services);
+
+        // when / then
+        assertThat(laptop.isService()).isFalse();
+        assertThat(laptop.isServiceGroup()).isFalse();
+        assertThat(service.isService()).isTrue();
+        assertThat(service.isServiceGroup()).isTrue();
+    }
+
+    @Test
+    void basketItemServicePredicatesMatchEnumChecks() {
+        // given
+        BasketItem service = basketItemWithCategory(ProductCategory.Services);
+        BasketItem laptop = basketItemWithCategory(ProductCategory.Laptops);
+
+        // when / then
+        assertThat(service.isService())
+                .isEqualTo(service.getCategory() == ProductCategory.Services)
+                .isTrue();
+        assertThat(service.isProduct()).isFalse();
+        assertThat(laptop.isService()).isFalse();
+        assertThat(laptop.isProduct())
+                .isEqualTo(laptop.getCategory() != ProductCategory.Services)
+                .isTrue();
+    }
+
     private OrderItem orderItemWithCategory(ProductCategory category) {
         OrderItem item = new OrderItem();
         item.setCategoryKey(category.name());

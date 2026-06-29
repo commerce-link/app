@@ -60,16 +60,6 @@ public class BasketItem implements Categorized {
         return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
     }
 
-    @DynamoDBIgnore
-    public boolean isProduct() {
-        return !hasCategoryKey(SERVICES);
-    }
-
-    @DynamoDBIgnore
-    public boolean isService() {
-        return hasCategoryKey(SERVICES);
-    }
-
     public String getId() {
         return id;
     }

@@ -24,6 +24,21 @@ public interface Categorized {
     }
 
     @DynamoDBIgnore
+    default boolean isService() {
+        return hasCategoryKey(SERVICES);
+    }
+
+    @DynamoDBIgnore
+    default boolean isProduct() {
+        return !isService();
+    }
+
+    @DynamoDBIgnore
+    default boolean isServiceGroup() {
+        return hasGroupKey(SERVICES);
+    }
+
+    @DynamoDBIgnore
     default int getSequenceNumber() {
         return getCategory().ordinal();
     }

@@ -1,7 +1,5 @@
 package pl.commercelink.orders;
 
-import pl.commercelink.taxonomy.Categorized;
-
 import pl.commercelink.invoicing.api.Price;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,10 +22,10 @@ public class OrderFinancials {
     private double unpaidAmount;
 
     public OrderFinancials(Order order, List<OrderItem> orderItems) {
-        this.totalItemsPrice = orderItems.stream().filter(i -> !i.hasGroupKey(Categorized.SERVICES)).mapToDouble(OrderItem::getTotalPrice).sum();
-        this.totalItemsCost = orderItems.stream().filter(i -> !i.hasGroupKey(Categorized.SERVICES)).mapToDouble(OrderItem::getTotalCost).sum();
-        this.totalServicesPrice = orderItems.stream().filter(i -> i.hasGroupKey(Categorized.SERVICES)).mapToDouble(OrderItem::getTotalPrice).sum();
-        this.totalServicesCost = orderItems.stream().filter(i -> i.hasGroupKey(Categorized.SERVICES)).mapToDouble(OrderItem::getTotalCost).sum();
+        this.totalItemsPrice = orderItems.stream().filter(i -> !i.isServiceGroup()).mapToDouble(OrderItem::getTotalPrice).sum();
+        this.totalItemsCost = orderItems.stream().filter(i -> !i.isServiceGroup()).mapToDouble(OrderItem::getTotalCost).sum();
+        this.totalServicesPrice = orderItems.stream().filter(i -> i.isServiceGroup()).mapToDouble(OrderItem::getTotalPrice).sum();
+        this.totalServicesCost = orderItems.stream().filter(i -> i.isServiceGroup()).mapToDouble(OrderItem::getTotalCost).sum();
         this.totalProcessingFeesCost = order.getPayments().stream().mapToDouble(Payment::getFee).sum();
 
         this.totalPrice = totalItemsPrice + totalServicesPrice;

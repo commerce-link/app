@@ -1,7 +1,5 @@
 package pl.commercelink.orders.fulfilment;
 
-import pl.commercelink.taxonomy.Categorized;
-
 import pl.commercelink.orders.*;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
@@ -59,13 +57,13 @@ abstract class OrderFulfilment {
         List<OrderItem> acceptedProducts = orderItems.stream()
                 .filter(i -> !i.isInAllocation())
                 .filter(i -> !i.isAllocated())
-                .filter(i -> !i.hasCategoryKey(Categorized.SERVICES))
+                .filter(i -> i.isProduct())
                 .collect(Collectors.toList());
 
         List<OrderItem> acceptedServices = orderItems.stream()
                 .filter(i -> !i.isInAllocation())
                 .filter(i -> !i.isAllocated())
-                .filter(i -> i.hasCategoryKey(Categorized.SERVICES))
+                .filter(i -> i.isService())
                 .peek(OrderItem::markAsReceived)
                 .collect(Collectors.toList());
 

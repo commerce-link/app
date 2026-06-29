@@ -176,7 +176,7 @@ public abstract class Item implements Delivered, Categorized {
 
     @DynamoDBIgnore
     public boolean isAllocated() {
-        if (hasGroupKey(SERVICES) && this.status == FulfilmentStatus.Delivered) {
+        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
         return hasAllocationDetails() && hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered);
@@ -184,7 +184,7 @@ public abstract class Item implements Delivered, Categorized {
 
     @DynamoDBIgnore
     public boolean isOrdered() {
-        if (hasGroupKey(SERVICES) && this.status == FulfilmentStatus.Delivered) {
+        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
 

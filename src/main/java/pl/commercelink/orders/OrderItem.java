@@ -67,7 +67,7 @@ public class OrderItem extends Item {
     }
 
     public void markAsWarehouseFulfilled() {
-        if (hasCategoryKey(SERVICES)) {
+        if (isService()) {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
@@ -229,7 +229,7 @@ public class OrderItem extends Item {
 
     @DynamoDBIgnore
     public boolean canBeFulfilledInternally() {
-        return hasCategoryKey(SERVICES) && isWarehouseFulfilled();
+        return isService() && isWarehouseFulfilled();
     }
 
     @DynamoDBIgnore
