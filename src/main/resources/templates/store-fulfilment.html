@@ -145,13 +145,10 @@
                                     <div class="is-flex is-align-items-center">
                                         <label class="checkbox">
                                             <input type="checkbox" class="manual-enabled"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}"
-                                                   th:disabled="${!ms.hasFeed}" />
+                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
                                             <span th:text="${ms.label}">label</span>
                                         </label>
-                                        <button type="button" class="button is-link is-light is-small manual-upload-open ml-3"
-                                                th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                                        <span class="tag manual-file-tag ml-2"
+                                        <span class="tag manual-file-tag ml-3"
                                               th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
                                               th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
                                     </div>
@@ -160,8 +157,12 @@
                                         <span class="icon"><i class="fas fa-trash"></i></span>
                                     </button>
                                 </div>
-                                <p class="help manual-enable-hint is-hidden" th:text="#{store.manual.enable.needsfeed}"></p>
                                 <div class="manual-detail ml-5 mt-2">
+                                    <div class="field">
+                                        <button type="button" class="button is-link is-light is-small manual-upload-open"
+                                                th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                                    </div>
+                                    <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
                                     <div class="field">
                                         <label class="checkbox">
                                             <input type="checkbox"
@@ -223,7 +224,7 @@
                 </script>
 
                 <script th:inline="javascript">
-                    (function () {
+                    document.addEventListener('DOMContentLoaded', function () {
                         var list = document.getElementById('manual-supplier-list');
                         var nextIndex = list.querySelectorAll('.manual-item').length;
                         var storeId = /*[[${form.store.storeId}]]*/ '';
@@ -271,7 +272,6 @@
                             var tag = row.querySelector('.manual-file-tag');
                             tag.textContent = presentLabel + (fileName ? ': ' + fileName : '');
                             tag.classList.add('is-success');
-                            row.querySelector('.manual-enabled').disabled = false;
                             var hint = row.querySelector('.manual-enable-hint');
                             if (hint) { hint.classList.add('is-hidden'); }
                         }
@@ -379,7 +379,7 @@
                         uploadModal.querySelector('.modal-background').addEventListener('click', closeUploadModal);
 
                         list.querySelectorAll('.manual-item').forEach(wireRow);
-                    })();
+                    });
                 </script>
 
                 <div class="field is-grouped">
@@ -401,20 +401,22 @@
                         <div class="is-flex is-align-items-center">
                             <label class="checkbox">
                                 <input type="checkbox" class="manual-enabled"
-                                       name="manualSupplierSelections[__INDEX__].enabled" value="true" disabled />
+                                       name="manualSupplierSelections[__INDEX__].enabled" value="true" />
                                 <span class="manual-label"></span>
                             </label>
-                            <button type="button" class="button is-link is-light is-small manual-upload-open ml-3"
-                                    th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                            <span class="tag manual-file-tag is-light ml-2" th:text="#{store.manual.feed.missing}"></span>
+                            <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
                         </div>
                         <button type="button" class="button is-danger is-light is-small manual-delete"
                                 data-identity="" th:title="#{store.manual.delete.button}">
                             <span class="icon"><i class="fas fa-trash"></i></span>
                         </button>
                     </div>
-                    <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
                     <div class="manual-detail ml-5 mt-2" style="display:none">
+                        <div class="field">
+                            <button type="button" class="button is-link is-light is-small manual-upload-open"
+                                    th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                        </div>
+                        <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
                         <div class="field">
                             <label class="checkbox">
                                 <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInPricing" value="true" checked />
