@@ -71,7 +71,7 @@ public class OrdersManager {
                 availabilityAndPrice.getManufacturerCode(),
                 store.isPositionConsolidationEnabled()
         );
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.isService()) {
             orderItem.markAsWarehouseFulfilled();
         }
 
@@ -90,7 +90,7 @@ public class OrdersManager {
                 .collect(Collectors.toList());
 
         for (OrderItem selectedOrderItem : selectedOrderItems) {
-            if (selectedOrderItem.isNew() || selectedOrderItem.getCategory() == ProductCategory.Services) {
+            if (selectedOrderItem.isNew() || selectedOrderItem.isService()) {
                 orderItems.remove(selectedOrderItem);
                 orderItemsRepository.delete(selectedOrderItem);
 

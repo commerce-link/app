@@ -3,11 +3,12 @@ package pl.commercelink.orders.fulfilment;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Objects;
 
-public class FulfilmentSource {
+public class FulfilmentSource implements Categorized {
 
     private String name;
     private ProductCategory category;
@@ -85,6 +86,10 @@ public class FulfilmentSource {
 
     public void setCategory(ProductCategory category) {
         this.category = category;
+    }
+
+    public String getCategoryKey() {
+        return category == null ? null : category.name();
     }
 
     public int getQty() {
