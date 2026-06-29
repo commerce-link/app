@@ -154,9 +154,6 @@
                                                    th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
                                             <span th:text="${ms.label}">label</span>
                                         </label>
-                                        <span class="tag manual-file-tag ml-3"
-                                              th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
-                                              th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
                                     </div>
                                     <button type="button" class="button is-danger is-light is-small manual-delete"
                                             th:data-identity="${ms.identity}" th:title="#{store.manual.delete.button}">
@@ -164,9 +161,12 @@
                                     </button>
                                 </div>
                                 <div class="manual-detail ml-5 mt-2">
-                                    <div class="field">
+                                    <div class="field is-flex is-align-items-center">
                                         <button type="button" class="button is-link is-light is-small manual-upload-open"
                                                 th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                                        <span class="tag manual-file-tag ml-3"
+                                              th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
+                                              th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
                                     </div>
                                     <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
                                     <div class="field">
@@ -405,7 +405,6 @@
                                        name="manualSupplierSelections[__INDEX__].enabled" value="true" />
                                 <span class="manual-label"></span>
                             </label>
-                            <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
                         </div>
                         <button type="button" class="button is-danger is-light is-small manual-delete"
                                 data-identity="" th:title="#{store.manual.delete.button}">
@@ -413,9 +412,10 @@
                         </button>
                     </div>
                     <div class="manual-detail ml-5 mt-2" style="display:none">
-                        <div class="field">
+                        <div class="field is-flex is-align-items-center">
                             <button type="button" class="button is-link is-light is-small manual-upload-open"
                                     th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                            <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
                         </div>
                         <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
                         <div class="field">
