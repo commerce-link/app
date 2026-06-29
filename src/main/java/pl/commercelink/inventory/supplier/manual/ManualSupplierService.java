@@ -68,7 +68,7 @@ public class ManualSupplierService {
         if (store == null || !ManualSupplierNames.isManual(identity) || !alreadyExists(store, identity)) {
             return Result.error("store.manual.error.supplier.notfound");
         }
-        if (!hasAtLeastOneParseableRow(identity, csvBytes)) {
+        if (!hasAtLeastOneLoadableRow(identity, csvBytes)) {
             return Result.error("store.manual.error.csv.invalid");
         }
         storeFeedRepository.store(storeId, identity, csvBytes, "csv");
@@ -91,18 +91,19 @@ public class ManualSupplierService {
         return Result.error("store.manual.error.supplier.notfound");
     }
 
-    public void delete(String storeId, String identity) {
+    public Result delete(String storeId, String identity) {
         Store store = storesRepository.findById(storeId);
         if (store == null || !ManualSupplierNames.isManual(identity)) {
-            return;
+            return Result.error("store.manual.error.supplier.notfound");
         }
         boolean removed = connections(store).removeIf(connection ->
                 connection.getMode() == ConnectionMode.MANUAL && connection.getSupplierName().equals(identity));
         if (!removed) {
-            return;
+            return Result.error("store.manual.error.supplier.notfound");
         }
         storeFeedRepository.delete(storeId, identity);
         storesRepository.save(store);
+        return Result.success();
     }
 
     public List<ManualSupplierView> list(Store store) {
@@ -134,15 +135,19 @@ public class ManualSupplierService {
                         && connection.getSupplierName().equalsIgnoreCase(identity));
     }
 
-    private boolean hasAtLeastOneParseableRow(String identity, byte[] csvBytes) {
+    private boolean hasAtLeastOneLoadableRow(String identity, byte[] csvBytes) {
         CsvRowParser parser = new ManualCsvRowParser(identity);
-        AtomicInteger valid = new AtomicInteger();
+        AtomicInteger loadable = new AtomicInteger();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(csvBytes), StandardCharsets.UTF_8)) {
-            new CSVLoader(reader).readRows(';', row -> parser.tryParse(row).ifPresent(r -> valid.incrementAndGet()));
+            new CSVLoader(reader).readRows(';', row -> parser.tryParse(row).ifPresent(parsed -> {
+                if (parsed.taxonomy().isProcessable() && parsed.item().isSellable()) {
+                    loadable.incrementAndGet();
+                }
+            }));
         } catch (Exception e) {
             return false;
         }
-        return valid.get() > 0;
+        return loadable.get() > 0;
     }
 
     private List<StoreSupplierConnection> connections(Store store) {

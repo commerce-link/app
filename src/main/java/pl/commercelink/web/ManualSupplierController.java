@@ -53,8 +53,8 @@ public class ManualSupplierController {
 
     @PostMapping("/dashboard/store/manual-supplier/{identity}/delete")
     @PreAuthorize("hasRole('ADMIN')")
-    public String delete(@PathVariable String identity, RedirectAttributes redirectAttributes) {
-        manualSupplierService.delete(currentStoreId(), identity);
+    public String delete(@PathVariable String identity, Locale locale, RedirectAttributes redirectAttributes) {
+        flash(manualSupplierService.delete(currentStoreId(), identity), locale, redirectAttributes);
         return "redirect:/dashboard/store/fulfilment";
     }
 

@@ -16,6 +16,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -132,6 +133,51 @@ class ManualSupplierServiceTest {
 
         // then
         assertFalse(result.ok());
+    }
+
+    @Test
+    void uploadRejectsCsvWhereNoRowIsLoadable() {
+        // given
+        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;0;2\n";
+        when(storesRepository.findById("store-1")).thenReturn(
+                storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL)));
+
+        // when
+        ManualSupplierService.Result result =
+                service.uploadFeed("store-1", "manual:Hurtownia A", csv.getBytes(StandardCharsets.UTF_8));
+
+        // then
+        assertFalse(result.ok());
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void deleteReturnsSuccessResultWhenRemoved() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.delete("store-1", "manual:Hurtownia A");
+
+        // then
+        assertTrue(result.ok());
+    }
+
+    @Test
+    void deleteReturnsNotFoundResultWhenIdentityUnknown() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.delete("store-1", "manual:Nope");
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.supplier.notfound", result.messageCode());
+        verify(storeFeedRepository, never()).delete(anyString(), anyString());
     }
 
     @Test
