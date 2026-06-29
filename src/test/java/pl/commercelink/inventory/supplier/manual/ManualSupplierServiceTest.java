@@ -254,4 +254,62 @@ class ManualSupplierServiceTest {
         assertFalse(view.enabled());
         assertEquals("Hurtownia A", view.label());
     }
+
+    @Test
+    void applySelectionsUpdatesEnabledAndFlags() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        ManualSupplierService.ManualSelection selection =
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, null);
+
+        // when
+        List<String> rejected = service.applySelections("store-1", List.of(selection));
+
+        // then
+        assertTrue(rejected.isEmpty());
+        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
+        assertFalse(connection.isEnabled());
+        assertFalse(connection.isIncludeInPricing());
+        assertTrue(connection.isIncludeInFulfilment());
+        verify(storesRepository).save(store);
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void applySelectionsStoresValidFeed() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;7;2\n";
+        ManualSupplierService.ManualSelection selection = new ManualSupplierService.ManualSelection(
+                "manual:Hurtownia A", true, true, true, csv.getBytes(StandardCharsets.UTF_8));
+
+        // when
+        List<String> rejected = service.applySelections("store-1", List.of(selection));
+
+        // then
+        assertTrue(rejected.isEmpty());
+        verify(storeFeedRepository).store(eq("store-1"), eq("manual:Hurtownia A"), any(), eq("csv"));
+    }
+
+    @Test
+    void applySelectionsRejectsUnloadableFeedButStillSavesSettings() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;0;2\n";
+        ManualSupplierService.ManualSelection selection = new ManualSupplierService.ManualSelection(
+                "manual:Hurtownia A", true, true, true, csv.getBytes(StandardCharsets.UTF_8));
+
+        // when
+        List<String> rejected = service.applySelections("store-1", List.of(selection));
+
+        // then
+        assertEquals(List.of("Hurtownia A"), rejected);
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
+        verify(storesRepository).save(store);
+    }
 }

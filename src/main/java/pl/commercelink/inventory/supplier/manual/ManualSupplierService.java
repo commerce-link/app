@@ -45,6 +45,10 @@ public class ManualSupplierService {
                                      boolean includeInFulfilment, boolean hasFeed) {
     }
 
+    public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
+                                  boolean includeInFulfilment, byte[] feed) {
+    }
+
     public Result create(String storeId, String label) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
@@ -104,6 +108,33 @@ public class ManualSupplierService {
         storeFeedRepository.delete(storeId, identity);
         storesRepository.save(store);
         return Result.success();
+    }
+
+    public List<String> applySelections(String storeId, List<ManualSelection> selections) {
+        Store store = storesRepository.findById(storeId);
+        List<String> rejected = new ArrayList<>();
+        if (store == null) {
+            return rejected;
+        }
+        for (ManualSelection selection : selections) {
+            for (StoreSupplierConnection connection : connections(store)) {
+                if (connection.getMode() == ConnectionMode.MANUAL
+                        && connection.getSupplierName().equals(selection.identity())) {
+                    connection.setEnabled(selection.enabled());
+                    connection.setIncludeInPricing(selection.includeInPricing());
+                    connection.setIncludeInFulfilment(selection.includeInFulfilment());
+                    if (selection.feed() != null && selection.feed().length > 0) {
+                        if (hasAtLeastOneLoadableRow(selection.identity(), selection.feed())) {
+                            storeFeedRepository.store(storeId, selection.identity(), selection.feed(), "csv");
+                        } else {
+                            rejected.add(ManualSupplierNames.label(selection.identity()));
+                        }
+                    }
+                }
+            }
+        }
+        storesRepository.save(store);
+        return rejected;
     }
 
     public List<ManualSupplierView> list(Store store) {
