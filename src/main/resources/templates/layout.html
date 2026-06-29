@@ -20,6 +20,44 @@
             padding-right: 38px;
             padding-left: 5px;
         }
+        @media screen and (min-width: 768px) {
+            .navbar-brand {
+                display: none;
+            }
+            .navbar-menu {
+                display: flex !important;
+                flex-shrink: 1;
+                min-width: 0;
+            }
+            .navbar-menu .navbar-start {
+                overflow-x: auto;
+                overflow-y: hidden;
+                flex: 1 1 auto;
+                min-width: 0;
+                margin-right: 0;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .navbar-menu .navbar-start::-webkit-scrollbar {
+                display: none;
+            }
+            .navbar-menu .navbar-end {
+                display: flex;
+                align-items: center;
+                flex: 0 0 auto;
+            }
+        }
+        @media screen and (max-width: 767px) {
+            .navbar-menu {
+                display: none;
+            }
+            .navbar-menu.is-active {
+                display: block;
+            }
+            .navbar-menu.is-active .is-flex {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -134,6 +172,17 @@
 <script>
     let formToSubmit;
     let onConfirmCallback;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const burger = document.querySelector('.navbar-burger');
+        const menu = burger && document.getElementById(burger.dataset.target);
+        if (burger && menu) {
+            burger.addEventListener('click', function () {
+                burger.classList.toggle('is-active');
+                menu.classList.toggle('is-active');
+            });
+        }
+    });
 
     function hideNotification(button) {
         const notification = button.parentNode;
