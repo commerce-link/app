@@ -62,7 +62,9 @@ public class ManualSupplierService {
         if (collidesWithStatic(trimmed) || alreadyExists(store, identity)) {
             return Result.error("store.manual.error.name.taken");
         }
-        connections(store).add(new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true));
+        StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
+        connection.setEnabled(false);
+        connections(store).add(connection);
         storesRepository.save(store);
         return Result.success();
     }
