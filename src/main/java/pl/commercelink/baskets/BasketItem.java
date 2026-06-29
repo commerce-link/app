@@ -3,9 +3,9 @@ package pl.commercelink.baskets;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -13,7 +13,7 @@ import pl.commercelink.inventory.supplier.api.Taxonomy;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
-public class BasketItem {
+public class BasketItem implements Categorized {
 
     public static final String SHIPPING_MFN_CODE = "Shipping";
 
@@ -23,9 +23,7 @@ public class BasketItem {
     private  String name;
     @DynamoDBAttribute(attributeName = "mfn")
     private String mfn;
-    @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private  ProductCategory category;
+    private String category;
     @DynamoDBAttribute(attributeName = "qty")
     private  long qty;
     @DynamoDBAttribute(attributeName = "unitPrice")
@@ -48,7 +46,7 @@ public class BasketItem {
         this.id = id;
         this.name = name;
         this.mfn = mfn;
-        this.category = category;
+        this.category = category == null ? null : category.name();
         this.qty = qty;
         this.unitPrice = unitPrice;
         this.unitCost = unitCost;
@@ -62,16 +60,6 @@ public class BasketItem {
         return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
     }
 
-    @DynamoDBIgnore
-    public boolean isProduct() {
-        return category != ProductCategory.Services;
-    }
-
-    @DynamoDBIgnore
-    public boolean isService() {
-        return category == ProductCategory.Services;
-    }
-
     public String getId() {
         return id;
     }
@@ -80,8 +68,13 @@ public class BasketItem {
         return name;
     }
 
-    public ProductCategory getCategory() {
+    @DynamoDBAttribute(attributeName = "category")
+    public String getCategoryKey() {
         return category;
+    }
+
+    public void setCategoryKey(String category) {
+        this.category = category;
     }
 
     public double getUnitPrice() {
@@ -116,8 +109,10 @@ public class BasketItem {
         this.name = name;
     }
 
+    @Deprecated
+    @DynamoDBIgnore
     public void setCategory(ProductCategory category) {
-        this.category = category;
+        this.category = category == null ? null : category.name();
     }
 
     public void setQty(long qty) {
@@ -150,11 +145,6 @@ public class BasketItem {
 
     public void setConsolidated(boolean consolidated) {
         this.consolidated = consolidated;
-    }
-
-    @DynamoDBIgnore
-    public boolean hasCategory(ProductCategory category) {
-        return this.category == category;
     }
 
     @DynamoDBIgnore
