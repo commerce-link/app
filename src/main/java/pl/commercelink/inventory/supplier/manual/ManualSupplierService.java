@@ -67,34 +67,6 @@ public class ManualSupplierService {
         return Result.success();
     }
 
-    public Result uploadFeed(String storeId, String identity, byte[] csvBytes) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null || !ManualSupplierNames.isManual(identity) || !alreadyExists(store, identity)) {
-            return Result.error("store.manual.error.supplier.notfound");
-        }
-        if (!hasAtLeastOneLoadableRow(identity, csvBytes)) {
-            return Result.error("store.manual.error.csv.invalid");
-        }
-        storeFeedRepository.store(storeId, identity, csvBytes, "csv");
-        return Result.success();
-    }
-
-    public Result setFlags(String storeId, String identity, boolean includeInPricing, boolean includeInFulfilment) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            return Result.error("store.manual.error.store.notfound");
-        }
-        for (StoreSupplierConnection connection : connections(store)) {
-            if (connection.getMode() == ConnectionMode.MANUAL && connection.getSupplierName().equals(identity)) {
-                connection.setIncludeInPricing(includeInPricing);
-                connection.setIncludeInFulfilment(includeInFulfilment);
-                storesRepository.save(store);
-                return Result.success();
-            }
-        }
-        return Result.error("store.manual.error.supplier.notfound");
-    }
-
     public Result delete(String storeId, String identity) {
         Store store = storesRepository.findById(storeId);
         if (store == null || !ManualSupplierNames.isManual(identity)) {

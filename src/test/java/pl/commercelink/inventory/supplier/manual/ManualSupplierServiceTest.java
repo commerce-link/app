@@ -103,56 +103,6 @@ class ManualSupplierServiceTest {
     }
 
     @Test
-    void uploadValidCsvIsStored() {
-        // given
-        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
-                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;7;2\n";
-        when(storesRepository.findById("store-1")).thenReturn(
-                storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL)));
-
-        // when
-        ManualSupplierService.Result result =
-                service.uploadFeed("store-1", "manual:Hurtownia A", csv.getBytes(StandardCharsets.UTF_8));
-
-        // then
-        assertTrue(result.ok());
-        verify(storeFeedRepository).store(eq("store-1"), eq("manual:Hurtownia A"), any(), eq("csv"));
-    }
-
-    @Test
-    void uploadRejectsCsvWithNoParseableRows() {
-        // given
-        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
-                + ";;;;;;;;\n";
-        when(storesRepository.findById("store-1")).thenReturn(
-                storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL)));
-
-        // when
-        ManualSupplierService.Result result =
-                service.uploadFeed("store-1", "manual:Hurtownia A", csv.getBytes(StandardCharsets.UTF_8));
-
-        // then
-        assertFalse(result.ok());
-    }
-
-    @Test
-    void uploadRejectsCsvWhereNoRowIsLoadable() {
-        // given
-        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
-                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;0;2\n";
-        when(storesRepository.findById("store-1")).thenReturn(
-                storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL)));
-
-        // when
-        ManualSupplierService.Result result =
-                service.uploadFeed("store-1", "manual:Hurtownia A", csv.getBytes(StandardCharsets.UTF_8));
-
-        // then
-        assertFalse(result.ok());
-        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
-    }
-
-    @Test
     void deleteReturnsSuccessResultWhenRemoved() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
@@ -206,37 +156,6 @@ class ManualSupplierServiceTest {
 
         // then
         verify(storeFeedRepository, never()).delete(anyString(), anyString());
-        verify(storesRepository, never()).save(any());
-    }
-
-    @Test
-    void setFlagsUpdatesFlags() {
-        // given
-        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
-        when(storesRepository.findById("store-1")).thenReturn(store);
-
-        // when
-        ManualSupplierService.Result result = service.setFlags("store-1", "manual:Hurtownia A", false, true);
-
-        // then
-        assertTrue(result.ok());
-        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
-        assertFalse(connection.isIncludeInPricing());
-        assertTrue(connection.isIncludeInFulfilment());
-        verify(storesRepository).save(store);
-    }
-
-    @Test
-    void setFlagsRejectsUnknownIdentity() {
-        // given
-        Store store = storeWith();
-        when(storesRepository.findById("store-1")).thenReturn(store);
-
-        // when
-        ManualSupplierService.Result result = service.setFlags("store-1", "manual:Nope", false, false);
-
-        // then
-        assertFalse(result.ok());
         verify(storesRepository, never()).save(any());
     }
 
