@@ -1,5 +1,7 @@
 package pl.commercelink.orders;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.baskets.Basket;
@@ -11,8 +13,6 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
-
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -281,7 +281,7 @@ public class Order {
 
     @DynamoDBIgnore
     public void increaseRealizationDays(OrderItem orderItem, int estimatedDeliveryDays) {
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.hasCategoryKey(Categorized.SERVICES)) {
             this.orderRealizationDays = Math.max(orderRealizationDays, estimatedDeliveryDays);
         }
     }
@@ -300,14 +300,14 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> !i.hasCategory(ProductCategory.Services))
+                .filter(i -> !i.hasCategoryKey(Categorized.SERVICES))
                 .allMatch(OrderItem::isReturned);
     }
 
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
         orderItems.stream()
-                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .filter(i -> i.hasCategoryKey(Categorized.SERVICES))
                 .forEach(OrderItem::markAsReturned);
 
         this.totalPrice = orderItems.stream()

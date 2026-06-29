@@ -1,8 +1,8 @@
 package pl.commercelink.baskets;
 
-import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.Categorized;
 
+import pl.commercelink.inventory.MatchedInventory;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -63,7 +63,7 @@ public class OfferItem {
     public int getSequenceNumber() { return sequenceNumber; }
 
     public String getCostRangeDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.hasCategoryKey(Categorized.SERVICES)) {
             return "";
         }
 
@@ -71,7 +71,7 @@ public class OfferItem {
     }
 
     public String getQtyDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.hasCategoryKey(Categorized.SERVICES)) {
             return "";
         }
 
@@ -79,7 +79,7 @@ public class OfferItem {
     }
 
     public String getSuppliersDistribution() {
-        if (basketItem.getCategory() == ProductCategory.Services) {
+        if (basketItem.hasCategoryKey(Categorized.SERVICES)) {
             return "";
         }
 

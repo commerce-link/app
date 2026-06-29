@@ -1,5 +1,7 @@
 package pl.commercelink.warehouse;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentReason;
@@ -11,7 +13,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
@@ -79,7 +80,7 @@ class GoodsOutService {
 
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId())
                 .stream()
-                .filter(i -> !i.hasCategory(ProductCategory.Services))
+                .filter(i -> !i.hasCategoryKey(Categorized.SERVICES))
                 .toList();
 
         List<GoodsOutItem> items = orderItems.stream()

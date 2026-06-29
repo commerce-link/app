@@ -1,10 +1,10 @@
 package pl.commercelink.orders.fulfilment;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,8 +60,8 @@ public class FulfilmentGroupsGenerator {
                 .flatMap(List::stream)
                 .filter(FulfilmentItem::hasProvider)
                 .filter(c -> acceptedSuppliers.isEmpty() || acceptedSuppliers.contains(c.getSource().getProvider()))
-                .filter(c -> ProductCategory.Services == c.getSource().getCategory() || isNotBlank(c.getSource().getEan()))
-                .filter(c -> ProductCategory.Services == c.getSource().getCategory() || isNotBlank(c.getSource().getMfn()))
+                .filter(c -> c.getSource().hasCategoryKey(Categorized.SERVICES) || isNotBlank(c.getSource().getEan()))
+                .filter(c -> c.getSource().hasCategoryKey(Categorized.SERVICES) || isNotBlank(c.getSource().getMfn()))
                 .filter(c -> !enforceFulfilmentUnderCost || c.getSource().getPriceGross() > 0)
                 .filter(c -> !enforceFulfilmentUnderCost || c.getAllocation().getOrderItemPrice() >= c.getSource().getPriceGross())
                 .filter(c -> !enforceCompleteFulfilment || c.getSource().getQty() >= c.getAllocation().getOrderItemQty())
@@ -72,7 +72,7 @@ public class FulfilmentGroupsGenerator {
     }
 
     private List<FulfilmentItem> createFulfilments(OrderItem orderItem) {
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.hasCategoryKey(Categorized.SERVICES)) {
             return Collections.singletonList(FulfilmentItem.internal(orderItem));
         }
 

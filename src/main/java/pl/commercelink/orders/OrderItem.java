@@ -67,7 +67,7 @@ public class OrderItem extends Item {
     }
 
     public void markAsWarehouseFulfilled() {
-        if (hasCategory(ProductCategory.Services)) {
+        if (hasCategoryKey(SERVICES)) {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
@@ -228,13 +228,8 @@ public class OrderItem extends Item {
     }
 
     @DynamoDBIgnore
-    public int getSequenceNumber() {
-        return getCategory().ordinal();
-    }
-
-    @DynamoDBIgnore
     public boolean canBeFulfilledInternally() {
-        return getCategory() == ProductCategory.Services && isWarehouseFulfilled();
+        return hasCategoryKey(SERVICES) && isWarehouseFulfilled();
     }
 
     @DynamoDBIgnore

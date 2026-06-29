@@ -1,5 +1,7 @@
 package pl.commercelink.orders;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -71,7 +73,7 @@ public class OrdersManager {
                 availabilityAndPrice.getManufacturerCode(),
                 store.isPositionConsolidationEnabled()
         );
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.hasCategoryKey(Categorized.SERVICES)) {
             orderItem.markAsWarehouseFulfilled();
         }
 
@@ -90,7 +92,7 @@ public class OrdersManager {
                 .collect(Collectors.toList());
 
         for (OrderItem selectedOrderItem : selectedOrderItems) {
-            if (selectedOrderItem.isNew() || selectedOrderItem.getCategory() == ProductCategory.Services) {
+            if (selectedOrderItem.isNew() || selectedOrderItem.hasCategoryKey(Categorized.SERVICES)) {
                 orderItems.remove(selectedOrderItem);
                 orderItemsRepository.delete(selectedOrderItem);
 

@@ -1,5 +1,7 @@
 package pl.commercelink.orders.notifications;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import pl.commercelink.documents.DocumentType;
@@ -7,8 +9,6 @@ import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.localization.EnumLocalizer;
-import pl.commercelink.taxonomy.ProductCategory;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,11 +45,11 @@ class OrderConfirmationEmailNotification extends EmailNotification {
         this.personalCollection = personalCollection;
 
         this.products = orderItems.stream()
-                .filter(o -> !o.hasCategory(ProductCategory.Services))
+                .filter(o -> !o.hasCategoryKey(Categorized.SERVICES))
                 .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
                 .collect(Collectors.toList());
         this.services = orderItems.stream()
-                .filter(o -> o.hasCategory(ProductCategory.Services))
+                .filter(o -> o.hasCategoryKey(Categorized.SERVICES))
                 .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
                 .collect(Collectors.toList());
     }

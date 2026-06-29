@@ -164,10 +164,10 @@ public class OfferItemReloader {
     }
 
     private int getCategoryOrdinal(BasketItem basketItem) {
-        if (basketItem == null || basketItem.getCategory() == null) {
+        if (basketItem == null || basketItem.getCategoryKey() == null) {
             return Integer.MAX_VALUE;
         }
-        return basketItem.getCategory().ordinal();
+        return basketItem.getSequenceNumber();
     }
 
 }

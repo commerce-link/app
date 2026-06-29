@@ -1,9 +1,9 @@
 package pl.commercelink.invoicing;
 
+import pl.commercelink.taxonomy.Categorized;
+
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.ProductCategory;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,7 +19,7 @@ public class InvoicePositionName {
     public static String fromOrderItems(String prefix, List<OrderItem> orderItems) {
         return prefix + " " +
                 orderItems.stream()
-                        .filter(i -> i.getCategory() != ProductCategory.Services)
+                        .filter(i -> !i.hasCategoryKey(Categorized.SERVICES))
                         .map(i -> formatName(i.getName(), i.getQty()))
                         .collect(Collectors.joining(", "))
                         .trim();
