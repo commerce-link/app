@@ -147,15 +147,13 @@
                                  th:attr="data-identity=${ms.identity},data-hasfeed=${ms.hasFeed}">
                                 <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].identity}" />
                                 <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].label}" />
-                                <div class="is-flex is-justify-content-space-between is-align-items-center">
-                                    <div class="is-flex is-align-items-center">
-                                        <label class="checkbox">
-                                            <input type="checkbox" class="manual-enabled"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
-                                            <span th:text="${ms.label}">label</span>
-                                        </label>
-                                    </div>
-                                    <button type="button" class="button is-danger is-light is-small manual-delete"
+                                <div class="is-flex is-align-items-center">
+                                    <label class="checkbox">
+                                        <input type="checkbox" class="manual-enabled"
+                                               th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
+                                        <span th:text="${ms.label}">label</span>
+                                    </label>
+                                    <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
                                             th:data-identity="${ms.identity}" th:title="#{store.manual.delete.button}">
                                         <span class="icon"><i class="fas fa-trash"></i></span>
                                     </button>
@@ -398,15 +396,13 @@
                 <div class="field manual-item" data-identity="" data-hasfeed="false">
                     <input type="hidden" name="manualSupplierSelections[__INDEX__].identity" />
                     <input type="hidden" name="manualSupplierSelections[__INDEX__].label" />
-                    <div class="is-flex is-justify-content-space-between is-align-items-center">
-                        <div class="is-flex is-align-items-center">
-                            <label class="checkbox">
-                                <input type="checkbox" class="manual-enabled"
-                                       name="manualSupplierSelections[__INDEX__].enabled" value="true" />
-                                <span class="manual-label"></span>
-                            </label>
-                        </div>
-                        <button type="button" class="button is-danger is-light is-small manual-delete"
+                    <div class="is-flex is-align-items-center">
+                        <label class="checkbox">
+                            <input type="checkbox" class="manual-enabled"
+                                   name="manualSupplierSelections[__INDEX__].enabled" value="true" />
+                            <span class="manual-label"></span>
+                        </label>
+                        <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
                                 data-identity="" th:title="#{store.manual.delete.button}">
                             <span class="icon"><i class="fas fa-trash"></i></span>
                         </button>

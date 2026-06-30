@@ -64,6 +64,9 @@ public class ManualSupplierService {
         }
         StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
         connection.setEnabled(false);
+        if (!connection.hasConsistentManualNaming()) {
+            return Result.error("store.manual.error.name.invalid");
+        }
         connections(store).add(connection);
         storesRepository.save(store);
         return Result.success();
@@ -71,7 +74,7 @@ public class ManualSupplierService {
 
     public Result delete(String storeId, String identity) {
         Store store = storesRepository.findById(storeId);
-        if (store == null || !ManualSupplierNames.isManual(identity)) {
+        if (store == null) {
             return Result.error("store.manual.error.supplier.notfound");
         }
         boolean removed = connections(store).removeIf(connection ->
@@ -86,7 +89,7 @@ public class ManualSupplierService {
 
     public Result uploadFeed(String storeId, String identity, byte[] csvBytes) {
         Store store = storesRepository.findById(storeId);
-        if (store == null || !ManualSupplierNames.isManual(identity) || !alreadyExists(store, identity)) {
+        if (store == null || !alreadyExists(store, identity)) {
             return Result.error("store.manual.error.supplier.notfound");
         }
         if (!hasAtLeastOneLoadableRow(identity, csvBytes)) {

@@ -2,7 +2,9 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierNames;
 
 @DynamoDBDocument
 public class StoreSupplierConnection {
@@ -76,5 +78,10 @@ public class StoreSupplierConnection {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasConsistentManualNaming() {
+        return ManualSupplierNames.isManual(supplierName) == (mode == ConnectionMode.MANUAL);
     }
 }

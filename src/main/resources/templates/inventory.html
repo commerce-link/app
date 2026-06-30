@@ -144,7 +144,7 @@
                             <td>
                                 <span class="tag"
                                       th:classappend="${enabledSuppliers.contains(item.supplier)} ? 'is-primary' : 'is-danger'"
-                                      th:text="${item.supplier}"></span>
+                                      th:text="${item.supplierLabel}"></span>
                             </td>
                             <td th:text="${item.productEan}"></td>
                             <td th:text="${item.productCode}"></td>

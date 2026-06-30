@@ -76,6 +76,21 @@ class ManualSupplierServiceTest {
     }
 
     @Test
+    void createProducesConsistentManualNaming() {
+        // given
+        Store store = storeWith();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
+
+        // when
+        service.create("store-1", "Hurtownia A");
+
+        // then
+        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
+        assertTrue(connection.hasConsistentManualNaming());
+    }
+
+    @Test
     void createRejectsDuplicateLabel() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
