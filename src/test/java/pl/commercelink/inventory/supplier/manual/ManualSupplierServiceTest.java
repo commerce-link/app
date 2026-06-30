@@ -87,7 +87,8 @@ class ManualSupplierServiceTest {
 
         // then
         StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
-        assertTrue(connection.hasConsistentManualNaming());
+        assertEquals(ConnectionMode.MANUAL, connection.getMode());
+        assertEquals("manual:Hurtownia A", connection.getSupplierName());
     }
 
     @Test

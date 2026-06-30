@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierNames;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
@@ -77,8 +77,8 @@ public class ManualSupplierController {
         if (!result.ok()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
         }
-        String identity = ManualSupplierNames.identityFor(name.trim());
-        return ResponseEntity.ok(Map.of("ok", true, "identity", identity, "label", ManualSupplierNames.label(identity)));
+        String identity = ManualSupplierInfos.identityFor(name.trim());
+        return ResponseEntity.ok(Map.of("ok", true, "identity", identity, "label", ManualSupplierInfos.label(identity)));
     }
 
     private ResponseEntity<Map<String, Object>> doUploadFeed(String storeId, String identity, MultipartFile file, Locale locale) throws IOException {

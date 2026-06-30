@@ -15,7 +15,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierNames;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrdersRepository;
@@ -205,7 +205,7 @@ public class WebController {
             model.addAttribute("medianGrossPrice", matchedInventory.getMedianPrice().grossValue());
             model.addAttribute("totalAvailableQty", matchedInventory.getTotalAvailableQty());
             model.addAttribute("inventoryItems", matchedInventory.getInventoryItems().stream()
-                    .map(i -> new InventoryItemView(i.supplier(), ManualSupplierNames.label(i.supplier()), i.ean(), i.mfn(), Price.fromNet(i.netPrice()).grossValue(), i.qty()))
+                    .map(i -> new InventoryItemView(i.supplier(), ManualSupplierInfos.label(i.supplier()), i.ean(), i.mfn(), Price.fromNet(i.netPrice()).grossValue(), i.qty()))
                     .toList());
         } else {
             model.addAttribute("error", "Product not found");

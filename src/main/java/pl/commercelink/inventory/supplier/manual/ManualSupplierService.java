@@ -58,15 +58,12 @@ public class ManualSupplierService {
         if (!VALID_LABEL.matcher(trimmed).matches()) {
             return Result.error("store.manual.error.name.invalid");
         }
-        String identity = ManualSupplierNames.identityFor(trimmed);
+        String identity = ManualSupplierInfos.identityFor(trimmed);
         if (collidesWithStatic(trimmed) || alreadyExists(store, identity)) {
             return Result.error("store.manual.error.name.taken");
         }
         StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
         connection.setEnabled(false);
-        if (!connection.hasConsistentManualNaming()) {
-            return Result.error("store.manual.error.name.invalid");
-        }
         connections(store).add(connection);
         storesRepository.save(store);
         return Result.success();
@@ -128,7 +125,7 @@ public class ManualSupplierService {
                 String identity = connection.getSupplierName();
                 views.add(new ManualSupplierView(
                         identity,
-                        ManualSupplierNames.label(identity),
+                        ManualSupplierInfos.label(identity),
                         connection.isEnabled(),
                         connection.isIncludeInPricing(),
                         connection.isIncludeInFulfilment(),

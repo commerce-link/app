@@ -459,6 +459,17 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public List<StoreSupplierConnection> getOwnAndManualConnections() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::getSupplierConnections)
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(connection -> connection.getMode() == ConnectionMode.OWN
+                        || connection.getMode() == ConnectionMode.MANUAL)
+                .collect(Collectors.toList());
+    }
+
+    @DynamoDBIgnore
     public List<String> supplierNames(ConnectionMode mode, SupplierScope scope) {
         return supplierNamesMatching(connection -> connection.getMode() == mode && scope.includes(connection));
     }

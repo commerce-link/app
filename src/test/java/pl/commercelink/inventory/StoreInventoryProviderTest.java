@@ -13,7 +13,9 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
@@ -82,7 +84,8 @@ class StoreInventoryProviderTest {
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
-        when(storeEntity.getOwnAndManualSupplierNames()).thenReturn(List.of("Wortmann"));
+        when(storeEntity.getOwnAndManualConnections())
+                .thenReturn(List.of(new StoreSupplierConnection("Wortmann", ConnectionMode.OWN)));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
@@ -234,7 +237,8 @@ class StoreInventoryProviderTest {
         // given
         Store store = mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("Asbis"));
-        when(store.getOwnAndManualSupplierNames()).thenReturn(List.of("Action"));
+        when(store.getOwnAndManualConnections())
+                .thenReturn(List.of(new StoreSupplierConnection("Action", ConnectionMode.OWN)));
         when(store.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(cache.get("store-1")).thenReturn(Optional.empty());
