@@ -5,6 +5,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 public interface Categorized {
 
     String SERVICES = "Services";
+    String OTHER = "Other";
 
     String getCategoryKey();
 
