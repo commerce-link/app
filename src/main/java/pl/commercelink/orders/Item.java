@@ -27,7 +27,7 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 public abstract class Item implements Delivered, Categorized {
 
     // general information
-    private String category = "Other";
+    private String category = Categorized.OTHER;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "qty")
@@ -60,11 +60,16 @@ public abstract class Item implements Delivered, Categorized {
         // Required for DynamoDB
     }
 
-    public Item(ProductCategory category, String name, int qty, String comment) {
-        this.category = category == null ? null : category.name();
+    public Item(String categoryKey, String name, int qty, String comment) {
+        this.category = categoryKey;
         this.name = name;
         this.qty = qty;
         this.comment = comment;
+    }
+
+    @Deprecated
+    public Item(ProductCategory category, String name, int qty, String comment) {
+        this(category == null ? null : category.name(), name, qty, comment);
     }
 
     public void addFulfilment(FulfilmentSource source) {

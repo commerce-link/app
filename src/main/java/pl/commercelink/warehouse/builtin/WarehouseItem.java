@@ -7,6 +7,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.LocalDate;
@@ -32,11 +33,11 @@ public class WarehouseItem extends Item {
     }
 
     public static WarehouseItem empty(String storeId) {
-        return new WarehouseItem(storeId, "Other", ProductCategory.Other, null, null, null, 0, 1);
+        return new WarehouseItem(storeId, "Other", Categorized.OTHER, null, null, null, 0, 1);
     }
 
-    public WarehouseItem(String storeId, String deliveryId, ProductCategory category, String name, String ean, String mfn, double unitCost, int qty) {
-        super(category, name, qty, null);
+    public WarehouseItem(String storeId, String deliveryId, String categoryKey, String name, String ean, String mfn, double unitCost, int qty) {
+        super(categoryKey, name, qty, null);
 
         this.storeId = storeId;
         this.itemId = UUID.randomUUID().toString();
@@ -50,6 +51,11 @@ public class WarehouseItem extends Item {
                 null,
                 FulfilmentStatus.New
         );
+    }
+
+    @Deprecated
+    public WarehouseItem(String storeId, String deliveryId, ProductCategory category, String name, String ean, String mfn, double unitCost, int qty) {
+        this(storeId, deliveryId, category == null ? null : category.name(), name, ean, mfn, unitCost, qty);
     }
 
     @DynamoDBIgnore

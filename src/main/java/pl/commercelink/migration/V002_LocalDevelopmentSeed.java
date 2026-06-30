@@ -28,7 +28,6 @@ import pl.commercelink.stores.ReportingConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.WarehouseConfiguration;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -153,7 +152,7 @@ public class V002_LocalDevelopmentSeed {
         item.setSku("MFN-CLEAR-01");
         item.setPrice(1299.00);
         item.setConsolidated(false);
-        item.setCategory(ProductCategory.CPU);
+        item.setCategoryKey("CPU");
         item.setName("AMD ClearEdge Pro X3D");
         item.setQty(1);
         item.setEan("5900000000001");
@@ -171,7 +170,7 @@ public class V002_LocalDevelopmentSeed {
         item.setSku("MFN-TWIN-01");
         item.setPrice(459.00);
         item.setConsolidated(false);
-        item.setCategory(ProductCategory.Memory);
+        item.setCategoryKey("Memory");
         item.setName("G.Skill TwinMatch 32GB DDR5 Kit");
         item.setQty(1);
         item.setEan("5900000000003");

@@ -41,18 +41,26 @@ public class BasketItem implements Categorized {
     }
 
     public BasketItem(String id, String name, String mfn,
-                      ProductCategory category, double unitPrice, double unitCost, long qty,
+                      String categoryKey, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
         this.mfn = mfn;
-        this.category = category == null ? null : category.name();
+        this.category = categoryKey;
         this.qty = qty;
         this.unitPrice = unitPrice;
         this.unitCost = unitCost;
         this.catalogId = catalogId;
         this.estimatedDeliveryDays = estimatedDeliveryDays;
         this.consolidated = consolidated;
+    }
+
+    @Deprecated
+    public BasketItem(String id, String name, String mfn,
+                      ProductCategory category, double unitPrice, double unitCost, long qty,
+                      String catalogId, int estimatedDeliveryDays, boolean consolidated) {
+        this(id, name, mfn, category == null ? null : category.name(), unitPrice, unitCost, qty,
+                catalogId, estimatedDeliveryDays, consolidated);
     }
 
     @DynamoDBIgnore
@@ -156,7 +164,7 @@ public class BasketItem implements Categorized {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
-                ProductCategory.Services,
+                Categorized.SERVICES,
                 shippingPrice,
                 0,
                 1,
@@ -209,7 +217,7 @@ public class BasketItem implements Categorized {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 "Brak produktu",
                 mfn,
-                ProductCategory.Other,
+                Categorized.OTHER,
                 0,
                 0,
                 qty,
