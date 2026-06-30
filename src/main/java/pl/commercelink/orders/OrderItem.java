@@ -38,8 +38,8 @@ public class OrderItem extends Item {
     public OrderItem() {
     }
 
-    public OrderItem(String orderId, String categoryKey, String name, int qty, double price, String sku, boolean consolidated) {
-        super(categoryKey, name, qty, null);
+    public OrderItem(String orderId, String category, String name, int qty, double price, String sku, boolean consolidated) {
+        super(category, name, qty, null);
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = sku;

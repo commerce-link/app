@@ -41,12 +41,12 @@ public class BasketItem implements Categorized {
     }
 
     public BasketItem(String id, String name, String mfn,
-                      String categoryKey, double unitPrice, double unitCost, long qty,
+                      String category, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
         this.mfn = mfn;
-        this.category = categoryKey;
+        this.category = category;
         this.qty = qty;
         this.unitPrice = unitPrice;
         this.unitCost = unitCost;

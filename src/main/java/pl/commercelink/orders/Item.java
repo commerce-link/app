@@ -60,8 +60,8 @@ public abstract class Item implements Delivered, Categorized {
         // Required for DynamoDB
     }
 
-    public Item(String categoryKey, String name, int qty, String comment) {
-        this.category = categoryKey;
+    public Item(String category, String name, int qty, String comment) {
+        this.category = category;
         this.name = name;
         this.qty = qty;
         this.comment = comment;

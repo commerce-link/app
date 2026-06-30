@@ -36,8 +36,8 @@ public class WarehouseItem extends Item {
         return new WarehouseItem(storeId, "Other", Categorized.OTHER, null, null, null, 0, 1);
     }
 
-    public WarehouseItem(String storeId, String deliveryId, String categoryKey, String name, String ean, String mfn, double unitCost, int qty) {
-        super(categoryKey, name, qty, null);
+    public WarehouseItem(String storeId, String deliveryId, String category, String name, String ean, String mfn, double unitCost, int qty) {
+        super(category, name, qty, null);
 
         this.storeId = storeId;
         this.itemId = UUID.randomUUID().toString();
