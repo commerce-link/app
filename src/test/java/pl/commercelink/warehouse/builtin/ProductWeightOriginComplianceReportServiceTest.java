@@ -296,7 +296,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 List.<PimIdentifier>of(),
                 brand,
                 "Name",
-                category,
+                category.name(),
                 null,
                 true,
                 netG,
