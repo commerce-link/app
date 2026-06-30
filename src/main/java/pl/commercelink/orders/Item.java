@@ -6,8 +6,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.inventory.deliveries.Delivered;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
-import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -24,12 +24,10 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.*;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @DynamoDBDocument
-public abstract class Item implements Delivered {
+public abstract class Item implements Delivered, Categorized {
 
     // general information
-    @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private ProductCategory category = ProductCategory.Other;
+    private String category = Categorized.OTHER;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "qty")
@@ -62,11 +60,16 @@ public abstract class Item implements Delivered {
         // Required for DynamoDB
     }
 
-    public Item(ProductCategory category, String name, int qty, String comment) {
+    public Item(String category, String name, int qty, String comment) {
         this.category = category;
         this.name = name;
         this.qty = qty;
         this.comment = comment;
+    }
+
+    @Deprecated
+    public Item(ProductCategory category, String name, int qty, String comment) {
+        this(category == null ? null : category.name(), name, qty, comment);
     }
 
     public void addFulfilment(FulfilmentSource source) {
@@ -178,7 +181,7 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public boolean isAllocated() {
-        if (hasGroup(ProductGroup.Services) && this.status == FulfilmentStatus.Delivered) {
+        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
         return hasAllocationDetails() && hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered);
@@ -186,7 +189,7 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public boolean isOrdered() {
-        if (hasGroup(ProductGroup.Services) && this.status == FulfilmentStatus.Delivered) {
+        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
 
@@ -210,16 +213,6 @@ public abstract class Item implements Delivered {
         return this.deliveryId.equalsIgnoreCase(removalItem.getDeliveryId())
                 && areEansEq(this.ean, removalItem.getEan())
                 && areMfnsEq(this.manufacturerCode, removalItem.getMfn());
-    }
-
-    @DynamoDBIgnore
-    public boolean hasGroup(ProductGroup group) {
-        return category.getProductGroup() == group;
-    }
-
-    @DynamoDBIgnore
-    public boolean hasCategory(ProductCategory category) {
-        return this.category == category;
     }
 
     @DynamoDBIgnore
@@ -259,11 +252,18 @@ public abstract class Item implements Delivered {
         return cost * qty;
     }
 
-    public ProductCategory getCategory() {
+    @Deprecated
+    @DynamoDBIgnore
+    public void setCategory(ProductCategory category) {
+        this.category = category == null ? null : category.name();
+    }
+
+    @DynamoDBAttribute(attributeName = "category")
+    public String getCategoryKey() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategoryKey(String category) {
         this.category = category;
     }
 

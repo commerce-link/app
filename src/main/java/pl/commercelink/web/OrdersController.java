@@ -305,7 +305,7 @@ public class OrdersController extends BaseController {
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
-                .filter(i -> i.getCategory() != ProductCategory.Services)
+                .filter(i -> i.isProduct())
                 .collect(Collectors.toList());
 
         model.addAttribute("order", order);
@@ -624,7 +624,7 @@ public class OrdersController extends BaseController {
                 ));
 
         for (OrderItem item : orderItemsRepository.findByOrderId(orderId)) {
-            if (item.getCategory() != ProductCategory.Services) {
+            if (item.isProduct()) {
                 item.setSerialNo(serialByItemId.get(item.getItemId()));
                 orderItemsRepository.save(item);
             }

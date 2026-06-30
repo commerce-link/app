@@ -69,7 +69,7 @@ public class FulfilmentGroup {
     }
 
     public int getFirstSortNumber() {
-        return source.getCategory().ordinal();
+        return source.getSequenceNumber();
     }
 
     public int getSecondSortNumber() {

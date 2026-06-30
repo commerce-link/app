@@ -89,7 +89,7 @@ public class FulfilmentItem {
     }
 
     public int getFirstSortNumber() {
-        return source.getCategory().ordinal();
+        return source.getSequenceNumber();
     }
 
     public int getSecondSortNumber() {

@@ -11,8 +11,6 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
-
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -281,7 +279,7 @@ public class Order {
 
     @DynamoDBIgnore
     public void increaseRealizationDays(OrderItem orderItem, int estimatedDeliveryDays) {
-        if (orderItem.hasCategory(ProductCategory.Services)) {
+        if (orderItem.isService()) {
             this.orderRealizationDays = Math.max(orderRealizationDays, estimatedDeliveryDays);
         }
     }
@@ -300,14 +298,14 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> !i.hasCategory(ProductCategory.Services))
+                .filter(i -> i.isProduct())
                 .allMatch(OrderItem::isReturned);
     }
 
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
         orderItems.stream()
-                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .filter(i -> i.isService())
                 .forEach(OrderItem::markAsReturned);
 
         this.totalPrice = orderItems.stream()

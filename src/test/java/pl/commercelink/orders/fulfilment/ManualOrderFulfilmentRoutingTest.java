@@ -60,7 +60,7 @@ class ManualOrderFulfilmentRoutingTest {
                 warehouseFulfilmentService, supplierRegistry);
 
         // when
-        service.init(STORE_ID, List.of(ORDER_ID), pathSelector, false);
+        service.init(STORE_ID, List.of(ORDER_ID), pathSelector, false, false);
 
         // then
         verify(inventory).withEnabledSuppliersAndWarehouseData(eq(STORE_ID), eq(SupplierScope.FULFILMENT));

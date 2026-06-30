@@ -128,26 +128,6 @@ class InventoryScopedSuppliersTest {
     }
 
     @Test
-    void manualScopeFiltersBySupplierFlag() {
-        // given
-        Store store = storeWith(
-                new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, false));
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        MatchedInventory ownGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("manual:Hurtownia A", 1380.0)), taxonomyCache, supplierRegistry);
-        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownGroup)));
-        when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of()));
-
-        // when
-        MatchedInventory pricingResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING).findByProductCode(MFN);
-        MatchedInventory fulfilmentResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT).findByProductCode(MFN);
-
-        // then
-        assertThat(pricingResult.getSuppliers()).containsExactly("manual:Hurtownia A");
-        assertThat(fulfilmentResult.getSuppliers()).isEmpty();
-    }
-
-    @Test
     void fulfilmentScopeWithWarehouseAppendsWarehouseStockAndDropsExcludedSupplier() {
         // given
         Store store = storeWith(

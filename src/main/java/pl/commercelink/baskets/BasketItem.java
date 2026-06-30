@@ -3,9 +3,9 @@ package pl.commercelink.baskets;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -13,7 +13,7 @@ import pl.commercelink.inventory.supplier.api.Taxonomy;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
-public class BasketItem {
+public class BasketItem implements Categorized {
 
     public static final String SHIPPING_MFN_CODE = "Shipping";
 
@@ -23,9 +23,7 @@ public class BasketItem {
     private  String name;
     @DynamoDBAttribute(attributeName = "mfn")
     private String mfn;
-    @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private  ProductCategory category;
+    private String category;
     @DynamoDBAttribute(attributeName = "qty")
     private  long qty;
     @DynamoDBAttribute(attributeName = "unitPrice")
@@ -43,7 +41,7 @@ public class BasketItem {
     }
 
     public BasketItem(String id, String name, String mfn,
-                      ProductCategory category, double unitPrice, double unitCost, long qty,
+                      String category, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
@@ -57,19 +55,17 @@ public class BasketItem {
         this.consolidated = consolidated;
     }
 
+    @Deprecated
+    public BasketItem(String id, String name, String mfn,
+                      ProductCategory category, double unitPrice, double unitCost, long qty,
+                      String catalogId, int estimatedDeliveryDays, boolean consolidated) {
+        this(id, name, mfn, category == null ? null : category.name(), unitPrice, unitCost, qty,
+                catalogId, estimatedDeliveryDays, consolidated);
+    }
+
     @DynamoDBIgnore
     public boolean isComplete() {
         return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
-    }
-
-    @DynamoDBIgnore
-    public boolean isProduct() {
-        return category != ProductCategory.Services;
-    }
-
-    @DynamoDBIgnore
-    public boolean isService() {
-        return category == ProductCategory.Services;
     }
 
     public String getId() {
@@ -80,8 +76,13 @@ public class BasketItem {
         return name;
     }
 
-    public ProductCategory getCategory() {
+    @DynamoDBAttribute(attributeName = "category")
+    public String getCategoryKey() {
         return category;
+    }
+
+    public void setCategoryKey(String category) {
+        this.category = category;
     }
 
     public double getUnitPrice() {
@@ -116,8 +117,10 @@ public class BasketItem {
         this.name = name;
     }
 
+    @Deprecated
+    @DynamoDBIgnore
     public void setCategory(ProductCategory category) {
-        this.category = category;
+        this.category = category == null ? null : category.name();
     }
 
     public void setQty(long qty) {
@@ -153,11 +156,6 @@ public class BasketItem {
     }
 
     @DynamoDBIgnore
-    public boolean hasCategory(ProductCategory category) {
-        return this.category == category;
-    }
-
-    @DynamoDBIgnore
     public boolean isShippingItem() {
         return SHIPPING_MFN_CODE.equals(mfn);
     }
@@ -166,7 +164,7 @@ public class BasketItem {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
-                ProductCategory.Services,
+                Categorized.SERVICES,
                 shippingPrice,
                 0,
                 1,
@@ -219,7 +217,7 @@ public class BasketItem {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 "Brak produktu",
                 mfn,
-                ProductCategory.Other,
+                Categorized.OTHER,
                 0,
                 0,
                 qty,

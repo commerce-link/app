@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
@@ -37,13 +38,18 @@ public class OrderItem extends Item {
     public OrderItem() {
     }
 
-    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
+    public OrderItem(String orderId, String category, String name, int qty, double price, String sku, boolean consolidated) {
         super(category, name, qty, null);
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = sku;
         this.price = price;
         this.consolidated = consolidated;
+    }
+
+    @Deprecated
+    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
+        this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated);
     }
 
     public OrderItem(String orderId, OrderItem source, int qty) {
@@ -67,7 +73,7 @@ public class OrderItem extends Item {
     }
 
     public void markAsWarehouseFulfilled() {
-        if (hasCategory(ProductCategory.Services)) {
+        if (isService()) {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
@@ -228,13 +234,8 @@ public class OrderItem extends Item {
     }
 
     @DynamoDBIgnore
-    public int getSequenceNumber() {
-        return getCategory().ordinal();
-    }
-
-    @DynamoDBIgnore
     public boolean canBeFulfilledInternally() {
-        return getCategory() == ProductCategory.Services && isWarehouseFulfilled();
+        return isService() && isWarehouseFulfilled();
     }
 
     @DynamoDBIgnore
@@ -246,7 +247,7 @@ public class OrderItem extends Item {
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
         return new OrderItem(
                 orderId,
-                basketItem.getCategory(),
+                basketItem.getCategoryKey(),
                 basketItem.getName(),
                 (int) basketItem.getQty(),
                 basketItem.getUnitPrice(),
@@ -258,7 +259,7 @@ public class OrderItem extends Item {
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
         return new OrderItem(
                 orderId,
-                ProductCategory.Services,
+                Categorized.SERVICES,
                 opt.getName(),
                 1,
                 opt.getPrice(),

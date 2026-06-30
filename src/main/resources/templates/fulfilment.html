@@ -88,6 +88,9 @@
         .footer-inner { display: flex; align-items: center; gap: 1.5rem; }
         .footer-total { font-size: 1.35rem; font-weight: 700; }
         .footer-total small { font-size: .72rem; font-weight: 500; color: #9aa1ab; display: block; }
+        .footer-profit { font-size: 1.2rem; font-weight: 700; color: #1b8f5a; white-space: nowrap; }
+        .footer-profit small { font-size: .72rem; font-weight: 500; color: #9aa1ab; display: block; }
+        .footer-profit.neg { color: #c0392b; }
         .prov-breakdown { display: flex; flex-wrap: wrap; gap: .4rem; flex: 1; }
         .prov-pill { font-size: .78rem; padding: .15rem .55rem; border-radius: 6px; background: #f1f3f5;
             color: #4a4a4a; border-left: 3px solid var(--accent, #b5b5b5); }
@@ -200,6 +203,14 @@
         <div class="footer-bar">
             <div class="container footer-inner">
                 <div class="footer-total"><small th:text="#{fulfilment.total.net}"></small><span id="grandTotal">0,00</span> PLN</div>
+                <div class="footer-profit" id="footerProfit">
+                    <small th:text="#{fulfilment.total.profit}"></small>
+                    <span id="grandProfit">+0,00</span> PLN
+                </div>
+                <div class="footer-profit" id="footerMargin">
+                    <small th:text="#{fulfilment.total.margin}"></small>
+                    <span id="grandMargin">+0%</span>
+                </div>
                 <div class="prov-breakdown" id="provBreakdown"></div>
                 <div id="partialWarn" class="has-text-danger has-text-weight-semibold is-size-7" style="display:none; white-space:nowrap;">
                     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span><span id="partialWarnText"></span>
@@ -308,7 +319,7 @@
             const offers = offerCount();
 
             cards().forEach(c => {
-                let effQty = 0, visibleRows = 0, visibleQty = 0, profitNet = 0, allQty = 0, allProfit = 0;
+                let effQty = 0, effProfit = 0, visibleRows = 0, visibleQty = 0, profitNet = 0, allQty = 0, allProfit = 0;
                 const coveredAway = []; const headChips = [];
                 const v = vat(c);
                 c.querySelectorAll('tr[data-item]').forEach(r => {
@@ -326,7 +337,7 @@
                         visibleRows++;
                         visibleQty += qty;
                         profitNet += (price / v - net(c)) * qty;
-                        if (w === c) effQty += qty;
+                        if (w === c) { effQty += qty; effProfit += (price / v - net(c)) * qty; }
                     }
                 });
 
@@ -363,6 +374,7 @@
 
                 c.dataset.effqty = effQty;
                 c.dataset.effvalue = effQty * net(c);
+                c.dataset.effprofit = effProfit;
                 c.querySelector('.qty-val').textContent = effQty + ' ' + MSG.unit;
                 c.querySelector('.net-val').textContent = fmt(net(c));
 
@@ -459,15 +471,17 @@
         }
 
         function recalcFooter() {
-            let total = 0; const byProv = {};
+            let total = 0, totalProfit = 0; const byProv = {};
             cards().forEach(c => {
                 const v = parseFloat(c.dataset.effvalue || 0);
                 if (isAccepted(c) && v > 0) {
                     total += v;
+                    totalProfit += parseFloat(c.dataset.effprofit || 0);
                     byProv[c.dataset.provider] = (byProv[c.dataset.provider] || 0) + v;
                 }
             });
             document.getElementById('grandTotal').textContent = fmt(total);
+            renderFooterProfit(total, totalProfit);
             const bd = document.getElementById('provBreakdown'); bd.innerHTML = '';
             Object.keys(byProv).sort().forEach(p => {
                 const el = document.createElement('span');
@@ -475,6 +489,19 @@
                 el.innerHTML = '<strong>' + p + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
             });
             if (!Object.keys(byProv).length) bd.innerHTML = '<span class="has-text-grey is-size-7">' + MSG.nothingSelected + '</span>';
+        }
+
+        function renderFooterProfit(total, totalProfit) {
+            const box = document.getElementById('footerProfit');
+            if (!box) return;
+            const marginPct = total > 0 ? totalProfit / total : 0;
+            const neg = totalProfit < 0;
+            box.classList.toggle('neg', neg);
+            document.getElementById('footerMargin').classList.toggle('neg', neg);
+            const sign = totalProfit >= 0 ? '+' : '−';
+            document.getElementById('grandProfit').textContent = sign + fmt(Math.abs(totalProfit));
+            document.getElementById('grandMargin').textContent =
+                (marginPct >= 0 ? '+' : '−') + Math.abs(marginPct * 100).toFixed(0) + '%';
         }
 
         function renderCoverage(winner) {

@@ -8,7 +8,6 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
@@ -109,12 +108,12 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(i -> !i.hasCategory(ProductCategory.Services)).collect(Collectors.toList());
+        return basketItems.stream().filter(i -> i.isProduct()).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForServices() {
-        return basketItems.stream().filter(i -> i.hasCategory(ProductCategory.Services)).collect(Collectors.toList());
+        return basketItems.stream().filter(i -> i.isService()).collect(Collectors.toList());
     }
 
     public void setBasketItems(List<BasketItem> basketItems) {
@@ -247,7 +246,7 @@ public class Basket {
     @DynamoDBIgnore
     public Optional<BasketItem> getShippingItem() {
         return basketItems.stream()
-                .filter(i -> i.hasCategory(ProductCategory.Services))
+                .filter(i -> i.isService())
                 .filter(BasketItem::isShippingItem)
                 .findFirst();
     }
