@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.provider.ProviderConfigurationManager;
@@ -50,6 +51,8 @@ class StoreSupplierConnectionPersisterTest {
     private StoreFeedRepository storeFeedRepository;
     @Mock
     private StoresRepository storesRepository;
+    @Mock
+    private StoreInventoryCache storeInventoryCache;
 
     @InjectMocks
     private StoreSupplierConnectionPersister persister;
@@ -240,6 +243,39 @@ class StoreSupplierConnectionPersisterTest {
         verify(storeFeedRepository).delete("store-1", "Old");
         verify(feedScheduler).triggerImmediateImport("store-1", "New");
         verify(feedScheduler, never()).triggerImmediateImport("store-1", "Old");
+    }
+
+    @Test
+    void evictsStoreInventoryCacheOnSuccessfulPersist() {
+        // given
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
+        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+
+        // when
+        persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+
+        // then
+        verify(storeInventoryCache).evict("store-1");
+    }
+
+    @Test
+    void doesNotEvictStoreInventoryCacheWhenPersistFails() {
+        // given
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
+        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(configurationManager.snapshot(existing, "Acme"))
+                .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
+        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).createSchedule("store-1", "Acme");
+
+        // when
+        persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+
+        // then
+        verify(storeInventoryCache, never()).evict(anyString());
     }
 
     @Test

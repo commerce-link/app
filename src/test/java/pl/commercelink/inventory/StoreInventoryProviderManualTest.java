@@ -68,4 +68,30 @@ class StoreInventoryProviderManualTest {
         assertEquals("manual:H1", descriptorCaptor.getValue().name());
         verifyNoInteractions(supplierProviderFactory);
     }
+
+    @Test
+    void skipsDisabledManualSupplierFeed() {
+        // given
+        StoreSupplierConnection enabled = new StoreSupplierConnection("manual:Enabled", ConnectionMode.MANUAL);
+        StoreSupplierConnection disabled = new StoreSupplierConnection("manual:Disabled", ConnectionMode.MANUAL);
+        disabled.setEnabled(false);
+        Store store = new Store();
+        store.setStoreId("store-1");
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(List.of(enabled, disabled));
+        store.setFulfilmentConfiguration(config);
+
+        when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(any())).thenReturn(List.of());
+        when(storeFeedItemLoader.load(eq("store-1"), any(SupplierProviderDescriptor.class), any()))
+                .thenReturn(List.of());
+
+        // when
+        provider.ownIndex(store);
+
+        // then
+        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), descriptorCaptor.capture(), any());
+        assertEquals("manual:Enabled", descriptorCaptor.getValue().name());
+    }
 }

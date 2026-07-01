@@ -72,6 +72,9 @@ public class StoreInventoryProvider {
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         for (StoreSupplierConnection connection : storeEntity.getOwnAndManualConnections()) {
+            if (!connection.isEnabled()) {
+                continue;
+            }
             SupplierProviderDescriptor descriptor = descriptorFor(connection);
             if (descriptor != null) {
                 ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));

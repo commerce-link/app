@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier.manual;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
@@ -30,6 +31,7 @@ public class ManualSupplierService {
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
     private final SupplierRegistry supplierRegistry;
+    private final StoreInventoryCache storeInventoryCache;
 
     public record Result(boolean ok, String messageCode) {
         public static Result success() {
@@ -66,6 +68,7 @@ public class ManualSupplierService {
         connection.setEnabled(false);
         connections(store).add(connection);
         storesRepository.save(store);
+        storeInventoryCache.evict(storeId);
         return Result.success();
     }
 
@@ -81,6 +84,7 @@ public class ManualSupplierService {
         }
         storeFeedRepository.delete(storeId, identity);
         storesRepository.save(store);
+        storeInventoryCache.evict(storeId);
         return Result.success();
     }
 
@@ -93,6 +97,7 @@ public class ManualSupplierService {
             return Result.error("store.manual.error.csv.invalid");
         }
         storeFeedRepository.store(storeId, identity, csvBytes, "csv");
+        storeInventoryCache.evict(storeId);
         return Result.success();
     }
 
@@ -113,6 +118,7 @@ public class ManualSupplierService {
             }
         }
         storesRepository.save(store);
+        storeInventoryCache.evict(storeId);
     }
 
     public List<ManualSupplierView> list(Store store) {

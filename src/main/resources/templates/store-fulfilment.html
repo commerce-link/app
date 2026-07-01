@@ -162,6 +162,10 @@
                                     <div class="field is-flex is-align-items-center">
                                         <button type="button" class="button is-link is-light is-small manual-upload-open"
                                                 th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                                        <span class="icon has-text-grey ml-2 cl-tooltip"
+                                              th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                            <i class="fas fa-info-circle"></i>
+                                        </span>
                                         <span class="tag manual-file-tag ml-3"
                                               th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
                                               th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
@@ -411,6 +415,10 @@
                         <div class="field is-flex is-align-items-center">
                             <button type="button" class="button is-link is-light is-small manual-upload-open"
                                     th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
+                            <span class="icon has-text-grey ml-2 cl-tooltip"
+                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
                             <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
                         </div>
                         <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
@@ -461,7 +469,13 @@
                 <div class="modal-background"></div>
                 <div class="modal-content">
                     <div class="box">
-                        <h2 class="subtitle" th:text="#{store.manual.upload.modal.title}">Wgraj plik CSV</h2>
+                        <h2 class="subtitle">
+                            <span th:text="#{store.manual.upload.modal.title}">Wgraj plik CSV</span>
+                            <span class="icon has-text-grey ml-1 cl-tooltip"
+                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </h2>
                         <div class="file has-name">
                             <label class="file-label">
                                 <input class="file-input" type="file" accept=".csv" id="manual-upload-input" />

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.stores.ConnectionMode;
@@ -33,6 +34,7 @@ class ManualSupplierServiceTest {
     @Mock StoresRepository storesRepository;
     @Mock StoreFeedRepository storeFeedRepository;
     @Mock SupplierRegistry supplierRegistry;
+    @Mock StoreInventoryCache storeInventoryCache;
     @InjectMocks ManualSupplierService service;
 
     private Store storeWith(StoreSupplierConnection... connections) {
@@ -293,6 +295,63 @@ class ManualSupplierServiceTest {
         // then
         assertFalse(result.ok());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void createEvictsStoreInventoryCache() {
+        // given
+        Store store = storeWith();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
+
+        // when
+        service.create("store-1", "Hurtownia A");
+
+        // then
+        verify(storeInventoryCache).evict("store-1");
+    }
+
+    @Test
+    void uploadFeedEvictsStoreInventoryCache() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;7;2\n";
+
+        // when
+        service.uploadFeed("store-1", "manual:Hurtownia A", csv.getBytes(StandardCharsets.UTF_8));
+
+        // then
+        verify(storeInventoryCache).evict("store-1");
+    }
+
+    @Test
+    void deleteEvictsStoreInventoryCache() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        service.delete("store-1", "manual:Hurtownia A");
+
+        // then
+        verify(storeInventoryCache).evict("store-1");
+    }
+
+    @Test
+    void applySelectionsEvictsStoreInventoryCache() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        lenient().when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
+
+        // when
+        service.applySelections("store-1",
+                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true)));
+
+        // then
+        verify(storeInventoryCache).evict("store-1");
     }
 
     @Test
