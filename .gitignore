@@ -50,3 +50,6 @@ update.env
 ### Local infrastructure data
 /.dynamodb-data/
 /.ministack-data/
+
+### Local-only pricelist migration script (never push)
+scripts/migrate-pricelists-to-store-space.sh
