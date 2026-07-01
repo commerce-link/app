@@ -3,7 +3,6 @@ package pl.commercelink.offer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.starter.dynamodb.Metadata;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.products.ProductCustomAttribute;
 import pl.commercelink.products.ProductCustomAttributeFilter;
 
@@ -27,7 +26,7 @@ public class ProductDetailsView {
     @JsonProperty("group")
     private ProductGroup group;
     @JsonProperty("category")
-    private ProductCategory category;
+    private String category;
 
     // store specific, product related information
     @JsonProperty("recommendation")
@@ -45,7 +44,7 @@ public class ProductDetailsView {
     public ProductDetailsView() {
     }
 
-    public ProductDetailsView(String categoryId, String pimId, String manufacturerCode, String brand, String label, String name, ProductGroup group, ProductCategory category) {
+    public ProductDetailsView(String categoryId, String pimId, String manufacturerCode, String brand, String label, String name, ProductGroup group, String category) {
         this.categoryId = categoryId;
         this.pimId = pimId;
         this.manufacturerCode = manufacturerCode;
@@ -106,11 +105,11 @@ public class ProductDetailsView {
         this.name = name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 

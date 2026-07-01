@@ -50,9 +50,12 @@ public class InventoryView {
                 .collect(Collectors.toList());
     }
 
-    public Collection<MatchedInventory> findAllByProductCategory(ProductCategory productCategory) {
+    public Collection<MatchedInventory> findAllByProductCategory(String productCategory) {
         return listedKeys()
-                .filter(key -> taxonomyCache.find(key).category() == productCategory)
+                .filter(key -> {
+                    ProductCategory category = taxonomyCache.find(key).category();
+                    return category == null ? productCategory == null : category.name().equals(productCategory);
+                })
                 .map(this::assemble)
                 .collect(Collectors.toList());
     }

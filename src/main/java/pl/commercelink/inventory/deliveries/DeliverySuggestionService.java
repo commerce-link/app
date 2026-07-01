@@ -80,7 +80,7 @@ public class DeliverySuggestionService {
                 boolean isLowestPrice = offer.netPrice() <= lowestNetAcrossSuppliers;
 
                 suggestions.add(SuggestedDeliveryItem.of(
-                        level.getCategory(),
+                        level.getCategory() != null ? level.getCategory().name() : null,
                         level.getName(),
                         offer.ean(),
                         offer.mfn(),
@@ -93,7 +93,7 @@ public class DeliverySuggestionService {
         }
 
         suggestions.sort(Comparator
-                .comparing((SuggestedDeliveryItem s) -> s.getCategory() != null ? s.getCategory().name() : "")
+                .comparing((SuggestedDeliveryItem s) -> s.getCategory() != null ? s.getCategory() : "")
                 .thenComparing(s -> s.getName() != null ? s.getName() : ""));
 
         return suggestions;
