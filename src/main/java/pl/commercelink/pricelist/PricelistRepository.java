@@ -82,6 +82,9 @@ public class PricelistRepository {
 
     public Pricelist findNewestPricelist(String storeId, String catalogId) {
         Pair<String, InputStreamReader> reader = fileStorage.findNewest(bucketName, prefix(storeId, catalogId));
+        if (reader == null) {
+            return null;
+        }
         return getPricelist(extractPricelistId(reader.getLeft()), reader.getRight());
     }
 

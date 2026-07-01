@@ -83,6 +83,15 @@ class PricelistRepositoryTest {
     }
 
     @Test
+    void findNewestReturnsNullWhenPrefixEmpty() {
+        when(fileStorage.findNewest(bucketName, prefix)).thenReturn(null);
+
+        Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
+
+        assertNull(pricelist);
+    }
+
+    @Test
     void savesToStoreScopedKey() throws IOException {
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
 
