@@ -100,6 +100,15 @@
                             </div>
                         </div>
 
+                        <div class="field">
+                            <label class="label" th:text="#{general.comment}"></label>
+                            <div class="control">
+                                <textarea class="textarea" th:field="*{comment}"
+                                          th:placeholder="#{general.comment.placeholder}"
+                                          th:disabled="${delivery.hasBeenReceived()}"></textarea>
+                            </div>
+                        </div>
+
                         <div class="field is-grouped" th:unless="${delivery.hasBeenReceived()}">
                             <div class="control">
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
