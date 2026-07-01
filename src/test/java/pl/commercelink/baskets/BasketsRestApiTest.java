@@ -57,7 +57,7 @@ class BasketsRestApiTest {
     void setupExecutorPassThrough() {
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
-        when(req.toBasketItems(pricelistRepository)).thenReturn(Collections.emptyList());
+        when(req.toBasketItems(STORE_ID, pricelistRepository)).thenReturn(Collections.emptyList());
     }
 
     @Test

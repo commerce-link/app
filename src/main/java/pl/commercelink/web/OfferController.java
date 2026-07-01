@@ -171,8 +171,8 @@ public class OfferController {
 
         Pricelist pricelist = Pricelist.empty();
         if (isNotBlank(catalogId)) {
-            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(catalogId);
-            pricelist = pricelistRepository.find(catalogId, newestPricelistId);
+            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(getStoreId(), catalogId);
+            pricelist = pricelistRepository.find(getStoreId(), catalogId, newestPricelistId);
         }
 
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
@@ -306,7 +306,7 @@ public class OfferController {
                                             @RequestParam("itemName") String itemName) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
-        Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
+        Pricelist pricelist = pricelistRepository.find(getStoreId(), catalogId, pricelistId);
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
 
         AvailabilityAndPrice itemAvailabilityAndPrice = availabilityAndPrices.stream()

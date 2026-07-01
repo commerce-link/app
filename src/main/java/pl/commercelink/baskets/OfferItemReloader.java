@@ -38,7 +38,7 @@ public class OfferItemReloader {
     public List<OfferItem> recalculate(String storeId, Basket basket) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
 
-        updatePrices(basket.getBasketItems());
+        updatePrices(storeId, basket.getBasketItems());
         updateCosts(enabledInventory, basket.getBasketItems());
 
         return reload(enabledInventory, basket);
@@ -98,13 +98,13 @@ public class OfferItemReloader {
         return sortedOfferItems;
     }
 
-    private void updatePrices(List<BasketItem> basketItems) {
+    private void updatePrices(String storeId, List<BasketItem> basketItems) {
         basketItems.stream()
                 .filter(i -> isNotBlank(i.getCatalogId()))
                 .filter(i -> isNotBlank(i.getId()))
                 .forEach(i -> {
-                    String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(i.getCatalogId());
-                    Pricelist pricelist = pricelistRepository.find(i.getCatalogId(), newestPricelistId);
+                    String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(storeId, i.getCatalogId());
+                    Pricelist pricelist = pricelistRepository.find(storeId, i.getCatalogId(), newestPricelistId);
                     if (pricelist == null) return;
 
                     Optional<AvailabilityAndPrice> op = pricelist.findByPimId(i.getId());

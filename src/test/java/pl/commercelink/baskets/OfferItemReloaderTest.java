@@ -64,8 +64,8 @@ class OfferItemReloaderTest {
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
                 ProductCategory.Laptops, 250L, 5L, 3, 0L);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
-        when(pricelistRepository.findNewestPricelistIdCached("cat-1")).thenReturn("pricelist-1");
-        when(pricelistRepository.find("cat-1", "pricelist-1")).thenReturn(pricelist);
+        when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
