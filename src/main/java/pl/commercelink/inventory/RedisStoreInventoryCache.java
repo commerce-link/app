@@ -57,6 +57,15 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
         }
     }
 
+    @Override
+    public void evict(String storeId) {
+        try {
+            redisTemplate.delete(key(storeId));
+        } catch (Exception e) {
+            System.err.println("Redis store-inventory evict failed for " + storeId + ": " + e.getMessage());
+        }
+    }
+
     private String compress(String json) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (GZIPOutputStream gzip = new GZIPOutputStream(bytes)) {

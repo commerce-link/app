@@ -9,7 +9,11 @@ import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Duration;
@@ -38,7 +42,7 @@ public class StoreInventoryProvider {
     }
 
     public InventoryIndex ownIndex(Store store) {
-        if (store == null || !store.hasOwnSupplierConnections()) {
+        if (store == null || !store.hasOwnOrManualSupplierConnections()) {
             return InventoryIndex.of(List.of());
         }
         String storeId = store.getStoreId();
@@ -67,13 +71,23 @@ public class StoreInventoryProvider {
 
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
-        for (String supplierName : storeEntity.getOwnSupplierNames()) {
-            SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
+        for (StoreSupplierConnection connection : storeEntity.getOwnAndManualConnections()) {
+            if (!connection.isEnabled()) {
+                continue;
+            }
+            SupplierProviderDescriptor descriptor = descriptorFor(connection);
             if (descriptor != null) {
                 ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
             }
         }
 
         return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems)), LocalDateTime.now());
+    }
+
+    private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {
+        if (connection.getMode() == ConnectionMode.MANUAL) {
+            return new ManualSupplierDescriptor(ManualSupplierInfos.label(connection.getSupplierName()));
+        }
+        return supplierProviderFactory.getDescriptor(connection.getSupplierName());
     }
 }

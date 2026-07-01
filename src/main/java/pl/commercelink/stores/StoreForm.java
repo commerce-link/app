@@ -31,6 +31,7 @@ public class StoreForm {
 
     // per-supplier enablement + mode, fixed-index for stable form binding
     private List<SupplierSelectionForm> supplierSelections = new ArrayList<>();
+    private List<ManualSupplierSelectionForm> manualSupplierSelections = new ArrayList<>();
 
     public StoreForm() {
         this.providerConfiguration = new HashMap<>();
@@ -160,5 +161,13 @@ public class StoreForm {
 
     public void setSupplierSelections(List<SupplierSelectionForm> supplierSelections) {
         this.supplierSelections = supplierSelections;
+    }
+
+    public List<ManualSupplierSelectionForm> getManualSupplierSelections() {
+        return manualSupplierSelections;
+    }
+
+    public void setManualSupplierSelections(List<ManualSupplierSelectionForm> manualSupplierSelections) {
+        this.manualSupplierSelections = manualSupplierSelections;
     }
 }

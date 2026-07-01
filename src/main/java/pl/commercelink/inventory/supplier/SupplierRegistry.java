@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.*;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 
 import java.util.Collection;
 import java.util.List;
@@ -41,7 +42,13 @@ public class SupplierRegistry {
     }
 
     public SupplierInfo get(String supplierName) {
-        return suppliers.getOrDefault(supplierName, OTHER_ENTITY);
+        return suppliers.getOrDefault(supplierName, defaultFor(supplierName));
+    }
+
+    private SupplierInfo defaultFor(String supplierName) {
+        return ManualSupplierInfos.isManual(supplierName)
+                ? ManualSupplierInfos.forIdentity(supplierName)
+                : OTHER_ENTITY;
     }
 
     public boolean exists(String supplierName) {
