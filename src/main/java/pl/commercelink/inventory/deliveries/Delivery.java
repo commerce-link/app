@@ -35,6 +35,8 @@ public class Delivery {
     private String deliveryId;
     @DynamoDBAttribute(attributeName = "externalDeliveryId")
     private String externalDeliveryId;
+    @DynamoDBAttribute(attributeName = "comment")
+    private String comment;
 
     @DynamoDBAttribute(attributeName = "orderedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
@@ -343,6 +345,14 @@ public class Delivery {
 
     public void setExternalDeliveryId(String externalDeliveryId) {
         this.externalDeliveryId = externalDeliveryId;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 
     public LocalDateTime getOrderedAt() {

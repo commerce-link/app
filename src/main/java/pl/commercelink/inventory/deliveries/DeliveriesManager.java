@@ -139,6 +139,7 @@ public class DeliveriesManager {
         existingDelivery.updatePaymentCost(updatedDelivery.getPaymentCost());
         existingDelivery.setTax(updatedDelivery.getTax());
         existingDelivery.setPaymentTerms(updatedDelivery.getPaymentTerms());
+        existingDelivery.setComment(updatedDelivery.getComment());
         existingDelivery.addEvent(new Event(EventType.action, "DELIVERY_UPDATED", LocalDateTime.now()));
 
         if (isDeliveryDelayed) {
