@@ -41,7 +41,7 @@ class PricelistEventListener {
 
         String pricelistId = pricelistRepository.save(payload.getCatalogId(), pricelist);
 
-        sellingPriceHistoryService.update(payload.getCatalogId(), pricelist);
+        sellingPriceHistoryService.update(payload.getStoreId(), payload.getCatalogId(), pricelist);
 
         pricelistEventPublisher.publish(payload.getStoreId(), payload.getCatalogId(), pricelistId);
     }
