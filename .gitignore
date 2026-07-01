@@ -37,6 +37,7 @@ tmpclaude-*
 
 .claude/settings.local.json
 /.serena/
+.claude/worktrees/
 
 ### Should never go into repository ###
 src/main/resources/application-local.properties
@@ -51,5 +52,3 @@ update.env
 /.dynamodb-data/
 /.ministack-data/
 
-### Local-only pricelist migration script (never push)
-scripts/migrate-pricelists-to-store-space.sh
