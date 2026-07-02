@@ -752,7 +752,7 @@ public class OrdersController extends BaseController {
             existingOrder.setShipments(shipments);
         }
         String view = save(existingOrder);
-        if (existingOrder.getShipments().stream().anyMatch(Shipment::hasShippingData)) {
+        if (existingOrder.getShipments().stream().anyMatch(s -> s.hasShippingData() || s.hasCollectionData())) {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
         return view;

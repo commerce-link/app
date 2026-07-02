@@ -173,6 +173,46 @@ class OrdersControllerTest {
         verify(orderLifecycleEventPublisher, never()).publish(any(), any());
     }
 
+    @Test
+    @DisplayName("updateShipments publishes ShipmentCreated when the saved order has a personal-collection shipment")
+    void updateShipmentsPublishesShipmentCreatedWhenCollectionDataPresent() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.PersonalCollection);
+        shipment.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    @DisplayName("updateShipments leaves existing shipments untouched when the payload carries no shipments list")
+    void updateShipmentsKeepsExistingShipmentsWhenPayloadShipmentsIsNull() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("TRACK-1");
+        shipment.setShippedAt(LocalDateTime.now());
+        existingOrder.setShipments(List.of(shipment));
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(null);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        assertThat(existingOrder.getShipments()).containsExactly(shipment);
+        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
     private Order orderBase() {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

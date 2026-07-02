@@ -57,7 +57,9 @@ public class MarketplaceOrderLifecycleEventListener {
 
         switch (payload.getType()) {
             case OrderAccepted:
-                provider.acceptOrder(externalOrderId);
+                if (!order.getStatus().isOneOf(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed, OrderStatus.Cancelled)) {
+                    provider.acceptOrder(externalOrderId);
+                }
                 break;
             case ShipmentCreated:
                 extractShipmentUpdate(order)
@@ -79,10 +81,21 @@ public class MarketplaceOrderLifecycleEventListener {
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order) {
-        return order.getShipments().stream()
+        Optional<ShipmentUpdate> tracked = order.getShipments().stream()
                 .filter(Shipment::hasShippingData)
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(), s.getCarrier(), s.getTrackingUrl()));
+
+        if (tracked.isPresent()) {
+            return tracked;
+        }
+
+        boolean hasCollectionShipment = order.getShipments().stream().anyMatch(Shipment::hasCollectionData);
+        if (hasCollectionShipment) {
+            return Optional.of(new ShipmentUpdate(null, null, null));
+        }
+
+        return Optional.empty();
     }
 
     private Optional<InvoiceUpdate> extractInvoiceUpdate(Order order) {

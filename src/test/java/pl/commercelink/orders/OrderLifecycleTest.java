@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
@@ -121,6 +123,59 @@ class OrderLifecycleTest {
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(false);
         when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Completed, order.getStatus());
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void publishesOrderAcceptedAndCompletedWhenBlockedOrderBecomesSettled() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Blocked);
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order);
+
+        // then
+        assertEquals(OrderStatus.Completed, order.getStatus());
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void publishesNoEventWhenStatusChangesBetweenIntermediateStates() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(true);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Delivered, order.getStatus());
+        verifyNoInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void publishesOrderAcceptedAndCompletedWhenGenuinelySettledOrderReachesCompleted() {
+        // given
+        Order order = new Order("store-1");
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(true);
 
         // when
         orderLifecycle.update(order, List.of(item));

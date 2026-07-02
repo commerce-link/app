@@ -129,15 +129,21 @@ public class OrderLifecycle {
 
         notificationEventPublisher.publish(order);
 
-        if (previousOrderStatus != order.getStatus()) {
-            if (order.getStatus() == OrderStatus.Cancelled) {
-                orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
-            } else if (previousOrderStatus == OrderStatus.New || previousOrderStatus == OrderStatus.Blocked) {
-                orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderAccepted);
-            }
-            if (order.getStatus() == OrderStatus.Completed) {
-                orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCompleted);
-            }
+        publishLifecycleEvents(order, previousOrderStatus);
+    }
+
+    private void publishLifecycleEvents(Order order, OrderStatus previousOrderStatus) {
+        if (previousOrderStatus == order.getStatus()) {
+            return;
+        }
+
+        if (order.getStatus() == OrderStatus.Cancelled) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
+        } else if (previousOrderStatus == OrderStatus.New || previousOrderStatus == OrderStatus.Blocked) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderAccepted);
+        }
+        if (order.getStatus() == OrderStatus.Completed) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCompleted);
         }
     }
 
