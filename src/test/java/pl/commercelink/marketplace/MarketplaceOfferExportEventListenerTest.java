@@ -81,7 +81,7 @@ class MarketplaceOfferExportEventListenerTest {
         when(catalog.isMarketplaceExportEnabled(MARKETPLACE)).thenReturn(true);
         when(catalog.getCatalogId()).thenReturn(CATALOG_ID);
 
-        when(pricelistRepository.find(CATALOG_ID, PRICELIST_ID)).thenReturn(pricelist);
+        when(pricelistRepository.find(STORE_ID, CATALOG_ID, PRICELIST_ID)).thenReturn(pricelist);
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID)).thenReturn(inventoryView);
 
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);

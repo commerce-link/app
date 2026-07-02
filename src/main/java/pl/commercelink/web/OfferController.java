@@ -159,7 +159,7 @@ public class OfferController {
     }
 
     private String showEditOfferForm(Model model, Basket basket, String catalogId, Mode mode, boolean recalculate) {
-        List<OfferItem> offerItems = recalculate ? offerItemReloader.recalculate(getStoreId(), basket) : offerItemReloader.reload(getStoreId(), basket);
+        List<OfferItem> offerItems = recalculate ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket);
 
         Store store = storesRepository.findById(getStoreId());
         if (Mode.CREATE == mode) {
@@ -171,8 +171,8 @@ public class OfferController {
 
         Pricelist pricelist = Pricelist.empty();
         if (isNotBlank(catalogId)) {
-            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(catalogId);
-            pricelist = pricelistRepository.find(catalogId, newestPricelistId);
+            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(getStoreId(), catalogId);
+            pricelist = pricelistRepository.find(getStoreId(), catalogId, newestPricelistId);
         }
 
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
@@ -270,7 +270,7 @@ public class OfferController {
     @PostMapping("/dashboard/offer/{offerId}/recalculate")
     public String recalculateOffer(@PathVariable String offerId, Model model) {
         Optional<Basket> existingOfferOpt = basketsRepository.findById(getStoreId(), offerId);
-        offerItemReloader.recalculate(getStoreId(), existingOfferOpt.get());
+        offerItemReloader.recalculate(existingOfferOpt.get());
 
         return "redirect:/dashboard/offer/" + offerId;
     }
@@ -306,7 +306,7 @@ public class OfferController {
                                             @RequestParam("itemName") String itemName) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
-        Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
+        Pricelist pricelist = pricelistRepository.find(getStoreId(), catalogId, pricelistId);
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
 
         AvailabilityAndPrice itemAvailabilityAndPrice = availabilityAndPrices.stream()

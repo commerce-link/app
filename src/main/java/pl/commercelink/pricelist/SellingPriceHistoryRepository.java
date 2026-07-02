@@ -17,13 +17,13 @@ public class SellingPriceHistoryRepository {
     private final FileStorage fileStorage;
     private final String bucketName;
 
-    public SellingPriceHistoryRepository(FileStorage fileStorage, @Value("${s3.bucket.pricelists}") String bucketName) {
+    public SellingPriceHistoryRepository(FileStorage fileStorage, @Value("${s3.bucket.stores}") String bucketName) {
         this.fileStorage = fileStorage;
         this.bucketName = bucketName;
     }
 
-    public Map<String, SellingPriceHistory> load(String catalogId) {
-        String key = getKey(catalogId);
+    public Map<String, SellingPriceHistory> load(String storeId, String catalogId) {
+        String key = getKey(storeId, catalogId);
         if (!fileStorage.canRead(bucketName, key)) {
             return new HashMap<>();
         }
@@ -46,7 +46,7 @@ public class SellingPriceHistoryRepository {
         return histories;
     }
 
-    public void save(String catalogId, Collection<SellingPriceHistory> histories) throws IOException {
+    public void save(String storeId, String catalogId, Collection<SellingPriceHistory> histories) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ICSVWriter writer = new CSVWriterBuilder(new OutputStreamWriter(out))
                 .withSeparator(CSVLoader.DEFAULT_SEPARATOR)
@@ -56,10 +56,10 @@ public class SellingPriceHistoryRepository {
                 writer.writeNext(history.toCsvRow());
             }
         }
-        fileStorage.put(bucketName, getKey(catalogId), out.toByteArray());
+        fileStorage.put(bucketName, getKey(storeId, catalogId), out.toByteArray());
     }
 
-    private static String getKey(String catalogId) {
-        return catalogId + "-price-history/history.csv";
+    private static String getKey(String storeId, String catalogId) {
+        return storeId + "/price-history/" + catalogId + "/history.csv";
     }
 }

@@ -31,14 +31,14 @@ public class OfferItemReloader {
         this.basketsRepository = basketsRepository;
     }
 
-    public List<OfferItem> reload(String storeId, Basket basket) {
-        return reload(inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING), basket);
+    public List<OfferItem> reload(Basket basket) {
+        return reload(inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING), basket);
     }
 
-    public List<OfferItem> recalculate(String storeId, Basket basket) {
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
+    public List<OfferItem> recalculate(Basket basket) {
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
 
-        updatePrices(basket.getBasketItems());
+        updatePrices(basket);
         updateCosts(enabledInventory, basket.getBasketItems());
 
         return reload(enabledInventory, basket);
@@ -98,13 +98,14 @@ public class OfferItemReloader {
         return sortedOfferItems;
     }
 
-    private void updatePrices(List<BasketItem> basketItems) {
-        basketItems.stream()
+    private void updatePrices(Basket basket) {
+        String storeId = basket.getStoreId();
+        basket.getBasketItems().stream()
                 .filter(i -> isNotBlank(i.getCatalogId()))
                 .filter(i -> isNotBlank(i.getId()))
                 .forEach(i -> {
-                    String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(i.getCatalogId());
-                    Pricelist pricelist = pricelistRepository.find(i.getCatalogId(), newestPricelistId);
+                    String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(storeId, i.getCatalogId());
+                    Pricelist pricelist = pricelistRepository.find(storeId, i.getCatalogId(), newestPricelistId);
                     if (pricelist == null) return;
 
                     Optional<AvailabilityAndPrice> op = pricelist.findByPimId(i.getId());

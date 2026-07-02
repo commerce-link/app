@@ -165,12 +165,12 @@ public class Checkout {
     private CatalogProcessingResult processCatalog(CheckoutRequest req, Store store, CheckoutConfiguration checkoutConfiguration, String catalogId) {
         ProductCatalog productCatalog = productCatalogRepository.findById(store.getStoreId(), catalogId);
 
-        Pricelist incompletePricelist = pricelistRepository.findTopNPricelist(catalogId, checkoutConfiguration.getNumberOfAcceptedPricelists()).stream()
+        Pricelist incompletePricelist = pricelistRepository.findTopNPricelist(store.getStoreId(), catalogId, checkoutConfiguration.getNumberOfAcceptedPricelists()).stream()
                 .filter(p -> p.getPricelistId().equals(req.getPricelistId(catalogId)))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Pricelist not found for catalog: " + catalogId));
 
-        Pricelist pricelist = pricelistRepository.find(catalogId, incompletePricelist.getPricelistId());
+        Pricelist pricelist = pricelistRepository.find(store.getStoreId(), catalogId, incompletePricelist.getPricelistId());
 
         List<BasketItem> basketItems = req.toBasketItems(catalogId, pricelist);
         validateOrderCompleteness(productCatalog, basketItems);

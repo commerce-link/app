@@ -40,7 +40,7 @@ public class ProductCatalogRestApi {
         if (Objects.isNull(catalog)) {
             throw new RuntimeException("Internal error, contact administrator for more details.");
         }
-        return new ObjectIdDto(pricelistRepository.findNewestPricelistId(catalogId));
+        return new ObjectIdDto(pricelistRepository.findNewestPricelistId(storeId, catalogId));
     }
 
     @GetMapping("/Pricelist")
@@ -50,7 +50,7 @@ public class ProductCatalogRestApi {
         if (Objects.isNull(catalog)) {
             throw new RuntimeException("Internal error, contact administrator for more details.");
         }
-        return pricelistRepository.findNewestPricelistAsBytes(catalogId);
+        return pricelistRepository.findNewestPricelistAsBytes(storeId, catalogId);
     }
 
     @GetMapping("/Categories")
