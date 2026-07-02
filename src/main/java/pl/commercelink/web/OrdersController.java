@@ -740,6 +740,7 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateShipments(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder, Model model) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
+        List<String> shipmentDataBeforeUpdate = shipmentDataSnapshot(existingOrder);
         if (updatedOrder.getShipments() != null) {
             List<Shipment> shipments = updatedOrder.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
@@ -752,10 +753,24 @@ public class OrdersController extends BaseController {
             existingOrder.setShipments(shipments);
         }
         String view = save(existingOrder);
-        if (existingOrder.getShipments().stream().anyMatch(s -> s.hasShippingData() || s.hasCollectionData())) {
+        boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()
+                .anyMatch(s -> s.hasShippingData() || s.hasCollectionData());
+        boolean shipmentDataChanged = !shipmentDataBeforeUpdate.equals(shipmentDataSnapshot(existingOrder));
+        if (hasNotifiableShipmentData && shipmentDataChanged) {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
         return view;
+    }
+
+    private List<String> shipmentDataSnapshot(Order order) {
+        return order.getShipments().stream()
+                .map(s -> String.join("|",
+                        String.valueOf(s.getType()),
+                        Objects.toString(s.getCarrier(), ""),
+                        Objects.toString(s.getTrackingNo(), ""),
+                        Objects.toString(s.getTrackingUrl(), ""),
+                        Objects.toString(s.getShippedAt(), "")))
+                .collect(Collectors.toList());
     }
 
     @PostMapping("/dashboard/orders/{orderId}/addReceipt")

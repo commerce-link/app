@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -210,6 +211,58 @@ class OrdersControllerTest {
 
         // then
         assertThat(existingOrder.getShipments()).containsExactly(shipment);
+        verifyNoInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    @DisplayName("updateShipments does not republish ShipmentCreated when resubmitted shipment data is unchanged")
+    void updateShipmentsDoesNotRepublishWhenShipmentDataUnchanged() {
+        // given
+        LocalDateTime shippedAt = LocalDateTime.now();
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(shippedAt);
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-1");
+        resubmittedShipment.setShippedAt(shippedAt);
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateShipments republishes ShipmentCreated when the resubmitted tracking number changes")
+    void updateShipmentsPublishesWhenTrackingNumberChanges() {
+        // given
+        LocalDateTime shippedAt = LocalDateTime.now();
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(shippedAt);
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-2");
+        resubmittedShipment.setShippedAt(shippedAt);
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
         verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
     }
 
