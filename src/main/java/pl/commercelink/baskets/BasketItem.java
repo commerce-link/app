@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -13,7 +14,7 @@ import pl.commercelink.inventory.supplier.api.Taxonomy;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
-public class BasketItem implements Categorized {
+public class BasketItem implements Categorized, Positioned {
 
     public static final String SHIPPING_MFN_CODE = "Shipping";
 
@@ -36,6 +37,8 @@ public class BasketItem implements Categorized {
     private int estimatedDeliveryDays;
     @DynamoDBAttribute(attributeName = "consolidated")
     private boolean consolidated;
+    @DynamoDBAttribute(attributeName = "position")
+    private Integer position;
 
     public BasketItem() {
     }
@@ -153,6 +156,14 @@ public class BasketItem implements Categorized {
 
     public void setConsolidated(boolean consolidated) {
         this.consolidated = consolidated;
+    }
+
+    public Integer getPosition() {
+        return position;
+    }
+
+    public void setPosition(Integer position) {
+        this.position = position;
     }
 
     @DynamoDBIgnore

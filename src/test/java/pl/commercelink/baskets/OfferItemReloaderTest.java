@@ -98,6 +98,27 @@ class OfferItemReloaderTest {
     }
 
     @Test
+    @DisplayName("reload assigns basket item positions matching the reordered list")
+    void reloadAssignsBasketItemPositionsMatchingReorderedList() {
+        // given
+        BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        BasketItem cpuItem = new BasketItem("pim-2", "Processor", "MFN-C",
+                ProductCategory.CPU, 50.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(laptopItem, cpuItem);
+
+        // when
+        offerItemReloader.reload(STORE_ID, basket);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-C", "MFN-L");
+        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
     @DisplayName("recalculate persists basket exactly once when invoked")
     void recalculatePersistsBasketExactlyOnce() {
         // given

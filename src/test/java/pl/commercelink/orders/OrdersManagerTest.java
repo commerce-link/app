@@ -157,6 +157,32 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem assigns next position after the highest existing item position")
+    void addOrderItemAssignsNextPositionAfterHighestExistingItemPosition() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        OrderItem first = orderItem("item-1", 10.0);
+        first.setPosition(0);
+        OrderItem second = orderItem("item-2", 20.0);
+        second.setPosition(3);
+        OrderItem legacy = orderItem("item-3", 30.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
+                ProductCategory.Laptops, 200L, 10L, 5, 0L);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(first, second, legacy));
+
+        // when
+        ordersManager.addOrderItem(store, order, availability);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(4);
+    }
+
+    @Test
     @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes StatusChange")
     void cancelOrderZeroesServicesAndSetsCancelled() {
         // given

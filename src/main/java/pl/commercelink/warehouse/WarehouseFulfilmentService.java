@@ -57,17 +57,17 @@ public class WarehouseFulfilmentService {
             }
 
             if (reservationItem.getRemainingQty() > 0) {
-                fulfilledOrderItems.add(
-                        new OrderItem(
-                                orderItem.getOrderId(),
-                                orderItem.getCategory(),
-                                orderItem.getName(),
-                                reservationItem.getRemainingQty(),
-                                orderItem.getPrice(),
-                                orderItem.getSku(),
-                                orderItem.isConsolidated()
-                        )
+                OrderItem remainingItem = new OrderItem(
+                        orderItem.getOrderId(),
+                        orderItem.getCategory(),
+                        orderItem.getName(),
+                        reservationItem.getRemainingQty(),
+                        orderItem.getPrice(),
+                        orderItem.getSku(),
+                        orderItem.isConsolidated()
                 );
+                remainingItem.setPosition(orderItem.getPosition());
+                fulfilledOrderItems.add(remainingItem);
             }
 
             List<ReservationConfirmation> confirmations = reservationItem.getConfirmations();
@@ -93,6 +93,7 @@ public class WarehouseFulfilmentService {
                 orderItem.getSku(),
                 orderItem.isConsolidated()
         );
+        newItem.setPosition(orderItem.getPosition());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

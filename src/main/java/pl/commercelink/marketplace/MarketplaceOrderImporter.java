@@ -9,6 +9,7 @@ import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.CountryCodeConverter;
@@ -77,6 +78,8 @@ public class MarketplaceOrderImporter {
         List<OrderItem> orderItems = basket.getBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
                 .collect(Collectors.toList());
+
+        Positioned.fillMissing(orderItems);
 
         ordersManager.saveWithFulfilment(order, orderItems);
     }

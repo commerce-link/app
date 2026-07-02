@@ -5,13 +5,14 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import java.util.UUID;
 
 @DynamoDBTable(tableName = "OrderItems")
-public class OrderItem extends Item {
+public class OrderItem extends Item implements Positioned {
 
     public static final String GENERIC_WAREHOUSE_ORDER_NO = "Warehouse";
 
@@ -28,6 +29,8 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
+    @DynamoDBAttribute(attributeName = "position")
+    private Integer position;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -60,6 +63,7 @@ public class OrderItem extends Item {
         this.price = source.getPrice();
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
+        this.position = source.getPosition();
 
         this.addFulfilment(
             source.getEan(),
@@ -193,6 +197,14 @@ public class OrderItem extends Item {
         this.externalItemId = externalItemId;
     }
 
+    public Integer getPosition() {
+        return position;
+    }
+
+    public void setPosition(Integer position) {
+        this.position = position;
+    }
+
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
@@ -245,7 +257,7 @@ public class OrderItem extends Item {
 
     @DynamoDBIgnore
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
-        return new OrderItem(
+        OrderItem orderItem = new OrderItem(
                 orderId,
                 basketItem.getCategoryKey(),
                 basketItem.getName(),
@@ -254,6 +266,8 @@ public class OrderItem extends Item {
                 basketItem.getMfn(),
                 basketItem.isConsolidated()
         );
+        orderItem.setPosition(basketItem.getPosition());
+        return orderItem;
     }
 
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {

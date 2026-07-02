@@ -7,6 +7,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.stores.Store;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
@@ -54,6 +55,7 @@ public class OrdersManager {
                     store.isPositionConsolidationEnabled()
             );
         }
+        orderItem.setPosition(Positioned.next(orderItemsRepository.findByOrderId(order.getOrderId())));
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
@@ -75,6 +77,7 @@ public class OrdersManager {
             orderItem.markAsWarehouseFulfilled();
         }
 
+        orderItem.setPosition(Positioned.next(orderItemsRepository.findByOrderId(order.getOrderId())));
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());

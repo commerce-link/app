@@ -8,6 +8,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
@@ -295,6 +296,7 @@ public class Basket {
 
         public Builder withBasketItems(List<BasketItem> basketItems) {
             this.basket.setBasketItems(basketItems.stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
+            Positioned.reindex(this.basket.getBasketItems());
             return this;
         }
 

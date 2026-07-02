@@ -23,6 +23,10 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
         return dynamoDBMapper.load(OrderItem.class, orderId, orderItemId);
     }
 
+    public List<OrderItem> findAll() {
+        return dynamoDBMapper.scan(OrderItem.class, new DynamoDBScanExpression());
+    }
+
     public List<OrderItem> findByOrderId(String orderId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":orderId", new AttributeValue().withS(orderId));

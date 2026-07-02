@@ -93,7 +93,11 @@ public class OfferItemReloader {
 
         Collections.reverse(sortedOfferItems);
         for (int i = 0; i < sortedOfferItems.size(); i++) {
-            sortedOfferItems.get(i).setSequenceNumber(i);
+            OfferItem offerItem = sortedOfferItems.get(i);
+            offerItem.setSequenceNumber(i);
+            if (offerItem.getBasketItem() != null) {
+                offerItem.getBasketItem().setPosition(i);
+            }
         }
         return sortedOfferItems;
     }

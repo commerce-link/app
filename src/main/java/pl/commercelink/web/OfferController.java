@@ -23,6 +23,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -211,6 +212,7 @@ public class OfferController {
         existingBasket.setName(basket.getName());
         existingBasket.setFulfilmentType(basket.getFulfilmentType());
         existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
+        Positioned.reindex(existingBasket.getBasketItems());
         existingBasket.setComment(basket.getComment());
         existingBasket.setShowPrices(basket.isShowPrices());
         existingBasket.setExpiresAt(basket.getExpiresAt());
@@ -314,6 +316,7 @@ public class OfferController {
                 .findFirst().get();
 
         BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
+        basketItem.setPosition(Positioned.next(basket.getBasketItems()));
         basket.getBasketItems().add(basketItem);
         save(basket);
 
@@ -329,7 +332,9 @@ public class OfferController {
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
 
-        basket.getBasketItems().add(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
+        BasketItem basketItem = BasketItem.of(matchedInventory, 1, !basket.isShowPrices());
+        basketItem.setPosition(Positioned.next(basket.getBasketItems()));
+        basket.getBasketItems().add(basketItem);
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
