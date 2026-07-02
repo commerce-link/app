@@ -20,6 +20,9 @@ public class StoreSupplierConnection {
     @DynamoDBAttribute(attributeName = "includeInFulfilment")
     private boolean includeInFulfilment = true;
 
+    @DynamoDBAttribute(attributeName = "enabled")
+    private boolean enabled = true;
+
     public StoreSupplierConnection() {
     }
 
@@ -65,5 +68,13 @@ public class StoreSupplierConnection {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 }

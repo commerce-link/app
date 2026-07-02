@@ -4,8 +4,8 @@ import java.util.function.Predicate;
 
 public enum SupplierScope {
 
-    PRICING(StoreSupplierConnection::isIncludeInPricing),
-    FULFILMENT(StoreSupplierConnection::isIncludeInFulfilment);
+    PRICING(connection -> connection.isEnabled() && connection.isIncludeInPricing()),
+    FULFILMENT(connection -> connection.isEnabled() && connection.isIncludeInFulfilment());
 
     private final Predicate<StoreSupplierConnection> includes;
 

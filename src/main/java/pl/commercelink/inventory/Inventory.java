@@ -113,7 +113,7 @@ public class Inventory {
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
         InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope));
-        InventorySource own = GroupInventorySource.own(ownIndex, scopedSupplier(store, ConnectionMode.OWN, scope));
+        InventorySource own = GroupInventorySource.own(ownIndex, scopedOwnAndManualSupplier(store, scope));
         return view(globalIndex, ownIndex, global, own, additionalSources);
     }
 
@@ -126,6 +126,11 @@ public class Inventory {
 
     private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {
         Collection<String> names = store != null ? store.supplierNames(mode, scope) : List.of();
+        return names::contains;
+    }
+
+    private Predicate<String> scopedOwnAndManualSupplier(Store store, SupplierScope scope) {
+        Collection<String> names = store != null ? store.ownAndManualSupplierNames(scope) : List.of();
         return names::contains;
     }
 
