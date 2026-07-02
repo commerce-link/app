@@ -6,7 +6,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -14,7 +13,7 @@ import pl.commercelink.inventory.supplier.api.Taxonomy;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
-public class BasketItem implements Categorized, Positioned {
+public class BasketItem implements Categorized {
 
     public static final String SHIPPING_MFN_CODE = "Shipping";
 

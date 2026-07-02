@@ -15,7 +15,6 @@ import pl.commercelink.payments.api.PaymentWebhookResult;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Positioned;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -76,7 +75,7 @@ public class PaymentWebhookRegistry {
             order.increaseTotalPrice(opt.getPrice());
         });
 
-        Positioned.fillMissing(orderItems);
+        OrderItem.fillMissingPositions(orderItems);
 
         ordersManager.saveWithFulfilment(order, orderItems);
 

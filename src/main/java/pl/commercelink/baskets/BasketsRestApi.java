@@ -10,7 +10,6 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.web.dtos.ObjectIdInvoiceNoDto;
 
 import java.util.List;
@@ -71,7 +70,6 @@ public class BasketsRestApi {
         List<BasketItem> items = req.toBasketItems(pricelistRepository);
 
         basket.setBasketItems(items);
-        Positioned.reindex(basket.getBasketItems());
         basket.setDeliveryOptionId(req.getDeliveryOptionId());
         basket.setAffiliateId(req.getAffiliateId());
 

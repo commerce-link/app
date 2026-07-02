@@ -26,7 +26,6 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationItem;
 import pl.commercelink.warehouse.api.Warehouse;
-import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.*;
@@ -297,7 +296,7 @@ class WarehouseController {
                 .filter(orderItem -> scope != RestockScope.WholeCatalog || orderItem.getPrice() > 0)
                 .collect(Collectors.toList());
 
-        Positioned.fillMissing(orderItems);
+        OrderItem.fillMissingPositions(orderItems);
 
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 

@@ -5,14 +5,15 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @DynamoDBTable(tableName = "OrderItems")
-public class OrderItem extends Item implements Positioned {
+public class OrderItem extends Item {
 
     public static final String GENERIC_WAREHOUSE_ORDER_NO = "Warehouse";
 
@@ -203,6 +204,23 @@ public class OrderItem extends Item implements Positioned {
 
     public void setPosition(Integer position) {
         this.position = position;
+    }
+
+    public static void fillMissingPositions(List<OrderItem> orderItems) {
+        for (int i = 0; i < orderItems.size(); i++) {
+            if (orderItems.get(i).getPosition() == null) {
+                orderItems.get(i).setPosition(i);
+            }
+        }
+    }
+
+    public static int nextPositionFor(List<OrderItem> orderItems) {
+        return orderItems.stream()
+                .map(OrderItem::getPosition)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(orderItems.size() - 1) + 1;
     }
 
     public void setSelected(boolean selected) {

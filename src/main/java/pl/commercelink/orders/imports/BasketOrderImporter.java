@@ -10,7 +10,6 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Positioned;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.util.List;
@@ -52,7 +51,7 @@ public class BasketOrderImporter {
                 order.increaseTotalPrice(opt.getPrice());
         });
 
-        Positioned.fillMissing(orderItems);
+        OrderItem.fillMissingPositions(orderItems);
 
         ordersManager.saveWithFulfilment(order, orderItems);
 

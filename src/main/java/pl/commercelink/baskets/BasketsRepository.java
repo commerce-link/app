@@ -24,10 +24,6 @@ public class BasketsRepository extends DynamoDbRepository<Basket> {
         super(amazonDynamoDB);
     }
 
-    public List<Basket> findAll() {
-        return dynamoDBMapper.scan(Basket.class, new DynamoDBScanExpression());
-    }
-
     public List<Basket> findAll(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));

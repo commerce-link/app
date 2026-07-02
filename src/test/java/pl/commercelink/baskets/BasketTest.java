@@ -11,6 +11,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BasketTest {
 
     @Test
+    @DisplayName("setBasketItems assigns zero-based positions following the list order")
+    void setBasketItemsAssignsZeroBasedPositionsFollowingListOrder() {
+        // given
+        Basket basket = new Basket();
+        BasketItem first = basketItem("MFN-A");
+        BasketItem second = basketItem("MFN-B");
+
+        // when
+        basket.setBasketItems(List.of(first, second));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("setBasketItems overwrites stale positions restoring the list order invariant")
+    void setBasketItemsOverwritesStalePositionsRestoringListOrderInvariant() {
+        // given
+        Basket basket = new Basket();
+        BasketItem first = basketItem("MFN-A");
+        first.setPosition(5);
+        BasketItem second = basketItem("MFN-B");
+
+        // when
+        basket.setBasketItems(List.of(first, second));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("addBasketItem appends the item with the next list index as position")
+    void addBasketItemAppendsItemWithNextListIndexAsPosition() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B")));
+        BasketItem added = basketItem("MFN-C");
+
+        // when
+        basket.addBasketItem(added);
+
+        // then
+        assertThat(added.getPosition()).isEqualTo(2);
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
     @DisplayName("builder assigns zero-based positions after filtering out incomplete items")
     void builderAssignsZeroBasedPositionsAfterFilteringIncompleteItems() {
         // given
