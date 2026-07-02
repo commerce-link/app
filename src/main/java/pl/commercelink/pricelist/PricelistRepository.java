@@ -27,14 +27,14 @@ public class PricelistRepository {
     private final FileStorage fileStorage;
     private final String bucketName;
 
-    public PricelistRepository(FileStorage fileStorage, @Value("${s3.bucket.pricelists}") String bucketName) {
+    public PricelistRepository(FileStorage fileStorage, @Value("${s3.bucket.stores}") String bucketName) {
         this.fileStorage = fileStorage;
         this.bucketName = bucketName;
     }
 
-    @Cacheable(value = "pricelists", key = "#catalogId + '-' + #pricelistId")
-    public Pricelist find(String catalogId, String pricelistId) {
-        String key = getKey(catalogId, pricelistId);
+    @Cacheable(value = "pricelists", key = "#storeId + '-' + #catalogId + '-' + #pricelistId")
+    public Pricelist find(String storeId, String catalogId, String pricelistId) {
+        String key = getKey(storeId, catalogId, pricelistId);
         if(fileStorage.canRead(bucketName, key)){
             Reader reader = fileStorage.get(bucketName, key);
             return getPricelist(pricelistId, reader);
@@ -42,9 +42,9 @@ public class PricelistRepository {
         return null;
     }
 
-    public String save(String catalogId, List<AvailabilityAndPrice> availabilityAndPrices) throws IOException {
+    public String save(String storeId, String catalogId, List<AvailabilityAndPrice> availabilityAndPrices) throws IOException {
         String pricelistId = UUID.randomUUID().toString();
-        String s3Key = getKey(catalogId, pricelistId);
+        String s3Key = getKey(storeId, catalogId, pricelistId);
         byte[] bytes = new CSVWriter().writeAllRowsToBytes(availabilityAndPrices, AvailabilityAndPrice.HEADERS);
         fileStorage.put(bucketName, s3Key, bytes);
         return pricelistId;
@@ -61,28 +61,35 @@ public class PricelistRepository {
     }
 
 
-    private static String getKey(String catalogId, String pricelistId) {
-        return  catalogId + "/" + pricelistId + ".csv";
+    private static String getKey(String storeId, String catalogId, String pricelistId) {
+        return prefix(storeId, catalogId) + pricelistId + ".csv";
     }
 
-    public String findNewestPricelistId(String catalogId) {
-        return fileStorage.findNewestFileName(bucketName, catalogId + "/")
+    private static String prefix(String storeId, String catalogId) {
+        return storeId + "/pricelists/" + catalogId + "/";
+    }
+
+    public String findNewestPricelistId(String storeId, String catalogId) {
+        return fileStorage.findNewestFileName(bucketName, prefix(storeId, catalogId))
                 .map(PricelistRepository::extractPricelistId)
                 .orElse(null);
     }
 
-    @Cacheable(value = "newestPricelistId", key = "#catalogId")
-    public String findNewestPricelistIdCached(String catalogId) {
-        return findNewestPricelistId(catalogId);
+    @Cacheable(value = "newestPricelistId", key = "#storeId + '-' + #catalogId")
+    public String findNewestPricelistIdCached(String storeId, String catalogId) {
+        return findNewestPricelistId(storeId, catalogId);
     }
 
-    public Pricelist findNewestPricelist(String catalogId) {
-        Pair<String, InputStreamReader> reader = fileStorage.findNewest(bucketName, catalogId + "/");
+    public Pricelist findNewestPricelist(String storeId, String catalogId) {
+        Pair<String, InputStreamReader> reader = fileStorage.findNewest(bucketName, prefix(storeId, catalogId));
+        if (reader == null) {
+            return null;
+        }
         return getPricelist(extractPricelistId(reader.getLeft()), reader.getRight());
     }
 
-    public List<Pricelist> findTopNPricelist(String catalogId, int n) {
-        return  fileStorage.findTopN(bucketName, catalogId + "/", n).stream()
+    public List<Pricelist> findTopNPricelist(String storeId, String catalogId, int n) {
+        return  fileStorage.findTopN(bucketName, prefix(storeId, catalogId), n).stream()
                 .map(pair -> new Pricelist(extractPricelistId(pair.getLeft()), pair.getRight()))
                 .collect(Collectors.toList());
     }
@@ -91,8 +98,8 @@ public class PricelistRepository {
         return fileName.replace(".csv", "");
     }
 
-    public byte[] findNewestPricelistAsBytes(String catalogId) {
-        return fileStorage.findNewestAsBytes(bucketName, catalogId + "/");
+    public byte[] findNewestPricelistAsBytes(String storeId, String catalogId) {
+        return fileStorage.findNewestAsBytes(bucketName, prefix(storeId, catalogId));
     }
 
     private AvailabilityAndPrice mapFieldsToObject(String[] fields) {

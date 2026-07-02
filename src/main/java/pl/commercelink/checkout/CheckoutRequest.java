@@ -60,14 +60,14 @@ public class CheckoutRequest {
                 .collect(Collectors.toList());
     }
 
-    public List<BasketItem> toBasketItems(PricelistRepository pricelistRepository) {
+    public List<BasketItem> toBasketItems(String storeId, PricelistRepository pricelistRepository) {
         return checkoutItems.stream()
-                .map(i -> toBasketItem(i, pricelistRepository))
+                .map(i -> toBasketItem(storeId, i, pricelistRepository))
                 .collect(Collectors.toList());
     }
 
-    private BasketItem toBasketItem(CheckoutItem checkoutItem, PricelistRepository pricelistRepository) {
-        Pricelist pricelist = pricelistRepository.find(checkoutItem.getCatalogId(), checkoutItem.getPricelistId());
+    private BasketItem toBasketItem(String storeId, CheckoutItem checkoutItem, PricelistRepository pricelistRepository) {
+        Pricelist pricelist = pricelistRepository.find(storeId, checkoutItem.getCatalogId(), checkoutItem.getPricelistId());
 
         return toBasketItem(checkoutItem, pricelist);
     }

@@ -37,6 +37,7 @@ tmpclaude-*
 
 .claude/settings.local.json
 /.serena/
+.claude/worktrees/
 
 ### Should never go into repository ###
 src/main/resources/application-local.properties
@@ -50,3 +51,4 @@ update.env
 ### Local infrastructure data
 /.dynamodb-data/
 /.ministack-data/
+

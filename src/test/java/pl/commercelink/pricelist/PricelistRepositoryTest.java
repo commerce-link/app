@@ -3,16 +3,23 @@ package pl.commercelink.pricelist;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PricelistRepositoryTest {
@@ -20,7 +27,10 @@ class PricelistRepositoryTest {
     @Mock
     private FileStorage fileStorage;
 
-    private String bucketName = "bucketName";
+    private final String bucketName = "stores";
+    private final String storeId = "uma2dqukxr";
+    private final String catalogId = "catalogId";
+    private final String prefix = "uma2dqukxr/pricelists/catalogId/";
 
     private PricelistRepository pricelistRepository;
 
@@ -32,17 +42,17 @@ class PricelistRepositoryTest {
 
     @Test
     void testFind() {
-        String catalogId = "catalogId";
         String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
         String csvData = "CatalogId;PimId;ManufacturerCode;Brand;Label;Name;Category;Price;Qty\n" +
                 "catalogId;pim2;mfc2;brand2;label2;name2;PSU;200;20\n" +
                 "catalogId;pim3;mfc3;brand3;label3;name3;PSU;300;30";
         InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
 
-        when(fileStorage.canRead(bucketName, "catalogId/pricelistId.csv")).thenReturn(true);
-        when(fileStorage.get(bucketName, "catalogId/pricelistId.csv")).thenReturn(reader);
+        when(fileStorage.canRead(bucketName, key)).thenReturn(true);
+        when(fileStorage.get(bucketName, key)).thenReturn(reader);
 
-        Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
 
         assertEquals(pricelistId, pricelist.getPricelistId());
         assertEquals(2, pricelist.getAvailabilityAndPrices().size());
@@ -50,29 +60,65 @@ class PricelistRepositoryTest {
 
     @Test
     void testFindFileNotThere() {
-        String catalogId = "catalogId";
         String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
 
-        when(fileStorage.canRead(bucketName, "catalogId/pricelistId.csv")).thenReturn(false);
-        Pricelist pricelist = pricelistRepository.find(catalogId, pricelistId);
+        when(fileStorage.canRead(bucketName, key)).thenReturn(false);
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
         assertNull(pricelist);
     }
 
-
     @Test
     void testFindNewestPricelist() {
-        String catalogId = "catalogId";
         String csvData = "CatalogId;PimId;ManufacturerCode;Brand;Label;Name;Category;Price;Qty\n" +
                 "catalogId;pim2;mfc2;brand2;label2;name2;PSU;200;20\n" +
                 "catalogId;pim3;mfc3;brand3;label3;name3;PSU;300;30";
         InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
-        when(fileStorage.findNewest(anyString(), anyString())).thenReturn(Pair.of("newestPricelistId", reader));
+        when(fileStorage.findNewest(bucketName, prefix)).thenReturn(Pair.of("newestPricelistId", reader));
 
-        Pricelist pricelist = pricelistRepository.findNewestPricelist(catalogId);
+        Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
 
         assertEquals("newestPricelistId", pricelist.getPricelistId());
         assertEquals(2, pricelist.getAvailabilityAndPrices().size());
     }
 
-// Remove this method as it's no longer needed
+    @Test
+    void findNewestReturnsNullWhenPrefixEmpty() {
+        when(fileStorage.findNewest(bucketName, prefix)).thenReturn(null);
+
+        Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
+
+        assertNull(pricelist);
+    }
+
+    @Test
+    void savesToStoreScopedKey() throws IOException {
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+
+        String pricelistId = pricelistRepository.save(storeId, catalogId, List.of());
+
+        verify(fileStorage).put(eq(bucketName), keyCaptor.capture(), any());
+        String key = keyCaptor.getValue();
+        assertTrue(key.startsWith(prefix), "key should start with store prefix: " + key);
+        assertEquals(prefix + pricelistId + ".csv", key);
+    }
+
+    @Test
+    void findsNewestUsesStorePrefix() {
+        when(fileStorage.findNewestFileName(bucketName, prefix)).thenReturn(Optional.of("abc.csv"));
+
+        String id = pricelistRepository.findNewestPricelistId(storeId, catalogId);
+
+        assertEquals("abc", id);
+        verify(fileStorage).findNewestFileName(bucketName, prefix);
+    }
+
+    @Test
+    void topNUsesStorePrefix() {
+        when(fileStorage.findTopN(bucketName, prefix, 3)).thenReturn(List.of());
+
+        pricelistRepository.findTopNPricelist(storeId, catalogId, 3);
+
+        verify(fileStorage).findTopN(bucketName, prefix, 3);
+    }
 }
