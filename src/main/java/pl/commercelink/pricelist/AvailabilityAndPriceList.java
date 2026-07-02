@@ -36,13 +36,13 @@ public class AvailabilityAndPriceList {
     }
 
     public List<AvailabilityAndPrice> generate(String storeId, String catalogId) {
-        Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(catalogId);
+        Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(storeId, catalogId);
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
         return generate(catalog.getCategories(), histories);
     }
 
     public List<AvailabilityAndPrice> generate(String storeId, String catalogId, String categoryId) {
-        Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(catalogId);
+        Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(storeId, catalogId);
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
         return generate(catalog.getCategories().stream().filter(c -> c.getCategoryId().equals(categoryId)).collect(Collectors.toList()), histories);
     }

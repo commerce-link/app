@@ -61,7 +61,7 @@ public class MarketplaceOfferExportEventListener {
             return;
         }
 
-        Pricelist pricelist = pricelistRepository.find(payload.getCatalogId(), payload.getPricelistId());
+        Pricelist pricelist = pricelistRepository.find(payload.getStoreId(), payload.getCatalogId(), payload.getPricelistId());
         if (pricelist == null) {
             return;
         }

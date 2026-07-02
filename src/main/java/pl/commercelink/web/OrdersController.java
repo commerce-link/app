@@ -263,7 +263,7 @@ public class OrdersController extends BaseController {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
-        Pricelist pricelist = pricelistRepository.find(itemCatalogId, itemPricelistId);
+        Pricelist pricelist = pricelistRepository.find(getStoreId(), itemCatalogId, itemPricelistId);
         Optional<AvailabilityAndPrice> op = pricelist.findByCategoryLabelAndName(ProductCategory.valueOf(category), itemLabel, itemName);
 
         op.ifPresent(availabilityAndPrice -> ordersManager.addOrderItem(store, order, availabilityAndPrice));
@@ -293,8 +293,8 @@ public class OrdersController extends BaseController {
 
         Pricelist pricelist = Pricelist.empty();
         if (Strings.isNotBlank(catalogId)) {
-            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(catalogId);
-            pricelist = pricelistRepository.find(catalogId, newestPricelistId);
+            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(order.getStoreId(), catalogId);
+            pricelist = pricelistRepository.find(order.getStoreId(), catalogId, newestPricelistId);
         }
 
         Store store = storesRepository.findById(order.getStoreId());
