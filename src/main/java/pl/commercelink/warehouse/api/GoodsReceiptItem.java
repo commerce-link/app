@@ -1,7 +1,7 @@
 package pl.commercelink.warehouse.api;
 
 import pl.commercelink.orders.rma.RMAItem;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.Categorized;
 
 public class GoodsReceiptItem {
 
@@ -9,13 +9,13 @@ public class GoodsReceiptItem {
     private final String ean;
     private final String mfn;
     private final String name;
-    private final ProductCategory category;
+    private final String category;
     private final int qty;
     private final double unitPrice;
     private final double tax;
     private final String serialNo;
 
-    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, ProductCategory category, int qty, double unitPrice, double tax, String serialNo) {
+    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, String category, int qty, double unitPrice, double tax, String serialNo) {
         this.deliveryId = deliveryId;
         this.ean = ean;
         this.mfn = mfn;
@@ -33,7 +33,7 @@ public class GoodsReceiptItem {
                 rmaItem.getEan(),
                 rmaItem.getMfn(),
                 rmaItem.getName(),
-                ProductCategory.Other,
+                Categorized.OTHER,
                 rmaItem.getQty(),
                 rmaItem.getCost(),
                 rmaItem.getTax(),
@@ -57,7 +57,7 @@ public class GoodsReceiptItem {
         return name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 

@@ -1,13 +1,12 @@
 package pl.commercelink.web.dtos;
 
 import pl.commercelink.inventory.deliveries.DeliveryItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Collections;
 
 public class SuggestedDeliveryItem {
 
-    private ProductCategory category;
+    private String category;
     private String name;
     private String ean;
     private String mfn;
@@ -20,7 +19,7 @@ public class SuggestedDeliveryItem {
     public SuggestedDeliveryItem() {
     }
 
-    public static SuggestedDeliveryItem of(ProductCategory category, String name, String ean, String mfn,
+    public static SuggestedDeliveryItem of(String category, String name, String ean, String mfn,
                                            int expectedQty, int availableAtSupplier, boolean lowestPrice, double unitCost) {
         SuggestedDeliveryItem item = new SuggestedDeliveryItem();
         item.category = category;
@@ -41,11 +40,11 @@ public class SuggestedDeliveryItem {
         return item;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 

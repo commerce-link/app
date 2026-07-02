@@ -71,7 +71,7 @@ public class ProductDetails {
                 product.getLabel(),
                 product.getName(),
                 product.getCategory().getProductGroup(),
-                product.getCategory()
+                product.getCategory().name()
         );
 
         p.setRecommendation(product.getRecommendation());
