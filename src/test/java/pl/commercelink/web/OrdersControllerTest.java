@@ -241,6 +241,31 @@ class OrdersControllerTest {
     }
 
     @Test
+    @DisplayName("updateShipments does not republish ShipmentCreated when only sub-minute shippedAt precision differs")
+    void updateShipmentsDoesNotRepublishWhenShippedAtLosesSubMinutePrecision() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31, 22));
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-1");
+        resubmittedShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31));
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
     @DisplayName("updateShipments republishes ShipmentCreated when the resubmitted tracking number changes")
     void updateShipmentsPublishesWhenTrackingNumberChanges() {
         // given

@@ -44,6 +44,7 @@ import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderItemsForm;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -769,7 +770,9 @@ public class OrdersController extends BaseController {
                         Objects.toString(s.getCarrier(), ""),
                         Objects.toString(s.getTrackingNo(), ""),
                         Objects.toString(s.getTrackingUrl(), ""),
-                        Objects.toString(s.getShippedAt(), "")))
+                        // the shipments form round-trips shippedAt at minute precision,
+                        // so sub-minute digits must not count as a data change
+                        s.getShippedAt() == null ? "" : s.getShippedAt().truncatedTo(ChronoUnit.MINUTES).toString()))
                 .collect(Collectors.toList());
     }
 
