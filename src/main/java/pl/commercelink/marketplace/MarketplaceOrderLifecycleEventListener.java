@@ -6,7 +6,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
-import pl.commercelink.marketplace.api.MarketplaceOrderStatus;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.orders.*;
@@ -57,18 +56,24 @@ public class MarketplaceOrderLifecycleEventListener {
         String externalOrderId = order.getExternalOrderId();
 
         switch (payload.getType()) {
-            case StatusChange:
-                if (order.getStatus() != OrderStatus.New && order.getStatus() != OrderStatus.Blocked) {
-                    provider.updateOrderStatus(externalOrderId, mapOrderStatus(order.getStatus()));
-                }
+            case OrderAccepted:
+                provider.acceptOrder(externalOrderId);
                 break;
             case ShipmentCreated:
                 extractShipmentUpdate(order)
-                        .ifPresent(update -> provider.updateShipment(externalOrderId, update));
+                        .ifPresent(update -> provider.shipOrder(externalOrderId, update));
+                break;
+            case OrderCancelled:
+                provider.cancelOrder(externalOrderId);
+                break;
+            case OrderCompleted:
+                provider.completeOrder(externalOrderId);
                 break;
             case InvoiceCreated:
                 extractInvoiceUpdate(order)
                         .ifPresent(update -> provider.updateInvoice(externalOrderId, update));
+                break;
+            case StatusChange:
                 break;
         }
     }
@@ -86,20 +91,5 @@ public class MarketplaceOrderLifecycleEventListener {
                 .filter(d -> d.getType().isClosingInvoice())
                 .findFirst()
                 .map(d -> new InvoiceUpdate(d.getNumber(), d.getLink()));
-    }
-
-    private MarketplaceOrderStatus mapOrderStatus(OrderStatus orderStatus) {
-        switch (orderStatus) {
-            case Shipping:
-                return MarketplaceOrderStatus.Shipping;
-            case Delivered:
-                return MarketplaceOrderStatus.Delivered;
-            case Completed:
-                return MarketplaceOrderStatus.Completed;
-            case Cancelled:
-                return MarketplaceOrderStatus.Cancelled;
-            default:
-                return MarketplaceOrderStatus.InProgress;
-        }
     }
 }

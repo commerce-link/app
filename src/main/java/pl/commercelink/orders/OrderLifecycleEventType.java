@@ -1,7 +1,11 @@
 package pl.commercelink.orders;
 
 public enum OrderLifecycleEventType {
-    StatusChange,
+    OrderAccepted,
+    OrderCancelled,
+    OrderCompleted,
     ShipmentCreated,
-    InvoiceCreated
+    InvoiceCreated,
+    @Deprecated
+    StatusChange
 }

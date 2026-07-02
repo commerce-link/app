@@ -250,7 +250,7 @@ public class OrdersManager {
 
         orderItemsRepository.batchSave(orderItems);
         ordersRepository.save(order);
-        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.StatusChange);
+        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
     public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {
