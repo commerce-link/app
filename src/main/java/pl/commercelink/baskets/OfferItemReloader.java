@@ -38,7 +38,7 @@ public class OfferItemReloader {
     public List<OfferItem> recalculate(Basket basket) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
 
-        updatePrices(basket.getStoreId(), basket.getBasketItems());
+        updatePrices(basket);
         updateCosts(enabledInventory, basket.getBasketItems());
 
         return reload(enabledInventory, basket);
@@ -98,8 +98,9 @@ public class OfferItemReloader {
         return sortedOfferItems;
     }
 
-    private void updatePrices(String storeId, List<BasketItem> basketItems) {
-        basketItems.stream()
+    private void updatePrices(Basket basket) {
+        String storeId = basket.getStoreId();
+        basket.getBasketItems().stream()
                 .filter(i -> isNotBlank(i.getCatalogId()))
                 .filter(i -> isNotBlank(i.getId()))
                 .forEach(i -> {
