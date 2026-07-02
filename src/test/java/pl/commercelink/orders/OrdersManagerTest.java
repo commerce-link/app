@@ -157,7 +157,7 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes StatusChange")
+    @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes OrderCancelled")
     void cancelOrderZeroesServicesAndSetsCancelled() {
         // given
         Order order = deliveredOrder(150.0);
@@ -176,7 +176,7 @@ class OrdersManagerTest {
         assertThat(order.getTotalPrice()).isEqualTo(0.0);
         verify(orderItemsRepository).batchSave(List.of(product, service));
         verify(ordersRepository).save(order);
-        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.StatusChange);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
     @Test
