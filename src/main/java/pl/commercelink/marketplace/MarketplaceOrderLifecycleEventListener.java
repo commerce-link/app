@@ -57,18 +57,20 @@ public class MarketplaceOrderLifecycleEventListener {
 
         switch (payload.getType()) {
             case OrderAccepted:
-                if (!order.getStatus().isOneOf(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed, OrderStatus.Cancelled)) {
-                    provider.acceptOrder(externalOrderId);
-                }
+                ensureOrderAccepted(order, provider);
                 break;
             case ShipmentCreated:
                 extractShipmentUpdate(order)
-                        .ifPresent(update -> provider.shipOrder(externalOrderId, update));
+                        .ifPresent(update -> {
+                            ensureOrderAccepted(order, provider);
+                            provider.shipOrder(externalOrderId, update);
+                        });
                 break;
             case OrderCancelled:
                 provider.cancelOrder(externalOrderId);
                 break;
             case OrderCompleted:
+                ensureOrderAccepted(order, provider);
                 provider.completeOrder(externalOrderId);
                 break;
             case InvoiceCreated:
@@ -78,6 +80,19 @@ public class MarketplaceOrderLifecycleEventListener {
             case StatusChange:
                 break;
         }
+    }
+
+    // Acceptance is recorded on the order instead of being inferred from the current
+    // status: the queue is at-least-once without ordering, and single-pass transitions
+    // (New/Blocked -> Shipping/Completed) persist the new status before this listener
+    // runs. Ship/complete also route through here so acceptance always precedes them.
+    private void ensureOrderAccepted(Order order, MarketplaceProvider provider) {
+        if (order.isMarketplaceAccepted() || order.getStatus() == OrderStatus.Cancelled) {
+            return;
+        }
+        provider.acceptOrder(order.getExternalOrderId());
+        order.markMarketplaceAccepted();
+        ordersRepository.save(order);
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order) {

@@ -23,9 +23,14 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import org.mockito.InOrder;
+
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -63,18 +68,47 @@ class MarketplaceOrderLifecycleEventListenerTest {
         when(order.getShipments()).thenReturn(List.of());
         when(order.getDocuments()).thenReturn(List.of());
         when(order.getStatus()).thenReturn(OrderStatus.Assembly);
+        when(order.isMarketplaceAccepted()).thenReturn(true);
         when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
     }
 
     @Test
-    void orderAcceptedEventCallsAcceptOrder() {
+    void orderAcceptedEventCallsAcceptOrderAndRecordsAcceptance() {
+        // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
+
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
 
         // then
         verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
+        verify(order).markMarketplaceAccepted();
+        verify(ordersRepository).save(order);
         verifyNoMoreInteractions(provider);
+    }
+
+    @Test
+    void orderAcceptedEventIsSkippedWhenAcceptanceAlreadyRecorded() {
+        // when
+        handle(OrderLifecycleEventType.OrderAccepted);
+
+        // then
+        verifyNoInteractions(provider);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    void orderAcceptedEventIsSkippedWhenOrderIsCancelled() {
+        // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
+        when(order.getStatus()).thenReturn(OrderStatus.Cancelled);
+
+        // when
+        handle(OrderLifecycleEventType.OrderAccepted);
+
+        // then
+        verifyNoInteractions(provider);
     }
 
     @Test
@@ -162,32 +196,37 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
-    void orderAcceptedEventIsSkippedWhenOrderIsAlreadyShipping() {
+    void orderAcceptedEventCallsAcceptOrderWhenOrderIsAlreadyShipping() {
         // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Shipping);
 
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
 
         // then
-        verifyNoInteractions(provider);
+        verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
+        verifyNoMoreInteractions(provider);
     }
 
     @Test
-    void orderAcceptedEventIsSkippedWhenOrderIsAlreadyCompleted() {
+    void orderAcceptedEventCallsAcceptOrderWhenOrderIsAlreadyCompleted() {
         // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Completed);
 
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
 
         // then
-        verifyNoInteractions(provider);
+        verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
+        verifyNoMoreInteractions(provider);
     }
 
     @Test
     void orderAcceptedEventCallsAcceptOrderWhenOrderIsStillInAssembly() {
         // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Assembly);
 
         // when
@@ -196,6 +235,43 @@ class MarketplaceOrderLifecycleEventListenerTest {
         // then
         verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
         verifyNoMoreInteractions(provider);
+    }
+
+    @Test
+    void shipmentCreatedEventAcceptsOrderBeforeShippingWhenAcceptanceNotRecorded() {
+        // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
+        Shipment shipment = mock(Shipment.class);
+        when(shipment.hasShippingData()).thenReturn(true);
+        when(shipment.getTrackingNo()).thenReturn("TRACK-9");
+        when(shipment.getCarrier()).thenReturn("DPD");
+        when(shipment.getTrackingUrl()).thenReturn("https://track.example/TRACK-9");
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        InOrder inOrder = inOrder(provider);
+        inOrder.verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
+        inOrder.verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
+        verify(order).markMarketplaceAccepted();
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    void orderCompletedEventAcceptsOrderBeforeCompletingWhenAcceptanceNotRecorded() {
+        // given
+        when(order.isMarketplaceAccepted()).thenReturn(false);
+        when(order.getStatus()).thenReturn(OrderStatus.Completed);
+
+        // when
+        handle(OrderLifecycleEventType.OrderCompleted);
+
+        // then
+        InOrder inOrder = inOrder(provider);
+        inOrder.verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
+        inOrder.verify(provider).completeOrder(EXTERNAL_ORDER_ID);
     }
 
     @Test
