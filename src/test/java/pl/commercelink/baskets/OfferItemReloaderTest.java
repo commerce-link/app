@@ -108,7 +108,7 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(laptopItem, cpuItem);
 
         // when
-        offerItemReloader.reload(STORE_ID, basket);
+        offerItemReloader.reload(basket);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);

@@ -165,7 +165,7 @@ class OfferControllerTest {
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
                 ProductCategory.Laptops, 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find("cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
