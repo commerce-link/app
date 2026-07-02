@@ -31,14 +31,14 @@ public class OfferItemReloader {
         this.basketsRepository = basketsRepository;
     }
 
-    public List<OfferItem> reload(String storeId, Basket basket) {
-        return reload(inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING), basket);
+    public List<OfferItem> reload(Basket basket) {
+        return reload(inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING), basket);
     }
 
-    public List<OfferItem> recalculate(String storeId, Basket basket) {
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
+    public List<OfferItem> recalculate(Basket basket) {
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
 
-        updatePrices(storeId, basket.getBasketItems());
+        updatePrices(basket.getStoreId(), basket.getBasketItems());
         updateCosts(enabledInventory, basket.getBasketItems());
 
         return reload(enabledInventory, basket);

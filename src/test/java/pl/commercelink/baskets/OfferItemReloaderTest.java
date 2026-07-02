@@ -69,7 +69,7 @@ class OfferItemReloaderTest {
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -88,7 +88,7 @@ class OfferItemReloaderTest {
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -105,7 +105,7 @@ class OfferItemReloaderTest {
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         verify(basketsRepository).save(basket);

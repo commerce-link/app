@@ -44,7 +44,7 @@ public class BasketsRestApi {
                 .withSource(new OrderSource("", OrderSourceType.WebStore))
                 .build();
 
-        processBasket(storeId, basket, req);
+        processBasket(basket, req);
 
         if (req.isSendInvoice()) {
             InvoicingService.OperationResult result = invoicingService.createProforma(basket, Locale.getDefault(), true);
@@ -60,14 +60,14 @@ public class BasketsRestApi {
                                              @RequestBody CheckoutRequest req) {
         return basketsRepository.findById(storeId, basketId)
                 .map(basket -> {
-                    processBasket(storeId, basket, req);
+                    processBasket(basket, req);
                     return ResponseEntity.ok().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    private void processBasket(String storeId, Basket basket, CheckoutRequest req) {
-        List<BasketItem> items = req.toBasketItems(storeId, pricelistRepository);
+    private void processBasket(Basket basket, CheckoutRequest req) {
+        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
 
         basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());
