@@ -144,7 +144,8 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     public List<OrderItem> scanAndSort(DynamoDBScanExpression scanExpression) {
         return dynamoDBMapper.scan(OrderItem.class, scanExpression)
                 .stream()
-                .sorted(Comparator.comparing(OrderItem::getSequenceNumber))
+                .sorted(Comparator.comparing(OrderItem::getPosition, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(OrderItem::getItemId))
                 .collect(Collectors.toList());
     }
 

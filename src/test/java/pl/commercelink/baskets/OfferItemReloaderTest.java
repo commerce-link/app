@@ -98,8 +98,8 @@ class OfferItemReloaderTest {
     }
 
     @Test
-    @DisplayName("reload assigns basket item positions matching the reordered list")
-    void reloadAssignsBasketItemPositionsMatchingReorderedList() {
+    @DisplayName("reload keeps basket items in position order regardless of category")
+    void reloadKeepsBasketItemsInPositionOrderRegardlessOfCategory() {
         // given
         BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
                 ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
@@ -111,11 +111,90 @@ class OfferItemReloaderTest {
         offerItemReloader.reload(basket);
 
         // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-C", "MFN-L");
+        List<BasketItem> savedItems = savedBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
         assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("reload sorts basket items by position ascending")
+    void reloadSortsBasketItemsByPositionAscending() {
+        // given
+        BasketItem first = basketItemWithPrice("MFN-1", 100.0);
+        BasketItem second = basketItemWithPrice("MFN-2", 100.0);
+        BasketItem third = basketItemWithPrice("MFN-3", 100.0);
+        Basket basket = basketWith(first, second, third);
+        first.setPosition(2);
+        second.setPosition(0);
+        third.setPosition(1);
+
+        // when
+        offerItemReloader.reload(basket);
+
+        // then
+        assertThat(savedBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-2", "MFN-3", "MFN-1");
+    }
+
+    @Test
+    @DisplayName("reload puts basket items with null position last")
+    void reloadPutsBasketItemsWithNullPositionLast() {
+        // given
+        BasketItem legacy = basketItemWithPrice("MFN-LEGACY", 100.0);
+        BasketItem first = basketItemWithPrice("MFN-1", 100.0);
+        BasketItem second = basketItemWithPrice("MFN-2", 100.0);
+        Basket basket = basketWith(legacy, first, second);
+        legacy.setPosition(null);
+        first.setPosition(1);
+        second.setPosition(0);
+
+        // when
+        offerItemReloader.reload(basket);
+
+        // then
+        List<BasketItem> savedItems = savedBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-2", "MFN-1", "MFN-LEGACY");
+        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("reload breaks equal positions by unit price descending")
+    void reloadBreaksEqualPositionsByUnitPriceDescending() {
+        // given
+        BasketItem cheap = basketItemWithPrice("MFN-CHEAP", 100.0);
+        BasketItem expensive = basketItemWithPrice("MFN-EXPENSIVE", 300.0);
+        BasketItem last = basketItemWithPrice("MFN-LAST", 500.0);
+        Basket basket = basketWith(cheap, expensive, last);
+        cheap.setPosition(0);
+        expensive.setPosition(0);
+        last.setPosition(1);
+
+        // when
+        offerItemReloader.reload(basket);
+
+        // then
+        assertThat(savedBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-EXPENSIVE", "MFN-CHEAP", "MFN-LAST");
+    }
+
+    @Test
+    @DisplayName("reload reindexes offer item sequence numbers to match the sorted list")
+    void reloadReindexesOfferItemSequenceNumbersToMatchSortedList() {
+        // given
+        BasketItem first = basketItemWithPrice("MFN-1", 100.0);
+        BasketItem second = basketItemWithPrice("MFN-2", 100.0);
+        BasketItem third = basketItemWithPrice("MFN-3", 100.0);
+        Basket basket = basketWith(first, second, third);
+        first.setPosition(2);
+        second.setPosition(0);
+        third.setPosition(1);
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1, 2);
     }
 
     @Test
@@ -130,6 +209,17 @@ class OfferItemReloaderTest {
 
         // then
         verify(basketsRepository).save(basket);
+    }
+
+    private List<BasketItem> savedBasketItems() {
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        return basketCaptor.getValue().getBasketItems();
+    }
+
+    private BasketItem basketItemWithPrice(String mfn, double unitPrice) {
+        return new BasketItem("pim-" + mfn, "Product " + mfn, mfn,
+                ProductCategory.Laptops, unitPrice, 0, 1, null, 3, false);
     }
 
     private Basket basketWith(BasketItem... items) {

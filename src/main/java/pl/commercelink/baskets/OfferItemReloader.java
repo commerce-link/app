@@ -86,12 +86,10 @@ public class OfferItemReloader {
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {
         List<OfferItem> sortedOfferItems = offerItems.stream()
-                .sorted(Comparator.comparingInt((OfferItem o) -> getCategoryOrdinal(o.getBasketItem())).reversed()
-                        .thenComparing(Comparator.comparingInt(OfferItem::getSequenceNumber).reversed())
-                )
+                .sorted(Comparator.comparing(OfferItem::getPosition, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(OfferItem::getUnitPrice, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
 
-        Collections.reverse(sortedOfferItems);
         for (int i = 0; i < sortedOfferItems.size(); i++) {
             sortedOfferItems.get(i).setSequenceNumber(i);
         }
@@ -162,13 +160,6 @@ public class OfferItemReloader {
                 .filter(c -> c.isFor(orderItem))
                 .findFirst()
                 .orElse(null);
-    }
-
-    private int getCategoryOrdinal(BasketItem basketItem) {
-        if (basketItem == null || basketItem.getCategoryKey() == null) {
-            return Integer.MAX_VALUE;
-        }
-        return basketItem.getSequenceNumber();
     }
 
 }

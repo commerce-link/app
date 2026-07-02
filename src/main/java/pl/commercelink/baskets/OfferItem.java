@@ -60,6 +60,10 @@ public class OfferItem {
 
     public int getSequenceNumber() { return sequenceNumber; }
 
+    public Integer getPosition() { return basketItem == null ? null : basketItem.getPosition(); }
+
+    public double getUnitPrice() { return basketItem == null ? 0 : basketItem.getUnitPrice(); }
+
     public String getCostRangeDistribution() {
         if (basketItem.isService()) {
             return "";
