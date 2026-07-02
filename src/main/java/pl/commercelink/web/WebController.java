@@ -16,6 +16,7 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrdersRepository;
@@ -25,6 +26,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -61,6 +63,9 @@ public class WebController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
+
+    @Autowired
+    private ManualSupplierService manualSupplierService;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -171,8 +176,9 @@ public class WebController {
     }
 
     private String mapInventory(Model model, Inventory _inventory) {
-        List<String> enabledSuppliers = getStoreId() != null ?
-                new ArrayList<>(storesRepository.findById(getStoreId()).getEnabledProviders()) :
+        Store store = getStoreId() != null ? storesRepository.findById(getStoreId()) : null;
+        List<String> enabledSuppliers = store != null ?
+                new ArrayList<>(store.getEnabledProviders()) :
                 new ArrayList<>(supplierRegistry.getAllSupplierNames());
         enabledSuppliers.add(SupplierRegistry.WAREHOUSE);
 
@@ -184,6 +190,7 @@ public class WebController {
                 ));
 
         model.addAttribute("enabledSuppliers", enabledSuppliers);
+        model.addAttribute("manualSuppliers", store != null ? manualSupplierService.list(store) : List.of());
         model.addAttribute("inventorySize", _inventory.size());
         model.addAttribute("supplierUpdateEntries", providerUpdateDates.entrySet());
         model.addAttribute("taxonomyFileName", taxonomyCache.getFileName());
