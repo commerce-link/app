@@ -51,8 +51,6 @@ public class BasketOrderImporter {
                 order.increaseTotalPrice(opt.getPrice());
         });
 
-        OrderItem.fillMissingPositions(orderItems);
-
         ordersManager.saveWithFulfilment(order, orderItems);
 
         cleanUp(getStoreId(), dto);

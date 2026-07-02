@@ -160,7 +160,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         BasketItem existing = basketItem("MFN-A");
         existing.setPosition(0);
-        basket.setBasketItems(new java.util.LinkedList<>(List.of(existing)));
+        basket.setBasketItems(List.of(existing));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
                 ProductCategory.Laptops, 199L, 1L, 3, 0L);
@@ -187,7 +187,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         BasketItem item0 = basketItem("MFN-A");
         BasketItem item1 = basketItem("MFN-B");
-        basket.setBasketItems(new java.util.LinkedList<>(List.of(item0, item1)));
+        basket.setBasketItems(List.of(item0, item1));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
         Model model = new ConcurrentModel();
 

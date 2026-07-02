@@ -296,8 +296,6 @@ class WarehouseController {
                 .filter(orderItem -> scope != RestockScope.WholeCatalog || orderItem.getPrice() > 0)
                 .collect(Collectors.toList());
 
-        OrderItem.fillMissingPositions(orderItems);
-
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 
         model.addAttribute("form", fulfilmentForm);

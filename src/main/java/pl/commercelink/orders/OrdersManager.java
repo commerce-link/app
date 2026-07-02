@@ -54,7 +54,7 @@ public class OrdersManager {
                     store.isPositionConsolidationEnabled()
             );
         }
-        orderItem.setPosition(OrderItem.nextPositionFor(orderItemsRepository.findByOrderId(order.getOrderId())));
+        assignNextPosition(order, orderItem);
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
@@ -76,12 +76,16 @@ public class OrdersManager {
             orderItem.markAsWarehouseFulfilled();
         }
 
-        orderItem.setPosition(OrderItem.nextPositionFor(orderItemsRepository.findByOrderId(order.getOrderId())));
+        assignNextPosition(order, orderItem);
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
+    }
+
+    private void assignNextPosition(Order order, OrderItem orderItem) {
+        orderItem.setPosition(OrderItem.nextPositionFor(orderItemsRepository.findByOrderId(order.getOrderId())));
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {
@@ -256,6 +260,8 @@ public class OrdersManager {
     }
 
     public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {
+        OrderItem.fillMissingPositions(orderItems);
+
         // prevent duplicate orders based on externalOrderId
         if (StringUtils.isNotBlank(order.getExternalOrderId())) {
             Order existingOrder = ordersRepository.findByStoreIdAndExternalOrderId(order.getStoreId(), order.getExternalOrderId());

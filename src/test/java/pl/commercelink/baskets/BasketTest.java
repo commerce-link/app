@@ -58,6 +58,21 @@ class BasketTest {
     }
 
     @Test
+    @DisplayName("removeBasketItem removes the item at index and reindexes remaining positions")
+    void removeBasketItemRemovesItemAtIndexAndReindexesRemainingPositions() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
+
+        // when
+        basket.removeBasketItem(1);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
     @DisplayName("builder assigns zero-based positions after filtering out incomplete items")
     void builderAssignsZeroBasedPositionsAfterFilteringIncompleteItems() {
         // given

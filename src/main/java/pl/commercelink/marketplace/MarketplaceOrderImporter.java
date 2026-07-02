@@ -78,8 +78,6 @@ public class MarketplaceOrderImporter {
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
                 .collect(Collectors.toList());
 
-        OrderItem.fillMissingPositions(orderItems);
-
         ordersManager.saveWithFulfilment(order, orderItems);
     }
 

@@ -75,8 +75,6 @@ public class PaymentWebhookRegistry {
             order.increaseTotalPrice(opt.getPrice());
         });
 
-        OrderItem.fillMissingPositions(orderItems);
-
         ordersManager.saveWithFulfilment(order, orderItems);
 
         basketsRepository.delete(basket);

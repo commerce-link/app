@@ -342,7 +342,7 @@ public class OfferController {
             return "error";
         }
         Basket offer = offerOpt.get();
-        offer.getBasketItems().remove(index);
+        offer.removeBasketItem(index);
         save(offer);
         return "redirect:/dashboard/offer/" + offerId;
     }

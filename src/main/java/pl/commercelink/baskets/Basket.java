@@ -122,14 +122,23 @@ public class Basket {
                     var unifiedMfn = UnifiedProductIdentifiers.unifyMfn(i.getMfn());
                     i.setMfn(unifiedMfn);
                 }).collect(Collectors.toList());
-        for (int i = 0; i < this.basketItems.size(); i++) {
-            this.basketItems.get(i).setPosition(i);
-        }
+        reindexPositions();
     }
 
     public void addBasketItem(BasketItem basketItem) {
         basketItem.setPosition(basketItems.size());
         basketItems.add(basketItem);
+    }
+
+    public void removeBasketItem(int index) {
+        basketItems.remove(index);
+        reindexPositions();
+    }
+
+    private void reindexPositions() {
+        for (int i = 0; i < basketItems.size(); i++) {
+            basketItems.get(i).setPosition(i);
+        }
     }
 
     public LocalDateTime getCreatedAt() {
