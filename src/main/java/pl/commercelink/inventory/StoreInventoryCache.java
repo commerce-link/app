@@ -8,4 +8,6 @@ public interface StoreInventoryCache {
     Optional<StoreInventory> get(String storeId);
 
     void put(String storeId, StoreInventory inventory, Duration ttl);
+
+    void evict(String storeId);
 }

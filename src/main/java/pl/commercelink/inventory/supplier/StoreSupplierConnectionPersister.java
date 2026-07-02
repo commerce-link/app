@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
@@ -26,6 +27,7 @@ public class StoreSupplierConnectionPersister {
     private final StoreSupplierFeedScheduler feedScheduler;
     private final StoreFeedRepository storeFeedRepository;
     private final StoresRepository storesRepository;
+    private final StoreInventoryCache storeInventoryCache;
 
     public PersistOutcome persist(Store existingStore, FulfilmentConfiguration submitted,
                                   Map<String, Map<String, String>> submittedConfig) {
@@ -44,6 +46,7 @@ public class StoreSupplierConnectionPersister {
 
         triggerImmediateImports(changes);
         deleteRemovedFeeds(changes);
+        storeInventoryCache.evict(existingStore.getStoreId());
         return PersistOutcome.success(changes.added(), changes.removed());
     }
 

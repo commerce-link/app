@@ -12,6 +12,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
@@ -70,6 +71,9 @@ public class StoreController {
 
     @Autowired
     private PrintProviderRegistry printProviderRegistry;
+
+    @Autowired
+    private ManualSupplierService manualSupplierService;
 
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
@@ -385,13 +389,27 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
         form.setSupplierSelections(storeSupplierConnectionService.selectionsFor(store));
+        List<ManualSupplierSelectionForm> manualSelections = new ArrayList<>();
+        for (ManualSupplierService.ManualSupplierView view : manualSupplierService.list(store)) {
+            ManualSupplierSelectionForm selection = new ManualSupplierSelectionForm();
+            selection.setIdentity(view.identity());
+            selection.setLabel(view.label());
+            selection.setEnabled(view.enabled());
+            selection.setIncludeInPricing(view.includeInPricing());
+            selection.setIncludeInFulfilment(view.includeInFulfilment());
+            selection.setHasFeed(view.hasFeed());
+            manualSelections.add(selection);
+        }
+        form.setManualSupplierSelections(manualSelections);
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("productGroupTypes", ProductGroup.values());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
-        model.addAttribute("connectionModes", ConnectionMode.values());
+        model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
+                .filter(mode -> mode != ConnectionMode.MANUAL)
+                .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "store-fulfilment";
@@ -665,6 +683,14 @@ public class StoreController {
             redirectAttributes.addFlashAttribute("errorMessage", errorMessage);
             return redirectToFulfilment(form.getStore().getStoreId());
         }
+
+        List<ManualSupplierService.ManualSelection> manualSelections = new ArrayList<>();
+        for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
+            manualSelections.add(new ManualSupplierService.ManualSelection(
+                    selection.getIdentity(), selection.isEnabled(),
+                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
+        }
+        manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
 
         List<String> messages = new ArrayList<>();
         messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));

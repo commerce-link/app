@@ -64,6 +64,14 @@
                                     <span th:if="${!enabledSuppliers.contains(entry.key)}" class="ml-2">&bull; </span>
                                     <span th:if="${!enabledSuppliers.contains(entry.key)}" th:text="#{general.disabled}"></span>
                                 </span>
+                                <span th:each="ms : ${manualSuppliers}"
+                                      class="tag is-medium mb-2"
+                                      th:classappend="${ms.enabled} ? 'is-primary' : 'is-danger'">
+                                    <span th:text="${ms.label}">Manual</span>
+                                    <span class="ml-1" th:text="'(' + #{inventory.provider.manual} + ')'"></span>
+                                    <span th:if="${!ms.enabled}" class="ml-2" th:text="'&bull; ' + #{general.disabled}"></span>
+                                    <span th:if="${ms.enabled and !ms.hasFeed}" class="ml-2" th:text="'&bull; ' + #{inventory.provider.nofile}"></span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -144,7 +152,7 @@
                             <td>
                                 <span class="tag"
                                       th:classappend="${enabledSuppliers.contains(item.supplier)} ? 'is-primary' : 'is-danger'"
-                                      th:text="${item.supplier}"></span>
+                                      th:text="${item.supplierLabel}"></span>
                             </td>
                             <td th:text="${item.productEan}"></td>
                             <td th:text="${item.productCode}"></td>

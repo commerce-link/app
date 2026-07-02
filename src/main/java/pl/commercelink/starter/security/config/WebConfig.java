@@ -53,6 +53,7 @@ public class WebConfig {
                                 "/dashboard/store/shipping/**",
                                 "/dashboard/store/notification/**",
                                 "/dashboard/store/fulfilment/**",
+                                "/dashboard/store/manual-supplier/**",
                                 "/dashboard/store/payments/**",
                                 "/dashboard/store/marketplaces/**",
                                 "/dashboard/store/company-details/**",
