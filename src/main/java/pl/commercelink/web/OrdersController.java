@@ -101,6 +101,9 @@ public class OrdersController extends BaseController {
     @Autowired
     private TaxonomyCache taxonomyCache;
 
+    @Autowired
+    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam(required = false) List<String> statuses,
@@ -748,7 +751,11 @@ public class OrdersController extends BaseController {
 
             existingOrder.setShipments(shipments);
         }
-        return save(existingOrder);
+        String view = save(existingOrder);
+        if (existingOrder.getShipments().stream().anyMatch(Shipment::hasShippingData)) {
+            orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+        }
+        return view;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/addReceipt")

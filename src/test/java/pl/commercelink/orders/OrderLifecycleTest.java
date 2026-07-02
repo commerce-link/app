@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,6 +89,7 @@ class OrderLifecycleTest {
         // then
         assertEquals(OrderStatus.Cancelled, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+        verifyNoMoreInteractions(orderLifecycleEventPublisher);
     }
 
     @Test
@@ -107,5 +109,26 @@ class OrderLifecycleTest {
         // then
         assertEquals(OrderStatus.Completed, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void publishesBothOrderAcceptedAndOrderCompletedWhenNewOrderIsSettled() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.New);
+        doReturn(true).when(order).isSettled(anyBoolean());
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(false);
+        when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Completed, order.getStatus());
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoMoreInteractions(orderLifecycleEventPublisher);
     }
 }
