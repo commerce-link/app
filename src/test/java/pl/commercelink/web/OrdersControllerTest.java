@@ -19,6 +19,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
@@ -263,6 +264,28 @@ class OrdersControllerTest {
 
         // then
         verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateShipments does not publish ShipmentCreated when the order is cancelled")
+    void updateShipmentsDoesNotPublishWhenOrderIsCancelled() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.Cancelled);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("TRACK-1");
+        shipment.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        String view = ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
     }
 
     @Test

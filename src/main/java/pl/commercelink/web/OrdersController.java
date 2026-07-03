@@ -741,6 +741,11 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateShipments(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder, Model model) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
+        // OrderLifecycle.update never persists cancelled orders, so publishing here
+        // would announce a shipment change that was never saved
+        if (existingOrder.getStatus() == OrderStatus.Cancelled) {
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         List<String> shipmentDataBeforeUpdate = shipmentDataSnapshot(existingOrder);
         if (updatedOrder.getShipments() != null) {
             List<Shipment> shipments = updatedOrder.getShipments().stream()
