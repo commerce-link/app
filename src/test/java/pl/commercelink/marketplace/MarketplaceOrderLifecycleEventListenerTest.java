@@ -20,6 +20,7 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -27,6 +28,7 @@ import org.mockito.InOrder;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -69,7 +71,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         when(order.getDocuments()).thenReturn(List.of());
         when(order.getStatus()).thenReturn(OrderStatus.Assembly);
         when(order.isMarketplaceAccepted()).thenReturn(true);
-        when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
+        when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(new MarketplaceIntegration(MARKETPLACE));
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
     }
 
@@ -317,14 +319,26 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
-    void inactiveMarketplaceIntegrationIsIgnored() {
+    void removedMarketplaceIntegrationIsIgnored() {
         // given
-        when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(false);
+        when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(null);
 
         // when
-        handle(OrderLifecycleEventType.OrderAccepted);
+        handle(OrderLifecycleEventType.OrderCancelled);
 
         // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void loggedOutMarketplaceIntegrationThrowsSoSqsRetriesUntilReauthentication() {
+        // given
+        MarketplaceIntegration integration = new MarketplaceIntegration(MARKETPLACE);
+        integration.setLoggedIn(false);
+        when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(integration);
+
+        // when / then
+        assertThrows(IllegalStateException.class, () -> handle(OrderLifecycleEventType.OrderAccepted));
         verifyNoInteractions(provider);
     }
 

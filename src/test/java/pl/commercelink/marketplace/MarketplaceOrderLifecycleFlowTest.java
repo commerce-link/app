@@ -24,6 +24,7 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
@@ -107,7 +108,7 @@ class MarketplaceOrderLifecycleFlowTest {
         doReturn(true).when(order).isSettled(anyBoolean());
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
-        when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
+        when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(new MarketplaceIntegration(MARKETPLACE));
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
         return order;
     }

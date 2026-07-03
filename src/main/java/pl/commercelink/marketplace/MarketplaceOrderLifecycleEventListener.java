@@ -9,6 +9,7 @@ import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.orders.*;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -44,8 +45,15 @@ public class MarketplaceOrderLifecycleEventListener {
 
         String marketplace = order.getSource().getName();
 
-        if (!store.hasActiveMarketplaceIntegration(marketplace)) {
+        MarketplaceIntegration integration = store.getMarketplaceIntegration(marketplace);
+        if (integration == null) {
             return;
+        }
+        // a logged-out integration must fail loud so SQS retries until the store
+        // re-authenticates; a silent skip would lose the event permanently
+        if (!integration.isLoggedIn()) {
+            throw new IllegalStateException("Marketplace integration " + marketplace
+                    + " for store " + payload.getStoreId() + " is not authenticated");
         }
 
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
