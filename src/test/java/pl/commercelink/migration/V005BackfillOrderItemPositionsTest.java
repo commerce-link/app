@@ -1,6 +1,9 @@
 package pl.commercelink.migration;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ScanRequest;
+import com.amazonaws.services.dynamodbv2.model.ScanResult;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,10 +12,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.taxonomy.ProductCategory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class V005BackfillOrderItemPositionsTest {
 
     private static final String ORDER_ID = "order-1";
@@ -45,7 +52,8 @@ class V005BackfillOrderItemPositionsTest {
         OrderItem laptopItem = orderItem(ORDER_ID, "item-l", ProductCategory.Laptops.name());
         OrderItem cpuItem = orderItem(ORDER_ID, "item-c", ProductCategory.CPU.name());
         OrderItem serviceItem = orderItem(ORDER_ID, "item-s", ProductCategory.Services.name());
-        when(orderItemsRepository.findAll()).thenReturn(List.of(laptopItem, cpuItem, serviceItem));
+        stubScanReturning(ORDER_ID);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(laptopItem, cpuItem, serviceItem));
 
         // when
         migration.backfillPositions();
@@ -62,7 +70,8 @@ class V005BackfillOrderItemPositionsTest {
     void writesPositionsThroughIfNotExistsUpdateOnItemKey() {
         // given
         OrderItem cpuItem = orderItem(ORDER_ID, "item-c", ProductCategory.CPU.name());
-        when(orderItemsRepository.findAll()).thenReturn(List.of(cpuItem));
+        stubScanReturning(ORDER_ID);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(cpuItem));
 
         // when
         migration.backfillPositions();
@@ -85,7 +94,9 @@ class V005BackfillOrderItemPositionsTest {
         // given
         OrderItem firstOrderItem = orderItem("order-1", "item-a", ProductCategory.Laptops.name());
         OrderItem secondOrderItem = orderItem("order-2", "item-b", ProductCategory.CPU.name());
-        when(orderItemsRepository.findAll()).thenReturn(List.of(firstOrderItem, secondOrderItem));
+        stubScanReturning("order-1", "order-2");
+        when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of(firstOrderItem));
+        when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of(secondOrderItem));
 
         // when
         migration.backfillPositions();
@@ -103,7 +114,9 @@ class V005BackfillOrderItemPositionsTest {
         OrderItem cpuItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
         OrderItem missingCategoryItem = orderItem(ORDER_ID, "item-b", null);
         OrderItem unknownCategoryItem = orderItem(ORDER_ID, "item-c", "NotACategory");
-        when(orderItemsRepository.findAll()).thenReturn(List.of(missingCategoryItem, cpuItem, unknownCategoryItem));
+        stubScanReturning(ORDER_ID);
+        when(orderItemsRepository.findByOrderId(ORDER_ID))
+                .thenReturn(List.of(missingCategoryItem, cpuItem, unknownCategoryItem));
 
         // when
         migration.backfillPositions();
@@ -121,7 +134,8 @@ class V005BackfillOrderItemPositionsTest {
         // given
         OrderItem laterItem = orderItem(ORDER_ID, "item-b", ProductCategory.CPU.name());
         OrderItem earlierItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
-        when(orderItemsRepository.findAll()).thenReturn(List.of(laterItem, earlierItem));
+        stubScanReturning(ORDER_ID);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(laterItem, earlierItem));
 
         // when
         migration.backfillPositions();
@@ -133,20 +147,34 @@ class V005BackfillOrderItemPositionsTest {
     }
 
     @Test
-    @DisplayName("does not write order items that already have a position")
-    void doesNotWriteOrderItemsThatAlreadyHavePosition() {
+    @DisplayName("issues an if_not_exists update for every item so existing positions are preserved by DynamoDB")
+    void issuesIfNotExistsUpdateForEveryItemPreservingExistingPositions() {
         // given
-        OrderItem positionedItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
-        positionedItem.setPosition(7);
-        OrderItem missingItem = orderItem(ORDER_ID, "item-b", ProductCategory.CPU.name());
-        when(orderItemsRepository.findAll()).thenReturn(List.of(positionedItem, missingItem));
+        OrderItem firstItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
+        OrderItem secondItem = orderItem(ORDER_ID, "item-b", ProductCategory.CPU.name());
+        stubScanReturning(ORDER_ID);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(firstItem, secondItem));
 
         // when
         migration.backfillPositions();
 
         // then
-        verify(dynamoDB, times(1)).updateItem(any(UpdateItemRequest.class));
-        assertThat(capturedPositionsByItemId()).containsExactlyInAnyOrderEntriesOf(Map.of("item-b", 1));
+        ArgumentCaptor<UpdateItemRequest> captor = ArgumentCaptor.forClass(UpdateItemRequest.class);
+        verify(dynamoDB, times(2)).updateItem(captor.capture());
+        assertThat(captor.getAllValues())
+                .allSatisfy(request -> assertThat(request.getUpdateExpression())
+                        .isEqualTo("SET #p = if_not_exists(#p, :position)"));
+        assertThat(capturedPositionsByItemId()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "item-a", 0,
+                "item-b", 1));
+    }
+
+    private void stubScanReturning(String... orderIds) {
+        List<Map<String, AttributeValue>> items = Arrays.stream(orderIds)
+                .distinct()
+                .map(id -> Map.of("orderId", new AttributeValue().withS(id)))
+                .collect(Collectors.toList());
+        when(dynamoDB.scan(any(ScanRequest.class))).thenReturn(new ScanResult().withItems(items));
     }
 
     private Map<String, Integer> capturedPositionsByItemId() {

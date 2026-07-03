@@ -8,8 +8,6 @@ import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
-import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @DynamoDBTable(tableName = "OrderItems")
@@ -31,7 +29,7 @@ public class OrderItem extends Item {
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
     @DynamoDBAttribute(attributeName = "position")
-    private Integer position;
+    private int position;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -54,6 +52,15 @@ public class OrderItem extends Item {
     @Deprecated
     public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
         this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated);
+    }
+
+    public OrderItem(String orderId, String category, String name, int qty, double price, String sku, boolean consolidated, int position) {
+        this(orderId, category, name, qty, price, sku, consolidated);
+        this.position = position;
+    }
+
+    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated, int position) {
+        this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated, position);
     }
 
     public OrderItem(String orderId, OrderItem source, int qty) {
@@ -198,29 +205,12 @@ public class OrderItem extends Item {
         this.externalItemId = externalItemId;
     }
 
-    public Integer getPosition() {
+    public int getPosition() {
         return position;
     }
 
-    public void setPosition(Integer position) {
+    public void setPosition(int position) {
         this.position = position;
-    }
-
-    public static void fillMissingPositions(List<OrderItem> orderItems) {
-        for (int i = 0; i < orderItems.size(); i++) {
-            if (orderItems.get(i).getPosition() == null) {
-                orderItems.get(i).setPosition(i);
-            }
-        }
-    }
-
-    public static int nextPositionFor(List<OrderItem> orderItems) {
-        return orderItems.stream()
-                .map(OrderItem::getPosition)
-                .filter(Objects::nonNull)
-                .mapToInt(Integer::intValue)
-                .max()
-                .orElse(orderItems.size() - 1) + 1;
     }
 
     public void setSelected(boolean selected) {

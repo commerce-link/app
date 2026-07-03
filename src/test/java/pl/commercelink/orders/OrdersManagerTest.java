@@ -23,6 +23,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -67,7 +69,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory);
+        ordersManager.addOrderItem(store, order, matchedInventory, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -95,7 +97,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory);
+        ordersManager.addOrderItem(store, order, matchedInventory, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -118,7 +120,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability);
+        ordersManager.addOrderItem(store, order, availability, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -145,7 +147,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability);
+        ordersManager.addOrderItem(store, order, availability, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -157,29 +159,24 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem assigns next position after the highest existing item position")
-    void addOrderItemAssignsNextPositionAfterHighestExistingItemPosition() {
+    @DisplayName("addOrderItem stores the provided position and never scans existing items")
+    void addOrderItemStoresProvidedPositionWithoutScanningExistingItems() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        OrderItem first = orderItem("item-1", 10.0);
-        first.setPosition(0);
-        OrderItem second = orderItem("item-2", 20.0);
-        second.setPosition(3);
-        OrderItem legacy = orderItem("item-3", 30.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
                 ProductCategory.Laptops, 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(first, second, legacy));
 
         // when
-        ordersManager.addOrderItem(store, order, availability);
+        ordersManager.addOrderItem(store, order, availability, 4);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getPosition()).isEqualTo(4);
+        verify(orderItemsRepository, never()).findByOrderId(any());
     }
 
     @Test

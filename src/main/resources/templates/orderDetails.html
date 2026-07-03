@@ -215,6 +215,7 @@
     </div>
 
     <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
+        <input type="hidden" name="position" th:value="${#lists.size(orderItemsForm.orderItems)}"/>
         <h2 class="subtitle" th:text="#{order.items}"></h2>
         <div class="box mb-5">
             <div class="table-container mb-4">

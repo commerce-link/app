@@ -37,7 +37,7 @@ public class BasketItem implements Categorized {
     @DynamoDBAttribute(attributeName = "consolidated")
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "position")
-    private Integer position;
+    private int position;
 
     public BasketItem() {
     }
@@ -157,11 +157,11 @@ public class BasketItem implements Categorized {
         this.consolidated = consolidated;
     }
 
-    public Integer getPosition() {
+    public int getPosition() {
         return position;
     }
 
-    public void setPosition(Integer position) {
+    public void setPosition(int position) {
         this.position = position;
     }
 

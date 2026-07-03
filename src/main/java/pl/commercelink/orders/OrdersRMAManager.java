@@ -107,17 +107,16 @@ public class OrdersRMAManager {
     }
 
     private OrderItem createReplacementItem(String orderId, OrderItem orderItem, RMAItem rmaItem) {
-        OrderItem replacementItem = new OrderItem(
+        return new OrderItem(
                 orderId,
                 orderItem.getCategory(),
                 orderItem.getName(),
                 rmaItem.getQty(),
                 0,
                 orderItem.getSku(),
-                orderItem.isConsolidated()
+                orderItem.isConsolidated(),
+                orderItem.getPosition()
         );
-        replacementItem.setPosition(orderItem.getPosition());
-        return replacementItem;
     }
 
     private void commitCurrentOrderChangesIfSuccess(

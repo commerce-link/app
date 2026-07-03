@@ -3,7 +3,6 @@ package pl.commercelink.orders.imports;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
-import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -47,7 +46,9 @@ public class BasketOrderImporter {
                 .collect(Collectors.toList());
 
         basket.resolveDeliveryOption(store).ifPresent(opt -> {
-                orderItems.add(OrderItem.fromDeliveryOption(order.getOrderId(), opt));
+                OrderItem deliveryItem = OrderItem.fromDeliveryOption(order.getOrderId(), opt);
+                deliveryItem.setPosition(orderItems.size());
+                orderItems.add(deliveryItem);
                 order.increaseTotalPrice(opt.getPrice());
         });
 

@@ -10,11 +10,13 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.executeUpdate;
+import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.scanAndProcess;
 
 @ChangeUnit(id = "V005-backfill-order-item-positions", order = "005", author = "commercelink")
 @RequiredArgsConstructor
@@ -29,20 +31,18 @@ public class V005_BackfillOrderItemPositions {
 
     @Execution
     public void backfillPositions() {
-        Map<String, List<OrderItem>> itemsByOrderId = orderItemsRepository.findAll().stream()
-                .collect(Collectors.groupingBy(OrderItem::getOrderId));
+        Set<String> orderIds = new LinkedHashSet<>();
+        scanAndProcess(dynamoDB, TABLE_NAME, List.of("orderId"),
+                key -> orderIds.add(key.get("orderId").getS()));
 
-        for (List<OrderItem> orderItems : itemsByOrderId.values()) {
-            List<OrderItem> displayOrderedItems = orderItems.stream()
+        for (String orderId : orderIds) {
+            List<OrderItem> displayOrderedItems = orderItemsRepository.findByOrderId(orderId).stream()
                     .sorted(Comparator.comparingInt(V005_BackfillOrderItemPositions::displaySequence)
                             .thenComparing(OrderItem::getItemId))
                     .toList();
 
             for (int position = 0; position < displayOrderedItems.size(); position++) {
-                OrderItem orderItem = displayOrderedItems.get(position);
-                if (orderItem.getPosition() == null) {
-                    backfillPosition(orderItem, position);
-                }
+                backfillPosition(displayOrderedItems.get(position), position);
             }
         }
     }

@@ -64,9 +64,9 @@ public class WarehouseFulfilmentService {
                         reservationItem.getRemainingQty(),
                         orderItem.getPrice(),
                         orderItem.getSku(),
-                        orderItem.isConsolidated()
+                        orderItem.isConsolidated(),
+                        orderItem.getPosition()
                 );
-                remainingItem.setPosition(orderItem.getPosition());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -91,9 +91,9 @@ public class WarehouseFulfilmentService {
                 confirmation.qty(),
                 orderItem.getPrice(),
                 orderItem.getSku(),
-                orderItem.isConsolidated()
+                orderItem.isConsolidated(),
+                orderItem.getPosition()
         );
-        newItem.setPosition(orderItem.getPosition());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

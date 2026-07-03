@@ -37,11 +37,11 @@ public class OrdersManager {
     @Autowired
     private OrderLifecycle orderLifecycle;
 
-    public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory) {
+    public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int position) {
         OrderItem orderItem;
         if (!matchedInventory.hasAnyOffers()) {
             String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            orderItem = new OrderItem(order.getOrderId(), Categorized.OTHER, "", 1, 0, mfn, store.isPositionConsolidationEnabled());
+            orderItem = new OrderItem(order.getOrderId(), Categorized.OTHER, "", 1, 0, mfn, store.isPositionConsolidationEnabled(), position);
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
@@ -51,10 +51,10 @@ public class OrdersManager {
                     1,
                     matchedInventory.getMedianPrice().grossValue(),
                     taxonomy.mfn(),
-                    store.isPositionConsolidationEnabled()
+                    store.isPositionConsolidationEnabled(),
+                    position
             );
         }
-        assignNextPosition(order, orderItem);
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
@@ -62,7 +62,7 @@ public class OrdersManager {
         ordersRepository.save(order);
     }
 
-    public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice) {
+    public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int position) {
         OrderItem orderItem = new OrderItem(
                 order.getOrderId(),
                 availabilityAndPrice.getCategory(),
@@ -70,22 +70,18 @@ public class OrdersManager {
                 1,
                 availabilityAndPrice.getPrice(),
                 availabilityAndPrice.getManufacturerCode(),
-                store.isPositionConsolidationEnabled()
+                store.isPositionConsolidationEnabled(),
+                position
         );
         if (orderItem.isService()) {
             orderItem.markAsWarehouseFulfilled();
         }
 
-        assignNextPosition(order, orderItem);
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
-    }
-
-    private void assignNextPosition(Order order, OrderItem orderItem) {
-        orderItem.setPosition(OrderItem.nextPositionFor(orderItemsRepository.findByOrderId(order.getOrderId())));
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {
@@ -260,8 +256,6 @@ public class OrdersManager {
     }
 
     public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {
-        OrderItem.fillMissingPositions(orderItems);
-
         // prevent duplicate orders based on externalOrderId
         if (StringUtils.isNotBlank(order.getExternalOrderId())) {
             Order existingOrder = ordersRepository.findByStoreIdAndExternalOrderId(order.getStoreId(), order.getExternalOrderId());

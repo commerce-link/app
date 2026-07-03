@@ -71,7 +71,9 @@ public class PaymentWebhookRegistry {
                 .collect(Collectors.toList());
 
         basket.resolveDeliveryOption(store).ifPresent(opt -> {
-            orderItems.add(OrderItem.fromDeliveryOption(order.getOrderId(), opt));
+            OrderItem deliveryItem = OrderItem.fromDeliveryOption(order.getOrderId(), opt);
+            deliveryItem.setPosition(orderItems.size());
+            orderItems.add(deliveryItem);
             order.increaseTotalPrice(opt.getPrice());
         });
 
