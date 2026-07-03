@@ -313,8 +313,7 @@ public class OfferController {
                 .filter(a -> a.getCategory() == ProductCategory.valueOf(category) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
                 .findFirst().get();
 
-        BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
-        basket.getBasketItems().add(basketItem);
+        basket.addBasketItem(BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices()));
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
@@ -329,7 +328,7 @@ public class OfferController {
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
 
-        basket.getBasketItems().add(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
+        basket.addBasketItem(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
@@ -343,7 +342,7 @@ public class OfferController {
             return "error";
         }
         Basket offer = offerOpt.get();
-        offer.getBasketItems().remove(index);
+        offer.removeBasketItem(index);
         save(offer);
         return "redirect:/dashboard/offer/" + offerId;
     }

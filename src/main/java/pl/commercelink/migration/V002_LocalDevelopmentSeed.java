@@ -160,6 +160,7 @@ public class V002_LocalDevelopmentSeed {
         item.setCost(1000.00);
         item.setTax(1.23);
         item.setStatus(FulfilmentStatus.New);
+        item.setPosition(0);
         return item;
     }
 
@@ -178,6 +179,7 @@ public class V002_LocalDevelopmentSeed {
         item.setCost(330.00);
         item.setTax(1.23);
         item.setStatus(FulfilmentStatus.New);
+        item.setPosition(1);
         return item;
     }
 }

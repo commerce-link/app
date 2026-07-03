@@ -259,27 +259,29 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addOrderItemFromPriceList(@PathVariable String orderId,
                                             @RequestParam String itemCatalogId, @RequestParam String itemPricelistId,
-                                            @RequestParam String category, @RequestParam String itemLabel, @RequestParam String itemName) {
+                                            @RequestParam String category, @RequestParam String itemLabel, @RequestParam String itemName,
+                                            @RequestParam int position) {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
         Pricelist pricelist = pricelistRepository.find(getStoreId(), itemCatalogId, itemPricelistId);
         Optional<AvailabilityAndPrice> op = pricelist.findByCategoryLabelAndName(ProductCategory.valueOf(category), itemLabel, itemName);
 
-        op.ifPresent(availabilityAndPrice -> ordersManager.addOrderItem(store, order, availabilityAndPrice));
+        op.ifPresent(availabilityAndPrice -> ordersManager.addOrderItem(store, order, availabilityAndPrice, position));
 
         return "redirect:/dashboard/orders/" + order.getOrderId() + "#orderItemsForm";
     }
 
     @PostMapping("/dashboard/orders/{orderId}/add-item/inventory")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String addOrderItemFromInventory(@PathVariable String orderId, @RequestParam(required = false) String itemEan, @RequestParam(required = false) String itemManufacturerCode) {
+    public String addOrderItemFromInventory(@PathVariable String orderId, @RequestParam(required = false) String itemEan, @RequestParam(required = false) String itemManufacturerCode,
+                                            @RequestParam int position) {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
-        ordersManager.addOrderItem(store, order, matchedInventory);
+        ordersManager.addOrderItem(store, order, matchedInventory, position);
 
         return "redirect:/dashboard/orders/" + order.getOrderId() + "#orderItemsForm";
     }

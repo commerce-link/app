@@ -154,13 +154,40 @@ class OfferControllerTest {
     }
 
     @Test
+    @DisplayName("addOfferItemFromPriceList assigns next position after existing basket items")
+    void addOfferItemFromPriceListAssignsNextPositionAfterExistingItems() {
+        // given
+        Basket basket = basketBase();
+        BasketItem existing = basketItem("MFN-A");
+        existing.setPosition(0);
+        basket.setBasketItems(List.of(existing));
+        AvailabilityAndPrice entry = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
+                ProductCategory.Laptops, 199L, 1L, 3, 0L);
+        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
+                ProductCategory.Laptops.name(), "GroupLabel", "Test Product");
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).hasSize(2);
+        assertThat(savedItems.get(1).getPosition()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("removeOfferItem removes the basket item at the specified valid index")
     void removeOfferItemRemovesBasketItemAtSpecifiedIndexWhenInRange() {
         // given
         Basket basket = basketBase();
         BasketItem item0 = basketItem("MFN-A");
         BasketItem item1 = basketItem("MFN-B");
-        basket.setBasketItems(new java.util.LinkedList<>(List.of(item0, item1)));
+        basket.setBasketItems(List.of(item0, item1));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
         Model model = new ConcurrentModel();
 
