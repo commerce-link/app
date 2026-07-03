@@ -60,6 +60,11 @@ public class MarketplaceOrderLifecycleEventListener {
                 ensureOrderAccepted(order, provider);
                 break;
             case ShipmentCreated:
+                // a terminal status is persisted before this listener runs; shipping
+                // after complete/cancel would regress the marketplace state
+                if (order.getStatus().isOneOf(OrderStatus.Completed, OrderStatus.Cancelled)) {
+                    break;
+                }
                 extractShipmentUpdate(order)
                         .ifPresent(update -> {
                             ensureOrderAccepted(order, provider);
@@ -70,6 +75,9 @@ public class MarketplaceOrderLifecycleEventListener {
                 provider.cancelOrder(externalOrderId);
                 break;
             case OrderCompleted:
+                if (order.getStatus() == OrderStatus.Cancelled) {
+                    break;
+                }
                 ensureOrderAccepted(order, provider);
                 provider.completeOrder(externalOrderId);
                 break;

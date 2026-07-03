@@ -155,6 +155,48 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
+    void shipmentCreatedEventIsSkippedWhenOrderIsCompleted() {
+        // given
+        when(order.getStatus()).thenReturn(OrderStatus.Completed);
+        Shipment shipment = mock(Shipment.class);
+        when(shipment.hasShippingData()).thenReturn(true);
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void shipmentCreatedEventIsSkippedWhenOrderIsCancelled() {
+        // given
+        when(order.getStatus()).thenReturn(OrderStatus.Cancelled);
+        Shipment shipment = mock(Shipment.class);
+        when(shipment.hasShippingData()).thenReturn(true);
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void orderCompletedEventIsSkippedWhenOrderIsCancelled() {
+        // given
+        when(order.getStatus()).thenReturn(OrderStatus.Cancelled);
+
+        // when
+        handle(OrderLifecycleEventType.OrderCompleted);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
     void orderCancelledEventCallsCancelOrder() {
         // when
         handle(OrderLifecycleEventType.OrderCancelled);
