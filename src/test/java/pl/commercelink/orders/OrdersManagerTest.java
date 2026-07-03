@@ -159,6 +159,26 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from availability and price shifts a service item into the service band")
+    void addOrderItemFromAvailabilityAndPriceShiftsServiceItemIntoServiceBand() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
+                ProductCategory.Services, 30L, 1L, 1, 0L);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, availability, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionBands.SERVICE_BAND_START + 3);
+    }
+
+    @Test
     @DisplayName("addOrderItem stores the provided position and never scans existing items")
     void addOrderItemStoresProvidedPositionWithoutScanningExistingItems() {
         // given

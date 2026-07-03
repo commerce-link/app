@@ -10,6 +10,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PositionBands;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.payments.api.PaymentWebhookResult;
 import pl.commercelink.provider.EventBindingRegistrar;
@@ -72,7 +73,7 @@ public class PaymentWebhookRegistry {
 
         basket.resolveDeliveryOption(store).ifPresent(opt -> {
             OrderItem deliveryItem = OrderItem.fromDeliveryOption(order.getOrderId(), opt);
-            deliveryItem.setPosition(orderItems.size());
+            deliveryItem.setPosition(PositionBands.DELIVERY_POSITION);
             orderItems.add(deliveryItem);
             order.increaseTotalPrice(opt.getPrice());
         });

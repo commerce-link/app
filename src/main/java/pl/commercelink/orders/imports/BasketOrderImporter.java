@@ -7,6 +7,7 @@ import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.orders.PositionBands;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
@@ -47,7 +48,7 @@ public class BasketOrderImporter {
 
         basket.resolveDeliveryOption(store).ifPresent(opt -> {
                 OrderItem deliveryItem = OrderItem.fromDeliveryOption(order.getOrderId(), opt);
-                deliveryItem.setPosition(orderItems.size());
+                deliveryItem.setPosition(PositionBands.DELIVERY_POSITION);
                 orderItems.add(deliveryItem);
                 order.increaseTotalPrice(opt.getPrice());
         });

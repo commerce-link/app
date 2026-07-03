@@ -98,8 +98,8 @@ class OfferItemReloaderTest {
     }
 
     @Test
-    @DisplayName("reload assigns basket item positions matching the reordered list")
-    void reloadAssignsBasketItemPositionsMatchingReorderedList() {
+    @DisplayName("reload sorts basket items by position preserving the list order")
+    void reloadSortsBasketItemsByPositionPreservingListOrder() {
         // given
         BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
                 ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
@@ -114,8 +114,27 @@ class OfferItemReloaderTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-C", "MFN-L");
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
         assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("reload sorts products before services following the position bands")
+    void reloadSortsProductsBeforeServices() {
+        // given
+        BasketItem service = BasketItem.shipping("Dostawa", 20.0);
+        BasketItem product = new BasketItem("pim-1", "Laptop", "MFN-L",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(service, product);
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "SHIPPING");
+        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
+        assertThat(offerItems.get(0).getBasketItem().getPosition())
+                .isLessThan(offerItems.get(1).getBasketItem().getPosition());
     }
 
     @Test
