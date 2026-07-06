@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.documents.DocumentReason;
+import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
@@ -56,6 +57,9 @@ class WarehouseController {
 
     @Autowired
     private WarehouseGoodsOutService warehouseGoodsOutService;
+
+    @Autowired
+    private DeliveredPredicate deliveredPredicate;
 
     @Autowired
     private WarehouseGoodsInService warehouseGoodsInService;
@@ -239,6 +243,15 @@ class WarehouseController {
     @PostMapping("/dashboard/warehouse/markAsInExternalService")
     String markAsInExternalService(@RequestParam("selectedItemIds") List<String> itemIds,
                                           RedirectAttributes redirectAttributes) {
+        List<WarehouseItem> warehouseItems = itemIds.stream()
+                .map(id -> warehouseRepository.findById(getStoreId(), id))
+                .toList();
+
+        if (!deliveredPredicate.isFromSameSource(getStoreId(), warehouseItems)) {
+            redirectAttributes.addFlashAttribute("errorMessage", "All selected items must have the same provider.");
+            return "redirect:/dashboard/warehouse?statuses=InRMA";
+        }
+
         OperationResult<?> result = warehouseGoodsOutService.issueGoodsOutForExternalService(
                 getStoreId(),
                 itemIds,
