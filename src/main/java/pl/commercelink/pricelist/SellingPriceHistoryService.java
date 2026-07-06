@@ -15,9 +15,9 @@ public class SellingPriceHistoryService {
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
     }
 
-    public void update(String catalogId, List<AvailabilityAndPrice> pricelist) {
+    public void update(String storeId, String catalogId, List<AvailabilityAndPrice> pricelist) {
         try {
-            Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(catalogId);
+            Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(storeId, catalogId);
             LocalDate today = LocalDate.now();
             LocalDate cutoff = today.minusDays(30);
 
@@ -32,7 +32,7 @@ public class SellingPriceHistoryService {
             }
             histories.values().removeIf(h -> h.getLowestPrice30d() == 0);
 
-            sellingPriceHistoryRepository.save(catalogId, histories.values());
+            sellingPriceHistoryRepository.save(storeId, catalogId, histories.values());
         } catch (Exception e) {
             System.err.println("Failed to update selling price history for catalog " + catalogId + ": " + e.getMessage());
         }

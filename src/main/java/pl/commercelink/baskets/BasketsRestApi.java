@@ -67,7 +67,7 @@ public class BasketsRestApi {
     }
 
     private void processBasket(Basket basket, CheckoutRequest req) {
-        List<BasketItem> items = req.toBasketItems(pricelistRepository);
+        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
 
         basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());

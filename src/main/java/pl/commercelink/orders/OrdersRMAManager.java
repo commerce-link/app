@@ -114,7 +114,8 @@ public class OrdersRMAManager {
                 rmaItem.getQty(),
                 0,
                 orderItem.getSku(),
-                orderItem.isConsolidated()
+                orderItem.isConsolidated(),
+                orderItem.getPosition()
         );
     }
 

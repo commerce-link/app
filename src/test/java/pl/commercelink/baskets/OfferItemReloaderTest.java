@@ -64,12 +64,12 @@ class OfferItemReloaderTest {
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
                 ProductCategory.Laptops, 250L, 5L, 3, 0L);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
-        when(pricelistRepository.findNewestPricelistIdCached("cat-1")).thenReturn("pricelist-1");
-        when(pricelistRepository.find("cat-1", "pricelist-1")).thenReturn(pricelist);
+        when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -88,13 +88,34 @@ class OfferItemReloaderTest {
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         BasketItem savedItem = basketCaptor.getValue().getBasketItems().get(0);
         assertThat(savedItem.getUnitCost()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("reload assigns basket item positions matching the reordered list")
+    void reloadAssignsBasketItemPositionsMatchingReorderedList() {
+        // given
+        BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        BasketItem cpuItem = new BasketItem("pim-2", "Processor", "MFN-C",
+                ProductCategory.CPU, 50.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(laptopItem, cpuItem);
+
+        // when
+        offerItemReloader.reload(basket);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-C", "MFN-L");
+        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
     }
 
     @Test
@@ -105,7 +126,7 @@ class OfferItemReloaderTest {
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerItemReloader.recalculate(STORE_ID, basket);
+        offerItemReloader.recalculate(basket);
 
         // then
         verify(basketsRepository).save(basket);

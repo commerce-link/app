@@ -28,6 +28,8 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
+    @DynamoDBAttribute(attributeName = "position")
+    private int position;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -52,6 +54,15 @@ public class OrderItem extends Item {
         this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated);
     }
 
+    public OrderItem(String orderId, String category, String name, int qty, double price, String sku, boolean consolidated, int position) {
+        this(orderId, category, name, qty, price, sku, consolidated);
+        this.position = position;
+    }
+
+    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated, int position) {
+        this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated, position);
+    }
+
     public OrderItem(String orderId, OrderItem source, int qty) {
         super(source.getCategory(), source.getName(), qty, source.getComment());
         this.orderId = orderId;
@@ -60,6 +71,7 @@ public class OrderItem extends Item {
         this.price = source.getPrice();
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
+        this.position = source.getPosition();
 
         this.addFulfilment(
             source.getEan(),
@@ -193,6 +205,14 @@ public class OrderItem extends Item {
         this.externalItemId = externalItemId;
     }
 
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
@@ -245,7 +265,7 @@ public class OrderItem extends Item {
 
     @DynamoDBIgnore
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
-        return new OrderItem(
+        OrderItem orderItem = new OrderItem(
                 orderId,
                 basketItem.getCategoryKey(),
                 basketItem.getName(),
@@ -254,6 +274,8 @@ public class OrderItem extends Item {
                 basketItem.getMfn(),
                 basketItem.isConsolidated()
         );
+        orderItem.setPosition(basketItem.getPosition());
+        return orderItem;
     }
 
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {

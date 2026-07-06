@@ -7,7 +7,6 @@ echo "=== Bootstrapping LocalStack resources ==="
 
 # S3 Buckets
 awslocal s3 mb s3://feeds           # s3.bucket.feeds
-awslocal s3 mb s3://pricelists      # s3.bucket.pricelists
 awslocal s3 mb s3://stores          # s3.bucket.stores
 awslocal s3 mb s3://datalake        # s3.bucket.datalake
 awslocal s3 mb s3://pim             # additional bucket used for PIM data
@@ -17,7 +16,6 @@ awslocal s3 mb s3://pim             # additional bucket used for PIM data
 awslocal s3 sync /local/s3/datalake s3://datalake/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/feeds s3://feeds/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/pim s3://pim/ --exclude ".gitkeep"
-awslocal s3 sync /local/s3/pricelists s3://pricelists/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/stores s3://stores/ --exclude ".gitkeep"
 
 # SQS Queues
