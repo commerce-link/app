@@ -27,6 +27,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
@@ -183,7 +184,7 @@ public class Checkout {
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
                     String requiredCategoryKey = category.getCategory() == null ? null : category.getCategory().name();
-                    if (items.stream().noneMatch(item -> item.hasCategoryKey(requiredCategoryKey) && item.getQty() > 0)) {
+                    if (items.stream().noneMatch(item -> Objects.equals(item.getCategoryKey(), requiredCategoryKey) && item.getQty() > 0)) {
                         throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + requiredCategoryKey);
                     }
                 });

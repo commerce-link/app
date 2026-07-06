@@ -40,6 +40,17 @@ class CheckoutTest {
                 .hasMessageContaining("Required item missing");
     }
 
+    @Test
+    void acceptsNullCategoryItemForNullRequiredCategory() {
+        // given
+        ProductCatalog catalog = catalogRequiring(null);
+        List<BasketItem> items = List.of(basketItem(null));
+
+        // when / then
+        assertThatCode(() -> checkout.validateOrderCompleteness(catalog, items))
+                .doesNotThrowAnyException();
+    }
+
     private ProductCatalog catalogRequiring(ProductCategory category) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategory(category);

@@ -109,7 +109,7 @@ public class OrdersRMAManager {
     private OrderItem createReplacementItem(String orderId, OrderItem orderItem, RMAItem rmaItem) {
         return new OrderItem(
                 orderId,
-                orderItem.getCategory(),
+                orderItem.getCategoryKey(),
                 orderItem.getName(),
                 rmaItem.getQty(),
                 0,

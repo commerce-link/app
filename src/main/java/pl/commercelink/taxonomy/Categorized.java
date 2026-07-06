@@ -9,6 +9,7 @@ public interface Categorized {
 
     String getCategoryKey();
 
+    @Deprecated
     @DynamoDBIgnore
     default ProductCategory getCategory() {
         return getCategoryKey() == null ? null : ProductCategory.valueOf(getCategoryKey());
@@ -17,11 +18,6 @@ public interface Categorized {
     @DynamoDBIgnore
     default boolean hasCategoryKey(String key) {
         return getCategoryKey() != null && getCategoryKey().equals(key);
-    }
-
-    @DynamoDBIgnore
-    default boolean hasGroupKey(String groupKey) {
-        return getCategory() != null && getCategory().getProductGroup().name().equals(groupKey);
     }
 
     @DynamoDBIgnore
@@ -36,7 +32,7 @@ public interface Categorized {
 
     @DynamoDBIgnore
     default boolean isServiceGroup() {
-        return hasGroupKey(SERVICES);
+        return isService();
     }
 
     @Deprecated
