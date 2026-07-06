@@ -6,7 +6,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.starter.localization.EnumLocalizer;
+import pl.commercelink.taxonomy.CategoryLocalizer;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,7 +33,7 @@ class OrderConfirmationEmailNotification extends EmailNotification {
     OrderConfirmationEmailNotification(
             String recipientEmail, String recipientName, String orderId, double totalAmount, String paymentMethod,
             List<OrderItem> orderItems, ShippingDetails shippingDetails, DocumentType documentType, boolean personalCollection,
-            EnumLocalizer enumLocalizer) {
+            CategoryLocalizer categoryLocalizer) {
         super(recipientEmail, recipientName);
         this.orderId = orderId;
         this.totalAmount = totalAmount;
@@ -44,11 +44,11 @@ class OrderConfirmationEmailNotification extends EmailNotification {
 
         this.products = orderItems.stream()
                 .filter(o -> o.isProduct())
-                .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
+                .map(o -> LocalizedOrderItem.fromOrderItem(o, categoryLocalizer))
                 .collect(Collectors.toList());
         this.services = orderItems.stream()
                 .filter(o -> o.isService())
-                .map(o -> LocalizedOrderItem.fromOrderItem(o, enumLocalizer))
+                .map(o -> LocalizedOrderItem.fromOrderItem(o, categoryLocalizer))
                 .collect(Collectors.toList());
     }
 
