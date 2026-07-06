@@ -61,7 +61,7 @@ public class V005_BackfillOrderItemPositions {
             return Integer.MAX_VALUE;
         }
         try {
-            return orderItem.getSequenceNumber();
+            return orderItem.getCategory().ordinal();
         } catch (IllegalArgumentException e) {
             return Integer.MAX_VALUE;
         }

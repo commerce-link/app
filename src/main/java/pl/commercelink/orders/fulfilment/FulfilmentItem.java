@@ -88,14 +88,6 @@ public class FulfilmentItem {
         return this.allocation.isFor(other);
     }
 
-    public int getFirstSortNumber() {
-        return source.getSequenceNumber();
-    }
-
-    public int getSecondSortNumber() {
-        return (int) source.getPriceNet();
-    }
-
     public boolean isAccepted() {
         return accepted;
     }

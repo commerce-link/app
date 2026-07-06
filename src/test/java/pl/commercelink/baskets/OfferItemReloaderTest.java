@@ -138,6 +138,25 @@ class OfferItemReloaderTest {
     }
 
     @Test
+    @DisplayName("reload breaks equal-position ties by unit price descending")
+    void reloadBreaksEqualPositionTiesByUnitPriceDescending() {
+        // given
+        BasketItem cheaper = new BasketItem("pim-1", "Cheaper", "MFN-CHEAP",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        BasketItem pricier = new BasketItem("pim-2", "Pricier", "MFN-PRICEY",
+                ProductCategory.Laptops, 500.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(cheaper, pricier);
+        basket.getBasketItems().forEach(item -> item.setPosition(7));
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn())
+                .containsExactly("MFN-PRICEY", "MFN-CHEAP");
+    }
+
+    @Test
     @DisplayName("recalculate persists basket exactly once when invoked")
     void recalculatePersistsBasketExactlyOnce() {
         // given

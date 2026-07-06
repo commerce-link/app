@@ -55,6 +55,10 @@ public class OrdersManager {
                     position
             );
         }
+        if (orderItem.isService()) {
+            orderItem.setPosition(PositionBands.SERVICE_BAND_START + position);
+            orderItem.markAsWarehouseFulfilled();
+        }
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());

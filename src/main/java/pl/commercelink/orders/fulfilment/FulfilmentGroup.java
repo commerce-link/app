@@ -68,14 +68,6 @@ public class FulfilmentGroup {
                         .anyMatch(k -> k.equals(key)));
     }
 
-    public int getFirstSortNumber() {
-        return source.getSequenceNumber();
-    }
-
-    public int getSecondSortNumber() {
-        return (int) source.getPriceGross();
-    }
-
     public List<FulfilmentItem> getFulfilmentItems() {
         return allocations.stream()
                 .map(a -> new FulfilmentItem(a, source, accepted))

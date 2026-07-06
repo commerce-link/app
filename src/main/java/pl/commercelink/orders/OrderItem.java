@@ -279,7 +279,7 @@ public class OrderItem extends Item {
     }
 
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
-        return new OrderItem(
+        OrderItem deliveryItem = new OrderItem(
                 orderId,
                 Categorized.SERVICES,
                 opt.getName(),
@@ -288,6 +288,8 @@ public class OrderItem extends Item {
                 null,
                 false
         );
+        deliveryItem.setPosition(PositionBands.DELIVERY_POSITION);
+        return deliveryItem;
     }
 
     @DynamoDBIgnore

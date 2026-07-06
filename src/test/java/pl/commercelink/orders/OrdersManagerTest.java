@@ -109,6 +109,31 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from matched inventory shifts a service item into the service band and marks it warehouse-fulfilled")
+    void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", ProductCategory.Services, 1, null, null);
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
+        when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, matchedInventory, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        OrderItem savedItem = itemCaptor.getValue();
+        assertThat(savedItem.getPosition()).isEqualTo(PositionBands.SERVICE_BAND_START + 3);
+        assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+    }
+
+    @Test
     @DisplayName("addOrderItem from availability and price persists item with availability data and increments order total price")
     void addOrderItemFromAvailabilityAndPriceIncrementsOrderTotalsAndPersistsItem() {
         // given

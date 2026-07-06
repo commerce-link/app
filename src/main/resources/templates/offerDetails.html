@@ -307,18 +307,17 @@
         function submitForm(actionType) {
             const form = document.getElementById('offerForm');
             const offerId = /*[[${offer.basketId}]]*/ '';
+            renumberOfferRows();
 
             if (actionType === 'recalculate') {
                 form.action = `/dashboard/offer/${offerId}/recalculate`;
             } else if (actionType === 'save') {
                 const isOfferNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
                 if (!isOfferNameValid) return;
-                renumberOfferRows();
                 form.action = `/dashboard/offer/${offerId}`;
             } else if (actionType === 'saveAsTemplate') {
                 const isTemplateNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
                 if (!isTemplateNameValid) return;
-                renumberOfferRows();
                 form.action = `/dashboard/offer/${offerId}/saveAsTemplate`;
             } else if (actionType === 'createProformaInvoice') {
                 form.action = `/dashboard/offer/${offerId}/createProformaInvoice`;

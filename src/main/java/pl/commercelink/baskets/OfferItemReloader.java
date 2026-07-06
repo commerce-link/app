@@ -62,26 +62,25 @@ public class OfferItemReloader {
     private List<OfferItem> convertBasketItemsIntoOffers(InventoryView inventory, List<BasketItem> basketItems) {
         List<OfferItem> offerItems = new ArrayList<>();
 
-        for (int index = 0; index < basketItems.size(); index++) {
-            BasketItem basketItem = basketItems.get(index);
-            offerItems.add(createOfferItem(inventory, basketItem, index));
+        for (BasketItem basketItem : basketItems) {
+            offerItems.add(createOfferItem(inventory, basketItem));
         }
 
         return sort(offerItems);
     }
 
-    private OfferItem createOfferItem(InventoryView inventory, BasketItem basketItem, int index) {
+    private OfferItem createOfferItem(InventoryView inventory, BasketItem basketItem) {
         if (isNotBlank(basketItem.getName())) {
             MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
 
             if (matchedInventory.hasAnyOffers()) {
-                return new OfferItem(index, basketItem, matchedInventory);
+                return new OfferItem(0, basketItem, matchedInventory);
             }
 
-            return new OfferItem(index, basketItem);
+            return new OfferItem(0, basketItem);
         }
 
-        return new OfferItem(index);
+        return new OfferItem(0);
     }
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {

@@ -262,7 +262,6 @@
 
         const isAccepted = c => c.dataset.accepted === 'true';
         const gross = c => parseFloat(c.dataset.gross) || 0;
-        const grossInt = c => Math.trunc(parseFloat(c.dataset.gross) || 0);
         const net = c => parseFloat(c.dataset.net) || 0;
         const vat = c => (net(c) > 0 ? gross(c) / net(c) : 1);
         const cardOrders = c => [...new Set(Array.from(c.querySelectorAll('tr[data-item]')).map(r => r.dataset.order))];
@@ -292,14 +291,14 @@
             render();
         }
 
-        /* winner per order-item = cheapest (by truncated gross, matching backend (int)priceGross) ACCEPTED card containing it */
+        /* winner per order-item = cheapest ACCEPTED card containing it */
         function computeWinners() {
             const winner = {}, winnerGross = {};
             cards().forEach(c => {
                 if (!isAccepted(c)) return;
                 c.querySelectorAll('tr[data-item]').forEach(r => {
                     const it = r.dataset.item;
-                    if (winner[it] === undefined || grossInt(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = grossInt(c); }
+                    if (winner[it] === undefined || gross(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = gross(c); }
                 });
             });
             return winner;

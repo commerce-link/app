@@ -104,7 +104,7 @@ class WarehouseController {
         warehouseItems =  warehouseRepository.findAllFiltered(getStoreId(), categories, statusEnums)
                 .stream()
                 .filter(item -> item.getStatus() != FulfilmentStatus.Destroyed)
-                .sorted(Comparator.comparing(WarehouseItem::getCategory))
+                .sorted(Comparator.comparing(WarehouseItem::getCategoryKey).thenComparing(WarehouseItem::getName))
                 .collect(Collectors.toList());
 
         double warehouseNetValue = warehouseItems.stream()
