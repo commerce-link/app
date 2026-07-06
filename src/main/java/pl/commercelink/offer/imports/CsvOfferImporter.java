@@ -3,7 +3,7 @@ package pl.commercelink.offer.imports;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.csv.CSVLoader;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.web.dtos.OfferCreationDto;
 
 import java.io.IOException;
@@ -45,12 +45,10 @@ public class CsvOfferImporter implements OfferImporter {
     }
 
     private String validCategory(String category, int rowNumber) {
-        try {
-            ProductCategory.valueOf(category);
-            return category;
-        } catch (IllegalArgumentException e) {
+        if (ProductCategories.tryParse(category).isEmpty()) {
             throw new IllegalArgumentException("Unknown category '" + category + "' in row " + rowNumber);
         }
+        return category;
     }
 
     @Override

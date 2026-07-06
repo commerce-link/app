@@ -20,7 +20,7 @@ class TaxonomyParser {
         String mfn = row[1];
         String brand = row[2];
         String name = row[3];
-        ProductCategory category = parseCategory(row[4]);
+        ProductCategory category = ProductCategories.tryParse(row[4]).orElse(ProductCategory.Other);
         int dataAccuracyScore = parseScore(row[5]);
         Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
         Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
@@ -35,14 +35,6 @@ class TaxonomyParser {
             return new CSVWriter().writeAllRowsToBytes(rows, COLUMNS);
         } catch (IOException e) {
             throw new RuntimeException("Failed to generate CSV", e);
-        }
-    }
-
-    private static ProductCategory parseCategory(String value) {
-        try {
-            return ProductCategory.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            return ProductCategory.Other;
         }
     }
 

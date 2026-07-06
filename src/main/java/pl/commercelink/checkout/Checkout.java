@@ -179,7 +179,7 @@ public class Checkout {
         return new CatalogProcessingResult(catalogId, basketItems);
     }
 
-    void validateOrderCompleteness(ProductCatalog productCatalog, List<BasketItem> items) {
+    private void validateOrderCompleteness(ProductCatalog productCatalog, List<BasketItem> items) {
         productCatalog.getCategories().stream()
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
