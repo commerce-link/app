@@ -106,13 +106,47 @@ class DataCorrectionTest {
         assertThat(result.dataAccuracyScore()).isZero();
     }
 
+    @Test
+    void keepsFeedCategoryWhenPimCategoryIsUnknown() {
+        // given
+        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
+                ProductCategory.CPU, 5, 100, 200);
+        PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isEqualTo(ProductCategory.CPU);
+    }
+
+    @Test
+    void overridesFeedCategoryWhenPimCategoryIsKnown() {
+        // given
+        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
+                ProductCategory.CPU, 5, 100, 200);
+        PimEntry pim = pimEntry(ProductCategory.GPU.name(), true, 7000, 9000);
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isEqualTo(ProductCategory.GPU);
+    }
+
     private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {
+        return pimEntry(ProductCategory.Other.name(), approved, net, gross);
+    }
+
+    private PimEntry pimEntry(String category, boolean approved, Integer net, Integer gross) {
         return new PimEntry(
                 "pim-id",
                 List.of(),
                 "PimBrand",
                 "PimName",
-                ProductCategory.Other.name(),
+                category,
                 "subcategory",
                 approved,
                 net,

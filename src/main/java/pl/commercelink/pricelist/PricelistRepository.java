@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.starter.csv.CSVWriter;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -115,7 +114,7 @@ public class PricelistRepository {
                 fields[3],                            // brand
                 fields[4],                            // label
                 fields[5],                            // name
-                "OS".equals(fields[6]) ? ProductCategory.Software : ProductCategory.valueOf(fields[6]),   // category
+                "OS".equals(fields[6]) ? "Software" : fields[6],   // category
                 price,                                // price
                 Long.parseLong(fields[8]),             // qty
                 parseEstimatedDeliveryDays(fields, 9),  // estimatedDeliveryDays

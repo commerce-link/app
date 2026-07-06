@@ -140,7 +140,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops, 200L, 10L, 5, 0L);
+                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -167,7 +167,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services, 30L, 1L, 1, 0L);
+                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -190,7 +190,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services, 30L, 1L, 1, 0L);
+                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -210,7 +210,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops, 200L, 10L, 5, 0L);
+                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 

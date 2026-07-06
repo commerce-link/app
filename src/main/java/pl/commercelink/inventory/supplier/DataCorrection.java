@@ -42,14 +42,24 @@ class DataCorrection {
             PimEntry entry = pim.get();
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
-            if (entry.category() != null && !Categorized.OTHER.equals(entry.category()))
-                category = ProductCategory.valueOf(entry.category());
+            if (entry.category() != null && !Categorized.OTHER.equals(entry.category())) {
+                ProductCategory pimCategory = parseCategory(entry.category());
+                if (pimCategory != null) category = pimCategory;
+            }
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;
         }
 
         return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight);
+    }
+
+    private static ProductCategory parseCategory(String value) {
+        try {
+            return ProductCategory.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {

@@ -59,6 +59,42 @@ class PricelistRepositoryTest {
     }
 
     @Test
+    void keepsUnknownCategoryFromCsv() {
+        // given
+        String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
+        String csvData = "CatalogId;PimId;ManufacturerCode;Brand;Label;Name;Category;Price;Qty\n" +
+                "catalogId;pim2;mfc2;brand2;label2;name2;Smartwatches;200;20";
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
+        when(fileStorage.canRead(bucketName, key)).thenReturn(true);
+        when(fileStorage.get(bucketName, key)).thenReturn(reader);
+
+        // when
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
+
+        // then
+        assertEquals("Smartwatches", pricelist.getAvailabilityAndPrices().get(0).getCategory());
+    }
+
+    @Test
+    void mapsLegacyOsCategoryToSoftware() {
+        // given
+        String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
+        String csvData = "CatalogId;PimId;ManufacturerCode;Brand;Label;Name;Category;Price;Qty\n" +
+                "catalogId;pim2;mfc2;brand2;label2;name2;OS;200;20";
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
+        when(fileStorage.canRead(bucketName, key)).thenReturn(true);
+        when(fileStorage.get(bucketName, key)).thenReturn(reader);
+
+        // when
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
+
+        // then
+        assertEquals("Software", pricelist.getAvailabilityAndPrices().get(0).getCategory());
+    }
+
+    @Test
     void testFindFileNotThere() {
         String pricelistId = "pricelistId";
         String key = prefix + "pricelistId.csv";
