@@ -237,6 +237,14 @@ public class OrdersManager {
             throw new IllegalStateException("Order must not have an invoice to be deleted");
         }
 
+        // Deleting a marketplace order is the operator's cancellation for an order not yet
+        // shipped: publish the cancel before removing the record. The event carries the
+        // external id + marketplace so the listener can reach the marketplace even though
+        // the record no longer exists.
+        if (order.isMarketplaceOrder()) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
+        }
+
         ordersRepository.delete(order);
     }
 
