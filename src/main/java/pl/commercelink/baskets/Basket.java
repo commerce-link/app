@@ -3,7 +3,7 @@ package pl.commercelink.baskets;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
-import pl.commercelink.orders.PositionBands;
+import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
@@ -127,7 +127,7 @@ public class Basket {
     }
 
     public void addBasketItem(BasketItem basketItem) {
-        int bandStart = basketItem.isService() ? PositionBands.SERVICE_BAND_START : 0;
+        int bandStart = basketItem.isService() ? PositionGroup.SERVICE_GROUP_START : 0;
         int next = basketItems.stream()
                 .filter(i -> i.isService() == basketItem.isService())
                 .mapToInt(BasketItem::getPosition)
@@ -143,7 +143,7 @@ public class Basket {
 
     private void reindexPositions() {
         int productPosition = 0;
-        int servicePosition = PositionBands.SERVICE_BAND_START;
+        int servicePosition = PositionGroup.SERVICE_GROUP_START;
         for (BasketItem item : basketItems) {
             item.setPosition(item.isService() ? servicePosition++ : productPosition++);
         }

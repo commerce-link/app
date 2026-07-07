@@ -53,27 +53,27 @@ class OrderItemsRepositoryTest {
     }
 
     @Test
-    @DisplayName("scanAndSort breaks position ties deterministically by itemId")
-    void scanAndSortBreaksPositionTiesByItemId() {
+    @DisplayName("scanAndSort breaks position ties by unit price descending")
+    void scanAndSortBreaksPositionTiesByUnitPriceDescending() {
         // given
-        OrderItem b = orderItem("id-B", 5);
-        OrderItem a = orderItem("id-A", 5);
-        OrderItem c = orderItem("id-C", 5);
-        stubScan(b, c, a);
+        OrderItem cheap = orderItem("id-cheap", 5, 10.0);
+        OrderItem expensive = orderItem("id-expensive", 5, 300.0);
+        OrderItem mid = orderItem("id-mid", 5, 50.0);
+        stubScan(cheap, expensive, mid);
 
         // when
         List<OrderItem> sorted = repository.scanAndSort(new DynamoDBScanExpression());
 
         // then
-        assertThat(sorted).extracting(OrderItem::getItemId).containsExactly("id-A", "id-B", "id-C");
+        assertThat(sorted).extracting(OrderItem::getItemId).containsExactly("id-expensive", "id-mid", "id-cheap");
     }
 
     @Test
     @DisplayName("scanAndSort keeps product, service and delivery bands ordered regardless of input order")
     void scanAndSortKeepsBandsOrdered() {
         // given
-        OrderItem delivery = orderItem("id-delivery", PositionBands.DELIVERY_POSITION);
-        OrderItem service = orderItem("id-service", PositionBands.SERVICE_BAND_START + 5);
+        OrderItem delivery = orderItem("id-delivery", PositionGroup.DELIVERY_POSITION);
+        OrderItem service = orderItem("id-service", PositionGroup.SERVICE_GROUP_START + 5);
         OrderItem product = orderItem("id-product", 5);
         stubScan(delivery, service, product);
 
@@ -92,7 +92,11 @@ class OrderItemsRepositoryTest {
     }
 
     private OrderItem orderItem(String itemId, int position) {
-        OrderItem orderItem = new OrderItem("order-1", "Laptops", "Product", 1, 10.0, "sku", false, position);
+        return orderItem(itemId, position, 10.0);
+    }
+
+    private OrderItem orderItem(String itemId, int position, double price) {
+        OrderItem orderItem = new OrderItem("order-1", "Laptops", "Product", 1, price, "sku", false, position);
         orderItem.setItemId(itemId);
         return orderItem;
     }

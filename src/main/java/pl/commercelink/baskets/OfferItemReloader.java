@@ -74,33 +74,25 @@ public class OfferItemReloader {
             MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
 
             if (matchedInventory.hasAnyOffers()) {
-                return new OfferItem(0, basketItem, matchedInventory);
+                return new OfferItem(basketItem, matchedInventory);
             }
 
-            return new OfferItem(0, basketItem);
+            return new OfferItem(basketItem);
         }
 
-        return new OfferItem(0);
+        return new OfferItem();
     }
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {
         List<OfferItem> sortedOfferItems = offerItems.stream()
-                .sorted(Comparator.comparingInt(OfferItemReloader::positionOf)
-                        .thenComparing(Comparator.comparingDouble(OfferItemReloader::unitPriceOf).reversed()))
+                .sorted(Comparator.comparingInt(OfferItem::getPosition)
+                        .thenComparing(Comparator.comparingDouble(OfferItem::getUnitPrice).reversed()))
                 .collect(Collectors.toList());
 
         for (int i = 0; i < sortedOfferItems.size(); i++) {
             sortedOfferItems.get(i).setSequenceNumber(i);
         }
         return sortedOfferItems;
-    }
-
-    private static int positionOf(OfferItem offerItem) {
-        return offerItem.getBasketItem() == null ? Integer.MAX_VALUE : offerItem.getBasketItem().getPosition();
-    }
-
-    private static double unitPriceOf(OfferItem offerItem) {
-        return offerItem.getBasketItem() == null ? 0 : offerItem.getBasketItem().getUnitPrice();
     }
 
     private void updatePrices(Basket basket) {

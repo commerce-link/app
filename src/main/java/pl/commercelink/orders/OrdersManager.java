@@ -56,7 +56,7 @@ public class OrdersManager {
             );
         }
         if (orderItem.isService()) {
-            orderItem.setPosition(PositionBands.SERVICE_BAND_START + position);
+            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
             orderItem.markAsWarehouseFulfilled();
         }
         orderItemsRepository.save(orderItem);
@@ -78,7 +78,7 @@ public class OrdersManager {
                 position
         );
         if (orderItem.isService()) {
-            orderItem.setPosition(PositionBands.SERVICE_BAND_START + position);
+            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
             orderItem.markAsWarehouseFulfilled();
         }
 

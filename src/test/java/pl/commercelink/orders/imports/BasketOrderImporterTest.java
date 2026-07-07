@@ -19,7 +19,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
-import pl.commercelink.orders.PositionBands;
+import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -96,11 +96,11 @@ class BasketOrderImporterTest {
 
         List<OrderItem> savedItems = itemsCaptor.getValue();
         assertThat(savedItems).hasSize(3);
-        assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, PositionBands.DELIVERY_POSITION);
+        assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, PositionGroup.DELIVERY_POSITION);
 
         OrderItem deliveryLine = savedItems.get(savedItems.size() - 1);
         assertThat(deliveryLine.getCategory()).isEqualTo(ProductCategory.Services);
-        assertThat(deliveryLine.getPosition()).isEqualTo(PositionBands.DELIVERY_POSITION);
+        assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
     }
 
     private Store storeWithDeliveryOption(DeliveryOption deliveryOption) {

@@ -21,20 +21,17 @@ public class OfferItem {
 
     private boolean existInInventory;
 
-    public OfferItem(int sequenceNumber) {
-        this.sequenceNumber = sequenceNumber;
+    public OfferItem() {
         this.existInInventory = false;
     }
 
-    public OfferItem(int sequenceNumber, BasketItem basketItem) {
-        this.sequenceNumber = sequenceNumber;
+    public OfferItem(BasketItem basketItem) {
         this.basketItem = basketItem;
         this.existInInventory = false;
     }
 
-    public OfferItem(int sequenceNumber, BasketItem basketItem, MatchedInventory matchedInventory) {
+    public OfferItem(BasketItem basketItem, MatchedInventory matchedInventory) {
         this.basketItem = basketItem;
-        this.sequenceNumber = sequenceNumber;
 
         this.lowestCost = matchedInventory.getLowestPrice().grossValue();
         this.lowestCostQty = matchedInventory.getLowestPricedInventoryItem().qty();
@@ -59,6 +56,14 @@ public class OfferItem {
     public BasketItem getBasketItem() { return basketItem; }
 
     public int getSequenceNumber() { return sequenceNumber; }
+
+    public int getPosition() {
+        return basketItem == null ? Integer.MAX_VALUE : basketItem.getPosition();
+    }
+
+    public double getUnitPrice() {
+        return basketItem == null ? 0 : basketItem.getUnitPrice();
+    }
 
     public String getCostRangeDistribution() {
         if (basketItem.isService()) {

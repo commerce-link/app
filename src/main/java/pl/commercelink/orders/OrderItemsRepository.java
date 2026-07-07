@@ -140,7 +140,8 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     public List<OrderItem> scanAndSort(DynamoDBScanExpression scanExpression) {
         return dynamoDBMapper.scan(OrderItem.class, scanExpression)
                 .stream()
-                .sorted(Comparator.comparingInt(OrderItem::getPosition).thenComparing(OrderItem::getItemId))
+                .sorted(Comparator.comparingInt(OrderItem::getPosition)
+                        .thenComparing(Comparator.comparingDouble(OrderItem::getPrice).reversed()))
                 .collect(Collectors.toList());
     }
 

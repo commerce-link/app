@@ -128,7 +128,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getPosition()).isEqualTo(PositionBands.SERVICE_BAND_START + 3);
+        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
@@ -200,7 +200,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionBands.SERVICE_BAND_START + 3);
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
     }
 
     @Test
