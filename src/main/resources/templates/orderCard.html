@@ -44,7 +44,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="item : ${orderItems}">
-                                <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
+                                <td th:text="${categoryI18n.localize(item.categoryKey, 'plural')}"></td>
                                 <td th:text="${item.name}"></td>
                                 <td th:text="${item.qty}"></td>
                                 <td th:text="${item.manufacturerCode}"></td>

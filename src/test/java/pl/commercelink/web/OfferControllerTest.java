@@ -138,7 +138,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops, 199L, 1L, 3, 0L);
+                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -184,7 +184,7 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(existing));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops, 199L, 1L, 3, 0L);
+                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));

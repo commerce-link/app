@@ -59,7 +59,7 @@ public class WarehouseFulfilmentService {
             if (reservationItem.getRemainingQty() > 0) {
                 OrderItem remainingItem = new OrderItem(
                         orderItem.getOrderId(),
-                        orderItem.getCategory(),
+                        orderItem.getCategoryKey(),
                         orderItem.getName(),
                         reservationItem.getRemainingQty(),
                         orderItem.getPrice(),
@@ -86,7 +86,7 @@ public class WarehouseFulfilmentService {
     private OrderItem createOrderItemForReservation(OrderItem orderItem, ReservationConfirmation confirmation) {
         OrderItem newItem = new OrderItem(
                 orderItem.getOrderId(),
-                orderItem.getCategory(),
+                orderItem.getCategoryKey(),
                 orderItem.getName(),
                 confirmation.qty(),
                 orderItem.getPrice(),

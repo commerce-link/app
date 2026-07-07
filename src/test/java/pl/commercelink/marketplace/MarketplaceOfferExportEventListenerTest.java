@@ -166,7 +166,7 @@ class MarketplaceOfferExportEventListenerTest {
         AvailabilityAndPrice ap = new AvailabilityAndPrice(
                 product.getPimId(), product.getEan(), product.getManufacturerCode(),
                 product.getBrand(), product.getLabel(), product.getName(),
-                product.getCategory(), price, 0L, deliveryDays, 0L
+                product.getCategory().name(), price, 0L, deliveryDays, 0L
         );
         when(pricelist.findByPimId(product.getPimId())).thenReturn(Optional.of(ap));
     }

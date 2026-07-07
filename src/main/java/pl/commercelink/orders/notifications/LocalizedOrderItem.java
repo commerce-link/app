@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.Getter;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.starter.localization.EnumLocalizer;
+import pl.commercelink.taxonomy.CategoryLocalizer;
 
 @Getter(AccessLevel.PACKAGE)
 class LocalizedOrderItem {
@@ -18,9 +18,9 @@ class LocalizedOrderItem {
     @JsonProperty("price")
     private double price;
 
-    static LocalizedOrderItem fromOrderItem(OrderItem orderItem, EnumLocalizer enumLocalizer) {
+    static LocalizedOrderItem fromOrderItem(OrderItem orderItem, CategoryLocalizer categoryLocalizer) {
         LocalizedOrderItem localizedOrderItem = new LocalizedOrderItem();
-        localizedOrderItem.category = enumLocalizer.localize(orderItem.getCategory(), "singular");
+        localizedOrderItem.category = categoryLocalizer.localize(orderItem.getCategoryKey(), "singular");
         localizedOrderItem.name = orderItem.getName();
         localizedOrderItem.quantity = orderItem.getQty();
         localizedOrderItem.price = orderItem.getPrice();
