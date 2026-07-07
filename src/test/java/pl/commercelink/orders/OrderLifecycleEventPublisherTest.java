@@ -11,6 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -28,12 +29,16 @@ class OrderLifecycleEventPublisherTest {
     private OrderLifecycleEventPublisher publisher;
 
     @Test
-    void marketplaceOrderEventIsPublishedToMarketplaceOrderLifecycleQueue() {
+    void marketplaceOrderEventCarriesExternalOrderIdAndMarketplace() {
         // given
         ReflectionTestUtils.setField(publisher, "env", "prod");
         when(order.isMarketplaceOrder()).thenReturn(true);
         when(order.getStoreId()).thenReturn(STORE_ID);
         when(order.getOrderId()).thenReturn(ORDER_ID);
+        when(order.getExternalOrderId()).thenReturn("EXT-1");
+        OrderSource source = mock(OrderSource.class);
+        when(source.getName()).thenReturn("Empik");
+        when(order.getSource()).thenReturn(source);
 
         // when
         publisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
@@ -44,6 +49,8 @@ class OrderLifecycleEventPublisherTest {
         assertEquals(STORE_ID, captor.getValue().getStoreId());
         assertEquals(ORDER_ID, captor.getValue().getOrderId());
         assertEquals(OrderLifecycleEventType.ShipmentCreated, captor.getValue().getType());
+        assertEquals("EXT-1", captor.getValue().getExternalOrderId());
+        assertEquals("Empik", captor.getValue().getMarketplace());
     }
 
     @Test

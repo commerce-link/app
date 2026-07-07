@@ -26,7 +26,9 @@ public class OrderLifecycleEventPublisher {
         OrderLifecycleEvent event = new OrderLifecycleEvent(
                 order.getStoreId(),
                 order.getOrderId(),
-                eventType
+                eventType,
+                order.getExternalOrderId(),
+                order.getSource().getName()
         );
 
         sqsTemplate.send("marketplace-order-lifecycle-queue", event);
