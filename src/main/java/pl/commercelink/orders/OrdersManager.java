@@ -238,9 +238,10 @@ public class OrdersManager {
         }
 
         // Deleting a marketplace order is the operator's cancellation for an order not yet
-        // shipped: publish the cancel before removing the record. The event carries the
-        // external id + marketplace so the listener can reach the marketplace even though
-        // the record no longer exists.
+        // shipped. The event is self-describing (external id + marketplace) so the listener
+        // can reach the marketplace even though the record is gone; publish before delete so
+        // a failed publish leaves the order intact for retry rather than a deleted-but-
+        // uncancelled order.
         if (order.isMarketplaceOrder()) {
             orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
         }
