@@ -340,6 +340,55 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
+    void orderAcceptedEventIsSkippedWhenOrderDeleted() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        handleDeleted(OrderLifecycleEventType.OrderAccepted);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void orderCompletedEventIsSkippedWhenOrderDeleted() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        handleDeleted(OrderLifecycleEventType.OrderCompleted);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void invoiceCreatedEventIsSkippedWhenOrderDeleted() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        handleDeleted(OrderLifecycleEventType.InvoiceCreated);
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
+    void deletedOrderWithoutMarketplaceInPayloadIsIgnored() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID,
+                OrderLifecycleEventType.OrderCancelled, EXTERNAL_ORDER_ID, null));
+
+        // then
+        verifyNoInteractions(provider);
+    }
+
+    @Test
     void removedMarketplaceIntegrationIsIgnored() {
         // given
         when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(null);
@@ -401,5 +450,9 @@ class MarketplaceOrderLifecycleEventListenerTest {
 
     private void handle(OrderLifecycleEventType type) {
         listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type));
+    }
+
+    private void handleDeleted(OrderLifecycleEventType type) {
+        listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type, EXTERNAL_ORDER_ID, MARKETPLACE));
     }
 }
