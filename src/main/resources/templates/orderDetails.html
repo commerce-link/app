@@ -257,7 +257,7 @@
                             <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
                         </td>
                         <td>
-                            <a th:if="${item.deliveryId != null}" th:href="@{/dashboard/deliveries/details(deliveryId=${item.deliveryId})}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
                         </td>
                         <td>
                             <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
