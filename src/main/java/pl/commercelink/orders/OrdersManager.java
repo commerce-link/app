@@ -46,7 +46,7 @@ public class OrdersManager {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
-                    taxonomy.category(),
+                    taxonomy.category() == null ? null : taxonomy.category().name(),
                     taxonomy.name(),
                     1,
                     matchedInventory.getMedianPrice().grossValue(),

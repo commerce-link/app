@@ -14,6 +14,7 @@ import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -135,6 +136,33 @@ public class Basket {
                 .max().orElse(bandStart - 1) + 1;
         basketItem.setPosition(next);
         basketItems.add(basketItem);
+    }
+
+    public void addBasketItemInCategoryOrder(BasketItem basketItem, Map<String, Integer> categorySequenceNumbers) {
+        Integer sequenceNumber = basketItem.isService() ? null : sequenceNumberOf(basketItem, categorySequenceNumbers);
+        if (sequenceNumber == null) {
+            addBasketItem(basketItem);
+            return;
+        }
+
+        int index = 0;
+        while (index < basketItems.size() && staysBefore(basketItems.get(index), sequenceNumber, categorySequenceNumbers)) {
+            index++;
+        }
+        basketItems.add(index, basketItem);
+        reindexPositions();
+    }
+
+    private boolean staysBefore(BasketItem existing, int sequenceNumber, Map<String, Integer> categorySequenceNumbers) {
+        if (existing.isService()) {
+            return false;
+        }
+        Integer existingSequenceNumber = sequenceNumberOf(existing, categorySequenceNumbers);
+        return existingSequenceNumber != null && existingSequenceNumber <= sequenceNumber;
+    }
+
+    private static Integer sequenceNumberOf(BasketItem basketItem, Map<String, Integer> categorySequenceNumbers) {
+        return basketItem.getCategory() == null ? null : categorySequenceNumbers.get(basketItem.getCategory());
     }
 
     public void removeBasketItem(int index) {

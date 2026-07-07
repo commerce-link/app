@@ -26,7 +26,7 @@ class CsvOfferImporterTest {
 
         // then
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).getCategoryKey()).isEqualTo("CPU");
+        assertThat(items.get(0).getCategory()).isEqualTo("CPU");
         assertThat(items.get(0).getName()).isEqualTo("Ryzen 7");
     }
 

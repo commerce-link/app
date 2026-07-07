@@ -312,10 +312,16 @@ public class OfferController {
                 .filter(a -> category.equals(a.getCategory()) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
                 .findFirst().get();
 
-        basket.addBasketItem(BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices()));
+        BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
+        basket.addBasketItemInCategoryOrder(basketItem, catalogCategorySequenceNumbers(catalogId));
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
+    }
+
+    private Map<String, Integer> catalogCategorySequenceNumbers(String catalogId) {
+        ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
+        return catalog == null ? Map.of() : catalog.getCategorySequenceNumbers();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/add-item/inventory")

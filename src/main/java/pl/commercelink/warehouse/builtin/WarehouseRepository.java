@@ -129,8 +129,8 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
 
         Set<String> categories = new HashSet<>();
         for (WarehouseItem item : items) {
-            if (item.getCategoryKey() != null) {
-                categories.add(item.getCategoryKey());
+            if (item.getCategory() != null) {
+                categories.add(item.getCategory());
             }
         }
         return categories;

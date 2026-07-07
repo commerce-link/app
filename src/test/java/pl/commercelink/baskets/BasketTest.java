@@ -123,7 +123,7 @@ class BasketTest {
         // given
         BasketItem first = basketItem("MFN-A");
         BasketItem incomplete = new BasketItem("pim-2", "", "MFN-X",
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
         BasketItem second = basketItem("MFN-B");
 
         // when
@@ -153,6 +153,6 @@ class BasketTest {
 
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
     }
 }

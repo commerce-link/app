@@ -75,7 +75,7 @@ class InventoryViewStoreListingsTest {
     private CategoryDefinition cpuCategory() {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-1");
-        definition.setCategory(ProductCategory.CPU);
+        definition.setCategory("CPU");
         return definition;
     }
 

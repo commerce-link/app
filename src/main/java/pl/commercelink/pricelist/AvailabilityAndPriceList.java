@@ -110,7 +110,7 @@ public class AvailabilityAndPriceList {
                 p.getBrand(),
                 p.getLabel(),
                 p.getName(),
-                p.getCategory() == null ? null : p.getCategory().name(),
+                p.getCategory(),
                 grossPrice,
                 totalAvailableQty,
                 estimatedDeliveryDays,

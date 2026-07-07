@@ -1,7 +1,5 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbMetadataConverter;
 import pl.commercelink.starter.dynamodb.Metadata;
@@ -37,8 +35,7 @@ public class Product {
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private ProductCategory category;
+    private String category;
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled = true;
 
@@ -78,13 +75,13 @@ public class Product {
     public Product() {
     }
 
-    public Product(String categoryId, ProductCategory category) {
+    public Product(String categoryId, String category) {
         this.categoryId = categoryId;
         this.productId = UUID.randomUUID().toString();
         this.category = category;
     }
 
-    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String label, String name, ProductCategory category, String pricingGroup) {
+    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String label, String name, String category, String pricingGroup) {
         this(categoryId, category);
 
         this.pimId = pimId;
@@ -174,11 +171,11 @@ public class Product {
         this.name = name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 

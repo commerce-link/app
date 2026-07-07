@@ -183,9 +183,9 @@ public class Checkout {
         productCatalog.getCategories().stream()
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
-                    String requiredCategoryKey = category.getCategory() == null ? null : category.getCategory().name();
-                    if (items.stream().noneMatch(item -> Objects.equals(item.getCategoryKey(), requiredCategoryKey) && item.getQty() > 0)) {
-                        throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + requiredCategoryKey);
+                    String requiredCategory = category.getCategory();
+                    if (items.stream().noneMatch(item -> Objects.equals(item.getCategory(), requiredCategory) && item.getQty() > 0)) {
+                        throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + requiredCategory);
                     }
                 });
     }

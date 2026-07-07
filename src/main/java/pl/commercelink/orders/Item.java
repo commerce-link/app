@@ -7,7 +7,6 @@ import pl.commercelink.inventory.deliveries.Delivered;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -65,11 +64,6 @@ public abstract class Item implements Delivered, Categorized {
         this.name = name;
         this.qty = qty;
         this.comment = comment;
-    }
-
-    @Deprecated
-    public Item(ProductCategory category, String name, int qty, String comment) {
-        this(category == null ? null : category.name(), name, qty, comment);
     }
 
     public void addFulfilment(FulfilmentSource source) {
@@ -252,18 +246,12 @@ public abstract class Item implements Delivered, Categorized {
         return cost * qty;
     }
 
-    @Deprecated
-    @DynamoDBIgnore
-    public void setCategory(ProductCategory category) {
-        this.category = category == null ? null : category.name();
-    }
-
     @DynamoDBAttribute(attributeName = "category")
-    public String getCategoryKey() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategoryKey(String category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 

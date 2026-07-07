@@ -5,7 +5,6 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import java.util.UUID;
@@ -49,22 +48,13 @@ public class OrderItem extends Item {
         this.consolidated = consolidated;
     }
 
-    @Deprecated
-    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated) {
-        this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated);
-    }
-
     public OrderItem(String orderId, String category, String name, int qty, double price, String sku, boolean consolidated, int position) {
         this(orderId, category, name, qty, price, sku, consolidated);
         this.position = position;
     }
 
-    public OrderItem(String orderId, ProductCategory category, String name, int qty, double price, String sku, boolean consolidated, int position) {
-        this(orderId, category == null ? null : category.name(), name, qty, price, sku, consolidated, position);
-    }
-
     public OrderItem(String orderId, OrderItem source, int qty) {
-        super(source.getCategoryKey(), source.getName(), qty, source.getComment());
+        super(source.getCategory(), source.getName(), qty, source.getComment());
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = source.getSku();
@@ -104,7 +94,7 @@ public class OrderItem extends Item {
     }
 
     public void updateAllFields(OrderItem other) {
-        this.setCategoryKey(other.getCategoryKey());
+        this.setCategory(other.getCategory());
         this.setSku(other.getSku());
         this.setName(other.getName());
         this.setPrice(other.getPrice());
@@ -123,7 +113,7 @@ public class OrderItem extends Item {
     }
 
     public void updateLimitedFields(OrderItem other) {
-        this.setCategoryKey(other.getCategoryKey());
+        this.setCategory(other.getCategory());
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
@@ -267,7 +257,7 @@ public class OrderItem extends Item {
     public static OrderItem fromBasketItem(String orderId, BasketItem basketItem) {
         OrderItem orderItem = new OrderItem(
                 orderId,
-                basketItem.getCategoryKey(),
+                basketItem.getCategory(),
                 basketItem.getName(),
                 (int) basketItem.getQty(),
                 basketItem.getUnitPrice(),

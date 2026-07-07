@@ -161,7 +161,7 @@ class OrdersRMAManagerTest {
     }
 
     private OrderItem orderItem(String itemId, double price, int qty) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Other, "test-item", qty, price, "SKU-" + itemId, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "test-item", qty, price, "SKU-" + itemId, false);
         item.setItemId(itemId);
         return item;
     }

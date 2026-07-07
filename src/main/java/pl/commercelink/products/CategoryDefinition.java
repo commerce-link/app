@@ -1,7 +1,5 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
@@ -19,8 +17,7 @@ public class CategoryDefinition implements DeletionProtection {
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private ProductCategory category;
+    private String category;
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private CategoryDefinitionType type = CategoryDefinitionType.Managed;
@@ -104,18 +101,13 @@ public class CategoryDefinition implements DeletionProtection {
     }
 
     @DynamoDBIgnore
-    public boolean hasCategory(ProductCategory category) {
-        return this.category == category;
-    }
-
-    @DynamoDBIgnore
     public boolean hasType(CategoryDefinitionType type) {
         return this.type == type;
     }
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return StringUtils.isNotBlank(name) && category != null && type != null && stockDefinition != null && stockDefinition.isComplete()
+        return StringUtils.isNotBlank(name) && StringUtils.isNotBlank(category) && type != null && stockDefinition != null && stockDefinition.isComplete()
                 && availabilityDefinition != null && availabilityDefinition.isComplete()
                 && !priceDefinitions.isEmpty() && priceDefinitions.stream().anyMatch(PriceDefinition::isComplete);
     }
@@ -160,11 +152,11 @@ public class CategoryDefinition implements DeletionProtection {
         this.name = name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 

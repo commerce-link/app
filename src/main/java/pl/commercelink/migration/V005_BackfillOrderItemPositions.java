@@ -26,6 +26,20 @@ public class V005_BackfillOrderItemPositions {
     private static final String UPDATE_EXPRESSION = "SET #p = if_not_exists(#p, :position)";
     private static final Map<String, String> EXPRESSION_ATTRIBUTE_NAMES = Map.of("#p", "position");
 
+
+    private static final List<String> LEGACY_CATEGORY_ORDER = List.of(
+            "CPU", "Cooler", "GPU", "Motherboard", "PSU", "Storage", "Memory", "Case", "Fan", "ModdingPC", "Other",
+            "Services",
+            "Laptops", "Desktops", "Workstations", "Servers", "AllInOnePCs", "GraphicsTablets", "Software",
+            "Smartphones", "StationaryPhones", "Tablets", "SmartphoneCases", "ScreenProtectors", "Chargers",
+            "Powerbanks", "MobileHeadphones",
+            "Printers", "LaserPrinters", "InkPrinters", "PhotoPrinters", "LargeFormatPrinters", "LabelPrinters",
+            "Printers3D", "Scanners", "MultifunctionPrinters",
+            "Displays", "Keyboards", "Mice", "KeyboardsAndMice", "Headphones", "Microphones", "Webcams",
+            "Speakers", "MousePads",
+            "GamingChairs", "OfficeChairs", "GamingDesks", "OfficeDesks", "StandingDesks", "MonitorMounts",
+            "Footrests");
+
     private final OrderItemsRepository orderItemsRepository;
     private final AmazonDynamoDB dynamoDB;
 
@@ -57,14 +71,11 @@ public class V005_BackfillOrderItemPositions {
     }
 
     private static int displaySequence(OrderItem orderItem) {
-        if (orderItem.getCategoryKey() == null) {
+        if (orderItem.getCategory() == null) {
             return Integer.MAX_VALUE;
         }
-        try {
-            return orderItem.getCategory().ordinal();
-        } catch (IllegalArgumentException e) {
-            return Integer.MAX_VALUE;
-        }
+        int index = LEGACY_CATEGORY_ORDER.indexOf(orderItem.getCategory());
+        return index >= 0 ? index : Integer.MAX_VALUE;
     }
 
     @RollbackExecution
