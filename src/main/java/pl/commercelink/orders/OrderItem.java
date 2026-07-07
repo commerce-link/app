@@ -254,6 +254,11 @@ public class OrderItem extends Item {
     }
 
     @DynamoDBIgnore
+    public boolean isGroup() {
+        return GroupSku.isGroup(sku);
+    }
+
+    @DynamoDBIgnore
     public boolean canBeFulfilledInternally() {
         return isService() && isWarehouseFulfilled();
     }

@@ -228,6 +228,42 @@ public class OrdersManager {
         return newOrder;
     }
 
+    public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components) {
+        OrderItem source = orderItemsRepository.findById(orderId, itemId);
+
+        if (source == null || !source.isNew()) {
+            throw new IllegalStateException("split.group.invalid.state");
+        }
+        if (components == null || components.size() < 2) {
+            throw new IllegalStateException("split.group.no.components");
+        }
+        if (components.stream().anyMatch(c -> !c.isValid())) {
+            throw new IllegalStateException("split.group.invalid.component");
+        }
+
+        double allocatedTotal = components.stream().mapToDouble(SplitGroupComponent::totalPrice).sum();
+        if (Math.abs(allocatedTotal - source.getTotalPrice()) > 0.01) {
+            throw new IllegalStateException("split.group.price.mismatch");
+        }
+
+        for (SplitGroupComponent component : components) {
+            OrderItem newItem = new OrderItem(
+                    orderId,
+                    source.getCategoryKey(),
+                    component.name(),
+                    component.qty(),
+                    component.price(),
+                    component.sku(),
+                    source.isConsolidated(),
+                    source.getPosition()
+            );
+            newItem.setComment(source.getComment());
+            orderItemsRepository.save(newItem);
+        }
+
+        orderItemsRepository.delete(source);
+    }
+
     public void deleteOrder(String storeId, String orderId) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
