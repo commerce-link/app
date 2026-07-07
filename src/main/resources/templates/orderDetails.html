@@ -292,7 +292,7 @@
                                     <div class="dropdown-content">
                                         <a th:if="${item.isNew()}" class="dropdown-item"
                                            href="#"
-                                           th:attr="data-item-id=${item.itemId}"
+                                           th:attr="data-item-id=${item.itemId},data-tax=${item.tax}"
                                            onclick="openQuickAssignModal(this); return false;"
                                            th:text="#{order.item.quick.assign}"></a>
                                         <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
@@ -395,7 +395,7 @@
                 <button class="delete" type="button" onclick="toggleQuickAssignModal(false)"></button>
             </header>
 
-            <form id="quickAssignForm" method="post"
+            <form id="quickAssignForm" method="post" onsubmit="normalizeQuickAssignPrice()"
                   th:action="@{/dashboard/orders/{orderId}/assign-supplier(orderId=${order.orderId})}">
                 <section class="modal-card-body">
                     <input type="hidden" id="quickAssignItemId" name="itemId"/>
@@ -409,10 +409,26 @@
                     </div>
 
                     <div class="field">
-                        <label class="label" th:text="#{order.item.price.net}"></label>
-                        <div class="control">
-                            <input class="input" type="text" id="quickAssignPrice" name="cost" required/>
+                        <label class="label" th:text="#{order.item.price.purchase}"></label>
+                        <div class="field has-addons mb-0">
+                            <div class="control is-expanded">
+                                <input class="input" type="text" id="quickAssignPrice" name="cost" required
+                                       oninput="updateQuickAssignPriceHint()"/>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAssignPriceTypeNet" class="button is-primary is-selected"
+                                        onclick="setQuickAssignPriceType('net')"
+                                        th:text="#{order.item.price.type.net}"></button>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAssignPriceTypeGross" class="button"
+                                        onclick="setQuickAssignPriceType('gross')"
+                                        th:text="#{order.item.price.type.gross}"></button>
+                            </div>
                         </div>
+                        <input type="hidden" id="quickAssignPriceType" value="net"/>
+                        <p class="help" id="quickAssignPriceHint" style="display: none;"
+                           th:attr="data-template=#{order.item.price.net.hint}"></p>
                     </div>
 
                     <div class="field">
@@ -1117,7 +1133,57 @@
             document.getElementById('quickAssignMfn').value = '';
             document.getElementById('quickAssignPrice').value = '';
             document.getElementById('quickAssignSupplier').value = '';
+            document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
+            setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);
+        }
+
+        function setQuickAssignPriceType(type) {
+            document.getElementById('quickAssignPriceType').value = type;
+            document.getElementById('quickAssignPriceTypeNet').classList.toggle('is-primary', type === 'net');
+            document.getElementById('quickAssignPriceTypeNet').classList.toggle('is-selected', type === 'net');
+            document.getElementById('quickAssignPriceTypeGross').classList.toggle('is-primary', type === 'gross');
+            document.getElementById('quickAssignPriceTypeGross').classList.toggle('is-selected', type === 'gross');
+            updateQuickAssignPriceHint();
+        }
+
+        function normalizeQuickAssignPrice() {
+            const priceInput = document.getElementById('quickAssignPrice');
+            priceInput.value = priceInput.value.replace(',', '.').trim();
+
+            const net = calculateQuickAssignNetPrice();
+            if (net !== null) {
+                priceInput.value = net.toFixed(2);
+            }
+        }
+
+        function calculateQuickAssignNetPrice() {
+            const priceInput = document.getElementById('quickAssignPrice');
+            const gross = parseFloat((priceInput.value || '').replace(',', '.'));
+            const tax = parseFloat(priceInput.getAttribute('data-tax'));
+            const isGross = document.getElementById('quickAssignPriceType').value === 'gross';
+
+            if (!isGross || isNaN(gross) || isNaN(tax) || tax < 1) {
+                return null;
+            }
+            return gross / tax;
+        }
+
+        function updateQuickAssignPriceHint() {
+            const hint = document.getElementById('quickAssignPriceHint');
+            const net = calculateQuickAssignNetPrice();
+
+            if (net === null) {
+                hint.style.display = 'none';
+                return;
+            }
+
+            const tax = parseFloat(document.getElementById('quickAssignPrice').getAttribute('data-tax'));
+            const vatPercent = Math.round((tax - 1) * 10000) / 100;
+            hint.textContent = hint.getAttribute('data-template')
+                .replace('{0}', net.toFixed(2))
+                .replace('{1}', vatPercent);
+            hint.style.display = '';
         }
 
         function submitClearSupplier(link) {
