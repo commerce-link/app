@@ -41,6 +41,8 @@ import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderItemsForm;
+import pl.commercelink.web.dtos.SplitGroupForm;
+import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -293,6 +295,11 @@ public class OrdersController extends BaseController {
         return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), catalogId, model);
     }
 
+    private String resolveTaxonomyName(String mfn) {
+        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+        return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
+    }
+
     private String showOrderDetails(Order order, List<OrderItem> orderItems, String catalogId, Model model) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(order.getStoreId());
 
@@ -313,10 +320,16 @@ public class OrdersController extends BaseController {
                 .filter(i -> i.isProduct())
                 .collect(Collectors.toList());
 
+        Map<String, SplitGroupPreviewDto> splitGroupPreviews = orderItems.stream()
+                .filter(OrderItem::isNew)
+                .filter(OrderItem::isGroup)
+                .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::resolveTaxonomyName)));
+
         model.addAttribute("order", order);
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);
+        model.addAttribute("splitGroupPreviews", splitGroupPreviews);
         model.addAttribute("orderFinancials", new OrderFinancials(order, orderItems));
         model.addAttribute("orderStatuses", Arrays.stream(OrderStatus.values())
                 .filter(status -> (status != OrderStatus.Completed || order.getStatus() == OrderStatus.Completed)
@@ -535,6 +548,19 @@ public class OrdersController extends BaseController {
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
         orderItem.removeFulfilment();
         orderItemsRepository.save(orderItem);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/split-group")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String splitGroupItem(@PathVariable String orderId, @ModelAttribute SplitGroupForm form,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents());
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+        }
         return "redirect:/dashboard/orders/" + orderId;
     }
 
