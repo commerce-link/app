@@ -43,7 +43,7 @@
                         <td th:text="${item.unitCost.netValue}"></td>
                         <td th:text="${item.unitCost.grossValue}"></td>
                         <td>
-                            <a th:href="@{/dashboard/deliveries/details(deliveryId=${item.deliveryId})}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
                         </td>
                         <td th:text="${item.serialNo}"></td>
                         <td th:text="${enumI18n.localize(item.status)}"></td>
