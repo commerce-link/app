@@ -39,11 +39,6 @@ public interface Categorized {
         return hasGroupKey(SERVICES);
     }
 
-    @DynamoDBIgnore
-    default int getSequenceNumber() {
-        return getCategory().ordinal();
-    }
-
     @Deprecated
     @DynamoDBIgnore
     default boolean hasCategory(ProductCategory category) {

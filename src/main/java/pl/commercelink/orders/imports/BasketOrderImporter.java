@@ -47,7 +47,6 @@ public class BasketOrderImporter {
 
         basket.resolveDeliveryOption(store).ifPresent(opt -> {
                 OrderItem deliveryItem = OrderItem.fromDeliveryOption(order.getOrderId(), opt);
-                deliveryItem.setPosition(orderItems.size());
                 orderItems.add(deliveryItem);
                 order.increaseTotalPrice(opt.getPrice());
         });

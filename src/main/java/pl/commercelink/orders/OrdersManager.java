@@ -55,6 +55,10 @@ public class OrdersManager {
                     position
             );
         }
+        if (orderItem.isService()) {
+            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
+            orderItem.markAsWarehouseFulfilled();
+        }
         orderItemsRepository.save(orderItem);
 
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
@@ -74,6 +78,7 @@ public class OrdersManager {
                 position
         );
         if (orderItem.isService()) {
+            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
             orderItem.markAsWarehouseFulfilled();
         }
 

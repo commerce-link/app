@@ -111,6 +111,27 @@ class OfferControllerTest {
     }
 
     @Test
+    @DisplayName("updateOffer persists basket items in submitted order and reindexes positions band-aware")
+    void updateOfferPersistsSubmittedItemOrderAndReindexesPositions() {
+        // given
+        Basket existing = basketBase();
+        existing.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
+        Basket payload = new Basket();
+        payload.setBasketItems(List.of(basketItem("MFN-B"), basketItem("MFN-A"), basketItem("MFN-C")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
+
+        // when
+        offerController.updateOffer(OFFER_ID, payload);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
+        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
     @DisplayName("addOfferItemFromPriceList appends a BasketItem built from the matching pricelist entry")
     void addOfferItemFromPriceListAppendsBasketItemConstructedFromPricelistEntry() {
         // given

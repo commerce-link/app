@@ -40,18 +40,6 @@ class CategoryKeyHelpersTest {
     }
 
     @Test
-    void sequenceNumberMatchesEnumOrdinal() {
-        // given
-        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
-
-        // when
-        int sequence = laptop.getSequenceNumber();
-
-        // then
-        assertThat(sequence).isEqualTo(ProductCategory.Laptops.ordinal());
-    }
-
-    @Test
     void categoryKeyAndGroupKeyAreNotConflated() {
         // given
         OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
@@ -75,7 +63,6 @@ class CategoryKeyHelpersTest {
         assertThat(service.isService()).isTrue();
         assertThat(service.isProduct()).isFalse();
         assertThat(laptop.isProduct()).isTrue();
-        assertThat(laptop.getSequenceNumber()).isEqualTo(ProductCategory.Laptops.ordinal());
     }
 
     @Test

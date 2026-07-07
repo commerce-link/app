@@ -62,36 +62,33 @@ public class OfferItemReloader {
     private List<OfferItem> convertBasketItemsIntoOffers(InventoryView inventory, List<BasketItem> basketItems) {
         List<OfferItem> offerItems = new ArrayList<>();
 
-        for (int index = 0; index < basketItems.size(); index++) {
-            BasketItem basketItem = basketItems.get(index);
-            offerItems.add(createOfferItem(inventory, basketItem, index));
+        for (BasketItem basketItem : basketItems) {
+            offerItems.add(createOfferItem(inventory, basketItem));
         }
 
         return sort(offerItems);
     }
 
-    private OfferItem createOfferItem(InventoryView inventory, BasketItem basketItem, int index) {
+    private OfferItem createOfferItem(InventoryView inventory, BasketItem basketItem) {
         if (isNotBlank(basketItem.getName())) {
             MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
 
             if (matchedInventory.hasAnyOffers()) {
-                return new OfferItem(index, basketItem, matchedInventory);
+                return new OfferItem(basketItem, matchedInventory);
             }
 
-            return new OfferItem(index, basketItem);
+            return new OfferItem(basketItem);
         }
 
-        return new OfferItem(index);
+        return new OfferItem();
     }
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {
         List<OfferItem> sortedOfferItems = offerItems.stream()
-                .sorted(Comparator.comparingInt((OfferItem o) -> getCategoryOrdinal(o.getBasketItem())).reversed()
-                        .thenComparing(Comparator.comparingInt(OfferItem::getSequenceNumber).reversed())
-                )
+                .sorted(Comparator.comparingInt(OfferItem::getPosition)
+                        .thenComparing(Comparator.comparingDouble(OfferItem::getUnitPrice).reversed()))
                 .collect(Collectors.toList());
 
-        Collections.reverse(sortedOfferItems);
         for (int i = 0; i < sortedOfferItems.size(); i++) {
             sortedOfferItems.get(i).setSequenceNumber(i);
         }
@@ -162,13 +159,6 @@ public class OfferItemReloader {
                 .filter(c -> c.isFor(orderItem))
                 .findFirst()
                 .orElse(null);
-    }
-
-    private int getCategoryOrdinal(BasketItem basketItem) {
-        if (basketItem == null || basketItem.getCategoryKey() == null) {
-            return Integer.MAX_VALUE;
-        }
-        return basketItem.getSequenceNumber();
     }
 
 }

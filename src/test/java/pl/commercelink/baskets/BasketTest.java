@@ -58,8 +58,8 @@ class BasketTest {
     }
 
     @Test
-    @DisplayName("removeBasketItem removes the item at index and reindexes remaining positions")
-    void removeBasketItemRemovesItemAtIndexAndReindexesRemainingPositions() {
+    @DisplayName("removeBasketItem removes the item at index and leaves a gap in positions")
+    void removeBasketItemRemovesItemAtIndexAndLeavesAGapInPositions() {
         // given
         Basket basket = new Basket();
         basket.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
@@ -69,7 +69,52 @@ class BasketTest {
 
         // then
         assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C");
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 2);
+    }
+
+    @Test
+    @DisplayName("setBasketItems places services into the service band starting at 800")
+    void setBasketItemsPlacesServicesIntoServiceBand() {
+        // given
+        Basket basket = new Basket();
+        BasketItem service = BasketItem.shipping("Dostawa", 20.0);
+
+        // when
+        basket.setBasketItems(List.of(service));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(800);
+    }
+
+    @Test
+    @DisplayName("setBasketItems assigns products from zero and services from the service band independently")
+    void setBasketItemsAssignsProductsFromZeroAndServicesFromServiceBand() {
+        // given
+        Basket basket = new Basket();
+        BasketItem product = basketItem("MFN-A");
+        BasketItem service = BasketItem.shipping("Dostawa", 20.0);
+
+        // when
+        basket.setBasketItems(List.of(product, service));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 800);
+    }
+
+    @Test
+    @DisplayName("addBasketItem appends a service into the next free slot of the service band")
+    void addBasketItemAppendsServiceIntoServiceBand() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A"), BasketItem.shipping("Dostawa", 20.0)));
+        BasketItem addedService = BasketItem.shipping("Montaz", 30.0);
+
+        // when
+        basket.addBasketItem(addedService);
+
+        // then
+        assertThat(addedService.getPosition()).isEqualTo(801);
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 800, 801);
     }
 
     @Test

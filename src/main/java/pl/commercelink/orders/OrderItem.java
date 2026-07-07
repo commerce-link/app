@@ -286,7 +286,8 @@ public class OrderItem extends Item {
                 1,
                 opt.getPrice(),
                 null,
-                false
+                false,
+                PositionGroup.DELIVERY_POSITION
         );
     }
 
