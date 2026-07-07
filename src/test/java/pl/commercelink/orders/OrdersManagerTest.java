@@ -111,13 +111,38 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from matched inventory shifts a service item into the service band and marks it warehouse-fulfilled")
+    void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", ProductCategory.Services, 1, null, null);
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
+        when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, matchedInventory, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        OrderItem savedItem = itemCaptor.getValue();
+        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
+        assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+    }
+
+    @Test
     @DisplayName("addOrderItem from availability and price persists item with availability data and increments order total price")
     void addOrderItemFromAvailabilityAndPriceIncrementsOrderTotalsAndPersistsItem() {
         // given
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops, 200L, 10L, 5, 0L);
+                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -144,7 +169,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services, 30L, 1L, 1, 0L);
+                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -161,13 +186,33 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from availability and price shifts a service item into the service band")
+    void addOrderItemFromAvailabilityAndPriceShiftsServiceItemIntoServiceBand() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
+                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, availability, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
+    }
+
+    @Test
     @DisplayName("addOrderItem stores the provided position and never scans existing items")
     void addOrderItemStoresProvidedPositionWithoutScanningExistingItems() {
         // given
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops, 200L, 10L, 5, 0L);
+                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 

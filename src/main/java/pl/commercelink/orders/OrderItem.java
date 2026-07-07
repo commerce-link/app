@@ -64,7 +64,7 @@ public class OrderItem extends Item {
     }
 
     public OrderItem(String orderId, OrderItem source, int qty) {
-        super(source.getCategory(), source.getName(), qty, source.getComment());
+        super(source.getCategoryKey(), source.getName(), qty, source.getComment());
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = source.getSku();
@@ -104,7 +104,7 @@ public class OrderItem extends Item {
     }
 
     public void updateAllFields(OrderItem other) {
-        this.setCategory(other.getCategory());
+        this.setCategoryKey(other.getCategoryKey());
         this.setSku(other.getSku());
         this.setName(other.getName());
         this.setPrice(other.getPrice());
@@ -123,7 +123,7 @@ public class OrderItem extends Item {
     }
 
     public void updateLimitedFields(OrderItem other) {
-        this.setCategory(other.getCategory());
+        this.setCategoryKey(other.getCategoryKey());
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
@@ -286,7 +286,8 @@ public class OrderItem extends Item {
                 1,
                 opt.getPrice(),
                 null,
-                false
+                false,
+                PositionGroup.DELIVERY_POSITION
         );
     }
 

@@ -111,13 +111,34 @@ class OfferControllerTest {
     }
 
     @Test
+    @DisplayName("updateOffer persists basket items in submitted order and reindexes positions band-aware")
+    void updateOfferPersistsSubmittedItemOrderAndReindexesPositions() {
+        // given
+        Basket existing = basketBase();
+        existing.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
+        Basket payload = new Basket();
+        payload.setBasketItems(List.of(basketItem("MFN-B"), basketItem("MFN-A"), basketItem("MFN-C")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
+
+        // when
+        offerController.updateOffer(OFFER_ID, payload);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
+        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
     @DisplayName("addOfferItemFromPriceList appends a BasketItem built from the matching pricelist entry")
     void addOfferItemFromPriceListAppendsBasketItemConstructedFromPricelistEntry() {
         // given
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops, 199L, 1L, 3, 0L);
+                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -163,7 +184,7 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(existing));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops, 199L, 1L, 3, 0L);
+                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));

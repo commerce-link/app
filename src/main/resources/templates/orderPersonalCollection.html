@@ -69,8 +69,8 @@
                             </tr>
                             </thead>
                             <tbody>
-                            <tr th:each="item : ${orderItems}" th:if="${item.category != T(pl.commercelink.taxonomy.ProductCategory).Services}">
-                                <td th:text="${enumI18n.localize(item.category, 'plural')}"></td>
+                            <tr th:each="item : ${orderItems}" th:if="${!item.service}">
+                                <td th:text="${categoryI18n.localize(item.categoryKey, 'plural')}"></td>
                                 <td th:text="${item.name}"></td>
                                 <td th:text="${item.qty}"></td>
                                 <td th:text="${item.manufacturerCode}"></td>

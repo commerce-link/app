@@ -3,13 +3,13 @@ package pl.commercelink.orders.notifications;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.taxonomy.CategoryLocalizer;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,7 +29,7 @@ class OrderNotificationsService {
 
     private final EmailClient emailClient;
 
-    private final EnumLocalizer enumLocalizer;
+    private final CategoryLocalizer categoryLocalizer;
 
     void send(Order order) {
 
@@ -265,7 +265,7 @@ class OrderNotificationsService {
                 shippingDetails,
                 documentType,
                 order.isPersonalCollection(),
-                enumLocalizer
+                categoryLocalizer
         );
 
         return send(order.getStoreId(), msg, EmailNotificationType.ORDER_CONFIRMATION);

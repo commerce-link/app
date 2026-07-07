@@ -23,7 +23,6 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -310,7 +309,7 @@ public class OfferController {
         List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
 
         AvailabilityAndPrice itemAvailabilityAndPrice = availabilityAndPrices.stream()
-                .filter(a -> a.getCategory() == ProductCategory.valueOf(category) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
+                .filter(a -> category.equals(a.getCategory()) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
                 .findFirst().get();
 
         basket.addBasketItem(BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices()));

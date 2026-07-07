@@ -151,7 +151,6 @@
              th:data-net="${entry.source.priceNet}"
              th:data-gross="${entry.source.priceGross}"
              th:data-category="${entry.source.category.name()}"
-             th:data-catindex="${entry.source.category.ordinal()}"
              th:data-targetprice="${entry.targetPrice}"
              th:data-accepted="${entry.accepted}">
             <div class="group-head">
@@ -263,7 +262,6 @@
 
         const isAccepted = c => c.dataset.accepted === 'true';
         const gross = c => parseFloat(c.dataset.gross) || 0;
-        const grossInt = c => Math.trunc(parseFloat(c.dataset.gross) || 0);
         const net = c => parseFloat(c.dataset.net) || 0;
         const vat = c => (net(c) > 0 ? gross(c) / net(c) : 1);
         const cardOrders = c => [...new Set(Array.from(c.querySelectorAll('tr[data-item]')).map(r => r.dataset.order))];
@@ -293,14 +291,14 @@
             render();
         }
 
-        /* winner per order-item = cheapest (by truncated gross, matching backend (int)priceGross) ACCEPTED card containing it */
+        /* winner per order-item = cheapest ACCEPTED card containing it */
         function computeWinners() {
             const winner = {}, winnerGross = {};
             cards().forEach(c => {
                 if (!isAccepted(c)) return;
                 c.querySelectorAll('tr[data-item]').forEach(r => {
                     const it = r.dataset.item;
-                    if (winner[it] === undefined || grossInt(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = grossInt(c); }
+                    if (winner[it] === undefined || gross(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = gross(c); }
                 });
             });
             return winner;
@@ -557,21 +555,19 @@
             });
         }
 
-        /* meta-grouping by product category (ordered by category ordinal); within a category sort by highest margin */
+        /* meta-grouping by product category (ordered A-Z by label); within a category sort by target price desc */
         function buildGroups() {
             const wrap = document.getElementById('groups');
-            const initMargin = c => { const n = net(c); if (n <= 0) return 0; const tp = parseFloat(c.dataset.targetprice) || 0; return ((tp / vat(c)) - n) / n; };
             const byCat = {};
             cards().forEach(c => {
                 c.style.setProperty('--accent', provColor(c.dataset.provider));
                 const cat = c.dataset.category || 'Other';
                 (byCat[cat] = byCat[cat] || []).push(c);
             });
-            const catIndex = cat => parseInt(byCat[cat][0].dataset.catindex);
-            const cats = Object.keys(byCat).sort((a, b) => catIndex(a) - catIndex(b));
+            const cats = Object.keys(byCat).sort((a, b) => a.localeCompare(b));
             wrap.innerHTML = '';
             cats.forEach((cat, ci) => {
-                const list = byCat[cat].sort((a, b) => initMargin(b) - initMargin(a));
+                const list = byCat[cat].sort((a, b) => (parseFloat(b.dataset.targetprice)||0) - (parseFloat(a.dataset.targetprice)||0));
                 const sec = document.createElement('div');
                 sec.className = 'cat-section' + (ci === 0 ? '' : ' cat-collapsed');
                 sec.dataset.category = cat;

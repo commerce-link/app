@@ -62,7 +62,7 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(item);
         AvailabilityAndPrice freshPriceData = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
-                ProductCategory.Laptops, 250L, 5L, 3, 0L);
+                ProductCategory.Laptops.name(), 250L, 5L, 3, 0L);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);
@@ -98,8 +98,8 @@ class OfferItemReloaderTest {
     }
 
     @Test
-    @DisplayName("reload assigns basket item positions matching the reordered list")
-    void reloadAssignsBasketItemPositionsMatchingReorderedList() {
+    @DisplayName("reload sorts basket items by position preserving the list order")
+    void reloadSortsBasketItemsByPositionPreservingListOrder() {
         // given
         BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
                 ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
@@ -114,8 +114,46 @@ class OfferItemReloaderTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-C", "MFN-L");
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
         assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("reload sorts products before services following the position bands")
+    void reloadSortsProductsBeforeServices() {
+        // given
+        BasketItem service = BasketItem.shipping("Dostawa", 20.0);
+        BasketItem product = new BasketItem("pim-1", "Laptop", "MFN-L",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(service, product);
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "SHIPPING");
+        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
+        assertThat(offerItems.get(0).getBasketItem().getPosition())
+                .isLessThan(offerItems.get(1).getBasketItem().getPosition());
+    }
+
+    @Test
+    @DisplayName("reload breaks equal-position ties by unit price descending")
+    void reloadBreaksEqualPositionTiesByUnitPriceDescending() {
+        // given
+        BasketItem cheaper = new BasketItem("pim-1", "Cheaper", "MFN-CHEAP",
+                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+        BasketItem pricier = new BasketItem("pim-2", "Pricier", "MFN-PRICEY",
+                ProductCategory.Laptops, 500.0, 0, 1, null, 3, false);
+        Basket basket = basketWith(cheaper, pricier);
+        basket.getBasketItems().forEach(item -> item.setPosition(7));
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn())
+                .containsExactly("MFN-PRICEY", "MFN-CHEAP");
     }
 
     @Test

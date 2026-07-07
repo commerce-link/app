@@ -41,9 +41,7 @@ public class FulfilmentGroupsGenerator {
                 ))
                 .filter(g -> !enforceFulfilmentUnderCost || g.getTargetPrice() >= g.getSource().getPriceGross())
                 .filter(g -> !enforceCompleteFulfilment || g.getSource().getQty() >= g.getTargetQty())
-                .sorted(
-                        Comparator.comparing(FulfilmentGroup::getFirstSortNumber).thenComparing(FulfilmentGroup::getSecondSortNumber)
-                )
+                .sorted(Comparator.comparingDouble(group -> group.getSource().getPriceGross()))
                 .collect(Collectors.toList());
     }
 
@@ -63,9 +61,7 @@ public class FulfilmentGroupsGenerator {
                 .filter(c -> !enforceFulfilmentUnderCost || c.getSource().getPriceGross() > 0)
                 .filter(c -> !enforceFulfilmentUnderCost || c.getAllocation().getOrderItemPrice() >= c.getSource().getPriceGross())
                 .filter(c -> !enforceCompleteFulfilment || c.getSource().getQty() >= c.getAllocation().getOrderItemQty())
-                .sorted(
-                        Comparator.comparing(FulfilmentItem::getFirstSortNumber).thenComparing(FulfilmentItem::getSecondSortNumber)
-                )
+                .sorted(Comparator.comparingDouble(item -> item.getSource().getPriceNet()))
                 .collect(Collectors.toList());
     }
 

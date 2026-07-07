@@ -127,6 +127,7 @@
                 <table class="table is-fullwidth is-striped">
                     <thead>
                     <tr>
+                        <th></th>
                         <th th:text="#{product.category}"></th>
                         <th th:text="#{product.name}"></th>
                         <th th:text="#{product.manufacturer.code}"></th>
@@ -141,10 +142,12 @@
                     </tr>
                     </thead>
                     <tbody id="offerRows">
-                    <tr th:each="offerItem : ${offerItems}">
+                    <tr th:each="offerItem : ${offerItems}"
+                        th:attr="data-band=${offerItem.basketItem != null && offerItem.basketItem.isService()} ? 'service' : 'product'">
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
+                        <td><span class="drag-handle" style="cursor:grab; padding:0 .4rem; color:#7a8290;" th:title="#{offers.item.drag.hint}"><i class="fas fa-arrows-alt"></i></span></td>
                         <td>
                             <div class="select">
                                 <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
@@ -287,10 +290,24 @@
         document.addEventListener('DOMContentLoaded', () => {
             const shouldOpenModal = /*[[${openModal}]]*/ false;
             if (shouldOpenModal) toggleOfferItemModal(true);
+            new Sortable(document.getElementById('offerRows'), {
+                handle: '.drag-handle',
+                animation: 150,
+                onMove: (evt) => evt.dragged.dataset.band === evt.related.dataset.band
+            });
         });
+
+        function renumberOfferRows() {
+            document.querySelectorAll('#offerRows tr').forEach((row, i) => {
+                row.querySelectorAll('input, select').forEach(el => {
+                    if (el.name) el.name = el.name.replace(/basketItems\[\d+\]/, 'basketItems[' + i + ']');
+                });
+            });
+        }
         function submitForm(actionType) {
             const form = document.getElementById('offerForm');
             const offerId = /*[[${offer.basketId}]]*/ '';
+            renumberOfferRows();
 
             if (actionType === 'recalculate') {
                 form.action = `/dashboard/offer/${offerId}/recalculate`;

@@ -107,12 +107,12 @@ public class StockLevels {
             }
             return stockProductLevels.stream()
                     .filter(i -> !onlyMissingItems || i.isFullyMissing())
-                    .sorted(Comparator.comparing(StockProductLevel::getCategory))
+                    .sorted(Comparator.comparing((StockProductLevel level) -> level.getCategory().name()).thenComparing(StockProductLevel::getName))
                     .collect(Collectors.toList());
         }
 
         return stockProductLevels.stream()
-                .sorted(Comparator.comparing(StockProductLevel::getCategory))
+                .sorted(Comparator.comparing((StockProductLevel level) -> level.getCategory().name()).thenComparing(StockProductLevel::getName))
                 .collect(Collectors.toList());
     }
 

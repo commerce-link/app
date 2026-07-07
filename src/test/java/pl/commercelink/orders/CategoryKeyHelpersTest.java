@@ -25,43 +25,38 @@ class CategoryKeyHelpersTest {
     }
 
     @Test
-    void hasGroupKeyMatchesEnumGroupCheck() {
+    void isServiceGroupIsFalseForCategoryKeyOutsideTheEnum() {
         // given
-        OrderItem service = orderItemWithCategory(ProductCategory.Services);
-        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+        OrderItem unknown = new OrderItem("order-1", "Smartwatches", "Watch 5", 1, 900.0, "SKU-1", false);
 
         // when / then
-        assertThat(service.hasGroupKey("Services"))
-                .isEqualTo(service.getCategory().getProductGroup() == ProductGroup.Services)
-                .isTrue();
-        assertThat(laptop.hasGroupKey("Services"))
-                .isEqualTo(laptop.getCategory().getProductGroup() == ProductGroup.Services)
-                .isFalse();
+        assertThat(unknown.isServiceGroup()).isFalse();
+        assertThat(unknown.isService()).isFalse();
     }
 
     @Test
-    void sequenceNumberMatchesEnumOrdinal() {
+    void copiedOrderItemKeepsCategoryKeyOutsideTheEnum() {
         // given
-        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
+        OrderItem source = new OrderItem("order-1", "Smartwatches", "Watch 5", 2, 900.0, "SKU-1", false);
 
         // when
-        int sequence = laptop.getSequenceNumber();
+        OrderItem copy = new OrderItem("order-2", source, 1);
 
         // then
-        assertThat(sequence).isEqualTo(ProductCategory.Laptops.ordinal());
+        assertThat(copy.getCategoryKey()).isEqualTo("Smartwatches");
     }
 
     @Test
-    void categoryKeyAndGroupKeyAreNotConflated() {
+    void updatedOrderItemKeepsCategoryKeyOutsideTheEnum() {
         // given
-        OrderItem laptop = orderItemWithCategory(ProductCategory.Laptops);
-        String groupKey = ProductCategory.Laptops.getProductGroup().name();
+        OrderItem item = new OrderItem("order-1", "Laptops", "Old", 1, 100.0, "SKU-1", false);
+        OrderItem other = new OrderItem("order-1", "Smartwatches", "Watch 5", 1, 900.0, "SKU-2", false);
 
-        // when / then
-        assertThat(laptop.hasGroupKey(groupKey)).isTrue();
-        assertThat(laptop.hasCategoryKey(groupKey)).isFalse();
-        assertThat(laptop.hasCategoryKey("Laptops")).isTrue();
-        assertThat(laptop.hasGroupKey("Laptops")).isFalse();
+        // when
+        item.updateAllFields(other);
+
+        // then
+        assertThat(item.getCategoryKey()).isEqualTo("Smartwatches");
     }
 
     @Test
@@ -75,7 +70,6 @@ class CategoryKeyHelpersTest {
         assertThat(service.isService()).isTrue();
         assertThat(service.isProduct()).isFalse();
         assertThat(laptop.isProduct()).isTrue();
-        assertThat(laptop.getSequenceNumber()).isEqualTo(ProductCategory.Laptops.ordinal());
     }
 
     @Test

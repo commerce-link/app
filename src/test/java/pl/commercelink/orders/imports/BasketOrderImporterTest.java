@@ -19,6 +19,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -73,8 +74,8 @@ class BasketOrderImporterTest {
     }
 
     @Test
-    @DisplayName("delivery line is appended at the end with position equal to the number of product items")
-    void deliveryLineIsAppendedAtEndWithPositionAfterProductItems() {
+    @DisplayName("delivery line is appended at the end with the fixed delivery band position")
+    void deliveryLineIsAppendedAtEndWithDeliveryBandPosition() {
         // given
         DeliveryOption deliveryOption = deliveryOption("Courier", 15.0);
         Store store = storeWithDeliveryOption(deliveryOption);
@@ -95,11 +96,11 @@ class BasketOrderImporterTest {
 
         List<OrderItem> savedItems = itemsCaptor.getValue();
         assertThat(savedItems).hasSize(3);
-        assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, 2);
+        assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, PositionGroup.DELIVERY_POSITION);
 
         OrderItem deliveryLine = savedItems.get(savedItems.size() - 1);
         assertThat(deliveryLine.getCategory()).isEqualTo(ProductCategory.Services);
-        assertThat(deliveryLine.getPosition()).isEqualTo(2);
+        assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
     }
 
     private Store storeWithDeliveryOption(DeliveryOption deliveryOption) {
