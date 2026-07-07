@@ -24,13 +24,10 @@ import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import org.mockito.InOrder;
-
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -282,7 +279,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
-    void shipmentCreatedEventAcceptsOrderBeforeShippingWhenAcceptanceNotRecorded() {
+    void shipmentCreatedEventDoesNotAcceptBeforeShipping() {
         // given
         when(order.isMarketplaceAccepted()).thenReturn(false);
         Shipment shipment = mock(Shipment.class);
@@ -296,15 +293,13 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        InOrder inOrder = inOrder(provider);
-        inOrder.verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
-        inOrder.verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
-        verify(order).markMarketplaceAccepted();
-        verify(ordersRepository).save(order);
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
+        verify(provider, never()).acceptOrder(any());
+        verify(order, never()).markMarketplaceAccepted();
     }
 
     @Test
-    void orderCompletedEventAcceptsOrderBeforeCompletingWhenAcceptanceNotRecorded() {
+    void orderCompletedEventDoesNotAcceptBeforeCompleting() {
         // given
         when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Completed);
@@ -313,9 +308,35 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.OrderCompleted);
 
         // then
-        InOrder inOrder = inOrder(provider);
-        inOrder.verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
-        inOrder.verify(provider).completeOrder(EXTERNAL_ORDER_ID);
+        verify(provider).completeOrder(EXTERNAL_ORDER_ID);
+        verify(provider, never()).acceptOrder(any());
+    }
+
+    @Test
+    void orderCancelledEventCancelsUsingPayloadWhenOrderDeleted() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID,
+                OrderLifecycleEventType.OrderCancelled, EXTERNAL_ORDER_ID, MARKETPLACE));
+
+        // then
+        verify(provider).cancelOrder(EXTERNAL_ORDER_ID);
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test
+    void shipmentCreatedEventIsSkippedWhenOrderDeleted() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID,
+                OrderLifecycleEventType.ShipmentCreated, EXTERNAL_ORDER_ID, MARKETPLACE));
+
+        // then
+        verifyNoInteractions(provider);
     }
 
     @Test

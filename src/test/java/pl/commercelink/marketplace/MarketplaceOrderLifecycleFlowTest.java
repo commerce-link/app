@@ -95,10 +95,8 @@ class MarketplaceOrderLifecycleFlowTest {
         consumePublishedEvents(order, true);
 
         // then
-        InOrder callOrder = inOrder(provider);
-        callOrder.verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
-        callOrder.verify(provider).completeOrder(EXTERNAL_ORDER_ID);
         verify(provider, times(1)).acceptOrder(EXTERNAL_ORDER_ID);
+        verify(provider).completeOrder(EXTERNAL_ORDER_ID);
     }
 
     private Order settledMarketplaceOrder() {

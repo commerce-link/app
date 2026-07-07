@@ -39,11 +39,17 @@ public class MarketplaceOrderLifecycleEventListener {
         Store store = storesRepository.findById(payload.getStoreId());
         Order order = ordersRepository.findById(payload.getStoreId(), payload.getOrderId());
 
-        if (!order.isMarketplaceOrder()) {
+        // The order may have been hard-deleted (cancel-on-delete) before this runs; in that
+        // case marketplace and external id come from the self-describing payload.
+        if (order != null && !order.isMarketplaceOrder()) {
             return;
         }
 
-        String marketplace = order.getSource().getName();
+        String marketplace = order != null ? order.getSource().getName() : payload.getMarketplace();
+        if (marketplace == null) {
+            return;
+        }
+        String externalOrderId = order != null ? order.getExternalOrderId() : payload.getExternalOrderId();
 
         MarketplaceIntegration integration = store.getMarketplaceIntegration(marketplace);
         if (integration == null) {
@@ -61,35 +67,38 @@ public class MarketplaceOrderLifecycleEventListener {
             return;
         }
 
-        String externalOrderId = order.getExternalOrderId();
-
         switch (payload.getType()) {
             case OrderAccepted:
+                if (order == null) {
+                    break;
+                }
                 ensureOrderAccepted(order, provider);
                 break;
             case ShipmentCreated:
+                if (order == null) {
+                    break;
+                }
                 // a terminal status is persisted before this listener runs; shipping
                 // after complete/cancel would regress the marketplace state
                 if (order.getStatus().isOneOf(OrderStatus.Completed, OrderStatus.Cancelled)) {
                     break;
                 }
                 extractShipmentUpdate(order)
-                        .ifPresent(update -> {
-                            ensureOrderAccepted(order, provider);
-                            provider.shipOrder(externalOrderId, update);
-                        });
+                        .ifPresent(update -> provider.shipOrder(externalOrderId, update));
                 break;
             case OrderCancelled:
                 provider.cancelOrder(externalOrderId);
                 break;
             case OrderCompleted:
-                if (order.getStatus() == OrderStatus.Cancelled) {
+                if (order == null || order.getStatus() == OrderStatus.Cancelled) {
                     break;
                 }
-                ensureOrderAccepted(order, provider);
                 provider.completeOrder(externalOrderId);
                 break;
             case InvoiceCreated:
+                if (order == null) {
+                    break;
+                }
                 extractInvoiceUpdate(order)
                         .ifPresent(update -> provider.updateInvoice(externalOrderId, update));
                 break;
@@ -98,10 +107,11 @@ public class MarketplaceOrderLifecycleEventListener {
         }
     }
 
-    // Acceptance is recorded on the order instead of being inferred from the current
-    // status: the queue is at-least-once without ordering, and single-pass transitions
-    // (New/Blocked -> Shipping/Completed) persist the new status before this listener
-    // runs. Ship/complete also route through here so acceptance always precedes them.
+    // Acceptance is driven only by the dedicated OrderAccepted event. Ship/complete no
+    // longer re-accept defensively: the marketplace is the source of truth for order state
+    // (it can change on the marketplace panel), and an accept queued immediately before a
+    // ship is processed with delay, so the ship would be rejected. The flag only de-dups
+    // this dedicated accept for providers whose accept is not idempotent.
     private void ensureOrderAccepted(Order order, MarketplaceProvider provider) {
         if (order.isMarketplaceAccepted() || order.getStatus() == OrderStatus.Cancelled) {
             return;
