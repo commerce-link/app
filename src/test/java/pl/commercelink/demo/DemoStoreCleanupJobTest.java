@@ -47,6 +47,22 @@ class DemoStoreCleanupJobTest {
     }
 
     @Test
+    void continuesSweepWhenExpiryTimestampIsMalformed() {
+        // given
+        Instant now = Instant.parse("2026-07-08T12:00:00Z");
+        Store corrupted = store("corrupt0001", new DemoStoreMetadata("a@example.com", "2026-06-01T00:00:00Z", "not-a-timestamp"));
+        Store expired = store("expired0001", new DemoStoreMetadata("b@example.com", "2026-06-01T00:00:00Z", "2026-07-01T00:00:00Z"));
+        when(storesRepository.findAll()).thenReturn(List.of(corrupted, expired));
+
+        // when
+        job.deleteExpiredDemoStores(now);
+
+        // then
+        verify(demoStoreDeletionService).deleteDemoStore("expired0001");
+        verify(demoStoreDeletionService, never()).deleteDemoStore("corrupt0001");
+    }
+
+    @Test
     void continuesSweepWhenSingleDeletionFails() {
         // given
         Instant now = Instant.parse("2026-07-08T12:00:00Z");

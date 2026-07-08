@@ -24,11 +24,10 @@ public class DemoStoreCleanupJob {
 
     void deleteExpiredDemoStores(Instant now) {
         for (Store store : storesRepository.findAll()) {
-            if (!store.isDemoExpired(now)) {
-                continue;
-            }
             try {
-                demoStoreDeletionService.deleteDemoStore(store.getStoreId());
+                if (store.isDemoExpired(now)) {
+                    demoStoreDeletionService.deleteDemoStore(store.getStoreId());
+                }
             } catch (RuntimeException e) {
                 System.err.println("[DemoStoreCleanup] Failed to delete expired store " + store.getStoreId() + ": " + e.getMessage());
             }

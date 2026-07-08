@@ -24,7 +24,7 @@
                     <td>
                         <div th:if="${store.demo != null}">
                             <span class="tag is-warning" th:text="#{store.demo.badge}"></span>
-                            <span class="tag is-light" th:if="${store.demo.expiresAt != null}"
+                            <span class="tag is-light" th:if="${store.demo.expiresAt != null and #strings.length(store.demo.expiresAt) >= 10}"
                                   th:text="#{store.demo.expires} + ' ' + ${#strings.substring(store.demo.expiresAt, 0, 10)}"></span>
                             <form th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
                                   style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
