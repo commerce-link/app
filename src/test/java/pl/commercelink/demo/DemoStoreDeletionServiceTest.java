@@ -7,7 +7,9 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import pl.commercelink.baskets.Basket;
 import pl.commercelink.inventory.StoreInventoryCache;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -137,12 +139,20 @@ class DemoStoreDeletionServiceTest {
         when(wipeRepository.findWarehouseItems(STORE_ID)).thenReturn(List.of());
         when(wipeRepository.findWarehouseDocumentSequences(STORE_ID)).thenReturn(List.of());
         when(wipeRepository.findEmailTemplates(STORE_ID)).thenReturn(List.of());
+        Basket basket = new Basket();
+        basket.setStoreId(STORE_ID);
+        when(wipeRepository.findBaskets(STORE_ID)).thenReturn(List.of(basket));
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        when(wipeRepository.findDeliveries(STORE_ID)).thenReturn(List.of(delivery));
 
         // when
         service.deleteDemoStore(STORE_ID);
 
         // then
         verify(demoUserService).deleteUser("user@example.com");
+        verify(wipeRepository).deleteAll(List.of(basket));
+        verify(wipeRepository).deleteAll(List.of(delivery));
         verify(wipeRepository).deleteAll(List.of(orderItem));
         verify(wipeRepository).deleteAll(List.of(orderEvent));
         verify(wipeRepository).deleteAll(List.of(order));

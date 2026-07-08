@@ -4,6 +4,8 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;
+import pl.commercelink.baskets.Basket;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.stores.Store;
 import pl.commercelink.templates.EmailTemplate;
@@ -52,6 +54,18 @@ public class DemoStoreWipeRepository {
         RMA key = new RMA();
         key.setStoreId(storeId);
         return query(RMA.class, key);
+    }
+
+    public List<Basket> findBaskets(String storeId) {
+        Basket key = new Basket();
+        key.setStoreId(storeId);
+        return query(Basket.class, key);
+    }
+
+    public List<Delivery> findDeliveries(String storeId) {
+        Delivery key = new Delivery();
+        key.setStoreId(storeId);
+        return query(Delivery.class, key);
     }
 
     public List<EmailTemplate> findEmailTemplates(String storeId) {

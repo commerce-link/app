@@ -79,6 +79,8 @@ public class DemoStoreDeletionService {
         boolean allSucceeded = true;
         allSucceeded &= step(storeId, "cognito user", () -> deleteCognitoUser(store));
         allSucceeded &= step(storeId, "orders", () -> deleteOrders(storeId));
+        allSucceeded &= step(storeId, "baskets", () -> wipeRepository.deleteAll(wipeRepository.findBaskets(storeId)));
+        allSucceeded &= step(storeId, "deliveries", () -> wipeRepository.deleteAll(wipeRepository.findDeliveries(storeId)));
         allSucceeded &= step(storeId, "catalogs and products", () -> deleteCatalogsAndProducts(storeId));
         allSucceeded &= step(storeId, "warehouse", () -> deleteWarehouse(storeId));
         allSucceeded &= step(storeId, "rma", () -> deleteRma(storeId));
