@@ -34,7 +34,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -147,9 +147,10 @@ class DemoStoreDeletionServiceTest {
         when(wipeRepository.findDeliveries(STORE_ID)).thenReturn(List.of(delivery));
 
         // when
-        service.deleteDemoStore(STORE_ID);
+        boolean deleted = service.deleteDemoStore(STORE_ID);
 
         // then
+        assertTrue(deleted);
         verify(demoUserService).deleteUser("user@example.com");
         verify(wipeRepository).deleteAll(List.of(basket));
         verify(wipeRepository).deleteAll(List.of(delivery));
@@ -186,9 +187,10 @@ class DemoStoreDeletionServiceTest {
         when(wipeRepository.findEmailTemplates(STORE_ID)).thenReturn(List.of());
 
         // when
-        service.deleteDemoStore(STORE_ID);
+        boolean deleted = service.deleteDemoStore(STORE_ID);
 
         // then
+        assertFalse(deleted);
         verify(wipeRepository, never()).deleteStore(any());
         verify(fileStorage).deleteAll("stores", STORE_ID + "/");
         verify(storeInventoryCache).evict(STORE_ID);

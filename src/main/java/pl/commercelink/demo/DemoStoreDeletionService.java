@@ -67,10 +67,10 @@ public class DemoStoreDeletionService {
         this.storesBucket = storesBucket;
     }
 
-    public void deleteDemoStore(String storeId) {
+    public boolean deleteDemoStore(String storeId) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return;
+            return true;
         }
         if (store.getDemo() == null) {
             throw new IllegalStateException("Refusing to delete non-demo store: " + storeId);
@@ -94,6 +94,7 @@ public class DemoStoreDeletionService {
         } else {
             System.err.println("[DemoStoreDeletion] Store " + storeId + " kept for retry after failed steps");
         }
+        return allSucceeded;
     }
 
     private void deleteCognitoUser(Store store) {
