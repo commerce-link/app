@@ -67,40 +67,32 @@ class MarketplaceOrderLifecycleEventListenerTest {
         when(order.getShipments()).thenReturn(List.of());
         when(order.getDocuments()).thenReturn(List.of());
         when(order.getStatus()).thenReturn(OrderStatus.Assembly);
-        when(order.isMarketplaceAccepted()).thenReturn(true);
         when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(new MarketplaceIntegration(MARKETPLACE));
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
     }
 
     @Test
-    void orderAcceptedEventCallsAcceptOrderAndRecordsAcceptance() {
-        // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
-
+    void orderAcceptedEventCallsAcceptOrder() {
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
 
         // then
         verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
-        verify(order).markMarketplaceAccepted();
-        verify(ordersRepository).save(order);
         verifyNoMoreInteractions(provider);
     }
 
     @Test
-    void orderAcceptedEventIsSkippedWhenAcceptanceAlreadyRecorded() {
+    void listenerNeverWritesToTheOrdersRepository() {
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
 
         // then
-        verifyNoInteractions(provider);
         verify(ordersRepository, never()).save(any());
     }
 
     @Test
     void orderAcceptedEventIsSkippedWhenOrderIsCancelled() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Cancelled);
 
         // when
@@ -239,7 +231,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Test
     void orderAcceptedEventCallsAcceptOrderWhenOrderIsAlreadyShipping() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Shipping);
 
         // when
@@ -253,7 +244,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Test
     void orderAcceptedEventCallsAcceptOrderWhenOrderIsAlreadyCompleted() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Completed);
 
         // when
@@ -267,7 +257,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Test
     void orderAcceptedEventCallsAcceptOrderWhenOrderIsStillInAssembly() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Assembly);
 
         // when

@@ -68,11 +68,14 @@ public class MarketplaceOrderLifecycleEventListener {
         }
 
         switch (payload.getType()) {
+            // The queue is at-least-once, so a redelivered event re-sends accept. Empik's
+            // accept is a no-op, Morele rejects backward status transitions and Ceneo's
+            // duplicate ConfirmOrder is an accepted pre-production risk (gate #4).
             case OrderAccepted:
-                if (order == null) {
+                if (order == null || order.getStatus() == OrderStatus.Cancelled) {
                     break;
                 }
-                ensureOrderAccepted(order, provider);
+                provider.acceptOrder(externalOrderId);
                 break;
             case ShipmentCreated:
                 if (order == null) {
@@ -105,20 +108,6 @@ public class MarketplaceOrderLifecycleEventListener {
             case StatusChange:
                 break;
         }
-    }
-
-    // Acceptance is driven only by the dedicated OrderAccepted event. Ship/complete no
-    // longer re-accept defensively: the marketplace is the source of truth for order state
-    // (it can change on the marketplace panel), and an accept queued immediately before a
-    // ship is processed with delay, so the ship would be rejected. The flag only de-dups
-    // this dedicated accept for providers whose accept is not idempotent.
-    private void ensureOrderAccepted(Order order, MarketplaceProvider provider) {
-        if (order.isMarketplaceAccepted() || order.getStatus() == OrderStatus.Cancelled) {
-            return;
-        }
-        provider.acceptOrder(order.getExternalOrderId());
-        order.markMarketplaceAccepted();
-        ordersRepository.save(order);
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order) {
