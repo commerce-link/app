@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.stores.Store;
@@ -31,6 +32,9 @@ public class SuperAdminController {
 
     @Autowired
     private OrphanedProductCleanupService orphanedProductCleanupService;
+
+    @Autowired
+    private DemoStoreDeletionService demoStoreDeletionService;
 
     @GetMapping("/dashboard/stores")
     public String store(Model model) {
@@ -99,6 +103,20 @@ public class SuperAdminController {
                     messageSource.getMessage("store.copy.error", null, locale));
             return String.format("redirect:/dashboard/store/%s/copy", storeId);
         }
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/delete")
+    public String deleteDemoStore(@PathVariable String storeId, Locale locale, RedirectAttributes redirectAttributes) {
+        try {
+            demoStoreDeletionService.deleteDemoStore(storeId);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("store.delete.success", null, locale));
+        } catch (Exception e) {
+            System.err.println("[DemoStoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.delete.error", null, locale));
+        }
+        return "redirect:/dashboard/stores";
     }
 
     @PostMapping("/dashboard/stores/cleanup-products")
