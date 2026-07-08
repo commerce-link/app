@@ -72,9 +72,9 @@ public class DemoRegistrationService {
         Instant now = clock.instant();
         DemoStoreMetadata metadata = new DemoStoreMetadata(normalized, now.toString(),
                 now.plus(ttlDays, ChronoUnit.DAYS).toString());
-        demoStoreSeeder.seedStore(storeId, "Sklep demo — " + normalized, metadata);
 
         try {
+            demoStoreSeeder.seedStore(storeId, "Sklep demo — " + normalized, metadata);
             if (revealPassword) {
                 String password = generatePassword();
                 demoUserService.createDemoAdmin(normalized, storeId, password);

@@ -118,6 +118,22 @@ class DemoRegistrationServiceTest {
     }
 
     @Test
+    void rollsBackStoreWhenSeedingFails() {
+        // given
+        when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
+        when(demoUserService.userExists("user@example.com")).thenReturn(false);
+        doThrow(new RuntimeException("s3 down")).when(demoStoreSeeder).seedStore(anyString(), anyString(), any());
+
+        // when / then
+        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+                () -> service(false).register("user@example.com", "1.1.1.1"));
+        assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
+        verify(demoStoreDeletionService).deleteDemoStore(anyString());
+        verify(demoUserService, never()).createDemoAdmin(anyString(), anyString());
+        verify(demoUserService, never()).createDemoAdmin(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void mapsReasonsToMessageKeys() {
         // when / then
         assertEquals("demo.register.error.invalid-email",
