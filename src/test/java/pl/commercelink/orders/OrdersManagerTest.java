@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,7 +17,6 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
@@ -24,6 +24,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -60,7 +62,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryWithOffersIncrementsOrderTotalsAndPersistsItem() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", ProductCategory.Laptops, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", "Laptops", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(150.0));
@@ -113,7 +115,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", ProductCategory.Services, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", "Services", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
@@ -140,7 +142,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -167,7 +169,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -190,7 +192,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -210,7 +212,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -225,7 +227,7 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes StatusChange")
+    @DisplayName("cancelOrder zeroes service prices, recalculates totalPrice, sets Cancelled and publishes OrderCancelled")
     void cancelOrderZeroesServicesAndSetsCancelled() {
         // given
         Order order = deliveredOrder(150.0);
@@ -244,7 +246,7 @@ class OrdersManagerTest {
         assertThat(order.getTotalPrice()).isEqualTo(0.0);
         verify(orderItemsRepository).batchSave(List.of(product, service));
         verify(ordersRepository).save(order);
-        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.StatusChange);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
     @Test
@@ -277,6 +279,62 @@ class OrdersManagerTest {
         // when / then
         assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("deleteOrder publishes OrderCancelled then deletes for a marketplace order")
+    void deleteOrderPublishesCancelForMarketplaceOrder() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setSource(new OrderSource("Empik", OrderSourceType.Marketplace));
+        order.setExternalOrderId("EXT-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+
+        // then
+        InOrder inOrder = inOrder(orderLifecycleEventPublisher, ordersRepository);
+        inOrder.verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+        inOrder.verify(ordersRepository).delete(order);
+    }
+
+    @Test
+    @DisplayName("deleteOrder does not delete when publishing OrderCancelled fails")
+    void deleteOrderDoesNotDeleteWhenPublishFails() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setSource(new OrderSource("Empik", OrderSourceType.Marketplace));
+        order.setExternalOrderId("EXT-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        doThrow(new RuntimeException("SQS unavailable"))
+                .when(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(RuntimeException.class);
+        verify(ordersRepository, never()).delete(order);
+    }
+
+    @Test
+    @DisplayName("deleteOrder deletes a non-marketplace order without publishing")
+    void deleteOrderDoesNotPublishForNonMarketplaceOrder() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+
+        // then
+        verify(ordersRepository).delete(order);
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

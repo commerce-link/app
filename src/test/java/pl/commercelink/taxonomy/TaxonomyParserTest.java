@@ -15,9 +15,46 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class TaxonomyParserTest {
 
     @Test
+    void csvRoundTripPreservesCategoryString() {
+        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
+                "Test Product", "Laptops", 1, null, null);
+
+        byte[] csv = TaxonomyParser.toCsv(List.of(original));
+        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
+        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
+
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
+
+        assertEquals("Laptops", parsed.category());
+    }
+
+    @Test
+    void nonEnumCategorySurvivesCsvRoundTrip() {
+        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
+                "Test Product", "Smartwatches", 1, null, null);
+
+        byte[] csv = TaxonomyParser.toCsv(List.of(original));
+        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
+        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
+
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
+
+        assertEquals("Smartwatches", parsed.category());
+    }
+
+    @Test
+    void blankCategoryCellFallsBackToOther() {
+        String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "1"};
+
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        assertEquals("Other", parsed.category());
+    }
+
+    @Test
     void csvRoundTripPreservesWeight() {
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
-                "Test Product", ProductCategory.Laptops, 1, 1300, null);
+                "Test Product", "Laptops", 1, 1300, null);
 
         byte[] csv = TaxonomyParser.toCsv(List.of(original));
         CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
@@ -31,7 +68,7 @@ class TaxonomyParserTest {
     @Test
     void csvRoundTripPreservesNullWeight() {
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
-                "Test Product", ProductCategory.Laptops, 1, null, null);
+                "Test Product", "Laptops", 1, null, null);
 
         byte[] csv = TaxonomyParser.toCsv(List.of(original));
         CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
@@ -80,7 +117,7 @@ class TaxonomyParserTest {
     @Test
     void writesAndReadsBothWeightsRoundTrip() {
         Taxonomy original = new Taxonomy("8718951561588", "EP1223/00", "Philips", "Ekspres",
-                ProductCategory.Other, 5, 8000, 12500);
+                "Other", 5, 8000, 12500);
 
         byte[] csv = TaxonomyParser.toCsv(List.of(original));
         CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
