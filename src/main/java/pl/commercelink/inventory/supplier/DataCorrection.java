@@ -33,7 +33,7 @@ class DataCorrection {
         String ean = resolveCorrectEanForMfn(taxonomy.ean(), taxonomy.mfn()).orElse(taxonomy.ean());
         String brand = brandMapper.unifyBrand(taxonomy.brand());
         String name = taxonomy.name();
-        ProductCategory category = taxonomy.category();
+        String category = taxonomy.category();
         int score = taxonomy.dataAccuracyScore();
         Integer netWeight = taxonomy.netWeightInGrams();
         Integer grossWeight = taxonomy.grossWeightInGrams();
@@ -44,7 +44,7 @@ class DataCorrection {
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
             if (entry.category() != null && !Categorized.OTHER.equals(entry.category()))
-                category = ProductCategories.tryParse(entry.category()).orElse(category);
+                category = ProductCategories.tryParse(entry.category()).map(ProductCategory::name).orElse(category);
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;

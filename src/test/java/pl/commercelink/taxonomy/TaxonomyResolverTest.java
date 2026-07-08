@@ -23,7 +23,7 @@ class TaxonomyResolverTest {
     @Test
     void hitReturnsResolvedNameAndCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", ProductCategory.CPU));
+        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", "CPU"));
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -50,7 +50,7 @@ class TaxonomyResolverTest {
     @Test
     void otherCategoryFallsBackToProvidedCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", ProductCategory.Other));
+        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", "Other"));
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -73,7 +73,7 @@ class TaxonomyResolverTest {
         assertThat(resolved.category()).isNull();
     }
 
-    private static Taxonomy taxonomy(String name, ProductCategory category) {
+    private static Taxonomy taxonomy(String name, String category) {
         return new Taxonomy("1234567890123", "MFN-1", "Brand", name, category, 1, null, null);
     }
 }

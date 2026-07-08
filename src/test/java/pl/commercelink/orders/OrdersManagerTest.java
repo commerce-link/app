@@ -16,7 +16,6 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
@@ -60,7 +59,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryWithOffersIncrementsOrderTotalsAndPersistsItem() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", ProductCategory.Laptops, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", "Laptops", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(150.0));
@@ -113,7 +112,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", ProductCategory.Services, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", "Services", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
@@ -140,7 +139,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -167,7 +166,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -190,7 +189,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -210,7 +209,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 

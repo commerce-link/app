@@ -23,7 +23,7 @@ public class TaxonomyResolver {
                 ? taxonomy.name()
                 : fallbackName;
 
-        String categoryKey = taxonomy.category() == null ? null : taxonomy.category().name();
+        String categoryKey = taxonomy.category();
         String category = categoryKey != null && !Categorized.OTHER.equals(categoryKey)
                 ? categoryKey
                 : fallbackCategory;
