@@ -37,15 +37,15 @@ public class DemoRegistrationRateLimiter {
 
     public synchronized boolean tryAcquire(String ip) {
         Instant now = clock.instant();
-        Deque<Instant> ipWindow = perIp.computeIfAbsent(ip, key -> new ArrayDeque<>());
-        prune(ipWindow, now.minus(1, ChronoUnit.HOURS));
-        prune(global, now.minus(1, ChronoUnit.DAYS));
+        Instant hourCutoff = now.minus(1, ChronoUnit.HOURS);
+        perIp.values().forEach(window -> prune(window, hourCutoff));
         perIp.values().removeIf(Deque::isEmpty);
+        prune(global, now.minus(1, ChronoUnit.DAYS));
+        Deque<Instant> ipWindow = perIp.computeIfAbsent(ip, key -> new ArrayDeque<>());
         if (ipWindow.size() >= maxPerIpPerHour || global.size() >= maxPerDay) {
             return false;
         }
         ipWindow.addLast(now);
-        perIp.putIfAbsent(ip, ipWindow);
         global.addLast(now);
         return true;
     }
