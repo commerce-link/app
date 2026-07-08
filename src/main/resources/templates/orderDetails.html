@@ -292,7 +292,7 @@
                                     <div class="dropdown-content">
                                         <a th:if="${item.isNew()}" class="dropdown-item"
                                            href="#"
-                                           th:attr="data-item-id=${item.itemId}"
+                                           th:attr="data-item-id=${item.itemId},data-tax=${item.tax}"
                                            onclick="openQuickAssignModal(this); return false;"
                                            th:text="#{order.item.quick.assign}"></a>
                                         <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
@@ -304,6 +304,13 @@
                                            th:text="#{order.item.clear.assign}"></a>
                                         <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
+                                        <a th:if="${item.isNew() and item.group}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId}"
+                                           onclick="openSplitGroupModal(this); return false;"
+                                           th:text="#{order.item.split.group}"></a>
+                                        <span th:unless="${item.isNew() and item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.split.group}"></span>
                                         <a class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
@@ -395,7 +402,7 @@
                 <button class="delete" type="button" onclick="toggleQuickAssignModal(false)"></button>
             </header>
 
-            <form id="quickAssignForm" method="post"
+            <form id="quickAssignForm" method="post" onsubmit="normalizeQuickAssignPrice()"
                   th:action="@{/dashboard/orders/{orderId}/assign-supplier(orderId=${order.orderId})}">
                 <section class="modal-card-body">
                     <input type="hidden" id="quickAssignItemId" name="itemId"/>
@@ -409,10 +416,26 @@
                     </div>
 
                     <div class="field">
-                        <label class="label" th:text="#{order.item.price.net}"></label>
-                        <div class="control">
-                            <input class="input" type="text" id="quickAssignPrice" name="cost" required/>
+                        <label class="label" th:text="#{order.item.price.purchase}"></label>
+                        <div class="field has-addons mb-0">
+                            <div class="control is-expanded">
+                                <input class="input" type="text" id="quickAssignPrice" name="cost" required
+                                       oninput="updateQuickAssignPriceHint()"/>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAssignPriceTypeNet" class="button is-primary is-selected"
+                                        onclick="setQuickAssignPriceType('net')"
+                                        th:text="#{order.item.price.type.net}"></button>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAssignPriceTypeGross" class="button"
+                                        onclick="setQuickAssignPriceType('gross')"
+                                        th:text="#{order.item.price.type.gross}"></button>
+                            </div>
                         </div>
+                        <input type="hidden" id="quickAssignPriceType" value="net"/>
+                        <p class="help" id="quickAssignPriceHint" style="display: none;"
+                           th:attr="data-template=#{order.item.price.net.hint}"></p>
                     </div>
 
                     <div class="field">
@@ -426,6 +449,91 @@
                 <footer class="modal-card-foot">
                     <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
                     <button class="button" type="button" onclick="toggleQuickAssignModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div id="splitGroupModal" class="modal">
+        <div class="modal-background" onclick="toggleSplitGroupModal(false)"></div>
+        <div class="modal-card" style="width: 940px; max-width: 96vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.item.split.group}"></p>
+                <button class="delete" type="button" onclick="toggleSplitGroupModal(false)"></button>
+            </header>
+
+            <form id="splitGroupForm" method="post"
+                  th:action="@{/dashboard/orders/{orderId}/split-group(orderId=${order.orderId})}">
+                <section class="modal-card-body">
+                    <input type="hidden" id="splitGroupItemId" name="itemId"/>
+
+                    <div class="box has-background-white-ter mb-4 py-3">
+                        <div class="columns is-vcentered is-mobile">
+                            <div class="column is-5">
+                                <p class="heading" th:text="#{order.item.split.group.source}"></p>
+                                <p class="has-text-weight-semibold" id="splitGroupSourceName"></p>
+                                <p class="is-family-monospace is-size-7 has-text-grey" id="splitGroupSourceSku"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.quantity}"></p>
+                                <p class="has-text-weight-semibold" id="splitGroupSourceQty"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.unit.price}"></p>
+                                <p class="has-text-weight-semibold" id="splitGroupSourcePrice"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-semibold" id="splitGroupSourceTotal"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="table is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th style="width: 100px;" th:text="#{order.item.quantity}"></th>
+                            <th th:text="#{order.item.sku}"></th>
+                            <th th:text="#{order.item.name}"></th>
+                            <th style="width: 150px;" th:text="#{order.item.unit.price}"></th>
+                            <th style="width: 120px;" class="has-text-right" th:text="#{general.value}"></th>
+                        </tr>
+                        </thead>
+                        <tbody id="splitGroupRows"
+                               th:attr="data-qty-hint=#{order.item.split.group.qty.hint},data-qty-warning=#{order.item.split.group.qty.warning}"></tbody>
+                    </table>
+
+                    <div class="mb-4">
+                        <button class="button is-small is-light" type="button" onclick="addSplitGroupRow()"
+                                th:text="#{order.item.split.group.add}"></button>
+                        <button class="button is-small is-light" type="button" onclick="distributeSplitGroup()"
+                                th:text="#{order.item.split.group.distribute}"></button>
+                    </div>
+
+                    <div id="splitGroupAllocBar" class="notification is-success is-light py-3 mb-2">
+                        <div class="columns is-mobile is-vcentered">
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-bold" id="splitGroupBarTotal"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.split.group.allocated}"></p>
+                                <p class="has-text-weight-bold" id="splitGroupBarAllocated"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.split.group.difference}"></p>
+                                <p class="has-text-weight-bold" id="splitGroupBarDifference"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="help" th:text="#{order.item.split.group.help}"></p>
+                </section>
+
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="submit" id="splitGroupSubmit"
+                            th:text="#{order.item.split.group.submit}"></button>
+                    <button class="button" type="button" onclick="toggleSplitGroupModal(false)"
+                            th:text="#{general.cancel}"></button>
                 </footer>
             </form>
         </div>
@@ -1117,7 +1225,57 @@
             document.getElementById('quickAssignMfn').value = '';
             document.getElementById('quickAssignPrice').value = '';
             document.getElementById('quickAssignSupplier').value = '';
+            document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
+            setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);
+        }
+
+        function setQuickAssignPriceType(type) {
+            document.getElementById('quickAssignPriceType').value = type;
+            document.getElementById('quickAssignPriceTypeNet').classList.toggle('is-primary', type === 'net');
+            document.getElementById('quickAssignPriceTypeNet').classList.toggle('is-selected', type === 'net');
+            document.getElementById('quickAssignPriceTypeGross').classList.toggle('is-primary', type === 'gross');
+            document.getElementById('quickAssignPriceTypeGross').classList.toggle('is-selected', type === 'gross');
+            updateQuickAssignPriceHint();
+        }
+
+        function normalizeQuickAssignPrice() {
+            const priceInput = document.getElementById('quickAssignPrice');
+            priceInput.value = priceInput.value.replace(',', '.').trim();
+
+            const net = calculateQuickAssignNetPrice();
+            if (net !== null) {
+                priceInput.value = net.toFixed(2);
+            }
+        }
+
+        function calculateQuickAssignNetPrice() {
+            const priceInput = document.getElementById('quickAssignPrice');
+            const gross = parseFloat((priceInput.value || '').replace(',', '.'));
+            const tax = parseFloat(priceInput.getAttribute('data-tax'));
+            const isGross = document.getElementById('quickAssignPriceType').value === 'gross';
+
+            if (!isGross || isNaN(gross) || isNaN(tax) || tax < 1) {
+                return null;
+            }
+            return gross / tax;
+        }
+
+        function updateQuickAssignPriceHint() {
+            const hint = document.getElementById('quickAssignPriceHint');
+            const net = calculateQuickAssignNetPrice();
+
+            if (net === null) {
+                hint.style.display = 'none';
+                return;
+            }
+
+            const tax = parseFloat(document.getElementById('quickAssignPrice').getAttribute('data-tax'));
+            const vatPercent = Math.round((tax - 1) * 10000) / 100;
+            hint.textContent = hint.getAttribute('data-template')
+                .replace('{0}', net.toFixed(2))
+                .replace('{1}', vatPercent);
+            hint.style.display = '';
         }
 
         function submitClearSupplier(link) {
@@ -1128,6 +1286,123 @@
         function submitToggleConsolidation(link) {
             document.getElementById('toggleConsolidationItemId').value = link.getAttribute('data-item-id') || '';
             document.getElementById('toggleConsolidationForm').submit();
+        }
+
+        const splitGroupPreviews = /*[[${splitGroupPreviews}]]*/ {};
+        const splitGroupState = { qty: 1, total: 0 };
+
+        function toggleSplitGroupModal(show) {
+            const modal = document.getElementById('splitGroupModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function formatPln(value) {
+            return value.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' zł';
+        }
+
+        function openSplitGroupModal(link) {
+            const itemId = link.getAttribute('data-item-id') || '';
+            const preview = splitGroupPreviews[itemId];
+            if (!preview) return;
+
+            splitGroupState.qty = preview.qty;
+            splitGroupState.total = preview.totalPrice;
+
+            document.getElementById('splitGroupItemId').value = itemId;
+            document.getElementById('splitGroupSourceName').textContent = preview.name;
+            document.getElementById('splitGroupSourceSku').textContent = preview.sku;
+            document.getElementById('splitGroupSourceQty').textContent = preview.qty;
+            document.getElementById('splitGroupSourcePrice').textContent = formatPln(preview.price);
+            document.getElementById('splitGroupSourceTotal').textContent = formatPln(preview.totalPrice);
+            document.getElementById('splitGroupBarTotal').textContent = formatPln(preview.totalPrice);
+
+            document.getElementById('splitGroupRows').innerHTML = '';
+            preview.components.forEach(c => addSplitGroupRow(c.qty, c.sku, c.name));
+
+            recalcSplitGroup();
+            toggleSplitGroupModal(true);
+        }
+
+        function addSplitGroupRow(qty, sku, name) {
+            const tbody = document.getElementById('splitGroupRows');
+            const index = tbody.children.length;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input class="input is-small split-group-qty" type="number" min="1" required
+                           name="rows[${index}].qty" value="${qty || splitGroupState.qty}">
+                    <p class="help split-group-qty-hint"></p>
+                </td>
+                <td><input class="input is-small is-family-monospace" type="text" required name="rows[${index}].sku" value="${sku || ''}"></td>
+                <td><input class="input is-small" type="text" required name="rows[${index}].name" value="${name || ''}"></td>
+                <td><input class="input is-small split-group-price" type="number" min="0" step="0.01" required
+                           name="rows[${index}].price" value="0.00"></td>
+                <td class="has-text-right split-group-row-total" style="vertical-align: middle;"></td>
+            `;
+            tbody.appendChild(row);
+            row.querySelectorAll('.split-group-qty, .split-group-price')
+                .forEach(input => input.addEventListener('input', recalcSplitGroup));
+        }
+
+        function recalcSplitGroup() {
+            const tbody = document.getElementById('splitGroupRows');
+            let allocated = 0;
+
+            tbody.querySelectorAll('tr').forEach(row => {
+                const qty = parseInt(row.querySelector('.split-group-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.split-group-price').value) || 0;
+                allocated += qty * price;
+                row.querySelector('.split-group-row-total').textContent = formatPln(qty * price);
+
+                const hint = row.querySelector('.split-group-qty-hint');
+                if (qty % splitGroupState.qty === 0) {
+                    hint.textContent = tbody.getAttribute('data-qty-hint')
+                        .replace('{0}', qty / splitGroupState.qty)
+                        .replace('{1}', splitGroupState.qty);
+                    hint.classList.remove('has-text-warning-dark');
+                } else {
+                    hint.textContent = tbody.getAttribute('data-qty-warning').replace('{0}', splitGroupState.qty);
+                    hint.classList.add('has-text-warning-dark');
+                }
+            });
+
+            const difference = splitGroupState.total - allocated;
+            const balanced = Math.abs(difference) < 0.005;
+
+            document.getElementById('splitGroupBarAllocated').textContent = formatPln(allocated);
+            document.getElementById('splitGroupBarDifference').textContent = formatPln(difference);
+
+            const bar = document.getElementById('splitGroupAllocBar');
+            bar.classList.toggle('is-success', balanced);
+            bar.classList.toggle('is-danger', !balanced);
+
+            document.getElementById('splitGroupSubmit').disabled = !balanced || tbody.children.length < 2;
+        }
+
+        function distributeSplitGroup() {
+            const rows = [...document.querySelectorAll('#splitGroupRows tr')];
+            if (rows.length === 0) return;
+
+            const current = rows.map(row => ({
+                row: row,
+                qty: parseInt(row.querySelector('.split-group-qty').value) || 0,
+                price: parseFloat(row.querySelector('.split-group-price').value) || 0
+            }));
+
+            let weights = current.map(c => c.qty * c.price);
+            if (weights.every(w => w === 0)) {
+                weights = current.map(c => c.qty);
+            }
+            const weightSum = weights.reduce((a, b) => a + b, 0);
+            if (weightSum <= 0) return;
+
+            current.forEach((c, i) => {
+                const price = c.qty > 0 ? (splitGroupState.total * weights[i] / weightSum) / c.qty : 0;
+                c.row.querySelector('.split-group-price').value = (Math.round(price * 100) / 100).toFixed(2);
+            });
+
+            recalcSplitGroup();
         }
     </script>
 
