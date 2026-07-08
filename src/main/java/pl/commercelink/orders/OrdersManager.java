@@ -46,7 +46,7 @@ public class OrdersManager {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
-                    taxonomy.category() == null ? null : taxonomy.category().name(),
+                    taxonomy.category(),
                     taxonomy.name(),
                     1,
                     matchedInventory.getMedianPrice().grossValue(),
@@ -278,6 +278,15 @@ public class OrdersManager {
             throw new IllegalStateException("Order must not have an invoice to be deleted");
         }
 
+        // Deleting a marketplace order is the operator's cancellation for an order not yet
+        // shipped. The event is self-describing (external id + marketplace) so the listener
+        // can reach the marketplace even though the record is gone; publish before delete so
+        // a failed publish leaves the order intact for retry rather than a deleted-but-
+        // uncancelled order.
+        if (order.isMarketplaceOrder()) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
+        }
+
         ordersRepository.delete(order);
     }
 
@@ -293,7 +302,7 @@ public class OrdersManager {
 
         orderItemsRepository.batchSave(orderItems);
         ordersRepository.save(order);
-        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.StatusChange);
+        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
     public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {

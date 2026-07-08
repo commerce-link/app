@@ -1,7 +1,5 @@
 package pl.commercelink.localdev;
 
-import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.starter.csv.CSVLoader;
 
 import java.io.IOException;
@@ -9,8 +7,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UncheckedIOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,12 +16,7 @@ import java.util.Locale;
 public final class CatalogSeed {
 
     public static final String RESOURCE = "/local-init/seed/catalog.csv";
-    public static final String ACME = "Acme";
-    public static final String ACME_B = "AcmeB";
 
-    private static final String CURRENCY = "PLN";
-    private static final BigDecimal VAT_RATE = BigDecimal.valueOf(Price.DEFAULT_VAT_RATE);
-    private static final BigDecimal ACME_B_PRICE_FACTOR = new BigDecimal("0.97");
     private static final int MIN_COLUMNS = 14;
 
     private CatalogSeed() {
@@ -66,45 +57,5 @@ public final class CatalogSeed {
 
     public static String categoryId(String category, String storeId) {
         return "cat-" + category.toLowerCase(Locale.ROOT) + "-" + storeId;
-    }
-
-    public static List<FeedRow> acmeFeed(List<CatalogSeedRow> rows) {
-        return feed(rows, ACME, BigDecimal.ONE);
-    }
-
-    public static List<FeedRow> acmeBFeed(List<CatalogSeedRow> rows) {
-        return feed(rows, ACME_B, ACME_B_PRICE_FACTOR);
-    }
-
-    private static List<FeedRow> feed(List<CatalogSeedRow> rows, String supplier, BigDecimal priceFactor) {
-        List<FeedRow> feed = new ArrayList<>();
-        for (CatalogSeedRow row : rows) {
-            if (row.soldBy(supplier)) {
-                feed.add(new FeedRow(row.ean(), row.mfn(), row.brand(), row.name(), row.category(),
-                        netPrice(row.priceGross(), priceFactor), CURRENCY, String.valueOf(row.qty())));
-            }
-        }
-        return feed;
-    }
-
-    public static List<AvailabilityAndPrice> pricelist(List<CatalogSeedRow> rows) {
-        List<AvailabilityAndPrice> pricelist = new ArrayList<>();
-        for (CatalogSeedRow row : rows) {
-            if (!row.inCatalog()) {
-                continue;
-            }
-            pricelist.add(new AvailabilityAndPrice(
-                    row.pimId(), row.ean(), row.mfn(), row.brand(), row.label(), row.name(), row.category(),
-                    row.priceGross(), row.qty(), row.estimatedDeliveryDays(), row.lowest30DaysPrice()));
-        }
-        return pricelist;
-    }
-
-    static String netPrice(int gross, BigDecimal priceFactor) {
-        return BigDecimal.valueOf(gross)
-                .divide(VAT_RATE, 4, RoundingMode.HALF_UP)
-                .multiply(priceFactor)
-                .setScale(2, RoundingMode.HALF_UP)
-                .toPlainString();
     }
 }

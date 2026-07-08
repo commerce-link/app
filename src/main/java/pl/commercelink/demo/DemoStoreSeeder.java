@@ -3,7 +3,7 @@ package pl.commercelink.demo;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
@@ -12,7 +12,6 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.RMACenter;
-import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
@@ -31,20 +30,24 @@ import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.WarehouseConfiguration;
+import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 @Service
-@RequiredArgsConstructor
 public class DemoStoreSeeder {
 
     public static final String CATALOG_ID = "cat-local-01";
 
+    private static final String ACME = "Acme";
+    private static final String ACME_B = "AcmeB";
+    private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
     private static final String CARRIER_DISPLAY_NAME = "Kurier Lokalny (demo)";
@@ -52,7 +55,16 @@ public class DemoStoreSeeder {
     private static final int WAREHOUSE_QTY = 3;
 
     private final AmazonDynamoDB dynamoDB;
-    private final PricelistRepository pricelistRepository;
+    private final FileStorage fileStorage;
+    private final String storesBucket;
+
+    public DemoStoreSeeder(AmazonDynamoDB dynamoDB,
+                           FileStorage fileStorage,
+                           @Value("${s3.bucket.stores}") String storesBucket) {
+        this.dynamoDB = dynamoDB;
+        this.fileStorage = fileStorage;
+        this.storesBucket = storesBucket;
+    }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
@@ -69,7 +81,7 @@ public class DemoStoreSeeder {
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
-        savePricelist(rows, storeId);
+        savePricelist(storeId);
         return store;
     }
 
@@ -85,8 +97,8 @@ public class DemoStoreSeeder {
         FulfilmentConfiguration fulfilment = Objects.requireNonNullElseGet(store.getFulfilmentConfiguration(), FulfilmentConfiguration::new);
         fulfilment.setCanUseGlobalSuppliers(true);
         fulfilment.setSupplierConnections(List.of(
-                new StoreSupplierConnection(CatalogSeed.ACME, ConnectionMode.GLOBAL),
-                new StoreSupplierConnection(CatalogSeed.ACME_B, ConnectionMode.GLOBAL)));
+                new StoreSupplierConnection(ACME, ConnectionMode.GLOBAL),
+                new StoreSupplierConnection(ACME_B, ConnectionMode.GLOBAL)));
         store.setFulfilmentConfiguration(fulfilment);
 
         WarehouseConfiguration warehouse = Objects.requireNonNullElseGet(store.getWarehouseConfiguration(), WarehouseConfiguration::new);
@@ -185,9 +197,12 @@ public class DemoStoreSeeder {
         mapper.save(center, clobber);
     }
 
-    private void savePricelist(List<CatalogSeedRow> rows, String storeId) {
-        try {
-            pricelistRepository.save(storeId, CATALOG_ID, CatalogSeed.pricelist(rows));
+    private void savePricelist(String storeId) {
+        try (InputStream template = DemoStoreSeeder.class.getResourceAsStream(PRICELIST_TEMPLATE)) {
+            if (template == null) {
+                throw new IllegalStateException("Missing pricelist template resource: " + PRICELIST_TEMPLATE);
+            }
+            fileStorage.put(storesBucket, storeId + "/pricelists/" + CATALOG_ID + "/seed.csv", template.readAllBytes());
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write demo pricelist for store " + storeId, e);
         }

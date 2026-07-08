@@ -1,7 +1,12 @@
 package pl.commercelink.orders;
 
 public enum OrderLifecycleEventType {
-    StatusChange,
+    OrderAccepted,
+    OrderCancelled,
+    OrderCompleted,
     ShipmentCreated,
-    InvoiceCreated
+    InvoiceCreated,
+    /** @deprecated Kept so in-flight SQS messages deserialize during the deploy window; remove one release after cutover. */
+    @Deprecated
+    StatusChange
 }
