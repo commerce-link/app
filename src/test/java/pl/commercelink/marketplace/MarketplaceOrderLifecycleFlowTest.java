@@ -41,7 +41,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -95,7 +94,7 @@ class MarketplaceOrderLifecycleFlowTest {
         consumePublishedEvents(order, true);
 
         // then
-        verify(provider, times(1)).acceptOrder(EXTERNAL_ORDER_ID);
+        verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
         verify(provider).completeOrder(EXTERNAL_ORDER_ID);
     }
 

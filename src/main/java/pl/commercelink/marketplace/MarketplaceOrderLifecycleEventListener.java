@@ -68,13 +68,15 @@ public class MarketplaceOrderLifecycleEventListener {
         }
 
         switch (payload.getType()) {
-            // The queue is at-least-once, so a redelivered event re-sends accept. Empik's
-            // accept is a no-op, Morele rejects backward status transitions and Ceneo's
-            // duplicate ConfirmOrder is an accepted pre-production risk (gate #4).
             case OrderAccepted:
                 if (order == null || order.getStatus() == OrderStatus.Cancelled) {
                     break;
                 }
+                // The same accept can be sent twice: the queue is at-least-once (redelivery,
+                // DLQ redrive), and the app republishes OrderAccepted when an order's status
+                // is rewound to New (OrderAllocationsManager.remove) and then moves forward
+                // again. Empik's acceptOrder is a no-op, Morele rejects backward status
+                // transitions, and a duplicate Ceneo ConfirmOrder is an accepted risk.
                 provider.acceptOrder(externalOrderId);
                 break;
             case ShipmentCreated:

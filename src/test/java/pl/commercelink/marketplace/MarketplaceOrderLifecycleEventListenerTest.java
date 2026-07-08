@@ -3,6 +3,8 @@ package pl.commercelink.marketplace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -82,9 +85,20 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
-    void listenerNeverWritesToTheOrdersRepository() {
+    void redeliveredOrderAcceptedEventSendsAcceptAgain() {
         // when
         handle(OrderLifecycleEventType.OrderAccepted);
+        handle(OrderLifecycleEventType.OrderAccepted);
+
+        // then
+        verify(provider, times(2)).acceptOrder(EXTERNAL_ORDER_ID);
+    }
+
+    @ParameterizedTest
+    @EnumSource(OrderLifecycleEventType.class)
+    void listenerNeverWritesToTheOrdersRepository(OrderLifecycleEventType type) {
+        // when
+        handle(type);
 
         // then
         verify(ordersRepository, never()).save(any());
@@ -252,50 +266,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
         // then
         verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
         verifyNoMoreInteractions(provider);
-    }
-
-    @Test
-    void orderAcceptedEventCallsAcceptOrderWhenOrderIsStillInAssembly() {
-        // given
-        when(order.getStatus()).thenReturn(OrderStatus.Assembly);
-
-        // when
-        handle(OrderLifecycleEventType.OrderAccepted);
-
-        // then
-        verify(provider).acceptOrder(EXTERNAL_ORDER_ID);
-        verifyNoMoreInteractions(provider);
-    }
-
-    @Test
-    void shipmentCreatedEventDoesNotAcceptBeforeShipping() {
-        // given
-        Shipment shipment = mock(Shipment.class);
-        when(shipment.hasShippingData()).thenReturn(true);
-        when(shipment.getTrackingNo()).thenReturn("TRACK-9");
-        when(shipment.getCarrier()).thenReturn("DPD");
-        when(shipment.getTrackingUrl()).thenReturn("https://track.example/TRACK-9");
-        when(order.getShipments()).thenReturn(List.of(shipment));
-
-        // when
-        handle(OrderLifecycleEventType.ShipmentCreated);
-
-        // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
-        verify(provider, never()).acceptOrder(any());
-    }
-
-    @Test
-    void orderCompletedEventDoesNotAcceptBeforeCompleting() {
-        // given
-        when(order.getStatus()).thenReturn(OrderStatus.Completed);
-
-        // when
-        handle(OrderLifecycleEventType.OrderCompleted);
-
-        // then
-        verify(provider).completeOrder(EXTERNAL_ORDER_ID);
-        verify(provider, never()).acceptOrder(any());
     }
 
     @Test

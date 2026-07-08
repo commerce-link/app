@@ -2,6 +2,7 @@ package pl.commercelink.orders;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,8 +19,11 @@ import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -57,6 +61,23 @@ class OrderLifecycleTest {
         // then
         assertEquals(OrderStatus.Assembly, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
+    }
+
+    @Test
+    void orderIsPersistedBeforeLifecycleEventsArePublished() {
+        // given
+        Order order = new Order("store-1");
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        InOrder inOrder = inOrder(ordersRepository, orderLifecycleEventPublisher);
+        inOrder.verify(ordersRepository).save(order);
+        inOrder.verify(orderLifecycleEventPublisher).publish(eq(order), any());
     }
 
     @Test
