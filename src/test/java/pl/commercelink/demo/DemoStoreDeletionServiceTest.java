@@ -25,7 +25,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -143,5 +142,7 @@ class DemoStoreDeletionServiceTest {
 
         // then
         verify(wipeRepository, never()).deleteStore(any());
+        verify(fileStorage).deleteAll("stores", STORE_ID + "/");
+        verify(storeInventoryCache).evict(STORE_ID);
     }
 }
