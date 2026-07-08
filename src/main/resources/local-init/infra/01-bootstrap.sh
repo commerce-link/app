@@ -17,8 +17,7 @@ awslocal s3 sync /local/s3/datalake s3://datalake/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/feeds s3://feeds/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/pim s3://pim/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/stores s3://stores/ --exclude ".gitkeep"
-# The synced feeds + pricelist are derived from local-init/seed/catalog.csv by hand;
-# CatalogSeedConsistencyTest fails whenever they drift from it.
+
 
 # SQS Queues
 # Spring Cloud AWS SQS auto-creates queues that are referenced by @SqsListener when the app starts
