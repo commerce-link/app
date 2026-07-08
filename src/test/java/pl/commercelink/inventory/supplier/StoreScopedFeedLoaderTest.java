@@ -126,7 +126,7 @@ class StoreScopedFeedLoaderTest {
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", ProductCategory.CPU, 5);
+        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
         when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
         when(dataCorrection.run(item)).thenReturn(item);
         when(dataCorrection.run(taxonomy)).thenReturn(taxonomy);
@@ -192,7 +192,7 @@ class StoreScopedFeedLoaderTest {
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", ProductCategory.CPU, 5);
+        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
         when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
         when(dataCorrection.run(item)).thenReturn(item);
         when(dataCorrection.run(taxonomy)).thenReturn(taxonomy);

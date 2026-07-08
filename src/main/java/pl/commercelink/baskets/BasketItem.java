@@ -197,7 +197,7 @@ public class BasketItem implements Categorized {
                     "",
                     taxonomy.name(),
                     taxonomy.mfn(),
-                    taxonomy.category() == null ? null : taxonomy.category().name(),
+                    taxonomy.category(),
                     matchedInventory.getMedianPrice().grossValue(),
                     matchedInventory.getLowestPrice().grossValue(),
                     qty,
