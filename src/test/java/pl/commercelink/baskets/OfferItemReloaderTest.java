@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,11 +21,9 @@ import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,8 +37,6 @@ class OfferItemReloaderTest {
     private Inventory inventory;
     @Mock
     private PricelistRepository pricelistRepository;
-    @Mock
-    private BasketsRepository basketsRepository;
     @Mock
     private InventoryView inventoryView;
 
@@ -66,17 +61,13 @@ class OfferItemReloaderTest {
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);
-        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
         offerItemReloader.recalculate(basket);
 
         // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        BasketItem savedItem = basketCaptor.getValue().getBasketItems().get(0);
-        assertThat(savedItem.getUnitPrice()).isEqualTo(250.0);
-        assertThat(savedItem.getMfn()).isEqualTo("NEW-MFN");
+        assertThat(item.getUnitPrice()).isEqualTo(250.0);
+        assertThat(item.getMfn()).isEqualTo("NEW-MFN");
     }
 
     @Test
@@ -85,21 +76,17 @@ class OfferItemReloaderTest {
         // given
         BasketItem item = basketItemWithMfn("MFN-Z", 0.0); // unitCost=0, mfn set → eligible for updateCosts
         Basket basket = basketWith(item);
-        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
 
         // when
         offerItemReloader.recalculate(basket);
 
         // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        BasketItem savedItem = basketCaptor.getValue().getBasketItems().get(0);
-        assertThat(savedItem.getUnitCost()).isEqualTo(0.0);
+        assertThat(item.getUnitCost()).isEqualTo(0.0);
     }
 
     @Test
-    @DisplayName("reload sorts basket items by position preserving the list order")
-    void reloadSortsBasketItemsByPositionPreservingListOrder() {
+    @DisplayName("reload returns offer items sorted by position without mutating the basket")
+    void reloadReturnsOfferItemsSortedByPositionWithoutMutatingTheBasket() {
         // given
         BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
                 "Laptops", 100.0, 0, 1, null, 3, false);
@@ -108,14 +95,12 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(laptopItem, cpuItem);
 
         // when
-        offerItemReloader.reload(basket);
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
-        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1);
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "MFN-C");
+        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
     }
 
     @Test
@@ -154,20 +139,6 @@ class OfferItemReloaderTest {
         // then
         assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn())
                 .containsExactly("MFN-PRICEY", "MFN-CHEAP");
-    }
-
-    @Test
-    @DisplayName("recalculate persists basket exactly once when invoked")
-    void recalculatePersistsBasketExactlyOnce() {
-        // given
-        Basket basket = basketWith(basketItemWithMfn("MFN-1", 50.0));
-        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
-
-        // when
-        offerItemReloader.recalculate(basket);
-
-        // then
-        verify(basketsRepository).save(basket);
     }
 
     private Basket basketWith(BasketItem... items) {

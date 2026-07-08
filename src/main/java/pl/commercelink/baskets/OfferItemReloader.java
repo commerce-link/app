@@ -23,16 +23,15 @@ public class OfferItemReloader {
 
     private final Inventory inventory;
     private final PricelistRepository pricelistRepository;
-    private final BasketsRepository basketsRepository;
 
-    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, BasketsRepository basketsRepository) {
+    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository) {
         this.inventory = inventory;
         this.pricelistRepository = pricelistRepository;
-        this.basketsRepository = basketsRepository;
     }
 
     public List<OfferItem> reload(Basket basket) {
-        return reload(inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING), basket);
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
+        return convertBasketItemsIntoOffers(enabledInventory, basket.getBasketItems());
     }
 
     public List<OfferItem> recalculate(Basket basket) {
@@ -41,22 +40,7 @@ public class OfferItemReloader {
         updatePrices(basket);
         updateCosts(enabledInventory, basket.getBasketItems());
 
-        return reload(enabledInventory, basket);
-    }
-
-    private List<OfferItem> reload(InventoryView inventory, Basket basket) {
-        updateEstimatedDeliveryDates(inventory, basket.getBasketItems());
-
-        List<OfferItem> sortedOfferItems = convertBasketItemsIntoOffers(inventory, basket.getBasketItems());
-
-        List<BasketItem> newOrderedBasketItems = sortedOfferItems.stream()
-                .map(OfferItem::getBasketItem)
-                .collect(Collectors.toList());
-
-        basket.setBasketItems(newOrderedBasketItems);
-        basketsRepository.save(basket);
-
-        return sortedOfferItems;
+        return convertBasketItemsIntoOffers(enabledInventory, basket.getBasketItems());
     }
 
     private List<OfferItem> convertBasketItemsIntoOffers(InventoryView inventory, List<BasketItem> basketItems) {
@@ -124,17 +108,6 @@ public class OfferItemReloader {
                     if (matchedInventory.hasAnyOffers()) {
                         basketItem.setEstimatedDeliveryDays(matchedInventory.getEstimatedDeliveryDays());
                         basketItem.setUnitCost(matchedInventory.getMedianPrice().grossValue());
-                    }
-                });
-    }
-
-    private void updateEstimatedDeliveryDates(InventoryView inventory, List<BasketItem> basketItems) {
-        basketItems.stream()
-                .filter(i -> isNotBlank(i.getMfn()))
-                .forEach(basketItem -> {
-                    MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
-                    if (matchedInventory.hasAnyOffers()) {
-                        basketItem.setEstimatedDeliveryDays(matchedInventory.getEstimatedDeliveryDays());
                     }
                 });
     }
