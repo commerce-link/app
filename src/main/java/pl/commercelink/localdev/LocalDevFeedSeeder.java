@@ -3,7 +3,6 @@ package pl.commercelink.localdev;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
 import pl.commercelink.starter.storage.FileStorage;
@@ -18,28 +17,19 @@ public class LocalDevFeedSeeder {
 
     private static final String ACME_FEED_KEY = "acme-feed.csv";
     private static final String ACME_B_FEED_KEY = "acmeb-feed.csv";
-    private static final String PRICELIST_FILE = "seed.csv";
 
     private final FileStorage fileStorage;
     private final String feedsBucket;
-    private final String storesBucket;
 
     public LocalDevFeedSeeder(FileStorage fileStorage,
-                              @Value("${s3.bucket.feeds}") String feedsBucket,
-                              @Value("${s3.bucket.stores}") String storesBucket) {
+                              @Value("${s3.bucket.feeds}") String feedsBucket) {
         this.fileStorage = fileStorage;
         this.feedsBucket = feedsBucket;
-        this.storesBucket = storesBucket;
     }
 
-    public void seedFeedsAndPricelist(List<CatalogSeedRow> rows, String storeId, String catalogId) {
+    public void seedGlobalFeeds(List<CatalogSeedRow> rows) {
         put(feedsBucket, ACME_FEED_KEY, CatalogSeed.acmeFeed(rows), FeedRow.HEADERS);
         put(feedsBucket, ACME_B_FEED_KEY, CatalogSeed.acmeBFeed(rows), FeedRow.HEADERS);
-        put(storesBucket, pricelistKey(storeId, catalogId), CatalogSeed.pricelist(rows), AvailabilityAndPrice.HEADERS);
-    }
-
-    private static String pricelistKey(String storeId, String catalogId) {
-        return storeId + "/pricelists/" + catalogId + "/" + PRICELIST_FILE;
     }
 
     private void put(String bucket, String key, List<? extends CSVReady> rows, String[] headers) {
