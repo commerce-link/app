@@ -17,11 +17,18 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderLifecycleEventPublisher;
+import pl.commercelink.orders.OrderLifecycleEventType;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +55,8 @@ class OrdersControllerTest {
     private OrdersManager ordersManager;
     @Mock
     private OrderLifecycle orderLifecycle;
+    @Mock
+    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock
     private RedirectAttributes redirectAttributes;
 
@@ -126,6 +136,182 @@ class OrdersControllerTest {
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getShippingDetails().getCity()).isEqualTo("Wroclaw");
+    }
+
+    @Test
+    @DisplayName("updateShipments publishes ShipmentCreated when the saved order has a shipment with shipping data")
+    void updateShipmentsPublishesShipmentCreatedWhenShippingDataPresent() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("TRACK-1");
+        shipment.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    @DisplayName("updateShipments does not publish ShipmentCreated when no shipment has shipping data")
+    void updateShipmentsSkipsPublishWhenShippingDataAbsent() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.PersonalCollection);
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateShipments publishes ShipmentCreated when the saved order has a personal-collection shipment")
+    void updateShipmentsPublishesShipmentCreatedWhenCollectionDataPresent() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.PersonalCollection);
+        shipment.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    @DisplayName("updateShipments leaves existing shipments untouched when the payload carries no shipments list")
+    void updateShipmentsKeepsExistingShipmentsWhenPayloadShipmentsIsNull() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("TRACK-1");
+        shipment.setShippedAt(LocalDateTime.now());
+        existingOrder.setShipments(List.of(shipment));
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(null);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        assertThat(existingOrder.getShipments()).containsExactly(shipment);
+        verifyNoInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    @DisplayName("updateShipments does not republish ShipmentCreated when resubmitted shipment data is unchanged")
+    void updateShipmentsDoesNotRepublishWhenShipmentDataUnchanged() {
+        // given
+        LocalDateTime shippedAt = LocalDateTime.now();
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(shippedAt);
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-1");
+        resubmittedShipment.setShippedAt(shippedAt);
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateShipments does not republish ShipmentCreated when only sub-minute shippedAt precision differs")
+    void updateShipmentsDoesNotRepublishWhenShippedAtLosesSubMinutePrecision() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31, 22));
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-1");
+        resubmittedShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31));
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateShipments does not publish ShipmentCreated when the order is cancelled")
+    void updateShipmentsDoesNotPublishWhenOrderIsCancelled() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.Cancelled);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("TRACK-1");
+        shipment.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(shipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        String view = ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("updateShipments republishes ShipmentCreated when the resubmitted tracking number changes")
+    void updateShipmentsPublishesWhenTrackingNumberChanges() {
+        // given
+        LocalDateTime shippedAt = LocalDateTime.now();
+        Order existingOrder = orderBase();
+        Shipment existingShipment = new Shipment(ShipmentType.Courier);
+        existingShipment.setCarrier("DPD");
+        existingShipment.setTrackingNo("TRACK-1");
+        existingShipment.setShippedAt(shippedAt);
+        existingOrder.setShipments(List.of(existingShipment));
+        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
+        resubmittedShipment.setCarrier("DPD");
+        resubmittedShipment.setTrackingNo("TRACK-2");
+        resubmittedShipment.setShippedAt(shippedAt);
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedShipment));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
     }
 
     private Order orderBase() {
