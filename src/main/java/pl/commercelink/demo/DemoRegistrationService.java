@@ -84,8 +84,16 @@ public class DemoRegistrationService {
             return new DemoRegistrationResult(storeId, null);
         } catch (RuntimeException e) {
             System.err.println("[DemoRegistration] User creation failed for " + normalized + ", rolling back store " + storeId + ": " + e.getMessage());
-            demoStoreDeletionService.deleteDemoStore(storeId);
+            rollBack(storeId);
             throw new DemoRegistrationException(DemoRegistrationException.Reason.CREATION_FAILED);
+        }
+    }
+
+    private void rollBack(String storeId) {
+        try {
+            demoStoreDeletionService.deleteDemoStore(storeId);
+        } catch (RuntimeException e) {
+            System.err.println("[DemoRegistration] Rollback failed for store " + storeId + ": " + e.getMessage());
         }
     }
 

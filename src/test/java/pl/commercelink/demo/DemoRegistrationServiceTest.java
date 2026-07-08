@@ -135,6 +135,20 @@ class DemoRegistrationServiceTest {
     }
 
     @Test
+    void reportsCreationFailureWhenRollbackAlsoFails() {
+        // given
+        when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
+        when(demoUserService.userExists("user@example.com")).thenReturn(false);
+        doThrow(new RuntimeException("cognito down")).when(demoUserService).createDemoAdmin(anyString(), anyString());
+        doThrow(new RuntimeException("dynamo down")).when(demoStoreDeletionService).deleteDemoStore(anyString());
+
+        // when / then
+        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+                () -> service(false).register("user@example.com", "1.1.1.1"));
+        assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
+    }
+
+    @Test
     void mapsReasonsToMessageKeys() {
         // when / then
         assertEquals("demo.register.error.invalid-email",
