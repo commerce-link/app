@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Profile;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
-import pl.commercelink.localdev.LocalDevFeedSeeder;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -46,6 +45,8 @@ public class V006_LocalDevelopmentBootstrapSeed {
 
     private static final String STORE_ID = "uma2dqukxr";
     private static final String CATALOG_ID = "cat-local-01";
+    private static final String ACME = "Acme";
+    private static final String ACME_B = "AcmeB";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
     private static final String CARRIER_DISPLAY_NAME = "Kurier Lokalny (demo)";
@@ -53,7 +54,6 @@ public class V006_LocalDevelopmentBootstrapSeed {
     private static final int WAREHOUSE_QTY = 3;
 
     private final AmazonDynamoDB dynamoDB;
-    private final LocalDevFeedSeeder feedSeeder;
 
     @Execution
     public void seed() {
@@ -68,7 +68,6 @@ public class V006_LocalDevelopmentBootstrapSeed {
         saveProducts(mapper, rows);
         saveWarehouseItems(mapper, rows);
         saveRmaCenter(mapper, clobber);
-        feedSeeder.seedFeedsAndPricelist(rows, STORE_ID, CATALOG_ID);
     }
 
     @RollbackExecution
@@ -86,8 +85,8 @@ public class V006_LocalDevelopmentBootstrapSeed {
         FulfilmentConfiguration fulfilment = Objects.requireNonNullElseGet(store.getFulfilmentConfiguration(), FulfilmentConfiguration::new);
         fulfilment.setCanUseGlobalSuppliers(true);
         fulfilment.setSupplierConnections(List.of(
-                new StoreSupplierConnection(CatalogSeed.ACME, ConnectionMode.GLOBAL),
-                new StoreSupplierConnection(CatalogSeed.ACME_B, ConnectionMode.GLOBAL)));
+                new StoreSupplierConnection(ACME, ConnectionMode.GLOBAL),
+                new StoreSupplierConnection(ACME_B, ConnectionMode.GLOBAL)));
         store.setFulfilmentConfiguration(fulfilment);
 
         WarehouseConfiguration warehouse = Objects.requireNonNullElseGet(store.getWarehouseConfiguration(), WarehouseConfiguration::new);

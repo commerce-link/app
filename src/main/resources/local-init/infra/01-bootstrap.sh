@@ -14,11 +14,11 @@ awslocal s3 mb s3://pim             # additional bucket used for PIM data
 # S3 Data Sync
 # These directories should exist at the repo level alongside docker-compose
 awslocal s3 sync /local/s3/datalake s3://datalake/ --exclude ".gitkeep"
+awslocal s3 sync /local/s3/feeds s3://feeds/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/pim s3://pim/ --exclude ".gitkeep"
 awslocal s3 sync /local/s3/stores s3://stores/ --exclude ".gitkeep"
-# NOTE: supplier feeds are NOT synced here. The localdev profile seeds them from
-# local-init/seed/catalog.csv on app startup (LocalDevFeedSeeder). Syncing a committed
-# feed here would clobber that on a Ministack-only restart.
+# The synced feeds + pricelist are derived from local-init/seed/catalog.csv by hand;
+# CatalogSeedConsistencyTest fails whenever they drift from it.
 
 # SQS Queues
 # Spring Cloud AWS SQS auto-creates queues that are referenced by @SqsListener when the app starts
