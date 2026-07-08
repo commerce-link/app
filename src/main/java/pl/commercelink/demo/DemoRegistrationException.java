@@ -2,6 +2,8 @@ package pl.commercelink.demo;
 
 import lombok.Getter;
 
+import java.util.Locale;
+
 @Getter
 public class DemoRegistrationException extends RuntimeException {
 
@@ -17,6 +19,6 @@ public class DemoRegistrationException extends RuntimeException {
     }
 
     public String messageKey() {
-        return "demo.register.error." + reason.name().toLowerCase().replace('_', '-');
+        return "demo.register.error." + reason.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 }

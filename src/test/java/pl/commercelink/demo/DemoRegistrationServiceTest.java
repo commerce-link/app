@@ -10,6 +10,7 @@ import pl.commercelink.stores.DemoStoreMetadata;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -140,5 +141,20 @@ class DemoRegistrationServiceTest {
                 new DemoRegistrationException(DemoRegistrationException.Reason.INVALID_EMAIL).messageKey());
         assertEquals("demo.register.error.rate-limited",
                 new DemoRegistrationException(DemoRegistrationException.Reason.RATE_LIMITED).messageKey());
+    }
+
+    @Test
+    void mapsReasonsToMessageKeysRegardlessOfDefaultLocale() {
+        // given
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+
+        // when / then
+        try {
+            assertEquals("demo.register.error.invalid-email",
+                    new DemoRegistrationException(DemoRegistrationException.Reason.INVALID_EMAIL).messageKey());
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 }
