@@ -66,6 +66,7 @@ class DemoUserServiceTest {
         assertEquals("ADMIN", attributes.get("custom:role"));
         assertEquals("abc123def4", attributes.get("custom:storeId"));
         assertEquals("true", attributes.get("email_verified"));
+        assertEquals("user@example.com", attributes.get("name"));
         assertNull(request.messageAction());
     }
 

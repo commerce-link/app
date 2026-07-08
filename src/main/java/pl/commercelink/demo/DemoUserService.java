@@ -73,6 +73,7 @@ public class DemoUserService {
                 .userAttributes(
                         AttributeType.builder().name("email").value(email).build(),
                         AttributeType.builder().name("email_verified").value("true").build(),
+                        AttributeType.builder().name("name").value(email).build(),
                         AttributeType.builder().name("custom:role").value(UserRole.ADMIN.name()).build(),
                         AttributeType.builder().name("custom:storeId").value(storeId).build());
     }
