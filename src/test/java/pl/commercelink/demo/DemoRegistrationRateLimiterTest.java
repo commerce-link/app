@@ -44,6 +44,7 @@ class DemoRegistrationRateLimiterTest {
 
         // then
         assertTrue(limiter.tryAcquire("1.1.1.1"));
+        assertFalse(limiter.tryAcquire("1.1.1.1"));
     }
 
     @Test
