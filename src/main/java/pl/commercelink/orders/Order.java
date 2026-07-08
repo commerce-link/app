@@ -79,9 +79,6 @@ public class Order {
     @DynamoDBAttribute(attributeName = "fulfilmentType")
     @DynamoDBTypeConvertedEnum
     private FulfilmentType fulfilmentType;
-    @DynamoDBAttribute(attributeName = "marketplaceAcceptedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime marketplaceAcceptedAt;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -562,23 +559,6 @@ public class Order {
 
     public void setExternalOrderId(String externalOrderId) {
         this.externalOrderId = externalOrderId;
-    }
-
-    public LocalDateTime getMarketplaceAcceptedAt() {
-        return marketplaceAcceptedAt;
-    }
-
-    public void setMarketplaceAcceptedAt(LocalDateTime marketplaceAcceptedAt) {
-        this.marketplaceAcceptedAt = marketplaceAcceptedAt;
-    }
-
-    @DynamoDBIgnore
-    public boolean isMarketplaceAccepted() {
-        return marketplaceAcceptedAt != null;
-    }
-
-    public void markMarketplaceAccepted() {
-        this.marketplaceAcceptedAt = LocalDateTime.now();
     }
 
     public String getGclid() {
