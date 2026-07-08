@@ -27,6 +27,9 @@ import pl.commercelink.offer.imports.OfferImporter;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.orders.PositionGroup;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
@@ -202,6 +205,94 @@ class OfferControllerTest {
     }
 
     @Test
+    @DisplayName("addOfferItemFromPriceList inserts the product according to the catalog category order and survives reload")
+    void addOfferItemFromPriceListInsertsProductAccordingToCatalogCategoryOrder() {
+        // given
+        Basket basket = basketBase();
+        BasketItem psu = basketItem("MFN-PSU", "PSU");
+        basket.setBasketItems(List.of(psu));
+        AvailabilityAndPrice entry = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-CASE", "Brand", "GroupLabel", "Test Case",
+                "Case", 199L, 1L, 3, 0L);
+        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
+                catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
+
+        // when
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
+                "Case", "GroupLabel", "Test Case");
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        Basket saved = basketCaptor.getValue();
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-CASE", "MFN-PSU");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+
+        // then the order survives a persistence round-trip (setter reindexes positions on load)
+        saved.setBasketItems(saved.getBasketItems());
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-CASE", "MFN-PSU");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
+    }
+
+    @Test
+    @DisplayName("addOfferItemFromPriceList appends after existing products of the same catalog category")
+    void addOfferItemFromPriceListAppendsAfterExistingProductsOfSameCategory() {
+        // given
+        Basket basket = basketBase();
+        BasketItem firstCase = basketItem("MFN-CASE-1", "Case");
+        BasketItem psu = basketItem("MFN-PSU", "PSU");
+        basket.setBasketItems(List.of(firstCase, psu));
+        AvailabilityAndPrice entry = new AvailabilityAndPrice(
+                "pim-2", "EAN-2", "MFN-CASE-2", "Brand", "GroupLabel", "Second Case",
+                "Case", 149L, 1L, 3, 0L);
+        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
+                catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
+
+        // when
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
+                "Case", "GroupLabel", "Second Case");
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactly("MFN-CASE-1", "MFN-CASE-2", "MFN-PSU");
+    }
+
+    @Test
+    @DisplayName("addOfferItemFromPriceList keeps services in the service position band despite catalog sequence number")
+    void addOfferItemFromPriceListKeepsServicesInServiceBand() {
+        // given
+        Basket basket = basketBase();
+        AvailabilityAndPrice entry = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Montaz",
+                "Services", 49L, 1L, 3, 0L);
+        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
+                catalog(categoryDefinition("Services", 3)));
+
+        // when
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
+                "Services", "GroupLabel", "Montaz");
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems().get(0).getPosition())
+                .isEqualTo(PositionGroup.SERVICE_GROUP_START);
+    }
+
+    @Test
     @DisplayName("removeOfferItem removes the basket item at the specified valid index")
     void removeOfferItemRemovesBasketItemAtSpecifiedIndexWhenInRange() {
         // given
@@ -232,7 +323,26 @@ class OfferControllerTest {
     }
 
     private BasketItem basketItem(String mfn) {
+        return basketItem(mfn, "Laptops");
+    }
+
+    private BasketItem basketItem(String mfn, String category) {
         return new BasketItem("pim", "name", mfn,
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                category, 100.0, 0, 1, null, 3, false);
+    }
+
+    private CategoryDefinition categoryDefinition(String category, int sequenceNumber) {
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-" + category);
+        definition.setName(category);
+        definition.setCategory(category);
+        definition.setSequenceNumber(sequenceNumber);
+        return definition;
+    }
+
+    private ProductCatalog catalog(CategoryDefinition... definitions) {
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "catalog");
+        catalog.setCategories(List.of(definitions));
+        return catalog;
     }
 }

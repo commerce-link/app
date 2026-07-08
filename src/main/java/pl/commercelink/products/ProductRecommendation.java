@@ -1,7 +1,5 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
@@ -15,7 +13,7 @@ import java.util.Optional;
 public class ProductRecommendation {
 
     private String catagoryId;
-    private ProductCategory productCategory;
+    private String productCategory;
 
     private String pimId;
     private String brand;

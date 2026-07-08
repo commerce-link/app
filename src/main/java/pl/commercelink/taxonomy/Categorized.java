@@ -7,22 +7,16 @@ public interface Categorized {
     String SERVICES = "Services";
     String OTHER = "Other";
 
-    String getCategoryKey();
-
-    @Deprecated
-    @DynamoDBIgnore
-    default ProductCategory getCategory() {
-        return getCategoryKey() == null ? null : ProductCategory.valueOf(getCategoryKey());
-    }
+    String getCategory();
 
     @DynamoDBIgnore
-    default boolean hasCategoryKey(String key) {
-        return getCategoryKey() != null && getCategoryKey().equals(key);
+    default boolean hasCategory(String category) {
+        return getCategory() != null && getCategory().equals(category);
     }
 
     @DynamoDBIgnore
     default boolean isService() {
-        return hasCategoryKey(SERVICES);
+        return hasCategory(SERVICES);
     }
 
     @DynamoDBIgnore
@@ -33,11 +27,5 @@ public interface Categorized {
     @DynamoDBIgnore
     default boolean isServiceGroup() {
         return isService();
-    }
-
-    @Deprecated
-    @DynamoDBIgnore
-    default boolean hasCategory(ProductCategory category) {
-        return getCategory() == category;
     }
 }

@@ -1,7 +1,9 @@
 package pl.commercelink.offer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.taxonomy.ProductGroup;
 
@@ -24,7 +26,7 @@ public class ProductCategoryTree {
     private int maxQty;
 
     @JsonProperty("productCategory")
-    private ProductCategory productCategory;
+    private String productCategory;
     @JsonProperty("productGroup")
     private ProductGroup productGroup;
 
@@ -47,12 +49,15 @@ public class ProductCategoryTree {
         this.maxQty = categoryDefinition.getMaxQty();
 
         this.productCategory = categoryDefinition.getCategory();
-        this.productGroup = categoryDefinition.getCategory().getProductGroup();
+        this.productGroup = ProductCategories.tryParse(categoryDefinition.getCategory())
+                .map(ProductCategory::getProductGroup)
+                .orElse(null);
 
+        String groupPrefix = StringUtils.isNotBlank(productGroupLocalizedName) ? productGroupLocalizedName + "/" : "";
         if (isDuplicated) {
-            this.categoryTree = productGroupLocalizedName + "/" + productCategoryLocalizedName + "/" + name;
+            this.categoryTree = groupPrefix + productCategoryLocalizedName + "/" + name;
         } else {
-            this.categoryTree = productGroupLocalizedName + "/" + productCategoryLocalizedName;
+            this.categoryTree = groupPrefix + productCategoryLocalizedName;
         }
     }
 
@@ -80,7 +85,7 @@ public class ProductCategoryTree {
         return maxQty;
     }
 
-    public ProductCategory getProductCategory() {
+    public String getProductCategory() {
         return productCategory;
     }
 

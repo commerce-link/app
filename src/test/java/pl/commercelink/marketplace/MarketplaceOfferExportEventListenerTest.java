@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.starter.localization.EnumLocalizer;
+import pl.commercelink.taxonomy.CategoryLocalizer;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -29,7 +30,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +59,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private MarketplaceProviderFactory providerFactory;
     @Mock private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
     @Mock private EnumLocalizer enumLocalizer;
+    @Mock private CategoryLocalizer categoryLocalizer;
 
     @Mock private Store store;
     @Mock private ProductCatalog catalog;
@@ -131,7 +132,7 @@ class MarketplaceOfferExportEventListenerTest {
 
     private Product product(String pimId, String ean) {
         Product p = new Product(CATEGORY_ID, pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name-" + pimId,
-                ProductCategory.Laptops, "default");
+                "Laptops", "default");
         return p;
     }
 
@@ -144,7 +145,7 @@ class MarketplaceOfferExportEventListenerTest {
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory(ProductCategory.Laptops);
+        category.setCategory("Laptops");
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));
@@ -166,7 +167,7 @@ class MarketplaceOfferExportEventListenerTest {
         AvailabilityAndPrice ap = new AvailabilityAndPrice(
                 product.getPimId(), product.getEan(), product.getManufacturerCode(),
                 product.getBrand(), product.getLabel(), product.getName(),
-                product.getCategory().name(), price, 0L, deliveryDays, 0L
+                product.getCategory(), price, 0L, deliveryDays, 0L
         );
         when(pricelist.findByPimId(product.getPimId())).thenReturn(Optional.of(ap));
     }

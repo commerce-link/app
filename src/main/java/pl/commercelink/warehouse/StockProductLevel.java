@@ -1,13 +1,12 @@
 package pl.commercelink.warehouse;
 
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.List;
 
 public class StockProductLevel {
 
-    private ProductCategory category;
+    private String category;
     private String manufacturerCode;
     private String name;
     private int restockPriceLowest;
@@ -21,7 +20,7 @@ public class StockProductLevel {
     private int tolerance;
     private int diff;
 
-    public StockProductLevel(ProductCategory category, String manufacturerCode, String name, int restockPricePromo, int restockPriceStandard, int expectedQuantity) {
+    public StockProductLevel(String category, String manufacturerCode, String name, int restockPricePromo, int restockPriceStandard, int expectedQuantity) {
         this.category = category;
         this.manufacturerCode = manufacturerCode;
         this.name = name;
@@ -48,7 +47,7 @@ public class StockProductLevel {
         return missingQuantity > 0;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 

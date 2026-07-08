@@ -102,8 +102,8 @@ class TaxonomyCacheTest {
 
     @Test
     void mergesNetFromOneAndGrossFromOtherIndependently() {
-        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 100, null);
-        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 10, null, 200);
+        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 100, null);
+        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", "Other", 10, null, 200);
 
         cache.add(a);
         cache.add(b);
@@ -115,8 +115,8 @@ class TaxonomyCacheTest {
 
     @Test
     void prefersWeightFromLowestScorePerDimension() {
-        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 2, 999, null);
-        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 9, 100, 200);
+        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", "Other", 2, 999, null);
+        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", "Other", 9, 100, 200);
 
         cache.add(highScoreBoth);
         cache.add(lowScoreNet);
@@ -128,8 +128,8 @@ class TaxonomyCacheTest {
 
     @Test
     void incomingWinsTieBreakForBothDimensions() {
-        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 100, 200);
-        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", ProductCategory.Other, 5, 150, 250);
+        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 100, 200);
+        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 150, 250);
 
         cache.add(first);
         cache.add(second);
@@ -145,6 +145,6 @@ class TaxonomyCacheTest {
 
     private static Taxonomy taxonomyNamed(String mfn, int score, Integer weight, String name) {
         return new Taxonomy("1234567890123", mfn, "Brand", name,
-                ProductCategory.Laptops, score, weight, null);
+                "Laptops", score, weight, null);
     }
 }

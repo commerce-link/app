@@ -1,6 +1,7 @@
 package pl.commercelink.baskets;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.checkout.CheckoutRequest;
@@ -28,6 +29,8 @@ public class BasketsRestApi {
     private InvoicingService invoicingService;
     @Autowired
     private PricelistRepository pricelistRepository;
+    @Value("${commercelink.localization.fallback-locale:#{null}}")
+    private Locale fallbackLocale;
 
     @GetMapping("/{basketId}")
     public ResponseEntity<Basket> getBasket(@PathVariable String storeId, @PathVariable String basketId) {
@@ -47,7 +50,7 @@ public class BasketsRestApi {
         processBasket(basket, req);
 
         if (req.isSendInvoice()) {
-            InvoicingService.OperationResult result = invoicingService.createProforma(basket, Locale.getDefault(), true);
+            InvoicingService.OperationResult result = invoicingService.createProforma(basket, fallbackLocale != null ? fallbackLocale : Locale.getDefault(), true);
             return ResponseEntity.ok(new ObjectIdInvoiceNoDto(basket.getBasketId(), result.getInvoiceNo()));
         }
 

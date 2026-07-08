@@ -20,7 +20,7 @@ class LocalizedOrderItem {
 
     static LocalizedOrderItem fromOrderItem(OrderItem orderItem, CategoryLocalizer categoryLocalizer) {
         LocalizedOrderItem localizedOrderItem = new LocalizedOrderItem();
-        localizedOrderItem.category = categoryLocalizer.localize(orderItem.getCategoryKey(), "singular");
+        localizedOrderItem.category = categoryLocalizer.localize(orderItem.getCategory(), "singular");
         localizedOrderItem.name = orderItem.getName();
         localizedOrderItem.quantity = orderItem.getQty();
         localizedOrderItem.price = orderItem.getPrice();

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,6 +59,88 @@ class BasketTest {
     }
 
     @Test
+    @DisplayName("addBasketItem inserts the item under the last item of the same category and shifts the rest")
+    void addBasketItemInsertsItemUnderLastItemOfSameCategoryAndShiftsTheRest() {
+        // given
+        Basket basket = new Basket();
+        BasketItem laptop = basketItem("MFN-A", "Laptops");
+        BasketItem cpu = basketItem("MFN-B", "CPU");
+        basket.setBasketItems(List.of(laptop, cpu));
+        BasketItem addedLaptop = basketItem("MFN-C", "Laptops");
+
+        // when
+        basket.addBasketItem(addedLaptop);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C", "MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("addBasketItem appends the item at the end when no item of its category exists")
+    void addBasketItemAppendsItemAtTheEndWhenNoItemOfItsCategoryExists() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A", "Laptops"), basketItem("MFN-B", "Laptops")));
+        BasketItem addedCpu = basketItem("MFN-C", "CPU");
+
+        // when
+        basket.addBasketItem(addedCpu);
+
+        // then
+        assertThat(addedCpu.getPosition()).isEqualTo(2);
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+    }
+
+    @Test
+    @DisplayName("addBasketItemInCategoryOrder inserts a new category according to catalog sequence numbers")
+    void addBasketItemInCategoryOrderInsertsNewCategoryAccordingToCatalogSequenceNumbers() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A", "CPU"), basketItem("MFN-B", "GPU")));
+        BasketItem addedMotherboard = basketItem("MFN-C", "Motherboard");
+
+        // when
+        basket.addBasketItemInCategoryOrder(addedMotherboard, Map.of("CPU", 1, "Motherboard", 2, "GPU", 3));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C", "MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("addBasketItemInCategoryOrder places the item under existing same-category items over catalog order")
+    void addBasketItemInCategoryOrderPlacesItemUnderExistingSameCategoryItemsOverCatalogOrder() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A", "GPU"), basketItem("MFN-B", "CPU")));
+        BasketItem addedCpu = basketItem("MFN-C", "CPU");
+
+        // when
+        basket.addBasketItemInCategoryOrder(addedCpu, Map.of("CPU", 1, "GPU", 2));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("addBasketItemInCategoryOrder falls back to the end when the category is unknown to the catalog")
+    void addBasketItemInCategoryOrderFallsBackToTheEndWhenCategoryIsUnknownToTheCatalog() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-A", "CPU"), basketItem("MFN-B", "GPU")));
+        BasketItem addedRam = basketItem("MFN-C", "Memory");
+
+        // when
+        basket.addBasketItemInCategoryOrder(addedRam, Map.of("CPU", 1, "GPU", 2));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+        assertThat(addedRam.getPosition()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("removeBasketItem removes the item at index and leaves a gap in positions")
     void removeBasketItemRemovesItemAtIndexAndLeavesAGapInPositions() {
         // given
@@ -70,6 +153,24 @@ class BasketTest {
         // then
         assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 2);
+    }
+
+    @Test
+    @DisplayName("removeBasketItem removes the item by position order even when the list order differs")
+    void removeBasketItemRemovesItemByPositionOrderWhenListOrderDiffers() {
+        // given
+        Basket basket = new Basket();
+        BasketItem first = basketItem("MFN-A");
+        first.setPosition(1);
+        BasketItem second = basketItem("MFN-B");
+        second.setPosition(0);
+        basket.getBasketItems().addAll(List.of(first, second));
+
+        // when
+        basket.removeBasketItem(0);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
     }
 
     @Test
@@ -123,7 +224,7 @@ class BasketTest {
         // given
         BasketItem first = basketItem("MFN-A");
         BasketItem incomplete = new BasketItem("pim-2", "", "MFN-X",
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
         BasketItem second = basketItem("MFN-B");
 
         // when
@@ -152,7 +253,11 @@ class BasketTest {
     }
 
     private BasketItem basketItem(String mfn) {
+        return basketItem(mfn, "Laptops");
+    }
+
+    private BasketItem basketItem(String mfn, String category) {
         return new BasketItem("pim-1", "Product", mfn,
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                category, 100.0, 0, 1, null, 3, false);
     }
 }

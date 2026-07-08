@@ -111,7 +111,7 @@ class OrderAllocationsManagerTest {
     }
 
     private OrderItem orderItemInStatus(String itemId, FulfilmentStatus status) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Other, "test", 1, 100.0, "SKU-" + itemId, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
         item.setItemId(itemId);
         item.setStatus(status);
         if (status == FulfilmentStatus.Allocation || status == FulfilmentStatus.Ordered) {

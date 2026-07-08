@@ -8,7 +8,10 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.taxonomy.ProductCategory;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCustomAttributeFilter;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
 
 import java.util.List;
@@ -25,7 +28,7 @@ class CategoryStringPersistenceTest {
         OrderItem item = new OrderItem();
         item.setOrderId("order-1");
         item.setItemId("item-1");
-        item.setCategoryKey("Laptop");
+        item.setCategory("Laptop");
 
         // when
         DynamoDBMapperTableModel<OrderItem> model = orderItemModel();
@@ -34,7 +37,7 @@ class CategoryStringPersistenceTest {
 
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Laptop");
-        assertThat(restored.getCategoryKey()).isEqualTo("Laptop");
+        assertThat(restored.getCategory()).isEqualTo("Laptop");
     }
 
     @Test
@@ -43,7 +46,7 @@ class CategoryStringPersistenceTest {
         OrderItem item = new OrderItem();
         item.setOrderId("order-1");
         item.setItemId("item-1");
-        item.setCategoryKey("Services");
+        item.setCategory("Services");
 
         // when
         Map<String, AttributeValue> attributes = orderItemModel().convert(item);
@@ -55,56 +58,12 @@ class CategoryStringPersistenceTest {
     }
 
     @Test
-    void enumBridgeWritesByteIdenticalString() {
-        // given
-        OrderItem item = new OrderItem();
-        item.setOrderId("order-1");
-        item.setItemId("item-1");
-        item.setCategory(ProductCategory.Services);
-
-        // when
-        Map<String, AttributeValue> attributes = orderItemModel().convert(item);
-
-        // then
-        assertThat(attributes.get("category").getS()).isEqualTo("Services");
-    }
-
-    @Test
-    void bridgeExposesEnumAndRawKey() {
-        // given
-        OrderItem item = new OrderItem();
-        item.setCategoryKey("Services");
-
-        // when
-        ProductCategory category = item.getCategory();
-        String categoryKey = item.getCategoryKey();
-
-        // then
-        assertThat(category).isEqualTo(ProductCategory.Services);
-        assertThat(categoryKey).isEqualTo("Services");
-    }
-
-    @Test
-    void basketItemWithNullCategoryReturnsNullWithoutException() {
-        // given
-        BasketItem basketItem = new BasketItem();
-
-        // when
-        ProductCategory category = basketItem.getCategory();
-        String categoryKey = basketItem.getCategoryKey();
-
-        // then
-        assertThat(category).isNull();
-        assertThat(categoryKey).isNull();
-    }
-
-    @Test
     void warehouseItemCategoryPersistsAsStringAttribute() {
         // given
         WarehouseItem item = new WarehouseItem();
         item.setStoreId("store-1");
         item.setItemId("item-1");
-        item.setCategoryKey("Services");
+        item.setCategory("Services");
 
         // when
         DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
@@ -121,7 +80,7 @@ class CategoryStringPersistenceTest {
     void basketItemCategoryPersistsAsStringInNestedDocument() {
         // given
         BasketItem basketItem = new BasketItem();
-        basketItem.setCategoryKey("Laptop");
+        basketItem.setCategory("Laptop");
         Basket basket = new Basket();
         basket.setStoreId("store-1");
         basket.setBasketItems(List.of(basketItem));
@@ -136,6 +95,49 @@ class CategoryStringPersistenceTest {
         assertThat(nested.get("category").getS()).isEqualTo("Laptop");
         assertThat(nested.get("category").getN()).isNull();
         assertThat(nested).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
+    }
+
+    @Test
+    void productCategoryPersistsAsStringAttributeAfterConverterRemoval() {
+        // given
+        Product product = new Product("cat-def-1", "CPU");
+        ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
+        filter.setCategory("CPU");
+        product.setCustomAttributesFilters(List.of(filter));
+
+        // when
+        DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
+        DynamoDBMapperTableModel<Product> model = mapper.getTableModel(Product.class, DynamoDBMapperConfig.DEFAULT);
+        Map<String, AttributeValue> attributes = model.convert(product);
+        Product restored = model.unconvert(attributes);
+
+        // then
+        assertThat(attributes.get("category").getS()).isEqualTo("CPU");
+        assertThat(attributes.get("category").getN()).isNull();
+        assertThat(attributes.get("customAttributesFilters").getL().get(0).getM().get("category").getS()).isEqualTo("CPU");
+        assertThat(restored.getCategory()).isEqualTo("CPU");
+    }
+
+    @Test
+    void categoryDefinitionCategoryPersistsAsStringInCatalogDocumentAfterConverterRemoval() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-1");
+        definition.setCategory("CPU");
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(definition));
+
+        // when
+        DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
+        DynamoDBMapperTableModel<ProductCatalog> model = mapper.getTableModel(ProductCatalog.class, DynamoDBMapperConfig.DEFAULT);
+        Map<String, AttributeValue> attributes = model.convert(catalog);
+        ProductCatalog restored = model.unconvert(attributes);
+
+        // then
+        Map<String, AttributeValue> nested = attributes.get("categories").getL().get(0).getM();
+        assertThat(nested.get("category").getS()).isEqualTo("CPU");
+        assertThat(nested.get("category").getN()).isNull();
+        assertThat(restored.getCategories().get(0).getCategory()).isEqualTo("CPU");
     }
 
     private DynamoDBMapperTableModel<OrderItem> orderItemModel() {

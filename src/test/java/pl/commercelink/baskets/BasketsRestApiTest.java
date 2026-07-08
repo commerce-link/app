@@ -12,20 +12,25 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.checkout.CheckoutRequest;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -129,6 +134,27 @@ class BasketsRestApiTest {
         Basket saved = basketCaptor.getValue();
         assertThat(saved.getBillingDetails().getCity()).isEqualTo("Original-Billing");
         assertThat(saved.getShippingDetails().getCity()).isEqualTo("Original-Shipping");
+    }
+
+    @Test
+    @DisplayName("createBasket creates proforma with configured fallback locale instead of JVM default")
+    void createBasketCreatesProformaWithConfiguredFallbackLocale() {
+        // given
+        ReflectionTestUtils.setField(basketsRestApi, "fallbackLocale", Locale.GERMAN);
+        Store store = mock(Store.class);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(req.isSendInvoice()).thenReturn(true);
+        InvoicingService.OperationResult result = mock(InvoicingService.OperationResult.class);
+        when(invoicingService.createProforma(any(Basket.class), any(Locale.class), eq(true))).thenReturn(result);
+
+        // when
+        basketsRestApi.createBasket(req, STORE_ID);
+
+        // then
+        ArgumentCaptor<Locale> localeCaptor = ArgumentCaptor.forClass(Locale.class);
+        verify(invoicingService).createProforma(any(Basket.class), localeCaptor.capture(), eq(true));
+        assertThat(localeCaptor.getValue()).isEqualTo(Locale.GERMAN);
     }
 
     private Basket basketBase() {

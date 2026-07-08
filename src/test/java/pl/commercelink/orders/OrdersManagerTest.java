@@ -17,7 +17,6 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
@@ -63,7 +62,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryWithOffersIncrementsOrderTotalsAndPersistsItem() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", ProductCategory.Laptops, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", "Laptops", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(150.0));
@@ -78,7 +77,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("test-product");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(150.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-1");
 
@@ -105,7 +104,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Other);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Other");
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");
@@ -116,7 +115,7 @@ class OrdersManagerTest {
     void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", ProductCategory.Services, 1, null, null);
+        Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", "Services", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
@@ -143,7 +142,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -154,7 +153,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("product-name");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(200.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-2");
 
@@ -170,7 +169,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -181,7 +180,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getCategory()).isEqualTo(ProductCategory.Services);
+        assertThat(savedItem.getCategory()).isEqualTo("Services");
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
@@ -193,7 +192,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                ProductCategory.Services.name(), 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -213,7 +212,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                ProductCategory.Laptops.name(), 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -353,7 +352,7 @@ class OrdersManagerTest {
     }
 
     private OrderItem orderItem(String itemId, double price) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Other, "product", 1, price, "SKU-" + itemId, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "product", 1, price, "SKU-" + itemId, false);
         item.setItemId(itemId);
         return item;
     }
@@ -365,7 +364,7 @@ class OrdersManagerTest {
     }
 
     private OrderItem serviceItem(String itemId, double price) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Services, "service", 1, price, null, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Services", "service", 1, price, null, false);
         item.setItemId(itemId);
         return item;
     }

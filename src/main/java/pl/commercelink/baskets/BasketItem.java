@@ -6,7 +6,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
@@ -57,14 +56,6 @@ public class BasketItem implements Categorized {
         this.consolidated = consolidated;
     }
 
-    @Deprecated
-    public BasketItem(String id, String name, String mfn,
-                      ProductCategory category, double unitPrice, double unitCost, long qty,
-                      String catalogId, int estimatedDeliveryDays, boolean consolidated) {
-        this(id, name, mfn, category == null ? null : category.name(), unitPrice, unitCost, qty,
-                catalogId, estimatedDeliveryDays, consolidated);
-    }
-
     @DynamoDBIgnore
     public boolean isComplete() {
         return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
@@ -79,11 +70,11 @@ public class BasketItem implements Categorized {
     }
 
     @DynamoDBAttribute(attributeName = "category")
-    public String getCategoryKey() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategoryKey(String category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 
@@ -117,12 +108,6 @@ public class BasketItem implements Categorized {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    @Deprecated
-    @DynamoDBIgnore
-    public void setCategory(ProductCategory category) {
-        this.category = category == null ? null : category.name();
     }
 
     public void setQty(long qty) {

@@ -1,7 +1,5 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
@@ -11,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -109,11 +108,11 @@ public class ProductCatalog implements DeletionProtection {
                 .orElseThrow(() -> new IllegalArgumentException("Category definition not found"));
     }
 
-    public CategoryDefinition findCategoryDefinition(ProductCategory category) {
+    @DynamoDBIgnore
+    public Map<String, Integer> getCategorySequenceNumbers() {
         return categories.stream()
-                .filter(c -> c.getName().equals(category.name()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Category definition not found"));
+                .filter(c -> c.getCategory() != null)
+                .collect(Collectors.toMap(CategoryDefinition::getCategory, CategoryDefinition::getSequenceNumber, Math::min));
     }
 
     @Override

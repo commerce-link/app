@@ -6,6 +6,8 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.*;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Optional;
 
@@ -70,8 +72,8 @@ public class ProductDetails {
                 product.getBrand(),
                 product.getLabel(),
                 product.getName(),
-                product.getCategory().getProductGroup(),
-                product.getCategory().name()
+                ProductCategories.tryParse(product.getCategory()).map(ProductCategory::getProductGroup).orElse(null),
+                product.getCategory()
         );
 
         p.setRecommendation(product.getRecommendation());

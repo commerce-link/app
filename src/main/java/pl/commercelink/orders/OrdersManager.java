@@ -249,7 +249,7 @@ public class OrdersManager {
         for (SplitGroupComponent component : components) {
             OrderItem newItem = new OrderItem(
                     orderId,
-                    source.getCategoryKey(),
+                    source.getCategory(),
                     component.name(),
                     component.qty(),
                     component.price(),
