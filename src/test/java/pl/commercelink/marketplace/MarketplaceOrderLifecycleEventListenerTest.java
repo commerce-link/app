@@ -270,7 +270,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Test
     void shipmentCreatedEventDoesNotAcceptBeforeShipping() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         Shipment shipment = mock(Shipment.class);
         when(shipment.hasShippingData()).thenReturn(true);
         when(shipment.getTrackingNo()).thenReturn("TRACK-9");
@@ -284,13 +283,11 @@ class MarketplaceOrderLifecycleEventListenerTest {
         // then
         verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
         verify(provider, never()).acceptOrder(any());
-        verify(order, never()).markMarketplaceAccepted();
     }
 
     @Test
     void orderCompletedEventDoesNotAcceptBeforeCompleting() {
         // given
-        when(order.isMarketplaceAccepted()).thenReturn(false);
         when(order.getStatus()).thenReturn(OrderStatus.Completed);
 
         // when
