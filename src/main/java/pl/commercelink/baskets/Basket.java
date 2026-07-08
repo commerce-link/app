@@ -128,6 +128,13 @@ public class Basket {
     }
 
     public void addBasketItem(BasketItem basketItem) {
+        int lastSameCategoryIndex = lastIndexOfCategory(basketItem.getCategory());
+        if (lastSameCategoryIndex >= 0) {
+            basketItems.add(lastSameCategoryIndex + 1, basketItem);
+            reindexPositions();
+            return;
+        }
+
         int bandStart = basketItem.isService() ? PositionGroup.SERVICE_GROUP_START : 0;
         int next = basketItems.stream()
                 .filter(i -> i.isService() == basketItem.isService())
@@ -140,7 +147,7 @@ public class Basket {
 
     public void addBasketItemInCategoryOrder(BasketItem basketItem, Map<String, Integer> categorySequenceNumbers) {
         Integer sequenceNumber = basketItem.isService() ? null : sequenceNumberOf(basketItem, categorySequenceNumbers);
-        if (sequenceNumber == null) {
+        if (sequenceNumber == null || lastIndexOfCategory(basketItem.getCategory()) >= 0) {
             addBasketItem(basketItem);
             return;
         }
@@ -163,6 +170,15 @@ public class Basket {
 
     private static Integer sequenceNumberOf(BasketItem basketItem, Map<String, Integer> categorySequenceNumbers) {
         return basketItem.getCategory() == null ? null : categorySequenceNumbers.get(basketItem.getCategory());
+    }
+
+    private int lastIndexOfCategory(String category) {
+        for (int i = basketItems.size() - 1; i >= 0; i--) {
+            if (basketItems.get(i).hasCategory(category)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public void removeBasketItem(int index) {
