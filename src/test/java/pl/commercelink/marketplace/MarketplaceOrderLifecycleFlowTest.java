@@ -86,7 +86,7 @@ class MarketplaceOrderLifecycleFlowTest {
     }
 
     @Test
-    void marketplaceAcceptsExactlyOnceEvenWhenEventsArriveOutOfOrder() {
+    void marketplaceReceivesAcceptAndCompleteEvenWhenEventsArriveOutOfOrder() {
         // given
         Order order = settledMarketplaceOrder();
 
