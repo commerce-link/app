@@ -75,7 +75,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("test-product");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(150.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-1");
 
@@ -102,7 +102,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Other);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Other");
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");
@@ -151,7 +151,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getName()).isEqualTo("product-name");
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(ProductCategory.Laptops);
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(200.0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-2");
 
@@ -178,7 +178,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getCategory()).isEqualTo(ProductCategory.Services);
+        assertThat(savedItem.getCategory()).isEqualTo("Services");
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
@@ -294,7 +294,7 @@ class OrdersManagerTest {
     }
 
     private OrderItem orderItem(String itemId, double price) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Other, "product", 1, price, "SKU-" + itemId, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "product", 1, price, "SKU-" + itemId, false);
         item.setItemId(itemId);
         return item;
     }
@@ -306,7 +306,7 @@ class OrdersManagerTest {
     }
 
     private OrderItem serviceItem(String itemId, double price) {
-        OrderItem item = new OrderItem(ORDER_ID, ProductCategory.Services, "service", 1, price, null, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Services", "service", 1, price, null, false);
         item.setItemId(itemId);
         return item;
     }

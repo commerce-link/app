@@ -23,7 +23,7 @@
                         <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
                     </select>
                 </div>
-                <input type="hidden" th:field="*{category}">
+                <input type="hidden" th:field="*{category}" th:if="${edit}">
             </div>
         </div>
 

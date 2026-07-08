@@ -8,7 +8,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -51,11 +50,6 @@ public class WarehouseItem extends Item {
                 null,
                 FulfilmentStatus.New
         );
-    }
-
-    @Deprecated
-    public WarehouseItem(String storeId, String deliveryId, ProductCategory category, String name, String ean, String mfn, double unitCost, int qty) {
-        this(storeId, deliveryId, category == null ? null : category.name(), name, ean, mfn, unitCost, qty);
     }
 
     @DynamoDBIgnore

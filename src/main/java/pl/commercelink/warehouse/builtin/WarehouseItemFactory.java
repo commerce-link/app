@@ -46,7 +46,7 @@ class WarehouseItemFactory {
 
     WarehouseItem create(String storeId, FulfilmentItem item) {
         FulfilmentSource source = item.getSource();
-        ResolvedProduct resolved = taxonomyResolver.resolve(source.getMfn(), source.getName(), source.getCategoryKey());
+        ResolvedProduct resolved = taxonomyResolver.resolve(source.getMfn(), source.getName(), source.getCategory());
         return new WarehouseItem(
                 storeId,
                 source.getProvider(),

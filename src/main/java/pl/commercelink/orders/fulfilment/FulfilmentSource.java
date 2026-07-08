@@ -4,14 +4,13 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.taxonomy.Categorized;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Objects;
 
 public class FulfilmentSource implements Categorized {
 
     private String name;
-    private ProductCategory category;
+    private String category;
 
     private String provider;
     private String ean;
@@ -40,7 +39,7 @@ public class FulfilmentSource implements Categorized {
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         FulfilmentSource that = (FulfilmentSource) o;
-        return qty == that.qty && Double.compare(priceNet, that.priceNet) == 0 && Double.compare(priceGross, that.priceGross) == 0 && Objects.equals(provider, that.provider) && Objects.equals(ean, that.ean) && Objects.equals(mfn, that.mfn) && category == that.category;
+        return qty == that.qty && Double.compare(priceNet, that.priceNet) == 0 && Double.compare(priceGross, that.priceGross) == 0 && Objects.equals(provider, that.provider) && Objects.equals(ean, that.ean) && Objects.equals(mfn, that.mfn) && Objects.equals(category, that.category);
     }
 
     @Override
@@ -80,16 +79,12 @@ public class FulfilmentSource implements Categorized {
         this.name = name;
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
-    }
-
-    public String getCategoryKey() {
-        return category == null ? null : category.name();
     }
 
     public int getQty() {

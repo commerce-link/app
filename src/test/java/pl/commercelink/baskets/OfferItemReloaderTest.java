@@ -102,9 +102,9 @@ class OfferItemReloaderTest {
     void reloadSortsBasketItemsByPositionPreservingListOrder() {
         // given
         BasketItem laptopItem = new BasketItem("pim-1", "Laptop", "MFN-L",
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
         BasketItem cpuItem = new BasketItem("pim-2", "Processor", "MFN-C",
-                ProductCategory.CPU, 50.0, 0, 1, null, 3, false);
+                "CPU", 50.0, 0, 1, null, 3, false);
         Basket basket = basketWith(laptopItem, cpuItem);
 
         // when
@@ -124,7 +124,7 @@ class OfferItemReloaderTest {
         // given
         BasketItem service = BasketItem.shipping("Dostawa", 20.0);
         BasketItem product = new BasketItem("pim-1", "Laptop", "MFN-L",
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
         Basket basket = basketWith(service, product);
 
         // when
@@ -142,9 +142,9 @@ class OfferItemReloaderTest {
     void reloadBreaksEqualPositionTiesByUnitPriceDescending() {
         // given
         BasketItem cheaper = new BasketItem("pim-1", "Cheaper", "MFN-CHEAP",
-                ProductCategory.Laptops, 100.0, 0, 1, null, 3, false);
+                "Laptops", 100.0, 0, 1, null, 3, false);
         BasketItem pricier = new BasketItem("pim-2", "Pricier", "MFN-PRICEY",
-                ProductCategory.Laptops, 500.0, 0, 1, null, 3, false);
+                "Laptops", 500.0, 0, 1, null, 3, false);
         Basket basket = basketWith(cheaper, pricier);
         basket.getBasketItems().forEach(item -> item.setPosition(7));
 
@@ -180,13 +180,13 @@ class OfferItemReloaderTest {
 
     private BasketItem basketItemWithCatalog(String pimId, String catalogId, String mfn, double unitPrice) {
         BasketItem item = new BasketItem(pimId, "Test Product", mfn,
-                ProductCategory.Laptops, unitPrice, 0, 1, catalogId, 3, false);
+                "Laptops", unitPrice, 0, 1, catalogId, 3, false);
         return item;
     }
 
     private BasketItem basketItemWithMfn(String mfn, double unitCost) {
         BasketItem item = new BasketItem("pim-id", "Other Product", mfn,
-                ProductCategory.Laptops, 100.0, unitCost, 1, null, 3, false);
+                "Laptops", 100.0, unitCost, 1, null, 3, false);
         return item;
     }
 }

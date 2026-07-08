@@ -1,11 +1,8 @@
 package pl.commercelink.products;
 
-import pl.commercelink.taxonomy.ProductCategory;
-
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -51,8 +48,7 @@ public class ProductCustomAttributeFilter {
     }
 
     @DynamoDBAttribute(attributeName = "category")
-    @DynamoDBTypeConvertedEnum
-    private ProductCategory category;
+    private String category;
     @JsonProperty("name")
     @DynamoDBAttribute(attributeName = "name")
     private String name;
@@ -66,11 +62,11 @@ public class ProductCustomAttributeFilter {
     public ProductCustomAttributeFilter() {
     }
 
-    public ProductCategory getCategory() {
+    public String getCategory() {
         return category;
     }
 
-    public void setCategory(ProductCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 
@@ -101,7 +97,7 @@ public class ProductCustomAttributeFilter {
     @JsonIgnore
     @DynamoDBIgnore
     public boolean isComplete() {
-        return category != null && isNotBlank(name) && isNotBlank(value) && Operator.isKnown(operator);
+        return isNotBlank(category) && isNotBlank(name) && isNotBlank(value) && Operator.isKnown(operator);
     }
 
     @JsonIgnore

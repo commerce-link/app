@@ -21,7 +21,7 @@ public class ReservationRemovalItem {
         item.ean = orderItem.getEan();
         item.mfn = orderItem.getManufacturerCode();
         item.name = orderItem.getName();
-        item.category = orderItem.getCategoryKey();
+        item.category = orderItem.getCategory();
         item.qty = orderItem.getQty();
         item.unitPrice = orderItem.getCost();
         item.tax = orderItem.getTax();

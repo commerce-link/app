@@ -14,7 +14,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.StockLevels;
 import pl.commercelink.warehouse.StockProductLevel;
@@ -54,9 +53,9 @@ class DeliverySuggestionServiceTest {
     @Test
     void sortsSuggestionsByCategoryThenName() {
         // given
-        StockProductLevel gpu = new StockProductLevel(ProductCategory.GPU, "MFN-GPU", "Zotac RTX", 1_000_000, 0, 3);
-        StockProductLevel cpuAmd = new StockProductLevel(ProductCategory.CPU, "MFN-CPU-AMD", "AMD Ryzen", 1_000_000, 0, 3);
-        StockProductLevel cpuIntel = new StockProductLevel(ProductCategory.CPU, "MFN-CPU-INTEL", "Intel Core", 1_000_000, 0, 3);
+        StockProductLevel gpu = new StockProductLevel("GPU", "MFN-GPU", "Zotac RTX", 1_000_000, 0, 3);
+        StockProductLevel cpuAmd = new StockProductLevel("CPU", "MFN-CPU-AMD", "AMD Ryzen", 1_000_000, 0, 3);
+        StockProductLevel cpuIntel = new StockProductLevel("CPU", "MFN-CPU-INTEL", "Intel Core", 1_000_000, 0, 3);
 
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 

@@ -80,7 +80,7 @@ public class DeliverySuggestionService {
                 boolean isLowestPrice = offer.netPrice() <= lowestNetAcrossSuppliers;
 
                 suggestions.add(SuggestedDeliveryItem.of(
-                        level.getCategory() != null ? level.getCategory().name() : null,
+                        level.getCategory(),
                         level.getName(),
                         offer.ean(),
                         offer.mfn(),

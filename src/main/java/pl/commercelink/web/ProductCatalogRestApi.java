@@ -13,6 +13,9 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.taxonomy.CategoryLocalizer;
+import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.web.dtos.ObjectIdDto;
 
 import java.util.List;
@@ -32,6 +35,7 @@ public class ProductCatalogRestApi {
     private final PricelistRepository pricelistRepository;
     private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
     private final EnumLocalizer enumLocalizer;
+    private final CategoryLocalizer categoryLocalizer;
 
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
@@ -60,9 +64,12 @@ public class ProductCatalogRestApi {
         return categoryDefinitions.stream()
                 .map(c -> new ProductCategoryTree(
                         c,
-                        categoryDefinitions.stream().anyMatch(d -> d != c && d.getCategory() == c.getCategory()),
-                        enumLocalizer.localize(c.getCategory(), "plural"),
-                        enumLocalizer.localize(c.getCategory().getProductGroup())))
+                        categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(d.getCategory(), c.getCategory())),
+                        categoryLocalizer.localize(c.getCategory(), "plural"),
+                        ProductCategories.tryParse(c.getCategory())
+                                .map(ProductCategory::getProductGroup)
+                                .map(enumLocalizer::localize)
+                                .orElse(null)))
                 .collect(Collectors.toList());
     }
 
