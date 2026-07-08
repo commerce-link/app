@@ -156,6 +156,24 @@ class BasketTest {
     }
 
     @Test
+    @DisplayName("removeBasketItem removes the item by position order even when the list order differs")
+    void removeBasketItemRemovesItemByPositionOrderWhenListOrderDiffers() {
+        // given
+        Basket basket = new Basket();
+        BasketItem first = basketItem("MFN-A");
+        first.setPosition(1);
+        BasketItem second = basketItem("MFN-B");
+        second.setPosition(0);
+        basket.getBasketItems().addAll(List.of(first, second));
+
+        // when
+        basket.removeBasketItem(0);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+    }
+
+    @Test
     @DisplayName("setBasketItems places services into the service band starting at 800")
     void setBasketItemsPlacesServicesIntoServiceBand() {
         // given

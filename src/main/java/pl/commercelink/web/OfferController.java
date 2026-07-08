@@ -267,10 +267,10 @@ public class OfferController {
     }
 
     @PostMapping("/dashboard/offer/{offerId}/recalculate")
-    public String recalculateOffer(@PathVariable String offerId, Model model) {
-        Optional<Basket> existingOfferOpt = basketsRepository.findById(getStoreId(), offerId);
-        offerItemReloader.recalculate(existingOfferOpt.get());
-
+    public String recalculateOffer(@PathVariable String offerId) {
+        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+        offerItemReloader.recalculate(basket);
+        save(basket);
         return "redirect:/dashboard/offer/" + offerId;
     }
 
