@@ -72,10 +72,6 @@ public class MarketplaceOrderLifecycleEventListener {
                 if (order == null || order.getStatus() == OrderStatus.Cancelled) {
                     break;
                 }
-                // The same accept can be sent twice: the queue is at-least-once (redelivery,
-                // DLQ redrive), and the app republishes OrderAccepted when an order's status
-                // is rewound to New (OrderAllocationsManager.remove) and then moves forward
-                // again. Providers are expected to make acceptOrder idempotent.
                 provider.acceptOrder(externalOrderId);
                 break;
             case ShipmentCreated:
