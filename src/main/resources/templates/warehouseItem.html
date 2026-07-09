@@ -30,7 +30,7 @@
                             <div class="select">
                                 <select th:field="*{category}">
                                     <option th:if="${!#strings.isEmpty(warehouseItem.category) && !productCategories.contains(warehouseItem.category)}"
-                                            th:value="${warehouseItem.category}" th:text="${categoryI18n.localize(warehouseItem.category, 'singular')}"></option>
+                                            th:value="${warehouseItem.category}" th:text="${warehouseItem.category}"></option>
                                     <optgroup th:each="group : ${productCategoryGroups}" th:label="${group.catalog}">
                                         <option th:each="category : ${group.names}" th:value="${category}"
                                                 th:text="${category}"></option>

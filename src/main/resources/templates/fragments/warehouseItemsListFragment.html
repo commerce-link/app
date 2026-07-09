@@ -35,7 +35,7 @@
                             <a th:href="@{/dashboard/warehouse/items/{itemId}(itemId=${item.itemId})}"
                                th:text="${#strings.substring(item.itemId, 0, 8)}"></a>
                         </td>
-                        <td th:text="${categoryI18n.localize(item.category, 'singular')}"></td>
+                        <td th:text="${item.category}"></td>
                         <td th:text="${item.ean}"></td>
                         <td th:text="${item.manufacturerCode}"></td>
                         <td th:text="${item.name}"></td>
