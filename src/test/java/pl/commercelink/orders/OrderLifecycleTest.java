@@ -185,7 +185,7 @@ class OrderLifecycleTest {
         orderLifecycle.update(order, List.of(item));
 
         // then
-        assertEquals(OrderStatus.Delivered, order.getStatus());
+        assertEquals(OrderStatus.Assembled, order.getStatus());
         verifyNoInteractions(orderLifecycleEventPublisher);
     }
 
