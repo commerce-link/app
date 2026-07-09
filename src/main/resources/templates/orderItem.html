@@ -20,7 +20,11 @@
                         <div class="control">
                             <div class="select">
                                 <select th:field="*{category}" th:disabled="${isCompletedOrder}">
-                                    <option th:each="category : ${categories}" th:value="${category}" th:text="${enumI18n.localize(category, 'plural')}"></option>
+                                    <option th:if="${!#strings.isEmpty(orderItem.category) && !categories.contains(orderItem.category)}"
+                                            th:value="${orderItem.category}" th:text="${categoryI18n.localize(orderItem.category, 'plural')}"></option>
+                                    <optgroup th:each="group : ${categoryGroups}" th:label="${group.catalog}">
+                                        <option th:each="category : ${group.names}" th:value="${category}" th:text="${category}"></option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>

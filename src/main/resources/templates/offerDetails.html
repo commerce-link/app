@@ -152,7 +152,11 @@
                             <div class="select">
                                 <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
                                     <option value=""></option>
-                                    <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
+                                    <option th:if="${offerItem.basketItem != null && !#strings.isEmpty(offerItem.basketItem.category) && !productCategories.contains(offerItem.basketItem.category)}"
+                                            th:value="${offerItem.basketItem.category}" th:text="${categoryI18n.localize(offerItem.basketItem.category, 'singular')}"></option>
+                                    <optgroup th:each="group : ${productCategoryGroups}" th:label="${group.catalog}">
+                                        <option th:each="cat : ${group.names}" th:value="${cat}" th:text="${cat}"></option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </td>

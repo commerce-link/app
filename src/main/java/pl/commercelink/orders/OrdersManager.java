@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.stores.Store;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -36,6 +37,8 @@ public class OrdersManager {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private OrderLifecycle orderLifecycle;
+    @Autowired
+    private StoreCategories storeCategories;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int position) {
         OrderItem orderItem;
@@ -77,6 +80,7 @@ public class OrdersManager {
                 store.isPositionConsolidationEnabled(),
                 position
         );
+        orderItem.setService(storeCategories.isService(store.getStoreId(), availabilityAndPrice.getCategory()));
         if (orderItem.isService()) {
             orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
             orderItem.markAsWarehouseFulfilled();

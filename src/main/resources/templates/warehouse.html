@@ -30,7 +30,7 @@
                 <div class="tags has-addons">
                     <a class="tag category-tag"
                        th:classappend="${#lists.contains(selectedCategories, category)} ? 'is-link' : 'is-link is-light'"
-                       th:text="${category}"
+                       th:text="${categoryI18n.localize(category, 'singular')}"
                        th:data-category="${category}"
                        href="javascript:void(0)"></a>
                 </div>

@@ -117,9 +117,34 @@ class OfferItemReloaderTest {
 
         // then
         assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "SHIPPING");
-        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
         assertThat(offerItems.get(0).getBasketItem().getPosition())
                 .isLessThan(offerItems.get(1).getBasketItem().getPosition());
+    }
+
+    @Test
+    @DisplayName("sequence numbers keep pointing at the basket list index so form fields bind the displayed item")
+    void sequenceNumbersPointAtBasketListIndexEvenWhenDisplayOrderDiffers() {
+        // given - a mid-list item became a service, so list order differs from position order
+        BasketItem service = new BasketItem("pim-s", "Montaż", "MFN-S",
+                "Usługi dodatkowe", 250.0, 0, 1, null, 3, false);
+        service.setService(true);
+        service.setPosition(800);
+        BasketItem product = new BasketItem("pim-1", "Obudowa Corsair", "MFN-C",
+                "Case", 399.0, 0, 1, null, 3, false);
+        product.setPosition(0);
+        Basket basket = new Basket();
+        basket.setStoreId(STORE_ID);
+        basket.getBasketItems().addAll(List.of(service, product));
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basket);
+
+        // then
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-C", "MFN-S");
+        for (OfferItem offerItem : offerItems) {
+            assertThat(basket.getBasketItems().get(offerItem.getSequenceNumber()))
+                    .isSameAs(offerItem.getBasketItem());
+        }
     }
 
     @Test

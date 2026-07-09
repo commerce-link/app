@@ -55,6 +55,7 @@ public class OrderItem extends Item {
 
     public OrderItem(String orderId, OrderItem source, int qty) {
         super(source.getCategory(), source.getName(), qty, source.getComment());
+        this.setService(source.isService());
         this.orderId = orderId;
         this.itemId = UUID.randomUUID().toString();
         this.sku = source.getSku();
@@ -95,6 +96,7 @@ public class OrderItem extends Item {
 
     public void updateAllFields(OrderItem other) {
         this.setCategory(other.getCategory());
+        this.setService(other.isService());
         this.setSku(other.getSku());
         this.setName(other.getName());
         this.setPrice(other.getPrice());
@@ -114,6 +116,7 @@ public class OrderItem extends Item {
 
     public void updateLimitedFields(OrderItem other) {
         this.setCategory(other.getCategory());
+        this.setService(other.isService());
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
@@ -269,12 +272,13 @@ public class OrderItem extends Item {
                 basketItem.getMfn(),
                 basketItem.isConsolidated()
         );
+        orderItem.setService(basketItem.isService());
         orderItem.setPosition(basketItem.getPosition());
         return orderItem;
     }
 
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
-        return new OrderItem(
+        OrderItem orderItem = new OrderItem(
                 orderId,
                 Categorized.SERVICES,
                 opt.getName(),
@@ -284,6 +288,8 @@ public class OrderItem extends Item {
                 false,
                 PositionGroup.DELIVERY_POSITION
         );
+        orderItem.setService(true);
+        return orderItem;
     }
 
     @DynamoDBIgnore

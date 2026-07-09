@@ -37,6 +37,7 @@ public class BasketItem implements Categorized {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "position")
     private int position;
+    private boolean service;
 
     public BasketItem() {
     }
@@ -142,6 +143,16 @@ public class BasketItem implements Categorized {
         this.consolidated = consolidated;
     }
 
+    @Override
+    @DynamoDBAttribute(attributeName = "service")
+    public boolean isService() {
+        return service || hasCategory(SERVICES);
+    }
+
+    public void setService(boolean service) {
+        this.service = service;
+    }
+
     public int getPosition() {
         return position;
     }
@@ -156,7 +167,7 @@ public class BasketItem implements Categorized {
     }
 
     public static BasketItem shipping(String name, double shippingPrice) {
-        return new BasketItem(UniqueIdentifierGenerator.generate(),
+        BasketItem item = new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
                 Categorized.SERVICES,
@@ -167,6 +178,8 @@ public class BasketItem implements Categorized {
                 1,
                 false
         );
+        item.setService(true);
+        return item;
     }
 
     public static BasketItem shipping(double shippingPrice) {

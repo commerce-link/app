@@ -111,8 +111,8 @@ public class ProductCatalog implements DeletionProtection {
     @DynamoDBIgnore
     public Map<String, Integer> getCategorySequenceNumbers() {
         return categories.stream()
-                .filter(c -> c.getCategory() != null)
-                .collect(Collectors.toMap(CategoryDefinition::getCategory, CategoryDefinition::getSequenceNumber, Math::min));
+                .filter(c -> c.getName() != null)
+                .collect(Collectors.toMap(CategoryDefinition::getName, CategoryDefinition::getSequenceNumber, Math::min));
     }
 
     @Override
