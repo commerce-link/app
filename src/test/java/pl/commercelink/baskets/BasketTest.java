@@ -156,8 +156,8 @@ class BasketTest {
     }
 
     @Test
-    @DisplayName("removeBasketItem removes the item at the list index even when the position order differs")
-    void removeBasketItemRemovesItemAtListIndexWhenPositionOrderDiffers() {
+    @DisplayName("removeBasketItem removes the item by position order even when the list order differs")
+    void removeBasketItemRemovesItemByPositionOrderWhenListOrderDiffers() {
         // given
         Basket basket = new Basket();
         BasketItem first = basketItem("MFN-A");
@@ -170,7 +170,7 @@ class BasketTest {
         basket.removeBasketItem(0);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
     }
 
     @Test

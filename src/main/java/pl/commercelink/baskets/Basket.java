@@ -12,6 +12,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -182,7 +183,10 @@ public class Basket {
     }
 
     public void removeBasketItem(int index) {
-        basketItems.remove(index);
+        List<BasketItem> byPosition = basketItems.stream()
+                .sorted(Comparator.comparingInt(BasketItem::getPosition))
+                .toList();
+        basketItems.remove(byPosition.get(index));
     }
 
     private void reindexPositions() {

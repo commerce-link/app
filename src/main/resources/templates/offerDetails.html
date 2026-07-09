@@ -142,7 +142,7 @@
                     </tr>
                     </thead>
                     <tbody id="offerRows">
-                    <tr th:each="offerItem : ${offerItems}"
+                    <tr th:each="offerItem, rowStat : ${offerItems}"
                         th:attr="data-band=${offerItem.basketItem != null && offerItem.basketItem.isService()} ? 'service' : 'product'">
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
@@ -183,7 +183,7 @@
                         </td>
                         <td>
                             <button class="button is-small is-danger" type="button"
-                                    th:onclick="|submitRemoveItem(event, ${offerItem.sequenceNumber})|"
+                                    th:onclick="|submitRemoveItem(event, ${rowStat.index})|"
                                     th:text="#{general.delete}">
                             </button>
                         </td>
