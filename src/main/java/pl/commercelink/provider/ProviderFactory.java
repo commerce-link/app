@@ -4,6 +4,7 @@ import pl.commercelink.provider.api.AuthConfig;
 import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.rest.client.ConfigurableOAuth2AuthorizationService;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
+import pl.commercelink.rest.client.OAuth2RefreshToken;
 import pl.commercelink.rest.client.OAuth2TokenStore;
 import pl.commercelink.rest.client.RestApi;
 import pl.commercelink.rest.client.RestApiWithRetry;
@@ -11,6 +12,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -53,6 +55,10 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
             OAuth2CredentialStore credentialStore, OAuth2TokenStore tokenStore,
             StoresRepository storesRepository) {
         this(descriptorClass, null, configurationManager, credentialStore, tokenStore, storesRepository);
+    }
+
+    void registerDescriptor(D descriptor) {
+        descriptors.put(descriptor.name(), descriptor);
     }
 
     public T get(Store store) {
@@ -163,6 +169,30 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         if (descriptor != null && configuration != null) {
             String configName = resolveCredentialName(descriptor);
             configurationManager.saveConfiguration(store, configName, descriptor, configuration);
+            seedRefreshToken(store, descriptor, configName, configuration);
         }
+    }
+
+    private void seedRefreshToken(Store store, D descriptor, String configName, Map<String, String> configuration) {
+        if (!(descriptor.authConfig() instanceof AuthConfig.OAuth2 oauth2) || tokenStore == null) {
+            return;
+        }
+        String fieldKey = oauth2.refreshTokenFieldKey();
+        if (fieldKey == null) {
+            return;
+        }
+        String refreshToken = configuration.get(fieldKey);
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        OAuth2RefreshToken token = new OAuth2RefreshToken(
+                refreshToken,
+                Instant.ofEpochMilli(now),
+                Instant.ofEpochMilli(now + oauth2.refreshTokenExpirationSeconds() * 1000));
+        tokenStore.storeToken(store.getStoreId(), configName,
+                ConfigurableOAuth2AuthorizationService.REFRESH_TOKEN, token);
+        tokenStore.deleteToken(store.getStoreId(), configName,
+                ConfigurableOAuth2AuthorizationService.ACCESS_TOKEN);
     }
 }
