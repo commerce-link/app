@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.products.StoreCategories;
@@ -33,6 +34,8 @@ public class OrdersManager {
     private OrderItemsRepository orderItemsRepository;
     @Autowired
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
+    @Autowired
+    private AutomatedOrderFulfilment automatedOrderFulfilment;
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
@@ -67,6 +70,8 @@ public class OrdersManager {
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
+
+        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
     public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int position) {
@@ -91,6 +96,8 @@ public class OrdersManager {
         order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
+
+        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {

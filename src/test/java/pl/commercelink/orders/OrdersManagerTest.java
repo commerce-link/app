@@ -14,6 +14,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.products.StoreCategories;
@@ -46,6 +47,8 @@ class OrdersManagerTest {
     private OrderItemsRepository orderItemsRepository;
     @Mock
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
+    @Mock
+    private AutomatedOrderFulfilment automatedOrderFulfilment;
     @Mock
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock

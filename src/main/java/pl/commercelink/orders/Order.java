@@ -160,7 +160,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean hasBeenShippedOrIsReadyForCollection() {
-        return getShipments().stream().allMatch(s -> s.hasCollectionData() || s.hasShippingData());
+        return !getShipments().isEmpty() && getShipments().stream().allMatch(s -> s.hasCollectionData() || s.hasShippingData());
     }
 
     @DynamoDBIgnore
