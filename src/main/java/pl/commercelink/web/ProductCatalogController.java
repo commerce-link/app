@@ -53,6 +53,9 @@ public class ProductCatalogController {
     private ProductRecommendationEngine recommendationEngine;
 
     @Autowired
+    private IcecatCategories icecatCategories;
+
+    @Autowired
     private StoresRepository storesRepository;
 
     @Autowired
@@ -172,7 +175,7 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("productCategories", store.getEnabledProductCategories());
+        model.addAttribute("productCategories", icecatCategories.leafNamesUnder(store.getEnabledCategories()));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
@@ -485,7 +488,7 @@ public class ProductCatalogController {
 
         Store store = storesRepository.findById(getStoreId());
 
-        model.addAttribute("productCategories", store.getEnabledProductCategories());
+        model.addAttribute("productCategories", icecatCategories.leafNamesUnder(store.getEnabledCategories()));
         model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
         model.addAttribute("labels", categoryDefinition.getGroupingOrder());
         model.addAttribute("availabilityTypes", ProductAvailabilityType.values());

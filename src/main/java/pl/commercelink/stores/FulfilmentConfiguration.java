@@ -26,6 +26,8 @@ public class FulfilmentConfiguration {
     @DynamoDBAttribute(attributeName = "enabledProductGroups")
     @DynamoDBTypeConverted(converter = ProductGroupListConverter.class)
     private List<ProductGroup> enabledProductGroups;
+    @DynamoDBAttribute(attributeName = "enabledCategories")
+    private List<String> enabledCategories;
     @DynamoDBAttribute(attributeName = "canUseGlobalSuppliers")
     private boolean canUseGlobalSuppliers = false;
     @DynamoDBAttribute(attributeName = "supplierConnections")
@@ -74,6 +76,14 @@ public class FulfilmentConfiguration {
 
     public void setEnabledProductGroups(List<ProductGroup> enabledProductGroups) {
         this.enabledProductGroups = enabledProductGroups;
+    }
+
+    public List<String> getEnabledCategories() {
+        return enabledCategories;
+    }
+
+    public void setEnabledCategories(List<String> enabledCategories) {
+        this.enabledCategories = enabledCategories;
     }
 
     public boolean isCanUseGlobalSuppliers() {

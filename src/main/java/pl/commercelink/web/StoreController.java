@@ -21,7 +21,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.printing.PrintProviderRegistry;
-import pl.commercelink.taxonomy.ProductGroup;
+import pl.commercelink.products.IcecatCategories;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.stores.*;
@@ -74,6 +74,9 @@ public class StoreController {
 
     @Autowired
     private ManualSupplierService manualSupplierService;
+
+    @Autowired
+    private IcecatCategories icecatCategories;
 
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
@@ -404,7 +407,7 @@ public class StoreController {
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("productGroupTypes", ProductGroup.values());
+        model.addAttribute("categoryNames", icecatCategories.topLevelNames());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())

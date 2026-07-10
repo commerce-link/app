@@ -13,6 +13,7 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierSelectionForm;
+import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -154,6 +155,59 @@ class StoreSupplierConnectionServiceTest {
         // then
         assertFalse(result.hasErrors());
         verify(persister).persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
+    }
+
+    @Test
+    void applyCarriesOverLegacyEnabledProductGroupsIntoSubmittedConfiguration() {
+        // given
+        Store existing = storeWith(true);
+        existing.getFulfilmentConfiguration().setEnabledProductGroups(List.of(ProductGroup.Computers));
+        FulfilmentConfiguration submitted = configWith(true);
+        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), any()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+
+        // when
+        service.apply(existing, submitted, List.of(), Map.of(), true);
+
+        // then
+        assertThat(submitted.getEnabledProductGroups()).containsExactly(ProductGroup.Computers);
+    }
+
+    @Test
+    void applyCarriesOverEnabledCategoriesWhenFormDidNotSubmitAny() {
+        // given
+        Store existing = storeWith(true);
+        existing.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom", "Biuro"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(null);
+        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), any()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+
+        // when
+        service.apply(existing, submitted, List.of(), Map.of(), true);
+
+        // then
+        assertThat(submitted.getEnabledCategories()).containsExactly("Dom", "Biuro");
+    }
+
+    @Test
+    void applyKeepsExplicitlyEmptiedEnabledCategories() {
+        // given
+        Store existing = storeWith(true);
+        existing.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(new ArrayList<>());
+        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), any()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+
+        // when
+        service.apply(existing, submitted, List.of(), Map.of(), true);
+
+        // then
+        assertThat(submitted.getEnabledCategories()).isEmpty();
     }
 
     @Test

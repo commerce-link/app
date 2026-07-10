@@ -20,6 +20,7 @@
             <div class="control">
                 <div class="select">
                     <select th:field="*{category}" th:disabled="${edit}">
+                        <option value="Services" th:text="#{catalog.category.services}"></option>
                         <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
                     </select>
                 </div>

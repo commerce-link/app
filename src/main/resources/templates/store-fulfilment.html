@@ -53,13 +53,14 @@
                     </div>
 
                     <div class="field">
-                        <label class="label" th:text="#{store.enabled.product.groups}"></label>
-                        <div th:each="type : ${productGroupTypes}" class="field">
+                        <label class="label" th:text="#{store.enabled.categories}"></label>
+                        <p th:if="${#lists.isEmpty(categoryNames)}" th:text="#{store.enabled.categories.unavailable}"></p>
+                        <div th:each="categoryName : ${categoryNames}" class="field">
                             <label class="checkbox">
                                 <input type="checkbox"
-                                       th:value="${type}"
-                                       th:field="*{store.fulfilmentConfiguration.enabledProductGroups}" />
-                                <span th:text="${enumI18n.localize(type)}"></span>
+                                       th:value="${categoryName}"
+                                       th:field="*{store.fulfilmentConfiguration.enabledCategories}" />
+                                <span th:text="${categoryName}"></span>
                             </label>
                         </div>
                     </div>
