@@ -15,10 +15,13 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.baskets.OfferItemReloader;
+import pl.commercelink.web.dtos.OfferCreationDto;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -31,13 +34,17 @@ import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -59,6 +66,8 @@ class OfferControllerTest {
     @Mock
     private ProductCatalogRepository productCatalogRepository;
     @Mock
+    private StoreCategories storeCategories;
+    @Mock
     private PricelistRepository pricelistRepository;
     @Mock
     private OfferItemReloader offerItemReloader;
@@ -70,6 +79,8 @@ class OfferControllerTest {
     private InvoicingService invoicingService;
     @Mock
     private List<OfferImporter> offerImporters;
+    @Mock
+    private OfferImporter offerImporter;
     @Mock
     private MessageSource messageSource;
 
@@ -132,6 +143,72 @@ class OfferControllerTest {
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
         assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
         assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("updateOffer marks items whose category is a service catalog definition as services")
+    void updateOfferMarksItemsFromServiceDefinitionsAsServices() {
+        // given
+        Basket existing = basketBase();
+        Basket payload = new Basket();
+        payload.setBasketItems(List.of(basketItem("MFN-S", "Usługi dodatkowe"), basketItem("MFN-P", "Obudowa")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
+        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
+
+        // when
+        offerController.updateOffer(OFFER_ID, payload);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(BasketItem::isService);
+        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-P")).noneMatch(BasketItem::isService);
+        verify(storeCategories).serviceNamesFor(STORE_ID);
+    }
+
+    @Test
+    @DisplayName("saveAsTemplate marks items whose category is a service catalog definition as services")
+    void saveAsTemplateMarksItemsFromServiceDefinitionsAsServices() {
+        // given
+        Basket payload = new Basket();
+        payload.setName("Offer");
+        payload.setBasketItems(List.of(basketItem("MFN-S", "Usługi dodatkowe")));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new pl.commercelink.stores.Store());
+        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
+
+        // when
+        offerController.saveAsTemplate(OFFER_ID, payload, new ConcurrentModel());
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).allMatch(BasketItem::isService);
+    }
+
+    @Test
+    @DisplayName("createOfferFromImport marks imported items whose category is a service catalog definition as services")
+    void createOfferFromImportMarksItemsFromServiceDefinitionsAsServices() throws Exception {
+        // given
+        OfferCreationDto dto = new OfferCreationDto();
+        dto.setType("CSV");
+        ContactDetails contact = new ContactDetails();
+        contact.setName("Jan");
+        contact.setEmail("jan@test.local");
+        dto.setContactDetails(contact);
+        when(offerImporters.stream()).thenReturn(Stream.of(offerImporter));
+        when(offerImporter.getType()).thenReturn("CSV");
+        when(offerImporter.importOffer(dto)).thenReturn(new java.util.ArrayList<>(List.of(basketItem("MFN-S", "Usługi dodatkowe"))));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new pl.commercelink.stores.Store());
+        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
+
+        // when
+        offerController.createOfferFromImport(dto, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).allMatch(BasketItem::isService);
     }
 
     @Test
@@ -265,6 +342,31 @@ class OfferControllerTest {
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn)
                 .containsExactly("MFN-CASE-1", "MFN-CASE-2", "MFN-PSU");
+    }
+
+    @Test
+    @DisplayName("addOfferItemFromPriceList marks a row from a service catalog definition as a service")
+    void addOfferItemFromPriceListMarksRowFromServiceDefinitionAsService() {
+        // given
+        Basket basket = basketBase();
+        AvailabilityAndPrice entry = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-S", "", "Montaż", "Montaż komputera",
+                "Usługi dodatkowe", 250L, 1L, 1, 0L);
+        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
+
+        // when
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
+                "Usługi dodatkowe", "Montaż", "Montaż komputera");
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        BasketItem savedItem = basketCaptor.getValue().getBasketItems().get(0);
+        assertThat(savedItem.isService()).isTrue();
+        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START);
     }
 
     @Test

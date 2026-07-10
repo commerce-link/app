@@ -110,7 +110,7 @@ public class AvailabilityAndPriceList {
                 p.getBrand(),
                 p.getLabel(),
                 p.getName(),
-                p.getCategory(),
+                c.getName(),
                 grossPrice,
                 totalAvailableQty,
                 estimatedDeliveryDays,

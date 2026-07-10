@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CsvOfferImporterTest {
 
@@ -31,17 +30,17 @@ class CsvOfferImporterTest {
     }
 
     @Test
-    void rejectsUnknownCategoryPointingAtTheRow() {
+    void importsRowWithCategoryFromProductCatalog() throws IOException {
         // given
         OfferCreationDto dto = dtoWithCsv("Category;Name;Qty;Price;Cost;Mfn\n" +
-                "CPU;Ryzen 7;2;1500;1200.5;mfn1\n" +
-                "Smartwatches;Watch 5;1;900;700.0;mfn2");
+                "Obudowa;Fractal Design North;1;600;500.0;FD-C-NOR1C-01");
 
-        // when / then
-        assertThatThrownBy(() -> importer.importOffer(dto))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Smartwatches")
-                .hasMessageContaining("row 3");
+        // when
+        List<BasketItem> items = importer.importOffer(dto);
+
+        // then
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).getCategory()).isEqualTo("Obudowa");
     }
 
     private OfferCreationDto dtoWithCsv(String csv) {

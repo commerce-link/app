@@ -245,7 +245,7 @@
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].itemId}"/>
                         </td>
-                        <td th:text="${categoryI18n.localize(item.category, 'plural')}"></td>
+                        <td th:text="${item.category}"></td>
                         <td>
                             <span th:if="${item.sku}" class="copyable truncate-sku" th:text="${item.sku}" th:title="${item.sku}" th:data-copy="${item.sku}" onclick="copyToClipboard(this)"></span>
                         </td>

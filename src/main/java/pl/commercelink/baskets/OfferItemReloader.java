@@ -46,8 +46,10 @@ public class OfferItemReloader {
     private List<OfferItem> convertBasketItemsIntoOffers(InventoryView inventory, List<BasketItem> basketItems) {
         List<OfferItem> offerItems = new ArrayList<>();
 
-        for (BasketItem basketItem : basketItems) {
-            offerItems.add(createOfferItem(inventory, basketItem));
+        for (int i = 0; i < basketItems.size(); i++) {
+            OfferItem offerItem = createOfferItem(inventory, basketItems.get(i));
+            offerItem.setSequenceNumber(i);
+            offerItems.add(offerItem);
         }
 
         return sort(offerItems);
@@ -68,15 +70,10 @@ public class OfferItemReloader {
     }
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {
-        List<OfferItem> sortedOfferItems = offerItems.stream()
+        return offerItems.stream()
                 .sorted(Comparator.comparingInt(OfferItem::getPosition)
                         .thenComparing(Comparator.comparingDouble(OfferItem::getUnitPrice).reversed()))
                 .collect(Collectors.toList());
-
-        for (int i = 0; i < sortedOfferItems.size(); i++) {
-            sortedOfferItems.get(i).setSequenceNumber(i);
-        }
-        return sortedOfferItems;
     }
 
     private void updatePrices(Basket basket) {
