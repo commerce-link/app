@@ -84,8 +84,8 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         ConfigurableOAuth2AuthorizationService authService = new ConfigurableOAuth2AuthorizationService(
                 credentialStore, tokenStore,
                 credentialName,
-                apiUrl + oauth2.authEndpointPath(),
-                apiUrl + oauth2.refreshEndpointPath(),
+                resolveAuthEndpoint(apiUrl, oauth2.authEndpointPath()),
+                resolveAuthEndpoint(apiUrl, oauth2.refreshEndpointPath()),
                 oauth2.refreshTokenExpirationSeconds(),
                 storeId -> {
                     Store s = storesRepository.findById(storeId);
@@ -97,6 +97,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         String acceptHeader = oauth2.acceptHeader();
         if (acceptHeader != null) {
             restApiBuilder.defaultHeader("Accept", acceptHeader);
+            restApiBuilder.defaultHeader("Content-Type", acceptHeader);
         }
 
         RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
@@ -104,6 +105,10 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 () -> authService.getAccessToken(store.getStoreId()));
 
         return Map.of("restApi", restApiWithRetry);
+    }
+
+    static String resolveAuthEndpoint(String apiUrl, String path) {
+        return path.startsWith("http") ? path : apiUrl + path;
     }
 
     protected void onAuthorizationLost(Store store, D descriptor) {
