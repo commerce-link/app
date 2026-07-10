@@ -70,7 +70,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="item : ${orderItems}" th:if="${!item.service}">
-                                <td th:text="${categoryI18n.localize(item.category, 'plural')}"></td>
+                                <td th:text="${item.category}"></td>
                                 <td th:text="${item.name}"></td>
                                 <td th:text="${item.qty}"></td>
                                 <td th:text="${item.manufacturerCode}"></td>

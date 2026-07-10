@@ -49,12 +49,16 @@ class CategoryStringPersistenceTest {
         item.setCategory("Services");
 
         // when
-        Map<String, AttributeValue> attributes = orderItemModel().convert(item);
+        DynamoDBMapperTableModel<OrderItem> model = orderItemModel();
+        Map<String, AttributeValue> attributes = model.convert(item);
+        OrderItem restored = model.unconvert(attributes);
 
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
+        assertThat(attributes.get("service").getN()).isEqualTo("1");
+        assertThat(restored.isService()).isTrue();
+        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "product", "serviceGroup");
     }
 
     @Test
@@ -73,7 +77,8 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
+        assertThat(attributes.get("service").getN()).isEqualTo("1");
+        assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "product", "serviceGroup");
     }
 
     @Test
@@ -94,7 +99,8 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(nested.get("category").getS()).isEqualTo("Laptop");
         assertThat(nested.get("category").getN()).isNull();
-        assertThat(nested).doesNotContainKeys("sequenceNumber", "categoryKey", "service", "product", "serviceGroup");
+        assertThat(nested.get("service").getN()).isEqualTo("0");
+        assertThat(nested).doesNotContainKeys("sequenceNumber", "categoryKey", "product", "serviceGroup");
     }
 
     @Test

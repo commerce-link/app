@@ -142,7 +142,7 @@
                     </tr>
                     </thead>
                     <tbody id="offerRows">
-                    <tr th:each="offerItem : ${offerItems}"
+                    <tr th:each="offerItem, rowStat : ${offerItems}"
                         th:attr="data-band=${offerItem.basketItem != null && offerItem.basketItem.isService()} ? 'service' : 'product'">
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
@@ -152,7 +152,11 @@
                             <div class="select">
                                 <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
                                     <option value=""></option>
-                                    <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
+                                    <option th:if="${offerItem.basketItem != null && !#strings.isEmpty(offerItem.basketItem.category) && !productCategories.contains(offerItem.basketItem.category)}"
+                                            th:value="${offerItem.basketItem.category}" th:text="${offerItem.basketItem.category}"></option>
+                                    <optgroup th:each="group : ${productCategoryGroups}" th:label="${group.catalog}">
+                                        <option th:each="cat : ${group.names}" th:value="${cat}" th:text="${cat}"></option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </td>
@@ -179,7 +183,7 @@
                         </td>
                         <td>
                             <button class="button is-small is-danger" type="button"
-                                    th:onclick="|submitRemoveItem(event, ${offerItem.sequenceNumber})|"
+                                    th:onclick="|submitRemoveItem(event, ${rowStat.index})|"
                                     th:text="#{general.delete}">
                             </button>
                         </td>

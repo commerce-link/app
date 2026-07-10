@@ -10,10 +10,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Arrays;
@@ -25,10 +24,10 @@ import java.util.stream.Collectors;
 class WarehouseItemController {
 
     @Autowired
-    private StoresRepository storesRepository;
+    private Warehouse warehouse;
 
     @Autowired
-    private Warehouse warehouse;
+    private StoreCategories storeCategories;
 
     @Autowired
     private WarehouseRepository warehouseRepository;
@@ -50,10 +49,10 @@ class WarehouseItemController {
     }
 
     private String showWarehouseItemDetails(Model model, WarehouseItem item) {
-        Store store = storesRepository.findById(getStoreId());
         boolean isEdit = !item.isNew();
 
-        model.addAttribute("productCategories", store.getEnabledProductCategories());
+        model.addAttribute("productCategories", storeCategories.namesFor(getStoreId()));
+        model.addAttribute("productCategoryGroups", storeCategories.groupsFor(getStoreId()));
         model.addAttribute("fulfilmentStatuses", getAvailableStatuses(isEdit));
         model.addAttribute("warehouseItem", item);
         model.addAttribute("isEdit", isEdit);

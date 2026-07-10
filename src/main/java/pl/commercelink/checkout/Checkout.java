@@ -19,6 +19,7 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.Store;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -43,6 +45,8 @@ public class Checkout {
     private PricelistRepository pricelistRepository;
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
+    @Autowired
+    private StoreCategories storeCategories;
     @Autowired
     private PaymentProviderFactory paymentProviderFactory;
 
@@ -174,20 +178,30 @@ public class Checkout {
         Pricelist pricelist = pricelistRepository.find(store.getStoreId(), catalogId, incompletePricelist.getPricelistId());
 
         List<BasketItem> basketItems = req.toBasketItems(catalogId, pricelist);
+        resolveServiceFlags(productCatalog, basketItems);
         validateOrderCompleteness(productCatalog, basketItems);
 
         return new CatalogProcessingResult(catalogId, basketItems);
     }
 
-    private void validateOrderCompleteness(ProductCatalog productCatalog, List<BasketItem> items) {
+    void resolveServiceFlags(ProductCatalog productCatalog, List<BasketItem> items) {
+        Set<String> serviceNames = storeCategories.serviceNames(List.of(productCatalog));
+        items.forEach(item -> item.setService(serviceNames.contains(item.getCategory()) || item.isService()));
+    }
+
+    void validateOrderCompleteness(ProductCatalog productCatalog, List<BasketItem> items) {
         productCatalog.getCategories().stream()
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
-                    String requiredCategory = category.getCategory();
-                    if (items.stream().noneMatch(item -> Objects.equals(item.getCategory(), requiredCategory) && item.getQty() > 0)) {
-                        throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + requiredCategory);
+                    if (items.stream().noneMatch(item -> matchesCategory(item, category) && item.getQty() > 0)) {
+                        throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + category.getName());
                     }
                 });
+    }
+
+    private boolean matchesCategory(BasketItem item, CategoryDefinition category) {
+        return Objects.equals(item.getCategory(), category.getName())
+                || Objects.equals(item.getCategory(), category.getCategory());
     }
 
     static class CatalogProcessingResult {

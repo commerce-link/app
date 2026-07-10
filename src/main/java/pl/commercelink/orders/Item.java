@@ -27,6 +27,7 @@ public abstract class Item implements Delivered, Categorized {
 
     // general information
     private String category = Categorized.OTHER;
+    private boolean service;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
     @DynamoDBAttribute(attributeName = "qty")
@@ -253,6 +254,16 @@ public abstract class Item implements Delivered, Categorized {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    @Override
+    @DynamoDBAttribute(attributeName = "service")
+    public boolean isService() {
+        return service || hasCategory(Categorized.SERVICES);
+    }
+
+    public void setService(boolean service) {
+        this.service = service;
     }
 
     public String getName() {

@@ -49,6 +49,35 @@ class OrderItemTest {
         assertThat(orderItem.getPosition()).isEqualTo(7);
     }
 
+    @Test
+    @DisplayName("fromBasketItem copies the service flag from a service-flagged basket item")
+    void fromBasketItemCopiesServiceFlag() {
+        // given
+        BasketItem basketItem = new BasketItem("pim-1", "Montaż komputera", "MFN-S",
+                "Usługi dodatkowe", 100.0, 0, 1, null, 3, false);
+        basketItem.setService(true);
+
+        // when
+        OrderItem orderItem = OrderItem.fromBasketItem(ORDER_ID, basketItem);
+
+        // then
+        assertThat(orderItem.isService()).isTrue();
+    }
+
+    @Test
+    @DisplayName("copy constructor keeps the service flag of the source item")
+    void copyConstructorKeepsServiceFlag() {
+        // given
+        OrderItem source = new OrderItem(ORDER_ID, "Usługi dodatkowe", "Montaż komputera", 1, 100.0, "MFN-S", false);
+        source.setService(true);
+
+        // when
+        OrderItem copy = new OrderItem("order-2", source, 1);
+
+        // then
+        assertThat(copy.isService()).isTrue();
+    }
+
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);

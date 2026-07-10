@@ -29,6 +29,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.api.ShippingException;
@@ -57,6 +58,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
+
+    @Autowired
+    private StoreCategories storeCategories;
 
     @Autowired
     private OrdersRepository ordersRepository;
@@ -343,7 +347,6 @@ public class OrdersController extends BaseController {
                 .findFirst()
                 .orElse(null));
         model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("categories", store.getEnabledProductCategories());
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || isSuperAdmin());
@@ -505,6 +508,7 @@ public class OrdersController extends BaseController {
         if (op.isPresent()) {
             OrderItem orderItem = op.get();
 
+            updatedItem.setService(storeCategories.isService(getStoreId(), updatedItem.getCategory()));
             orderItem.update(updatedItem);
             orderItemsRepository.save(orderItem);
 
@@ -574,11 +578,10 @@ public class OrdersController extends BaseController {
     }
 
     private String showOrderItemDetails(Order order, OrderItem orderItem, Model model) {
-        Store store = storesRepository.findById(order.getStoreId());
-
         model.addAttribute("orderId", order.getOrderId());
         model.addAttribute("orderItem", orderItem);
-        model.addAttribute("categories", store.getEnabledProductCategories());
+        model.addAttribute("categories", storeCategories.namesFor(order.getStoreId()));
+        model.addAttribute("categoryGroups", storeCategories.groupsFor(order.getStoreId()));
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
 

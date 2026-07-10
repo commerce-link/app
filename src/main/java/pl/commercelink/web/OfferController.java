@@ -23,6 +23,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -47,6 +48,9 @@ public class OfferController {
 
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
+
+    @Autowired
+    private StoreCategories storeCategories;
 
     @Autowired
     private PricelistRepository pricelistRepository;
@@ -185,7 +189,8 @@ public class OfferController {
         model.addAttribute("mode", mode.name());
         model.addAttribute("offer", basket);
         model.addAttribute("offerItems", offerItems);
-        model.addAttribute("productCategories", store.getEnabledProductCategories());
+        model.addAttribute("productCategories", storeCategories.names(catalogs));
+        model.addAttribute("productCategoryGroups", storeCategories.groups(catalogs));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("totalPrice", totalPrice);
         model.addAttribute("totalCost", totalCost);
@@ -209,7 +214,9 @@ public class OfferController {
         Basket existingBasket = basketsRepository.findById(getStoreId(), offerId).get();
         existingBasket.setName(basket.getName());
         existingBasket.setFulfilmentType(basket.getFulfilmentType());
-        existingBasket.setBasketItems(basket.getBasketItems().stream().filter(BasketItem::isComplete).collect(Collectors.toList()));
+        existingBasket.setBasketItems(withResolvedServiceFlags(basket.getBasketItems().stream()
+                .filter(BasketItem::isComplete)
+                .collect(Collectors.toList())));
         existingBasket.setComment(basket.getComment());
         existingBasket.setShowPrices(basket.isShowPrices());
         existingBasket.setExpiresAt(basket.getExpiresAt());
@@ -227,7 +234,7 @@ public class OfferController {
                 .withType(BasketType.OfferTemplate)
                 .withName("Template based on: " + basket.getName())
                 .withFulfilmentType(basket.getFulfilmentType())
-                .withBasketItems(basket.getBasketItems()).build();
+                .withBasketItems(withResolvedServiceFlags(basket.getBasketItems())).build();
         save(templateBasket);
 
         return "redirect:/dashboard/offer/" + templateBasket.getBasketId();
@@ -313,6 +320,7 @@ public class OfferController {
                 .findFirst().get();
 
         BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
+        withResolvedServiceFlags(List.of(basketItem));
         basket.addBasketItemInCategoryOrder(basketItem, catalogCategorySequenceNumbers(catalogId));
         save(basket);
 
@@ -395,7 +403,7 @@ public class OfferController {
         try {
             dto.setStoreId(getStoreId());
             OfferImporter importer = getImporter(dto.getType());
-            List<BasketItem> basketItems = importer.importOffer(dto);
+            List<BasketItem> basketItems = withResolvedServiceFlags(importer.importOffer(dto));
 
             if (basketItems.isEmpty()) {
                 redirectAttributes.addFlashAttribute("errorMessage",
@@ -437,6 +445,12 @@ public class OfferController {
         basketsRepository.save(basket);
 
         return basket;
+    }
+
+    private List<BasketItem> withResolvedServiceFlags(List<BasketItem> items) {
+        Set<String> serviceNames = storeCategories.serviceNamesFor(getStoreId());
+        items.forEach(item -> item.setService(serviceNames.contains(item.getCategory()) || item.isService()));
+        return items;
     }
 
     private Basket.Builder offerBuilder() {

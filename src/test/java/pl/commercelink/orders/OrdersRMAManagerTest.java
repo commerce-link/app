@@ -150,6 +150,34 @@ class OrdersRMAManagerTest {
         assertThat(item1.getStatus()).isEqualTo(FulfilmentStatus.Replaced);
     }
 
+    @Test
+    @DisplayName("createReplacementOrder keeps the service flag on replacement items")
+    void createReplacementOrderKeepsServiceFlagOnReplacementItems() {
+        // given
+        Order order = orderWithTotalPrice(100.0, OrderStatus.Delivered);
+        OrderItem serviceItem = orderItem("item-1", 100.0, 1);
+        serviceItem.setCategory("Usługi dodatkowe");
+        serviceItem.setService(true);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(serviceItem));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true)))
+                .thenReturn(OperationResult.success());
+
+        // when
+        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(serviceItem)), true);
+
+        // then
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(orderItemsRepository, org.mockito.Mockito.atLeast(1)).batchSave(itemsCaptor.capture());
+        OrderItem replacement = itemsCaptor.getAllValues().stream()
+                .flatMap(List::stream)
+                .filter(i -> !ORDER_ID.equals(i.getOrderId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected replacement item to be saved"));
+        assertThat(replacement.isService()).isTrue();
+    }
+
     private Order orderWithTotalPrice(double totalPrice, OrderStatus status) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

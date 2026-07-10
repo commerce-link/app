@@ -4,8 +4,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.stores.Store;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -33,9 +35,13 @@ public class OrdersManager {
     @Autowired
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
     @Autowired
+    private AutomatedOrderFulfilment automatedOrderFulfilment;
+    @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private OrderLifecycle orderLifecycle;
+    @Autowired
+    private StoreCategories storeCategories;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int position) {
         OrderItem orderItem;
@@ -64,6 +70,8 @@ public class OrdersManager {
         order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
+
+        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
     public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int position) {
@@ -77,6 +85,7 @@ public class OrdersManager {
                 store.isPositionConsolidationEnabled(),
                 position
         );
+        orderItem.setService(storeCategories.isService(store.getStoreId(), availabilityAndPrice.getCategory()));
         if (orderItem.isService()) {
             orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
             orderItem.markAsWarehouseFulfilled();
@@ -87,6 +96,8 @@ public class OrdersManager {
         order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
         order.increaseTotalPrice(orderItem.getTotalPrice());
         ordersRepository.save(order);
+
+        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {

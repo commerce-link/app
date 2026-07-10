@@ -107,7 +107,7 @@ public class OrdersRMAManager {
     }
 
     private OrderItem createReplacementItem(String orderId, OrderItem orderItem, RMAItem rmaItem) {
-        return new OrderItem(
+        OrderItem replacementItem = new OrderItem(
                 orderId,
                 orderItem.getCategory(),
                 orderItem.getName(),
@@ -117,6 +117,8 @@ public class OrdersRMAManager {
                 orderItem.isConsolidated(),
                 orderItem.getPosition()
         );
+        replacementItem.setService(orderItem.isService());
+        return replacementItem;
     }
 
     private void commitCurrentOrderChangesIfSuccess(

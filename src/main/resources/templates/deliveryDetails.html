@@ -41,8 +41,8 @@
                                                       (${delivery.overpaid} ? 'is-danger' :
                                                        (${delivery.underpaid} ? 'is-warning' : 'is-light'))"
                                       th:text="${delivery.paid} ? #{deliveries.status.paid} :
-                                               (${delivery.overpaid} ? #{deliveries.status.overpaid} :
-                                                (${delivery.underpaid} ? #{deliveries.status.underpaid} : #{deliveries.status.unpaid}))"></span>
+                                               (${delivery.overpaid} ? #{deliveries.status.overpaid} + ': ' + ${#numbers.formatDecimal(-delivery.unpaidAmount, 1, 2)} + ' PLN' :
+                                                (${delivery.underpaid} ? #{deliveries.status.underpaid} + ': ' + ${#numbers.formatDecimal(delivery.unpaidAmount, 1, 2)} + ' PLN' : #{deliveries.status.unpaid}))"></span>
                                 <span class="tag ml-1"
                                       th:classappend="${delivery.invoiced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.invoiced} ? #{deliveries.status.invoiced} : #{deliveries.status.not.invoiced}"></span>
