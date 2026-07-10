@@ -108,6 +108,11 @@
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
+            <artifactId>marketplace-allegro</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
             <artifactId>shipping-api</artifactId>
             <version>0.1.2</version>
         </dependency>
