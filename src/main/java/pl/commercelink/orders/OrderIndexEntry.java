@@ -2,6 +2,7 @@ package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.starter.util.ConversionUtil;
 
 import java.time.LocalDateTime;
 
@@ -31,6 +32,11 @@ public class OrderIndexEntry {
 
     public String getOrderId() {
         return orderId;
+    }
+
+    @DynamoDBIgnore
+    public String getShortenedOrderId() {
+        return ConversionUtil.getShortenedId(orderId);
     }
 
     public LocalDateTime getOrderedAt() {

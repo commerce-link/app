@@ -12,8 +12,10 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -35,19 +37,25 @@ class FulfilmentController extends BaseController {
     public String fulfilmentQueue(@RequestParam(value = "orderIds", required = false) List<String> orderIdsParam, Model model) {
         List<String> orderIds = (orderIdsParam != null && !orderIdsParam.isEmpty()) ? orderIdsParam : new ArrayList<>();
 
-        Predicate<Order> fulfilmentCriteria = order -> !orderItemsRepository.findByOrderIdAndStatus(order.getOrderId(), FulfilmentStatus.New).isEmpty();
+        Map<String, Integer> itemsToOrder = new HashMap<>();
+        Predicate<Order> fulfilmentCriteria = order -> {
+            int count = orderItemsRepository.findByOrderIdAndStatus(order.getOrderId(), FulfilmentStatus.New).size();
+            itemsToOrder.put(order.getOrderId(), count);
+            return count > 0;
+        };
         List<OrderIndexEntry> ordersPagination = isSuperAdmin()
                 ? fulfilmentQueue.pickFulfilmentGroup(orderIds, fulfilmentCriteria)
                 : fulfilmentQueue.pickFulfilmentGroup(getStoreId(), orderIds, fulfilmentCriteria);
 
         List<String> newOrders = ordersPagination.stream()
                 .map(OrderIndexEntry::getOrderId)
-                .collect(Collectors.toList());
+                .toList();
 
         Set<String> mergedOrderIds = new LinkedHashSet<>(orderIds);
         mergedOrderIds.addAll(newOrders);
 
         model.addAttribute("orders", ordersPagination);
+        model.addAttribute("itemsToOrder", itemsToOrder);
         model.addAttribute("orderIds", mergedOrderIds);
         model.addAttribute("hasNext", !newOrders.isEmpty());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
