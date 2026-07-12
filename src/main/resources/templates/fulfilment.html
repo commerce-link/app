@@ -102,11 +102,6 @@
             <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
             <span th:text="#{fulfilment.info.note}"></span>
         </p>
-        <p class="is-size-7 mb-2" th:if="${form.orderByOrder and !form.committedSuppliers.isEmpty()}">
-            <span class="has-text-grey mr-1" th:text="#{fulfilment.committed.suppliers}"></span>
-            <span class="tag is-info is-light mr-1" th:each="supplier : ${form.committedSuppliers}"
-                  th:text="${supplier.key + ': ' + #numbers.formatDecimal(supplier.value, 1, 'DEFAULT', 2, 'DEFAULT') + ' zł'}"></span>
-        </p>
     </div>
 
     <div class="fl-toolbar">
@@ -268,6 +263,7 @@
             splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers'
         };
         const IS_WAREHOUSE = /*[[${isWarehouse}]]*/ false;
+        const COMMITTED_SUPPLIERS = /*[[${form.committedSuppliers}]]*/ {};
     </script>
 
     <script>
@@ -485,6 +481,7 @@
 
         function recalcFooter() {
             let total = 0, totalProfit = 0; const byProv = {};
+            Object.keys(COMMITTED_SUPPLIERS).forEach(p => { byProv[p] = COMMITTED_SUPPLIERS[p]; });
             cards().forEach(c => {
                 const v = parseFloat(c.dataset.effvalue || 0);
                 if (isAccepted(c) && v > 0) {
