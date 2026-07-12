@@ -60,6 +60,13 @@ public class FulfilmentGroup {
         return source.getPriceNet() * getTargetQty();
     }
 
+    public boolean fulfillsMultipleOrders() {
+        return allocations.stream()
+                .map(FulfilmentAllocation::getOrderId)
+                .distinct()
+                .count() > 1;
+    }
+
     public boolean fulfills(FulfilmentGroup other) {
         return other.allocations.stream()
                 .map(FulfilmentAllocation::getKey)

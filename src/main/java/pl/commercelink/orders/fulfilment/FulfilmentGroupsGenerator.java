@@ -16,13 +16,15 @@ public class FulfilmentGroupsGenerator {
 
     private final boolean enforceFulfilmentUnderCost;
     private final boolean enforceCompleteFulfilment;
+    private final boolean enforceMultiOrderFulfilment;
 
-    private FulfilmentGroupsGenerator(InventoryView inventory, List<String> acceptedSuppliers, List<String> excludedSuppliers, boolean enforceFulfilmentUnderCost, boolean enforceCompleteFulfilment) {
+    private FulfilmentGroupsGenerator(InventoryView inventory, List<String> acceptedSuppliers, List<String> excludedSuppliers, boolean enforceFulfilmentUnderCost, boolean enforceCompleteFulfilment, boolean enforceMultiOrderFulfilment) {
         this.inventory = inventory;
         this.acceptedSuppliers = acceptedSuppliers;
         this.excludedSuppliers = excludedSuppliers;
         this.enforceFulfilmentUnderCost = enforceFulfilmentUnderCost;
         this.enforceCompleteFulfilment = enforceCompleteFulfilment;
+        this.enforceMultiOrderFulfilment = enforceMultiOrderFulfilment;
     }
 
     /*
@@ -43,6 +45,7 @@ public class FulfilmentGroupsGenerator {
                 ))
                 .filter(g -> !enforceFulfilmentUnderCost || g.getTargetPrice() >= g.getSource().getPriceGross())
                 .filter(g -> !enforceCompleteFulfilment || g.getSource().getQty() >= g.getTargetQty())
+                .filter(g -> !enforceMultiOrderFulfilment || g.fulfillsMultipleOrders())
                 .sorted(Comparator.comparingDouble(group -> group.getSource().getPriceGross()))
                 .collect(Collectors.toList());
     }
@@ -102,6 +105,7 @@ public class FulfilmentGroupsGenerator {
         private List<String> excludedSuppliers = new ArrayList<>();
         private boolean enforceFulfilmentUnderCost;
         private boolean enforceCompleteFulfilment;
+        private boolean enforceMultiOrderFulfilment;
 
         public Builder withInventory(InventoryView inventory) {
             this.inventory = inventory;
@@ -128,8 +132,13 @@ public class FulfilmentGroupsGenerator {
             return this;
         }
 
+        public Builder withMultiOrderFulfilmentOnly() {
+            this.enforceMultiOrderFulfilment = true;
+            return this;
+        }
+
         public FulfilmentGroupsGenerator build() {
-            return new FulfilmentGroupsGenerator(this.inventory, this.acceptedSuppliers, this.excludedSuppliers, this.enforceFulfilmentUnderCost, this.enforceCompleteFulfilment);
+            return new FulfilmentGroupsGenerator(this.inventory, this.acceptedSuppliers, this.excludedSuppliers, this.enforceFulfilmentUnderCost, this.enforceCompleteFulfilment, this.enforceMultiOrderFulfilment);
         }
     }
 

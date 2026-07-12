@@ -69,8 +69,9 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "selectedOrders", defaultValue = "") List<String> selectedOrders,
             @RequestParam(value = "pathSelector", defaultValue = "false") String pathSelector,
             @RequestParam(value = "onlyWithProfit", defaultValue = "false") boolean onlyWithProfit,
+            @RequestParam(value = "onlyMultiOrder", defaultValue = "false") boolean onlyMultiOrder,
             Model model) {
-        return renderManualFulfilmentPage(getStoreId(), selectedOrders, pathSelector, onlyWithProfit, model);
+        return renderManualFulfilmentPage(getStoreId(), selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, model);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment")
@@ -80,12 +81,13 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "selectedOrders", defaultValue = "") List<String> selectedOrders,
             @RequestParam(value = "pathSelector", defaultValue = "false") String pathSelector,
             @RequestParam(value = "onlyWithProfit", defaultValue = "false") boolean onlyWithProfit,
+            @RequestParam(value = "onlyMultiOrder", defaultValue = "false") boolean onlyMultiOrder,
             Model model) {
-        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, model);
+        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, model);
     }
 
-    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, Model model) {
-        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, selectedOrders, createPathSelector(pathSelector), isSuperAdmin(), onlyWithProfit);
+    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, Model model) {
+        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, selectedOrders, createPathSelector(pathSelector), isSuperAdmin(), onlyWithProfit, onlyMultiOrder);
 
         model.addAttribute("form", fulfilmentForm);
         if (isSuperAdmin()) {
@@ -123,7 +125,7 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(getStoreId(), form);
-        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), "default", false, model);
+        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), "default", false, false, model);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commit")
@@ -137,6 +139,6 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String commitFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(storeId, form);
-        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), "default", false, model);
+        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), "default", false, false, model);
     }
 }
