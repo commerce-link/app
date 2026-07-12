@@ -100,6 +100,14 @@ public class OrdersManager {
         automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
+    public void assignFromWarehouse(String storeId, String orderId, String itemId, String mfn) {
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        orderItem.setSku(mfn);
+        orderItemsRepository.save(orderItem);
+
+        automatedOrderFulfilment.run(storeId, List.of(orderItem));
+    }
+
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());

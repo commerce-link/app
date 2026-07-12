@@ -576,6 +576,13 @@ public class OrdersController extends BaseController {
         return "redirect:/dashboard/orders/" + orderId;
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String mfn) {
+        ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, mfn);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/split-group")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String splitGroupItem(@PathVariable String orderId, @ModelAttribute SplitGroupForm form,

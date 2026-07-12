@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
@@ -41,6 +43,16 @@ class WarehouseItemController {
     @GetMapping("/dashboard/warehouse/items/add")
     String addWarehouseItem(Model model) {
         return showWarehouseItemDetails(model, WarehouseItem.empty(getStoreId()));
+    }
+
+    @GetMapping("/dashboard/warehouse/items/available")
+    @ResponseBody
+    List<AvailableWarehouseItemDto> availableWarehouseItems(@RequestParam(defaultValue = "") String category) {
+        List<String> categories = category.isBlank() ? List.of() : List.of(category);
+        return warehouseRepository.findAllFiltered(getStoreId(), categories, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered))
+                .stream()
+                .map(AvailableWarehouseItemDto::from)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/dashboard/warehouse/items/{itemId}")

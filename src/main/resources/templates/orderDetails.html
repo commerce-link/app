@@ -388,26 +388,33 @@
                                 </div>
                                 <div class="dropdown-menu" role="menu">
                                     <div class="dropdown-content">
-                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
-                                           th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty}"
+                                           th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty},data-price=${item.price}"
                                            onclick="openAssignSkuModal(this); return false;"
                                            th:text="#{order.item.assign.sku}"></a>
-                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.assign.sku}"></span>
-                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId},data-tax=${item.tax}"
                                            onclick="openQuickAssignModal(this); return false;"
                                            th:text="#{order.item.quick.assign}"></a>
-                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.quick.assign}"></span>
-                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty},data-price=${item.price}"
+                                           onclick="openAssignWarehouseModal(this); return false;"
+                                           th:text="#{order.item.assign.warehouse}"></a>
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.assign.warehouse}"></span>
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="submitClearSupplier(this); return false;"
                                            th:text="#{order.item.clear.assign}"></a>
-                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
                                         <a th:if="${item.isNew() and item.group}" class="dropdown-item"
                                            href="#"
@@ -576,9 +583,10 @@
 
                     <div class="box has-background-white-ter mb-4 py-3">
                         <div class="columns is-vcentered is-mobile">
-                            <div class="column is-7">
+                            <div class="column is-5">
                                 <p class="heading" th:text="#{order.item.assign.sku.item}"></p>
                                 <p class="has-text-weight-semibold" id="assignSkuItemName"></p>
+                                <p class="is-family-monospace is-size-7 has-text-grey" id="assignSkuItemSku"></p>
                             </div>
                             <div class="column">
                                 <p class="heading" th:text="#{order.item.category}"></p>
@@ -587,6 +595,14 @@
                             <div class="column">
                                 <p class="heading" th:text="#{order.item.quantity}"></p>
                                 <p class="has-text-weight-semibold" id="assignSkuItemQty"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.unit.price}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemPrice"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemTotal"></p>
                             </div>
                         </div>
                     </div>
@@ -675,6 +691,87 @@
                         <button class="button" type="button" onclick="toggleAssignSkuModal(false)" th:text="#{general.cancel}"></button>
                     </div>
                     <span class="help" id="assignSkuHint" th:text="#{order.item.assign.sku.empty.hint}" style="display: none;"></span>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div id="assignWarehouseModal" class="modal">
+        <div class="modal-background" onclick="toggleAssignWarehouseModal(false)"></div>
+        <div class="modal-card" style="width: 940px; max-width: 96vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.item.assign.warehouse}"></p>
+                <button class="delete" type="button" onclick="toggleAssignWarehouseModal(false)"></button>
+            </header>
+
+            <form id="assignWarehouseForm" method="post"
+                  th:action="@{/dashboard/orders/{orderId}/assign-warehouse(orderId=${order.orderId})}"
+                  th:attr="data-url=@{/dashboard/warehouse/items/available}"
+                  onsubmit="return prepareAssignWarehouseSubmit()">
+                <section class="modal-card-body">
+                    <input type="hidden" id="assignWarehouseItemId" name="itemId"/>
+                    <input type="hidden" id="assignWarehouseMfn" name="mfn"/>
+
+                    <div class="box has-background-white-ter mb-4 py-3">
+                        <div class="columns is-vcentered is-mobile">
+                            <div class="column is-5">
+                                <p class="heading" th:text="#{order.item.assign.sku.item}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemName"></p>
+                                <p class="is-family-monospace is-size-7 has-text-grey" id="assignWarehouseItemSku"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.category}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemCategory"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.quantity}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemQty"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.unit.price}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemPrice"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemTotal"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field mb-3">
+                        <div class="control">
+                            <input class="input is-small" type="text" id="assignWarehouseSearch"
+                                   th:placeholder="#{order.item.assign.sku.search.placeholder}"
+                                   oninput="renderAssignWarehouseTable()">
+                        </div>
+                    </div>
+
+                    <div class="assign-sku-scroll">
+                        <table class="table is-fullwidth is-hoverable assign-sku-table mb-0"
+                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered}">
+                            <thead>
+                            <tr>
+                                <th style="width: 36px;"></th>
+                                <th th:text="#{order.item.name}"></th>
+                                <th th:text="#{order.item.sku}"></th>
+                                <th th:text="#{order.item.serial.no}"></th>
+                                <th class="has-text-right" th:text="#{order.item.quantity}"></th>
+                                <th th:text="#{order.item.status}"></th>
+                            </tr>
+                            </thead>
+                            <tbody id="assignWarehouseRows"></tbody>
+                        </table>
+                        <div class="assign-sku-empty" id="assignWarehouseNoResults" style="display: none;"
+                             th:text="#{order.item.assign.warehouse.no.results}"></div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot is-justify-content-space-between">
+                    <div>
+                        <button class="button is-primary" type="submit" id="assignWarehouseSubmit" th:text="#{general.save}"></button>
+                        <button class="button" type="button" onclick="toggleAssignWarehouseModal(false)" th:text="#{general.cancel}"></button>
+                    </div>
+                    <span class="help" id="assignWarehouseHint" th:text="#{order.item.assign.warehouse.empty.hint}" style="display: none;"></span>
                 </footer>
             </form>
         </div>
@@ -1520,11 +1617,20 @@
             modal.classList.toggle('is-active', show);
         }
 
+        function fillAssignItemContext(idPrefix, link) {
+            const qty = parseInt(link.getAttribute('data-qty')) || 0;
+            const price = parseFloat(link.getAttribute('data-price')) || 0;
+            document.getElementById(idPrefix + 'Name').textContent = link.getAttribute('data-name') || '';
+            document.getElementById(idPrefix + 'Sku').textContent = link.getAttribute('data-sku') || '';
+            document.getElementById(idPrefix + 'Category').textContent = link.getAttribute('data-category') || '';
+            document.getElementById(idPrefix + 'Qty').textContent = qty;
+            document.getElementById(idPrefix + 'Price').textContent = formatPln(price);
+            document.getElementById(idPrefix + 'Total').textContent = formatPln(price * qty);
+        }
+
         function openAssignSkuModal(link) {
             document.getElementById('assignSkuItemId').value = link.getAttribute('data-item-id') || '';
-            document.getElementById('assignSkuItemName').textContent = link.getAttribute('data-name') || '';
-            document.getElementById('assignSkuItemCategory').textContent = link.getAttribute('data-category') || '';
-            document.getElementById('assignSkuItemQty').textContent = link.getAttribute('data-qty') || '';
+            fillAssignItemContext('assignSkuItem', link);
             document.getElementById('assignSkuSearch').value = '';
             document.getElementById('assignSkuManual').value = '';
 
@@ -1695,6 +1801,98 @@
         function prepareAssignSkuSubmit() {
             if (assignSkuSelected.length === 0) return false;
             document.getElementById('assignSkuValue').value = assignSkuSelected.map(s => s.code).join(':');
+            return true;
+        }
+
+        let assignWarehouseData = [];
+        let assignWarehouseSelectedId = '';
+        const assignWarehouseCache = {};
+
+        function toggleAssignWarehouseModal(show) {
+            const modal = document.getElementById('assignWarehouseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function openAssignWarehouseModal(link) {
+            document.getElementById('assignWarehouseItemId').value = link.getAttribute('data-item-id') || '';
+            fillAssignItemContext('assignWarehouseItem', link);
+            document.getElementById('assignWarehouseSearch').value = '';
+            assignWarehouseSelectedId = '';
+
+            loadAssignWarehouseItems(link.getAttribute('data-category') || '', () => {
+                renderAssignWarehouseTable();
+                renderAssignWarehouseFooter();
+            });
+            toggleAssignWarehouseModal(true);
+        }
+
+        function loadAssignWarehouseItems(category, onLoaded) {
+            if (assignWarehouseCache[category]) {
+                assignWarehouseData = assignWarehouseCache[category];
+                onLoaded();
+                return;
+            }
+            const url = document.getElementById('assignWarehouseForm').getAttribute('data-url')
+                + '?category=' + encodeURIComponent(category);
+            fetch(url)
+                .then(response => response.ok ? response.json() : [])
+                .catch(() => [])
+                .then(data => {
+                    assignWarehouseCache[category] = data;
+                    assignWarehouseData = data;
+                    onLoaded();
+                });
+        }
+
+        function renderAssignWarehouseTable() {
+            const search = document.getElementById('assignWarehouseSearch').value.trim().toLowerCase();
+
+            let rows = assignWarehouseData;
+            if (search) rows = rows.filter(i =>
+                (i.name || '').toLowerCase().includes(search)
+                || (i.mfn || '').toLowerCase().includes(search)
+                || (i.serialNo || '').toLowerCase().includes(search));
+
+            const table = document.querySelector('#assignWarehouseModal table');
+            const tbody = document.getElementById('assignWarehouseRows');
+            tbody.innerHTML = '';
+            rows.forEach(i => {
+                const picked = i.itemId === assignWarehouseSelectedId;
+                const delivered = i.status === 'Delivered';
+                const statusLabel = table.getAttribute(delivered ? 'data-status-delivered' : 'data-status-ordered');
+                const row = document.createElement('tr');
+                row.classList.toggle('is-picked', picked);
+                row.innerHTML = `
+                    <td><input type="radio" name="assignWarehousePick" ${picked ? 'checked' : ''}></td>
+                    <td></td>
+                    <td class="mono"></td>
+                    <td class="mono"></td>
+                    <td class="has-text-right">${i.qty}</td>
+                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span></td>`;
+                row.children[1].textContent = i.name || '';
+                row.children[2].textContent = i.mfn || '';
+                row.children[3].textContent = i.serialNo || '';
+                row.addEventListener('click', () => {
+                    assignWarehouseSelectedId = i.itemId;
+                    renderAssignWarehouseTable();
+                    renderAssignWarehouseFooter();
+                });
+                tbody.appendChild(row);
+            });
+            document.getElementById('assignWarehouseNoResults').style.display = rows.length ? 'none' : 'block';
+        }
+
+        function renderAssignWarehouseFooter() {
+            const hasSelection = !!assignWarehouseSelectedId;
+            document.getElementById('assignWarehouseSubmit').disabled = !hasSelection;
+            document.getElementById('assignWarehouseHint').style.display = hasSelection ? 'none' : '';
+        }
+
+        function prepareAssignWarehouseSubmit() {
+            const selected = (assignWarehouseData || []).find(i => i.itemId === assignWarehouseSelectedId);
+            if (!selected || !selected.mfn) return false;
+            document.getElementById('assignWarehouseMfn').value = selected.mfn;
             return true;
         }
 
