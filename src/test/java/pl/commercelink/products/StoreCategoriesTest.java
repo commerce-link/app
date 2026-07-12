@@ -33,7 +33,7 @@ class StoreCategoriesTest {
         List<String> names = storeCategories.namesFor("store-1");
 
         // then
-        assertThat(names).containsExactly("Krzesło", "Biurko", "Obudowa", "Procesor");
+        assertThat(names).containsExactly("Krzesło", "Biurko", "Obudowa", "Procesor", "Other");
     }
 
     @Test
@@ -47,7 +47,7 @@ class StoreCategoriesTest {
         List<String> names = storeCategories.namesFor("store-1");
 
         // then
-        assertThat(names).containsExactly("Obudowa", "Procesor");
+        assertThat(names).containsExactly("Obudowa", "Procesor", "Other");
     }
 
     @Test
@@ -78,9 +78,24 @@ class StoreCategoriesTest {
 
         // then
         assertThat(groups).extracting(StoreCategories.Group::catalog)
-                .containsExactly("Meble biurowe", "Podzespoły komputerowe");
+                .containsExactly("Meble biurowe", "Podzespoły komputerowe", "Other");
         assertThat(groups.get(0).names()).containsExactly("Krzesło", "Biurko");
         assertThat(groups.get(1).names()).containsExactly("Obudowa");
+        assertThat(groups.get(2).names()).containsExactly("Other");
+    }
+
+    @Test
+    void groupsForSkipsSyntheticOtherGroupWhenCatalogAlreadyDefinesIt() {
+        // given
+        ProductCatalog catalog = catalog("Meble biurowe", definition("Krzesło", 1), definition("Other", 2));
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
+
+        // when
+        List<StoreCategories.Group> groups = storeCategories.groupsFor("store-1");
+
+        // then
+        assertThat(groups).extracting(StoreCategories.Group::catalog).containsExactly("Meble biurowe");
+        assertThat(groups.get(0).names()).containsExactly("Krzesło", "Other");
     }
 
     @Test
