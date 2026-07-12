@@ -235,7 +235,7 @@
                         </span>
                     </div>
                     <div class="control">
-                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment(this)">
+                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment()">
                             <span class="icon"><i class="fas fa-paper-plane"></i></span><span th:text="#{general.submit}"></span>
                         </button>
                     </div>
@@ -596,7 +596,7 @@
             });
         }
 
-        function submitFulfilment(btn) {
+        function submitFulfilment() {
             const winner = computeWinners();
             const container = document.getElementById('payload-container');
             container.innerHTML = '';
@@ -645,7 +645,7 @@
             const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
             form.action = basePath + '/' + type + '/fulfilment/' + action;
 
-            confirmSave(btn);
+            form.submit();
         }
 
         function skipFulfilment() {

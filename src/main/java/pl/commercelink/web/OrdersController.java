@@ -555,6 +555,27 @@ public class OrdersController extends BaseController {
         return "redirect:/dashboard/orders/" + orderId;
     }
 
+    @GetMapping("/dashboard/orders/{orderId}/pricelist")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public List<AvailabilityAndPrice> getPricelistForCatalog(@RequestParam String catalogId) {
+        String pricelistId = pricelistRepository.findNewestPricelistIdCached(getStoreId(), catalogId);
+        if (pricelistId == null) {
+            return List.of();
+        }
+        Pricelist pricelist = pricelistRepository.find(getStoreId(), catalogId, pricelistId);
+        return pricelist == null ? List.of() : pricelist.getAvailabilityAndPrices();
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/assign-sku")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String assignSku(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String sku) {
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        orderItem.setSku(sku);
+        orderItemsRepository.save(orderItem);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/split-group")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String splitGroupItem(@PathVariable String orderId, @ModelAttribute SplitGroupForm form,
