@@ -8,7 +8,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
@@ -29,18 +28,14 @@ class ManualWarehouseFulfilmentRoutingTest {
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
     @Mock
-    private SupplierRegistry supplierRegistry;
-    @Mock
     private InventoryView inventoryView;
 
     @Test
     void initCallsInventoryWithFulfilmentScope() {
         // given
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
-        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of());
 
-        ManualWarehouseFulfilment service = new ManualWarehouseFulfilment(
-                inventory, warehouseAllocationsManager, supplierRegistry);
+        ManualWarehouseFulfilment service = new ManualWarehouseFulfilment(inventory, warehouseAllocationsManager);
 
         // when
         service.init(STORE_ID, List.of());
