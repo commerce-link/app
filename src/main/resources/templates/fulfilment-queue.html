@@ -15,12 +15,11 @@
                     <thead>
                     <tr>
                         <th th:text="#{orders.select}"></th>
-                        <th th:text="#{store.id}"></th>
                         <th th:text="#{orders.id}"></th>
                         <th th:text="#{orders.email}"></th>
-                        <th th:text="#{offers.fulfilment.type}"></th>
-                        <th th:text="#{orders.status}"></th>
                         <th th:text="#{fulfilment.queue.items.to.order}"></th>
+                        <th th:text="#{offers.fulfilment.type}"></th>
+                        <th th:if="${isSuperAdmin}" th:text="#{store.id}"></th>
                         <th th:text="#{orders.ordered.at.date}"></th>
                     </tr>
                     </thead>
@@ -29,16 +28,15 @@
                         <td>
                             <input type="checkbox" name="selectedOrders" th:value="${order.orderId}" />
                         </td>
-                        <td th:text="${order.storeId}"></td>
                         <td>
                             <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${order.storeId}, orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}">
                                 <span th:text="${order.shortenedOrderId}"></span>
                             </a>
                         </td>
                         <td th:text="${order.email}"></td>
-                        <td th:text="${order.fulfilmentType}"></td>
-                        <td th:text="${enumI18n.localize(order.status)}"></td>
                         <td th:text="${itemsToOrder[order.orderId]}"></td>
+                        <td th:text="${order.fulfilmentType}"></td>
+                        <td th:if="${isSuperAdmin}" th:text="${order.storeId}"></td>
                         <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
                     </tr>
                     </tbody>
