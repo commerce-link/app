@@ -14,7 +14,9 @@
                 <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
                     <thead>
                     <tr>
-                        <th th:text="#{orders.select}"></th>
+                        <th>
+                            <input type="checkbox" id="selectAllOrders" />
+                        </th>
                         <th th:text="#{orders.id}"></th>
                         <th th:text="#{orders.email}"></th>
                         <th th:text="#{fulfilment.queue.items.to.order}"></th>
@@ -82,6 +84,9 @@
     <script>
         document.getElementById('fulfilmentQueueForm').addEventListener('submit', function () {
             this.action = document.getElementById('actionSelect').value;
+        });
+        document.getElementById('selectAllOrders').addEventListener('change', function () {
+            document.querySelectorAll('input[name="selectedOrders"]').forEach(checkbox => checkbox.checked = this.checked);
         });
     </script>
 
