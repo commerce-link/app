@@ -134,6 +134,42 @@ class SuperAdminControllerTest {
     }
 
     @Test
+    void deleteRegularStoreAcceptsConfirmIdWithSurroundingWhitespace() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
+        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, " " + STORE_ID + "\n", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+    }
+
+    @Test
+    void deleteMissingStoreShowsErrorAndSkipsDeletion() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+        when(messageSource.getMessage("store.delete.missing", null, locale)).thenReturn("Nie istnieje");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals("Nie istnieje", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        verifyNoInteractions(storeDeletionService);
+    }
+
+    @Test
     void deleteDemoStoreProceedsWithoutConfirmId() {
         // given
         Store store = new Store();
@@ -185,5 +221,22 @@ class SuperAdminControllerTest {
         // then
         assertEquals("redirect:/dashboard/store/srv-gen-002", view);
         verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", null, false));
+    }
+
+    @Test
+    void createStoreShowsErrorFlashWhenCreationFails() {
+        // given
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", null)))
+                .thenThrow(new IllegalStateException("Could not generate a unique store id"));
+        when(messageSource.getMessage("store.create.error", null, locale)).thenReturn("Błąd tworzenia");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createStore("Nowy sklep", null, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/create", view);
+        assertEquals("Błąd tworzenia", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
     }
 }

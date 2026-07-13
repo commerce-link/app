@@ -33,7 +33,7 @@
                             <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
                         </form>
                         <form th:if="${store.demo == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
-                              style="display:inline" onsubmit="this.confirmStoreId.value = prompt(this.dataset.confirm); return this.confirmStoreId.value !== null;"
+                              style="display:inline" onsubmit="var id = prompt(this.dataset.confirm); if (id === null) return false; this.confirmStoreId.value = id; return true;"
                               th:attr="data-confirm=${deleteConfirm}">
                             <input type="hidden" name="confirmStoreId">
                             <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>

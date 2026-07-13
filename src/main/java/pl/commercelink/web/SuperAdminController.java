@@ -77,9 +77,17 @@ public class SuperAdminController {
                               @RequestParam(required = false) String apiKey,
                               Locale locale,
                               RedirectAttributes redirectAttributes) {
-        Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey, !demoEnvironment));
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
-        return String.format("redirect:/dashboard/store/%s", store.getStoreId());
+        try {
+            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey, !demoEnvironment));
+            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
+            return String.format("redirect:/dashboard/store/%s", store.getStoreId());
+        } catch (Exception e) {
+            System.err.println("[StoreCreation] Failed to create store '" + name + "': " + e.getMessage());
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.create.error", null, locale));
+            return "redirect:/dashboard/store/create";
+        }
     }
 
     @GetMapping("/dashboard/store/{storeId}/copy")
@@ -119,7 +127,12 @@ public class SuperAdminController {
                               @RequestParam(required = false) String confirmStoreId,
                               Locale locale, RedirectAttributes redirectAttributes) {
         Store store = storesRepository.findById(storeId);
-        if (store != null && store.getDemo() == null && !storeId.equals(confirmStoreId)) {
+        if (store == null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.delete.missing", null, locale));
+            return "redirect:/dashboard/stores";
+        }
+        if (store.getDemo() == null && (confirmStoreId == null || !storeId.equals(confirmStoreId.trim()))) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.delete.confirm.mismatch", null, locale));
             return "redirect:/dashboard/stores";
