@@ -1,11 +1,11 @@
-package pl.commercelink.demo;
+package pl.commercelink.registration;
 
 import lombok.Getter;
 
 import java.util.Locale;
 
 @Getter
-public class DemoRegistrationException extends RuntimeException {
+public class RegistrationException extends RuntimeException {
 
     public enum Reason {
         INVALID_EMAIL, RATE_LIMITED, EMAIL_EXISTS, CREATION_FAILED
@@ -13,12 +13,12 @@ public class DemoRegistrationException extends RuntimeException {
 
     private final Reason reason;
 
-    public DemoRegistrationException(Reason reason) {
+    public RegistrationException(Reason reason) {
         super(reason.name());
         this.reason = reason;
     }
 
     public String messageKey() {
-        return "demo.register.error." + reason.name().toLowerCase(Locale.ROOT).replace('_', '-');
+        return "registration.error." + reason.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 }

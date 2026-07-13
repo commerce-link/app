@@ -1,9 +1,10 @@
-package pl.commercelink.demo;
+package pl.commercelink.registration;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import pl.commercelink.demo.DemoStoreSeeder;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.StoreDeletionService;
@@ -17,39 +18,39 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Service
-@ConditionalOnProperty(name = "app.demo.registration.enabled", havingValue = "true")
-public class DemoRegistrationService {
+@ConditionalOnProperty(name = "app.registration.enabled", havingValue = "true")
+public class RegistrationService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final String PASSWORD_CHARS = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-    private final CognitoUserService demoUserService;
+    private final CognitoUserService cognitoUserService;
     private final DemoStoreSeeder demoStoreSeeder;
     private final StoreDeletionService storeDeletionService;
-    private final DemoRegistrationRateLimiter rateLimiter;
+    private final RegistrationRateLimiter rateLimiter;
     private final Clock clock;
     private final int ttlDays;
     private final boolean revealPassword;
     private final SecureRandom random = new SecureRandom();
 
     @Autowired
-    public DemoRegistrationService(CognitoUserService demoUserService,
-                                   DemoStoreSeeder demoStoreSeeder,
-                                   StoreDeletionService storeDeletionService,
-                                   DemoRegistrationRateLimiter rateLimiter,
-                                   @Value("${app.demo.registration.ttl-days}") int ttlDays,
-                                   @Value("${app.demo.registration.reveal-password}") boolean revealPassword) {
-        this(demoUserService, demoStoreSeeder, storeDeletionService, rateLimiter, Clock.systemUTC(), ttlDays, revealPassword);
+    public RegistrationService(CognitoUserService cognitoUserService,
+                                DemoStoreSeeder demoStoreSeeder,
+                                StoreDeletionService storeDeletionService,
+                                RegistrationRateLimiter rateLimiter,
+                                @Value("${app.registration.ttl-days}") int ttlDays,
+                                @Value("${app.registration.reveal-password}") boolean revealPassword) {
+        this(cognitoUserService, demoStoreSeeder, storeDeletionService, rateLimiter, Clock.systemUTC(), ttlDays, revealPassword);
     }
 
-    DemoRegistrationService(CognitoUserService demoUserService,
-                            DemoStoreSeeder demoStoreSeeder,
-                            StoreDeletionService storeDeletionService,
-                            DemoRegistrationRateLimiter rateLimiter,
-                            Clock clock,
-                            int ttlDays,
-                            boolean revealPassword) {
-        this.demoUserService = demoUserService;
+    RegistrationService(CognitoUserService cognitoUserService,
+                        DemoStoreSeeder demoStoreSeeder,
+                        StoreDeletionService storeDeletionService,
+                        RegistrationRateLimiter rateLimiter,
+                        Clock clock,
+                        int ttlDays,
+                        boolean revealPassword) {
+        this.cognitoUserService = cognitoUserService;
         this.demoStoreSeeder = demoStoreSeeder;
         this.storeDeletionService = storeDeletionService;
         this.rateLimiter = rateLimiter;
@@ -58,16 +59,16 @@ public class DemoRegistrationService {
         this.revealPassword = revealPassword;
     }
 
-    public DemoRegistrationResult register(String email, String clientIp) {
+    public RegistrationResult register(String email, String clientIp) {
         String normalized = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
         if (!EMAIL_PATTERN.matcher(normalized).matches()) {
-            throw new DemoRegistrationException(DemoRegistrationException.Reason.INVALID_EMAIL);
+            throw new RegistrationException(RegistrationException.Reason.INVALID_EMAIL);
         }
         if (!rateLimiter.tryAcquire(clientIp)) {
-            throw new DemoRegistrationException(DemoRegistrationException.Reason.RATE_LIMITED);
+            throw new RegistrationException(RegistrationException.Reason.RATE_LIMITED);
         }
-        if (demoUserService.userExists(normalized)) {
-            throw new DemoRegistrationException(DemoRegistrationException.Reason.EMAIL_EXISTS);
+        if (cognitoUserService.userExists(normalized)) {
+            throw new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS);
         }
 
         String storeId = UniqueIdentifierGenerator.generate();
@@ -79,15 +80,15 @@ public class DemoRegistrationService {
             demoStoreSeeder.seedStore(storeId, "Sklep demo — " + normalized, metadata);
             if (revealPassword) {
                 String password = generatePassword();
-                demoUserService.createStoreAdmin(normalized, storeId, password);
-                return new DemoRegistrationResult(storeId, password);
+                cognitoUserService.createStoreAdmin(normalized, storeId, password);
+                return new RegistrationResult(storeId, password);
             }
-            demoUserService.createStoreAdmin(normalized, storeId);
-            return new DemoRegistrationResult(storeId, null);
+            cognitoUserService.createStoreAdmin(normalized, storeId);
+            return new RegistrationResult(storeId, null);
         } catch (RuntimeException e) {
-            System.err.println("[DemoRegistration] User creation failed for " + normalized + ", rolling back store " + storeId + ": " + e.getMessage());
+            System.err.println("[Registration] User creation failed for " + normalized + ", rolling back store " + storeId + ": " + e.getMessage());
             rollBack(storeId);
-            throw new DemoRegistrationException(DemoRegistrationException.Reason.CREATION_FAILED);
+            throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
     }
 
@@ -95,7 +96,7 @@ public class DemoRegistrationService {
         try {
             storeDeletionService.deleteDemoStore(storeId);
         } catch (RuntimeException e) {
-            System.err.println("[DemoRegistration] Rollback failed for store " + storeId + ": " + e.getMessage());
+            System.err.println("[Registration] Rollback failed for store " + storeId + ": " + e.getMessage());
         }
     }
 

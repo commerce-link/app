@@ -1,10 +1,11 @@
-package pl.commercelink.demo;
+package pl.commercelink.registration;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.demo.DemoStoreSeeder;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.users.CognitoUserService;
@@ -21,17 +22,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DemoRegistrationServiceTest {
+class RegistrationServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-07-08T10:00:00Z");
 
-    @Mock private CognitoUserService demoUserService;
+    @Mock private CognitoUserService cognitoUserService;
     @Mock private DemoStoreSeeder demoStoreSeeder;
     @Mock private StoreDeletionService storeDeletionService;
-    @Mock private DemoRegistrationRateLimiter rateLimiter;
+    @Mock private RegistrationRateLimiter rateLimiter;
 
-    private DemoRegistrationService service(boolean revealPassword) {
-        return new DemoRegistrationService(demoUserService, demoStoreSeeder, storeDeletionService,
+    private RegistrationService service(boolean revealPassword) {
+        return new RegistrationService(cognitoUserService, demoStoreSeeder, storeDeletionService,
                 rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC), 14, revealPassword);
     }
 
@@ -39,15 +40,15 @@ class DemoRegistrationServiceTest {
     void createsStoreAndInvitesUserByEmail() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(false);
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
         ArgumentCaptor<DemoStoreMetadata> metadataCaptor = ArgumentCaptor.forClass(DemoStoreMetadata.class);
 
         // when
-        DemoRegistrationResult result = service(false).register("User@Example.com ", "1.1.1.1");
+        RegistrationResult result = service(false).register("User@Example.com ", "1.1.1.1");
 
         // then
         verify(demoStoreSeeder).seedStore(eq(result.storeId()), eq("Sklep demo — user@example.com"), metadataCaptor.capture());
-        verify(demoUserService).createStoreAdmin("user@example.com", result.storeId());
+        verify(cognitoUserService).createStoreAdmin("user@example.com", result.storeId());
         assertNull(result.revealedPassword());
         assertEquals("user@example.com", metadataCaptor.getValue().getOwnerEmail());
         assertEquals(NOW.toString(), metadataCaptor.getValue().getCreatedAt());
@@ -59,13 +60,13 @@ class DemoRegistrationServiceTest {
     void returnsGeneratedPasswordInRevealMode() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(false);
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
 
         // when
-        DemoRegistrationResult result = service(true).register("user@example.com", "1.1.1.1");
+        RegistrationResult result = service(true).register("user@example.com", "1.1.1.1");
 
         // then
-        verify(demoUserService).createStoreAdmin(eq("user@example.com"), eq(result.storeId()), eq(result.revealedPassword()));
+        verify(cognitoUserService).createStoreAdmin(eq("user@example.com"), eq(result.storeId()), eq(result.revealedPassword()));
         assertNotNull(result.revealedPassword());
         assertTrue(result.revealedPassword().length() >= 12);
     }
@@ -73,10 +74,10 @@ class DemoRegistrationServiceTest {
     @Test
     void rejectsInvalidEmail() {
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("not-an-email", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.INVALID_EMAIL, e.getReason());
-        verifyNoInteractions(demoStoreSeeder, demoUserService);
+        assertEquals(RegistrationException.Reason.INVALID_EMAIL, e.getReason());
+        verifyNoInteractions(demoStoreSeeder, cognitoUserService);
     }
 
     @Test
@@ -85,9 +86,9 @@ class DemoRegistrationServiceTest {
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(false);
 
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.RATE_LIMITED, e.getReason());
+        assertEquals(RegistrationException.Reason.RATE_LIMITED, e.getReason());
         verifyNoInteractions(demoStoreSeeder);
     }
 
@@ -95,12 +96,12 @@ class DemoRegistrationServiceTest {
     void rejectsExistingEmail() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(true);
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(true);
 
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.EMAIL_EXISTS, e.getReason());
+        assertEquals(RegistrationException.Reason.EMAIL_EXISTS, e.getReason());
         verifyNoInteractions(demoStoreSeeder);
     }
 
@@ -108,13 +109,13 @@ class DemoRegistrationServiceTest {
     void rollsBackStoreWhenUserCreationFails() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(false);
-        doThrow(new RuntimeException("cognito down")).when(demoUserService).createStoreAdmin(anyString(), anyString());
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
+        doThrow(new RuntimeException("cognito down")).when(cognitoUserService).createStoreAdmin(anyString(), anyString());
 
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
         ArgumentCaptor<String> storeIdCaptor = ArgumentCaptor.forClass(String.class);
         verify(storeDeletionService).deleteDemoStore(storeIdCaptor.capture());
         verify(demoStoreSeeder).seedStore(eq(storeIdCaptor.getValue()), anyString(), any());
@@ -124,39 +125,39 @@ class DemoRegistrationServiceTest {
     void rollsBackStoreWhenSeedingFails() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(false);
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
         doThrow(new RuntimeException("s3 down")).when(demoStoreSeeder).seedStore(anyString(), anyString(), any());
 
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
         verify(storeDeletionService).deleteDemoStore(anyString());
-        verify(demoUserService, never()).createStoreAdmin(anyString(), anyString());
-        verify(demoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
     }
 
     @Test
     void reportsCreationFailureWhenRollbackAlsoFails() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
-        when(demoUserService.userExists("user@example.com")).thenReturn(false);
-        doThrow(new RuntimeException("cognito down")).when(demoUserService).createStoreAdmin(anyString(), anyString());
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
+        doThrow(new RuntimeException("cognito down")).when(cognitoUserService).createStoreAdmin(anyString(), anyString());
         doThrow(new RuntimeException("dynamo down")).when(storeDeletionService).deleteDemoStore(anyString());
 
         // when / then
-        DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
-        assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
     }
 
     @Test
     void mapsReasonsToMessageKeys() {
         // when / then
-        assertEquals("demo.register.error.invalid-email",
-                new DemoRegistrationException(DemoRegistrationException.Reason.INVALID_EMAIL).messageKey());
-        assertEquals("demo.register.error.rate-limited",
-                new DemoRegistrationException(DemoRegistrationException.Reason.RATE_LIMITED).messageKey());
+        assertEquals("registration.error.invalid-email",
+                new RegistrationException(RegistrationException.Reason.INVALID_EMAIL).messageKey());
+        assertEquals("registration.error.rate-limited",
+                new RegistrationException(RegistrationException.Reason.RATE_LIMITED).messageKey());
     }
 
     @Test
@@ -167,8 +168,8 @@ class DemoRegistrationServiceTest {
 
         // when / then
         try {
-            assertEquals("demo.register.error.invalid-email",
-                    new DemoRegistrationException(DemoRegistrationException.Reason.INVALID_EMAIL).messageKey());
+            assertEquals("registration.error.invalid-email",
+                    new RegistrationException(RegistrationException.Reason.INVALID_EMAIL).messageKey());
         } finally {
             Locale.setDefault(original);
         }

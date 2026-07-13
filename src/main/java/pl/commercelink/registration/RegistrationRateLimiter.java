@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.registration;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,8 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Component
-@ConditionalOnProperty(name = "app.demo.registration.enabled", havingValue = "true")
-public class DemoRegistrationRateLimiter {
+@ConditionalOnProperty(name = "app.registration.enabled", havingValue = "true")
+public class RegistrationRateLimiter {
 
     private final Clock clock;
     private final int maxPerIpPerHour;
@@ -24,12 +24,12 @@ public class DemoRegistrationRateLimiter {
     private final Deque<Instant> global = new ArrayDeque<>();
 
     @Autowired
-    public DemoRegistrationRateLimiter(@Value("${app.demo.registration.max-per-ip-hourly}") int maxPerIpPerHour,
-                                       @Value("${app.demo.registration.max-daily}") int maxPerDay) {
+    public RegistrationRateLimiter(@Value("${app.registration.max-per-ip-hourly}") int maxPerIpPerHour,
+                                    @Value("${app.registration.max-daily}") int maxPerDay) {
         this(Clock.systemUTC(), maxPerIpPerHour, maxPerDay);
     }
 
-    DemoRegistrationRateLimiter(Clock clock, int maxPerIpPerHour, int maxPerDay) {
+    RegistrationRateLimiter(Clock clock, int maxPerIpPerHour, int maxPerDay) {
         this.clock = clock;
         this.maxPerIpPerHour = maxPerIpPerHour;
         this.maxPerDay = maxPerDay;

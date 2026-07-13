@@ -68,16 +68,19 @@
 <body>
 
 <div class="demo-card">
-    <h1 th:text="#{demo.register.success.title}"></h1>
-    <p th:if="${revealedPassword == null}" th:text="#{demo.register.success.message(${email})}"></p>
-    <div th:if="${revealedPassword != null}">
-        <p th:text="#{demo.register.success.password.lead(${email})}"></p>
-        <div class="notification is-info is-light">
-            <strong th:text="${revealedPassword}"></strong>
+    <h1 th:text="#{registration.title}"></h1>
+    <p th:text="#{registration.lead}"></p>
+    <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
+    <form method="post" action="/register">
+        <div class="field">
+            <div class="control">
+                <input class="input" type="email" name="email" required
+                       th:placeholder="#{registration.email.placeholder}" th:value="${email}">
+            </div>
         </div>
-        <p th:text="#{demo.register.success.password.note}"></p>
-    </div>
-    <a class="button is-primary" href="/login" th:text="#{demo.register.success.login}"></a>
+        <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
+        <button type="submit" class="button is-primary" th:text="#{registration.submit}"></button>
+    </form>
 </div>
 
 </body>

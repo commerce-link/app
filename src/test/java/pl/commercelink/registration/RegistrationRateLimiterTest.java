@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.registration;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class DemoRegistrationRateLimiterTest {
+class RegistrationRateLimiterTest {
 
     private static final Instant START = Instant.parse("2026-07-08T10:00:00Z");
 
@@ -23,7 +23,7 @@ class DemoRegistrationRateLimiterTest {
     @Test
     void limitsRegistrationsPerIpPerHour() {
         // given
-        DemoRegistrationRateLimiter limiter = new DemoRegistrationRateLimiter(clock, 2, 100);
+        RegistrationRateLimiter limiter = new RegistrationRateLimiter(clock, 2, 100);
 
         // when / then
         assertTrue(limiter.tryAcquire("1.1.1.1"));
@@ -35,7 +35,7 @@ class DemoRegistrationRateLimiterTest {
     @Test
     void ipWindowSlidesAfterAnHour() {
         // given
-        DemoRegistrationRateLimiter limiter = new DemoRegistrationRateLimiter(clock, 1, 100);
+        RegistrationRateLimiter limiter = new RegistrationRateLimiter(clock, 1, 100);
         assertTrue(limiter.tryAcquire("1.1.1.1"));
         assertFalse(limiter.tryAcquire("1.1.1.1"));
 
@@ -50,7 +50,7 @@ class DemoRegistrationRateLimiterTest {
     @Test
     void enforcesGlobalDailyLimit() {
         // given
-        DemoRegistrationRateLimiter limiter = new DemoRegistrationRateLimiter(clock, 10, 2);
+        RegistrationRateLimiter limiter = new RegistrationRateLimiter(clock, 10, 2);
         assertTrue(limiter.tryAcquire("1.1.1.1"));
         assertTrue(limiter.tryAcquire("2.2.2.2"));
 
