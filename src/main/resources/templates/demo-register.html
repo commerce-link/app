@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Demo - CommerceLink</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f0ff, #fceeff, #ffffe0);
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .demo-card {
+            background: #ffffffff;
+            border-radius: 10px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid #c6c6cdff;
+        }
+
+        .demo-card h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
+            color: #000716ff;
+        }
+
+        .demo-card p {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 1.5rem;
+        }
+
+        .demo-card .button {
+            width: 100%;
+            font-weight: 600;
+            font-size: 14px;
+            border-radius: 10px;
+            background-color: #0972d3ff;
+            border-color: #0972d3ff;
+        }
+
+        .demo-card .button:hover {
+            background-color: #005bb5;
+            border-color: #005bb5;
+        }
+
+        .demo-card .honeypot {
+            position: absolute;
+            left: -9999px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="demo-card">
+    <h1 th:text="#{demo.register.title}"></h1>
+    <p th:text="#{demo.register.lead}"></p>
+    <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
+    <form method="post" action="/demo/register">
+        <div class="field">
+            <div class="control">
+                <input class="input" type="email" name="email" required
+                       th:placeholder="#{demo.register.email.placeholder}" th:value="${email}">
+            </div>
+        </div>
+        <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
+        <button type="submit" class="button is-primary" th:text="#{demo.register.submit}"></button>
+    </form>
+</div>
+
+</body>
+</html>

@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.taxonomy.ProductGroup;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Predicate;
@@ -59,6 +60,8 @@ public class Store {
     private ReportingConfiguration reportingConfiguration;
     @DynamoDBAttribute(attributeName = "shipping")
     private ShippingConfiguration shippingConfiguration;
+    @DynamoDBAttribute(attributeName = "demo")
+    private DemoStoreMetadata demo;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -380,6 +383,19 @@ public class Store {
 
     public void setShippingConfiguration(ShippingConfiguration shippingConfiguration) {
         this.shippingConfiguration = shippingConfiguration;
+    }
+
+    public DemoStoreMetadata getDemo() {
+        return demo;
+    }
+
+    public void setDemo(DemoStoreMetadata demo) {
+        this.demo = demo;
+    }
+
+    @DynamoDBIgnore
+    public boolean isDemoExpired(Instant now) {
+        return demo != null && demo.getExpiresAt() != null && Instant.parse(demo.getExpiresAt()).isBefore(now);
     }
 
     @DynamoDBIgnore

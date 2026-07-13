@@ -241,6 +241,12 @@
             <artifactId>sesv2</artifactId>
             <version>2.31.16</version>
         </dependency>
+        <!-- Cognito admin (demo onboarding) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>2.31.16</version>
+        </dependency>
 
         <dependency>
             <groupId>com.jcraft</groupId>

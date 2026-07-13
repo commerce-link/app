@@ -55,7 +55,7 @@ public final class CatalogSeed {
                 suppliers, Boolean.parseBoolean(f[12].trim()), Boolean.parseBoolean(f[13].trim()));
     }
 
-    public static String categoryId(String category) {
-        return "cat-" + category.toLowerCase(Locale.ROOT);
+    public static String categoryId(String category, String storeId) {
+        return "cat-" + category.toLowerCase(Locale.ROOT) + "-" + storeId;
     }
 }
