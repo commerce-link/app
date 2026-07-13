@@ -15,18 +15,17 @@ public class ManualWarehouseFulfilment {
 
     private final Inventory inventory;
     private final WarehouseAllocationsManager warehouseAllocationsManager;
-    private final SupplierRegistry supplierRegistry;
 
-    public ManualWarehouseFulfilment(Inventory inventory, WarehouseAllocationsManager warehouseAllocationsManager, SupplierRegistry supplierRegistry) {
+    public ManualWarehouseFulfilment(Inventory inventory, WarehouseAllocationsManager warehouseAllocationsManager) {
         this.inventory = inventory;
         this.warehouseAllocationsManager = warehouseAllocationsManager;
-        this.supplierRegistry = supplierRegistry;
     }
 
     public FulfilmentForm init(String storeId, List<OrderItem> orderItems) {
         FulfilmentGroupsGenerator generator = FulfilmentGroupsGenerator.builder()
                 .withInventory(inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT))
-                .withAcceptedSuppliers(supplierRegistry.getExternalSupplierNames())
+                .withExcludedSupplier(SupplierRegistry.WAREHOUSE)
+                .withExcludedSupplier(SupplierRegistry.OTHER)
                 .withFulfilmentUnderCost()
                 .build();
         return new FulfilmentForm("warehouse", "redirect:/dashboard/warehouse?statuses=New", generator.runWithGrouping(orderItems));

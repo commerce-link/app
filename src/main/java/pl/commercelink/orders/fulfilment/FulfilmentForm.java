@@ -1,5 +1,6 @@
 package pl.commercelink.orders.fulfilment;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,11 @@ public class FulfilmentForm {
 
     private String redirectUrl;
     private String fulfilmentType;
+    private String pathSelector = "default";
+    private boolean onlyWithProfit;
+    private boolean onlyMultiOrder;
+    private boolean orderByOrder;
+    private Map<String, Double> committedSuppliers = new LinkedHashMap<>();
     private List<String> selectedOrders = new LinkedList<>();
     private List<FulfilmentGroup> entries = new LinkedList<>();
 
@@ -53,12 +59,69 @@ public class FulfilmentForm {
         this.entries = entries;
     }
 
+    public String getPathSelector() {
+        return pathSelector;
+    }
+
+    public void setPathSelector(String pathSelector) {
+        this.pathSelector = pathSelector;
+    }
+
+    public boolean isOnlyWithProfit() {
+        return onlyWithProfit;
+    }
+
+    public void setOnlyWithProfit(boolean onlyWithProfit) {
+        this.onlyWithProfit = onlyWithProfit;
+    }
+
+    public boolean isOnlyMultiOrder() {
+        return onlyMultiOrder;
+    }
+
+    public void setOnlyMultiOrder(boolean onlyMultiOrder) {
+        this.onlyMultiOrder = onlyMultiOrder;
+    }
+
+    public boolean isOrderByOrder() {
+        return orderByOrder;
+    }
+
+    public void setOrderByOrder(boolean orderByOrder) {
+        this.orderByOrder = orderByOrder;
+    }
+
+    public Map<String, Double> getCommittedSuppliers() {
+        return committedSuppliers;
+    }
+
+    public void setCommittedSuppliers(Map<String, Double> committedSuppliers) {
+        this.committedSuppliers = committedSuppliers;
+    }
+
+    public Map<String, Double> getAcceptedValueByProvider() {
+        return entries.stream()
+                .filter(FulfilmentGroup::isAccepted)
+                .collect(Collectors.groupingBy(
+                        group -> group.getSource().getProvider(),
+                        LinkedHashMap::new,
+                        Collectors.summingDouble(FulfilmentGroup::getSourceValue)));
+    }
+
     public List<String> getSelectedOrders() {
         return selectedOrders;
     }
 
     public void setSelectedOrders(List<String> selectedOrders) {
         this.selectedOrders = selectedOrders;
+    }
+
+    public boolean hasRemainingOrders() {
+        return selectedOrders.size() > 1;
+    }
+
+    public List<String> getRemainingOrders() {
+        return hasRemainingOrders() ? selectedOrders.subList(1, selectedOrders.size()) : new LinkedList<>();
     }
 
     public List<FulfilmentItem> getAcceptedFulfilmentItems() {

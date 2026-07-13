@@ -30,6 +30,104 @@
         .copyable:hover {
             text-decoration: underline;
         }
+        .assign-sku-chips-box {
+            background: #f8f9fb;
+            border: 1px solid #e6e8eb;
+            border-radius: 8px;
+            padding: .7rem 1rem;
+        }
+        .assign-sku-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem;
+            min-height: 2rem;
+            align-items: center;
+        }
+        .assign-sku-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            font-family: monospace;
+            font-size: .8rem;
+            background: #eef4ff;
+            color: #2b5db8;
+            border: 1px solid #d4e2f8;
+            border-radius: 4px;
+            padding: .15rem .5rem;
+        }
+        .assign-sku-chip.is-foreign {
+            background: #fff8e6;
+            color: #946c00;
+            border-color: #f0dfa8;
+        }
+        .assign-sku-chip .chip-del {
+            cursor: pointer;
+            opacity: .55;
+            font-size: .7rem;
+        }
+        .assign-sku-chip .chip-del:hover {
+            opacity: 1;
+        }
+        .assign-sku-chips-empty {
+            font-size: .8rem;
+            color: #9aa1ab;
+            font-style: italic;
+        }
+        .assign-sku-preview {
+            font-family: monospace;
+            font-size: .82rem;
+            background: #f1f2f4;
+            border-radius: 4px;
+            padding: .3rem .6rem;
+            word-break: break-all;
+            color: #4a4f57;
+        }
+        .assign-sku-preview .sep {
+            color: #c0392b;
+            font-weight: 700;
+        }
+        .assign-sku-scroll {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid #e6e8eb;
+            border-radius: 6px;
+        }
+        .assign-sku-scroll thead th {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 1;
+            box-shadow: 0 1px 0 #e6e8eb;
+        }
+        .assign-sku-table {
+            font-size: .87rem;
+        }
+        .assign-sku-table td, .assign-sku-table th {
+            vertical-align: middle;
+        }
+        .assign-sku-table tbody tr {
+            cursor: pointer;
+        }
+        .assign-sku-table tbody tr.is-picked {
+            background: #eef8f1 !important;
+        }
+        .assign-sku-table .mono {
+            font-family: monospace;
+            font-size: .82rem;
+            white-space: nowrap;
+        }
+        .assign-sku-empty {
+            padding: 2rem;
+            text-align: center;
+            color: #9aa1ab;
+            font-size: .85rem;
+        }
+        .assign-sku-heading {
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #9aa1ab;
+        }
     </style>
 
     <div class="box mb-5">
@@ -290,19 +388,33 @@
                                 </div>
                                 <div class="dropdown-menu" role="menu">
                                     <div class="dropdown-content">
-                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty},data-price=${item.price}"
+                                           onclick="openAssignSkuModal(this); return false;"
+                                           th:text="#{order.item.assign.sku}"></a>
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.assign.sku}"></span>
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId},data-tax=${item.tax}"
                                            onclick="openQuickAssignModal(this); return false;"
                                            th:text="#{order.item.quick.assign}"></a>
-                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.quick.assign}"></span>
-                                        <a th:if="${item.isNew()}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                           href="#"
+                                           th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty},data-price=${item.price}"
+                                           onclick="openAssignWarehouseModal(this); return false;"
+                                           th:text="#{order.item.assign.warehouse}"></a>
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                              th:text="#{order.item.assign.warehouse}"></span>
+                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="submitClearSupplier(this); return false;"
                                            th:text="#{order.item.clear.assign}"></a>
-                                        <span th:unless="${item.isNew()}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
                                         <a th:if="${item.isNew() and item.group}" class="dropdown-item"
                                            href="#"
@@ -449,6 +561,217 @@
                 <footer class="modal-card-foot">
                     <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
                     <button class="button" type="button" onclick="toggleQuickAssignModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div id="assignSkuModal" class="modal">
+        <div class="modal-background" onclick="toggleAssignSkuModal(false)"></div>
+        <div class="modal-card" style="width: 940px; max-width: 96vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.item.assign.sku}"></p>
+                <button class="delete" type="button" onclick="toggleAssignSkuModal(false)"></button>
+            </header>
+
+            <form id="assignSkuForm" method="post"
+                  th:action="@{/dashboard/orders/{orderId}/assign-sku(orderId=${order.orderId})}"
+                  onsubmit="return prepareAssignSkuSubmit()">
+                <section class="modal-card-body">
+                    <input type="hidden" id="assignSkuItemId" name="itemId"/>
+                    <input type="hidden" id="assignSkuValue" name="sku"/>
+
+                    <div class="box has-background-white-ter mb-4 py-3">
+                        <div class="columns is-vcentered is-mobile">
+                            <div class="column is-5">
+                                <p class="heading" th:text="#{order.item.assign.sku.item}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemName"></p>
+                                <p class="is-family-monospace is-size-7 has-text-grey" id="assignSkuItemSku"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.category}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemCategory"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.quantity}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemQty"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.unit.price}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemPrice"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-semibold" id="assignSkuItemTotal"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="assign-sku-chips-box mb-4">
+                        <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
+                            <span class="assign-sku-heading">
+                                <span th:text="#{order.item.assign.sku.selected}"></span>
+                                (<span id="assignSkuChipCount">0</span>)
+                            </span>
+                            <div class="field has-addons mb-0">
+                                <div class="control">
+                                    <input class="input is-small is-family-monospace" type="text" id="assignSkuManual"
+                                           style="width: 180px;" th:placeholder="#{order.item.assign.sku.manual.placeholder}"
+                                           onkeydown="if(event.key === 'Enter') { event.preventDefault(); addAssignSkuManual(); }">
+                                </div>
+                                <div class="control">
+                                    <button class="button is-small" type="button" onclick="addAssignSkuManual()">
+                                        <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="assign-sku-chips" id="assignSkuChips"
+                             th:attr="data-empty=#{order.item.assign.sku.empty},data-foreign=#{order.item.assign.sku.foreign}"></div>
+                        <div class="mt-2">
+                            <span class="assign-sku-heading" th:text="#{order.item.assign.sku.result}"></span>
+                            <div class="assign-sku-preview mt-1" id="assignSkuPreview">&mdash;</div>
+                        </div>
+                    </div>
+
+                    <div class="field is-grouped is-flex-wrap-wrap mb-3" style="gap: .6rem; align-items: center;">
+                        <div class="control">
+                            <div class="select is-small">
+                                <select id="assignSkuCatalog" onchange="onAssignSkuCatalogChange(this)"
+                                        th:attr="data-url=@{/dashboard/orders/{orderId}/pricelist(orderId=${order.orderId})}">
+                                    <option value="" th:text="#{orders.select.catalog}"></option>
+                                    <option th:each="catalog : ${catalogs}"
+                                            th:value="${catalog.catalogId}"
+                                            th:text="${catalog.name}"
+                                            th:selected="${catalog.catalogId == catalogId}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <div class="select is-small">
+                                <select id="assignSkuCategory" onchange="onAssignSkuCategoryChange()"
+                                        th:attr="data-placeholder=#{offers.select.category}"></select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <div class="select is-small">
+                                <select id="assignSkuLabel" onchange="renderAssignSkuTable()"
+                                        th:attr="data-placeholder=#{order.item.assign.sku.all.labels}"></select>
+                            </div>
+                        </div>
+                        <div class="control is-expanded">
+                            <input class="input is-small" type="text" id="assignSkuSearch"
+                                   th:placeholder="#{order.item.assign.sku.search.placeholder}"
+                                   oninput="renderAssignSkuTable()">
+                        </div>
+                    </div>
+
+                    <div class="assign-sku-scroll">
+                        <table class="table is-fullwidth is-hoverable assign-sku-table mb-0">
+                            <thead>
+                            <tr>
+                                <th style="width: 36px;"></th>
+                                <th th:text="#{order.item.name}"></th>
+                                <th th:text="#{order.item.assign.sku.label}"></th>
+                                <th th:text="#{order.item.sku}"></th>
+                                <th class="has-text-right" th:text="#{order.item.price}"></th>
+                                <th class="has-text-right" th:text="#{order.item.assign.sku.availability}"></th>
+                            </tr>
+                            </thead>
+                            <tbody id="assignSkuRows"></tbody>
+                        </table>
+                        <div class="assign-sku-empty" id="assignSkuNoResults" style="display: none;"
+                             th:text="#{order.item.assign.sku.no.results}"></div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot is-justify-content-space-between">
+                    <div>
+                        <button class="button is-primary" type="submit" id="assignSkuSubmit" th:text="#{general.save}"></button>
+                        <button class="button" type="button" onclick="toggleAssignSkuModal(false)" th:text="#{general.cancel}"></button>
+                    </div>
+                    <span class="help" id="assignSkuHint" th:text="#{order.item.assign.sku.empty.hint}" style="display: none;"></span>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <div id="assignWarehouseModal" class="modal">
+        <div class="modal-background" onclick="toggleAssignWarehouseModal(false)"></div>
+        <div class="modal-card" style="width: 940px; max-width: 96vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.item.assign.warehouse}"></p>
+                <button class="delete" type="button" onclick="toggleAssignWarehouseModal(false)"></button>
+            </header>
+
+            <form id="assignWarehouseForm" method="post"
+                  th:action="@{/dashboard/orders/{orderId}/assign-warehouse(orderId=${order.orderId})}"
+                  th:attr="data-url=@{/dashboard/warehouse/items/available}"
+                  onsubmit="return prepareAssignWarehouseSubmit()">
+                <section class="modal-card-body">
+                    <input type="hidden" id="assignWarehouseItemId" name="itemId"/>
+                    <input type="hidden" id="assignWarehouseMfn" name="mfn"/>
+
+                    <div class="box has-background-white-ter mb-4 py-3">
+                        <div class="columns is-vcentered is-mobile">
+                            <div class="column is-5">
+                                <p class="heading" th:text="#{order.item.assign.sku.item}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemName"></p>
+                                <p class="is-family-monospace is-size-7 has-text-grey" id="assignWarehouseItemSku"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.category}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemCategory"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.quantity}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemQty"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{order.item.unit.price}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemPrice"></p>
+                            </div>
+                            <div class="column">
+                                <p class="heading" th:text="#{general.value}"></p>
+                                <p class="has-text-weight-semibold" id="assignWarehouseItemTotal"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field mb-3">
+                        <div class="control">
+                            <input class="input is-small" type="text" id="assignWarehouseSearch"
+                                   th:placeholder="#{order.item.assign.sku.search.placeholder}"
+                                   oninput="renderAssignWarehouseTable()">
+                        </div>
+                    </div>
+
+                    <div class="assign-sku-scroll">
+                        <table class="table is-fullwidth is-hoverable assign-sku-table mb-0"
+                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered}">
+                            <thead>
+                            <tr>
+                                <th style="width: 36px;"></th>
+                                <th th:text="#{order.item.name}"></th>
+                                <th th:text="#{order.item.sku}"></th>
+                                <th th:text="#{order.item.serial.no}"></th>
+                                <th class="has-text-right" th:text="#{order.item.quantity}"></th>
+                                <th th:text="#{order.item.status}"></th>
+                            </tr>
+                            </thead>
+                            <tbody id="assignWarehouseRows"></tbody>
+                        </table>
+                        <div class="assign-sku-empty" id="assignWarehouseNoResults" style="display: none;"
+                             th:text="#{order.item.assign.warehouse.no.results}"></div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot is-justify-content-space-between">
+                    <div>
+                        <button class="button is-primary" type="submit" id="assignWarehouseSubmit" th:text="#{general.save}"></button>
+                        <button class="button" type="button" onclick="toggleAssignWarehouseModal(false)" th:text="#{general.cancel}"></button>
+                    </div>
+                    <span class="help" id="assignWarehouseHint" th:text="#{order.item.assign.warehouse.empty.hint}" style="display: none;"></span>
                 </footer>
             </form>
         </div>
@@ -1276,6 +1599,301 @@
                 .replace('{0}', net.toFixed(2))
                 .replace('{1}', vatPercent);
             hint.style.display = '';
+        }
+
+        let assignSkuSelected = [];
+        let assignSkuData = [];
+        const assignSkuPricelists = {};
+        {
+            const catalogSelect = document.getElementById('assignSkuCatalog');
+            if (catalogSelect && catalogSelect.value) {
+                assignSkuPricelists[catalogSelect.value] = availabilityAndPrices;
+            }
+        }
+
+        function toggleAssignSkuModal(show) {
+            const modal = document.getElementById('assignSkuModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function fillAssignItemContext(idPrefix, link) {
+            const qty = parseInt(link.getAttribute('data-qty')) || 0;
+            const price = parseFloat(link.getAttribute('data-price')) || 0;
+            document.getElementById(idPrefix + 'Name').textContent = link.getAttribute('data-name') || '';
+            document.getElementById(idPrefix + 'Sku').textContent = link.getAttribute('data-sku') || '';
+            document.getElementById(idPrefix + 'Category').textContent = link.getAttribute('data-category') || '';
+            document.getElementById(idPrefix + 'Qty').textContent = qty;
+            document.getElementById(idPrefix + 'Price').textContent = formatPln(price);
+            document.getElementById(idPrefix + 'Total').textContent = formatPln(price * qty);
+        }
+
+        function openAssignSkuModal(link) {
+            document.getElementById('assignSkuItemId').value = link.getAttribute('data-item-id') || '';
+            fillAssignItemContext('assignSkuItem', link);
+            document.getElementById('assignSkuSearch').value = '';
+            document.getElementById('assignSkuManual').value = '';
+
+            assignSkuSelected = (link.getAttribute('data-sku') || '').split(':')
+                .map(code => code.trim())
+                .filter(code => code.length > 0)
+                .map(code => ({ code: code, foreign: true }));
+
+            renderAssignSkuChips();
+            loadAssignSkuPricelist(document.getElementById('assignSkuCatalog').value, refreshAssignSkuModal);
+            toggleAssignSkuModal(true);
+        }
+
+        function onAssignSkuCatalogChange(select) {
+            loadAssignSkuPricelist(select.value, refreshAssignSkuModal);
+        }
+
+        function loadAssignSkuPricelist(catalogId, onLoaded) {
+            if (!catalogId) {
+                assignSkuData = [];
+                onLoaded();
+                return;
+            }
+            if (assignSkuPricelists[catalogId]) {
+                assignSkuData = assignSkuPricelists[catalogId];
+                onLoaded();
+                return;
+            }
+            const url = document.getElementById('assignSkuCatalog').getAttribute('data-url')
+                + '?catalogId=' + encodeURIComponent(catalogId);
+            fetch(url)
+                .then(response => response.ok ? response.json() : [])
+                .catch(() => [])
+                .then(data => {
+                    assignSkuPricelists[catalogId] = data;
+                    assignSkuData = data;
+                    onLoaded();
+                });
+        }
+
+        function refreshAssignSkuModal() {
+            assignSkuSelected.forEach(s => s.foreign = !assignSkuData.some(p => p.mfn === s.code));
+            initAssignSkuCategories(document.getElementById('assignSkuItemCategory').textContent);
+            onAssignSkuCategoryChange();
+            renderAssignSkuChips();
+        }
+
+        function initAssignSkuCategories(itemCategory) {
+            const select = document.getElementById('assignSkuCategory');
+            select.innerHTML = '';
+            select.appendChild(new Option(select.getAttribute('data-placeholder'), ''));
+            [...new Set(assignSkuData.map(p => p.category))]
+                .forEach(category => select.appendChild(new Option(category, category)));
+            select.value = [...select.options].some(o => o.value === itemCategory) ? itemCategory : '';
+        }
+
+        function onAssignSkuCategoryChange() {
+            const category = document.getElementById('assignSkuCategory').value;
+            const select = document.getElementById('assignSkuLabel');
+            select.innerHTML = '';
+            select.appendChild(new Option(select.getAttribute('data-placeholder'), ''));
+            [...new Set(assignSkuData.filter(p => p.category === category).map(p => p.label))]
+                .forEach(label => select.appendChild(new Option(label, label)));
+            renderAssignSkuTable();
+        }
+
+        function renderAssignSkuTable() {
+            const category = document.getElementById('assignSkuCategory').value;
+            const label = document.getElementById('assignSkuLabel').value;
+            const search = document.getElementById('assignSkuSearch').value.trim().toLowerCase();
+
+            let rows = assignSkuData.filter(p => !category || p.category === category);
+            if (label) rows = rows.filter(p => p.label === label);
+            if (search) rows = rows.filter(p =>
+                p.name.toLowerCase().includes(search) || p.mfn.toLowerCase().includes(search));
+
+            const tbody = document.getElementById('assignSkuRows');
+            tbody.innerHTML = '';
+            rows.forEach(p => {
+                const picked = assignSkuSelected.some(s => s.code === p.mfn);
+                const row = document.createElement('tr');
+                row.classList.toggle('is-picked', picked);
+                row.innerHTML = `
+                    <td><input type="checkbox" ${picked ? 'checked' : ''}></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mono"></td>
+                    <td class="has-text-right" style="white-space: nowrap;">${formatPln(p.price)}</td>
+                    <td class="has-text-right ${p.qty > 0 ? 'has-text-success' : 'has-text-danger'}">${p.qty}</td>`;
+                row.children[1].textContent = p.name;
+                row.children[2].textContent = p.label;
+                row.children[3].textContent = p.mfn;
+                row.addEventListener('click', () => toggleAssignSkuPick(p.mfn));
+                tbody.appendChild(row);
+            });
+            document.getElementById('assignSkuNoResults').style.display = rows.length ? 'none' : 'block';
+        }
+
+        function toggleAssignSkuPick(mfn) {
+            const index = assignSkuSelected.findIndex(s => s.code === mfn);
+            if (index >= 0) assignSkuSelected.splice(index, 1);
+            else assignSkuSelected.push({ code: mfn, foreign: false });
+            renderAssignSkuChips();
+            renderAssignSkuTable();
+        }
+
+        function addAssignSkuManual() {
+            const input = document.getElementById('assignSkuManual');
+            const code = input.value.trim();
+            if (!code || code.includes(':') || assignSkuSelected.some(s => s.code === code)) return;
+            assignSkuSelected.push({ code: code, foreign: !assignSkuData.some(p => p.mfn === code) });
+            input.value = '';
+            renderAssignSkuChips();
+            renderAssignSkuTable();
+        }
+
+        function renderAssignSkuChips() {
+            const chips = document.getElementById('assignSkuChips');
+            chips.innerHTML = '';
+            if (assignSkuSelected.length === 0) {
+                const empty = document.createElement('span');
+                empty.className = 'assign-sku-chips-empty';
+                empty.textContent = chips.getAttribute('data-empty');
+                chips.appendChild(empty);
+            }
+            assignSkuSelected.forEach(s => {
+                const chip = document.createElement('span');
+                chip.className = 'assign-sku-chip' + (s.foreign ? ' is-foreign' : '');
+                if (s.foreign) {
+                    chip.title = chips.getAttribute('data-foreign');
+                    chip.innerHTML = '<i class="fas fa-exclamation-triangle" style="font-size: .65rem;"></i>';
+                }
+                chip.appendChild(document.createTextNode(s.code));
+                const del = document.createElement('span');
+                del.className = 'chip-del';
+                del.innerHTML = '<i class="fas fa-times"></i>';
+                del.addEventListener('click', () => {
+                    assignSkuSelected = assignSkuSelected.filter(x => x.code !== s.code);
+                    renderAssignSkuChips();
+                    renderAssignSkuTable();
+                });
+                chip.appendChild(del);
+                chips.appendChild(chip);
+            });
+
+            document.getElementById('assignSkuChipCount').textContent = assignSkuSelected.length;
+
+            const preview = document.getElementById('assignSkuPreview');
+            preview.innerHTML = '';
+            if (assignSkuSelected.length === 0) {
+                preview.textContent = '—';
+            } else {
+                assignSkuSelected.forEach((s, i) => {
+                    if (i > 0) {
+                        const sep = document.createElement('span');
+                        sep.className = 'sep';
+                        sep.textContent = ':';
+                        preview.appendChild(sep);
+                    }
+                    preview.appendChild(document.createTextNode(s.code));
+                });
+            }
+
+            document.getElementById('assignSkuSubmit').disabled = assignSkuSelected.length === 0;
+            document.getElementById('assignSkuHint').style.display = assignSkuSelected.length === 0 ? '' : 'none';
+        }
+
+        function prepareAssignSkuSubmit() {
+            if (assignSkuSelected.length === 0) return false;
+            document.getElementById('assignSkuValue').value = assignSkuSelected.map(s => s.code).join(':');
+            return true;
+        }
+
+        let assignWarehouseData = [];
+        let assignWarehouseSelectedId = '';
+        const assignWarehouseCache = {};
+
+        function toggleAssignWarehouseModal(show) {
+            const modal = document.getElementById('assignWarehouseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function openAssignWarehouseModal(link) {
+            document.getElementById('assignWarehouseItemId').value = link.getAttribute('data-item-id') || '';
+            fillAssignItemContext('assignWarehouseItem', link);
+            document.getElementById('assignWarehouseSearch').value = '';
+            assignWarehouseSelectedId = '';
+
+            loadAssignWarehouseItems(link.getAttribute('data-category') || '', () => {
+                renderAssignWarehouseTable();
+                renderAssignWarehouseFooter();
+            });
+            toggleAssignWarehouseModal(true);
+        }
+
+        function loadAssignWarehouseItems(category, onLoaded) {
+            if (assignWarehouseCache[category]) {
+                assignWarehouseData = assignWarehouseCache[category];
+                onLoaded();
+                return;
+            }
+            const url = document.getElementById('assignWarehouseForm').getAttribute('data-url')
+                + '?category=' + encodeURIComponent(category);
+            fetch(url)
+                .then(response => response.ok ? response.json() : [])
+                .catch(() => [])
+                .then(data => {
+                    assignWarehouseCache[category] = data;
+                    assignWarehouseData = data;
+                    onLoaded();
+                });
+        }
+
+        function renderAssignWarehouseTable() {
+            const search = document.getElementById('assignWarehouseSearch').value.trim().toLowerCase();
+
+            let rows = assignWarehouseData;
+            if (search) rows = rows.filter(i =>
+                (i.name || '').toLowerCase().includes(search)
+                || (i.mfn || '').toLowerCase().includes(search)
+                || (i.serialNo || '').toLowerCase().includes(search));
+
+            const table = document.querySelector('#assignWarehouseModal table');
+            const tbody = document.getElementById('assignWarehouseRows');
+            tbody.innerHTML = '';
+            rows.forEach(i => {
+                const picked = i.itemId === assignWarehouseSelectedId;
+                const delivered = i.status === 'Delivered';
+                const statusLabel = table.getAttribute(delivered ? 'data-status-delivered' : 'data-status-ordered');
+                const row = document.createElement('tr');
+                row.classList.toggle('is-picked', picked);
+                row.innerHTML = `
+                    <td><input type="radio" name="assignWarehousePick" ${picked ? 'checked' : ''}></td>
+                    <td></td>
+                    <td class="mono"></td>
+                    <td class="mono"></td>
+                    <td class="has-text-right">${i.qty}</td>
+                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span></td>`;
+                row.children[1].textContent = i.name || '';
+                row.children[2].textContent = i.mfn || '';
+                row.children[3].textContent = i.serialNo || '';
+                row.addEventListener('click', () => {
+                    assignWarehouseSelectedId = i.itemId;
+                    renderAssignWarehouseTable();
+                    renderAssignWarehouseFooter();
+                });
+                tbody.appendChild(row);
+            });
+            document.getElementById('assignWarehouseNoResults').style.display = rows.length ? 'none' : 'block';
+        }
+
+        function renderAssignWarehouseFooter() {
+            const hasSelection = !!assignWarehouseSelectedId;
+            document.getElementById('assignWarehouseSubmit').disabled = !hasSelection;
+            document.getElementById('assignWarehouseHint').style.display = hasSelection ? 'none' : '';
+        }
+
+        function prepareAssignWarehouseSubmit() {
+            const selected = (assignWarehouseData || []).find(i => i.itemId === assignWarehouseSelectedId);
+            if (!selected || !selected.mfn) return false;
+            document.getElementById('assignWarehouseMfn').value = selected.mfn;
+            return true;
         }
 
         function submitClearSupplier(link) {

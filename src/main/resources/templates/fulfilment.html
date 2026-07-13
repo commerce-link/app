@@ -194,8 +194,15 @@
 
     <form id="fulfilment-form" method="post" th:object="${form}">
         <input type="hidden" th:name="redirectUrl" th:value="${form.redirectUrl}" />
+        <input type="hidden" th:name="pathSelector" th:value="${form.pathSelector}" />
+        <input type="hidden" th:name="onlyWithProfit" th:value="${form.onlyWithProfit}" />
+        <input type="hidden" th:name="onlyMultiOrder" th:value="${form.onlyMultiOrder}" />
+        <input type="hidden" th:name="orderByOrder" th:value="${form.orderByOrder}" />
         <div th:each="order, stat : ${form.selectedOrders}">
             <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />
+        </div>
+        <div th:each="supplier : ${form.committedSuppliers}">
+            <input type="hidden" th:name="|committedSuppliers[${supplier.key}]|" th:value="${supplier.value}" />
         </div>
         <div id="payload-container"></div>
 
@@ -215,17 +222,20 @@
                     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span><span id="partialWarnText"></span>
                 </div>
                 <p id="emptyWarn" class="help is-danger has-text-weight-semibold mb-0" style="display:none; white-space:nowrap;" th:text="#{fulfilment.empty.selection}"></p>
+                <button class="button is-light is-small" type="button" th:if="${form.orderByOrder}" onclick="skipFulfilment()">
+                    <span class="icon"><i class="fas fa-forward"></i></span><span th:text="#{fulfilment.skip}"></span>
+                </button>
                 <div class="field has-addons mb-0">
                     <div class="control">
                         <span class="select is-small">
                             <select id="action-select" th:disabled="${isCompletedOrder}">
                                 <option value="commit" th:text="#{general.save}"></option>
-                                <option value="commitAndContinue" th:if="${form.fulfilmentType == 'orders'}" th:text="#{general.saveAndContinue}"></option>
+                                <option value="commitAndContinue" th:if="${form.fulfilmentType == 'orders' and !form.orderByOrder}" th:text="#{general.saveAndContinue}"></option>
                             </select>
                         </span>
                     </div>
                     <div class="control">
-                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment(this)">
+                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment()">
                             <span class="icon"><i class="fas fa-paper-plane"></i></span><span th:text="#{general.submit}"></span>
                         </button>
                     </div>
@@ -253,6 +263,7 @@
             splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers'
         };
         const IS_WAREHOUSE = /*[[${isWarehouse}]]*/ false;
+        const COMMITTED_SUPPLIERS = /*[[${form.committedSuppliers}]]*/ {};
     </script>
 
     <script>
@@ -470,6 +481,7 @@
 
         function recalcFooter() {
             let total = 0, totalProfit = 0; const byProv = {};
+            Object.keys(COMMITTED_SUPPLIERS).forEach(p => { byProv[p] = COMMITTED_SUPPLIERS[p]; });
             cards().forEach(c => {
                 const v = parseFloat(c.dataset.effvalue || 0);
                 if (isAccepted(c) && v > 0) {
@@ -584,7 +596,7 @@
             });
         }
 
-        function submitFulfilment(btn) {
+        function submitFulfilment() {
             const winner = computeWinners();
             const container = document.getElementById('payload-container');
             container.innerHTML = '';
@@ -633,7 +645,17 @@
             const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
             form.action = basePath + '/' + type + '/fulfilment/' + action;
 
-            confirmSave(btn);
+            form.submit();
+        }
+
+        function skipFulfilment() {
+            const form = document.getElementById('fulfilment-form');
+            document.getElementById('payload-container').innerHTML = '';
+            const isSuperAdmin = document.getElementById('isSuperAdmin').value === 'true';
+            const storeId = document.getElementById('storeId').value;
+            const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
+            form.action = basePath + '/orders/fulfilment/skip';
+            form.submit();
         }
 
         function addHidden(container, name, value) {

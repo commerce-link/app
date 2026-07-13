@@ -11,6 +11,7 @@ public class FulfilmentSource implements Categorized {
 
     private String name;
     private String category;
+    private boolean service;
 
     private String provider;
     private String ean;
@@ -26,6 +27,7 @@ public class FulfilmentSource implements Categorized {
     public FulfilmentSource(OrderItem orderItem, InventoryItem inventoryItem) {
         this.name = orderItem.getName();
         this.category = orderItem.getCategory();
+        this.service = orderItem.isService();
 
         this.provider = inventoryItem.supplier();
         this.ean = inventoryItem.ean();
@@ -85,6 +87,15 @@ public class FulfilmentSource implements Categorized {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    @Override
+    public boolean isService() {
+        return service || hasCategory(SERVICES);
+    }
+
+    public void setService(boolean service) {
+        this.service = service;
     }
 
     public int getQty() {

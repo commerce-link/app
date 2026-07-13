@@ -35,7 +35,7 @@ public class StoreCategories {
     }
 
     public List<Group> groups(List<ProductCatalog> catalogs) {
-        return catalogs.stream()
+        List<Group> groups = catalogs.stream()
                 .sorted(Comparator.comparing(ProductCatalog::getName, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(catalog -> new Group(catalog.getName(), catalog.getCategories().stream()
                         .sorted(Comparator.comparing(CategoryDefinition::getSequenceNumber))
@@ -45,6 +45,9 @@ public class StoreCategories {
                         .collect(Collectors.toList())))
                 .filter(group -> !group.names().isEmpty())
                 .collect(Collectors.toList());
+        if (groups.stream().noneMatch(group -> group.names().contains(Categorized.OTHER)))
+            groups.add(new Group(Categorized.OTHER, List.of(Categorized.OTHER)));
+        return groups;
     }
 
     public boolean isService(String storeId, String categoryName) {
