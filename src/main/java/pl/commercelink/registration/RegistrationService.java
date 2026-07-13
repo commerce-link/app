@@ -75,8 +75,9 @@ public class RegistrationService {
 
     public RegistrationResult register(String email, String storeName, String clientIp) {
         String normalized = normalize(email);
-        validate(normalized, clientIp);
+        validateEmail(normalized);
         String name = validatedStoreName(storeName);
+        acquireRateLimit(clientIp);
         if (cognitoUserService.userExists(normalized)) {
             throw new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS);
         }
@@ -88,10 +89,13 @@ public class RegistrationService {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private void validate(String normalized, String clientIp) {
+    private static void validateEmail(String normalized) {
         if (!EMAIL_PATTERN.matcher(normalized).matches()) {
             throw new RegistrationException(RegistrationException.Reason.INVALID_EMAIL);
         }
+    }
+
+    private void acquireRateLimit(String clientIp) {
         if (!rateLimiter.tryAcquire(clientIp)) {
             throw new RegistrationException(RegistrationException.Reason.RATE_LIMITED);
         }

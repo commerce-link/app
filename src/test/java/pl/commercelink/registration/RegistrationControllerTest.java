@@ -26,7 +26,7 @@ class RegistrationControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new RegistrationController(registrationService, messageSource, false);
+        controller = new RegistrationController(registrationService, messageSource, false, 3);
     }
 
     @Test
@@ -45,6 +45,7 @@ class RegistrationControllerTest {
         assertEquals("register-success", view);
         assertEquals("Demo1!secret", model.getAttribute("revealedPassword"));
         assertEquals("user@example.com", model.getAttribute("email"));
+        assertEquals(false, model.getAttribute("demoMode"));
     }
 
     @Test
@@ -89,6 +90,8 @@ class RegistrationControllerTest {
         // then
         assertEquals("register", view);
         assertEquals("Konto istnieje", model.getAttribute("errorMessage"));
+        assertEquals("Sklep Testowy", model.getAttribute("storeName"));
+        assertEquals(false, model.getAttribute("demoMode"));
     }
 
     @Test
@@ -119,7 +122,7 @@ class RegistrationControllerTest {
     @Test
     void registerPageExposesDemoModeFlagToTemplate() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true);
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3);
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -128,5 +131,25 @@ class RegistrationControllerTest {
         // then
         assertEquals("register", view);
         assertEquals(true, model.getAttribute("demoMode"));
+        assertEquals(3, model.getAttribute("ttlDays"));
+    }
+
+    @Test
+    void postPathExposesDemoModeAndTtlDaysToTemplate() {
+        // given
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 7);
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("1.1.1.1");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1"))
+                .thenReturn(new RegistrationResult("abc123def4", null));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = demoController.register("user@example.com", "Sklep Testowy", null, request, model, Locale.forLanguageTag("pl"));
+
+        // then
+        assertEquals("register-success", view);
+        assertEquals(true, model.getAttribute("demoMode"));
+        assertEquals(7, model.getAttribute("ttlDays"));
     }
 }

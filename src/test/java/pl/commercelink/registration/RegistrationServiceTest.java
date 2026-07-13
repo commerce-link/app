@@ -137,6 +137,22 @@ class RegistrationServiceTest {
     }
 
     @Test
+    void revealPasswordModeRollsBackWhenUserCreationFails() {
+        // given
+        when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
+        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
+        when(storeCreationService.createStore(any(CreateStoreRequest.class))).thenReturn(store("s-1"));
+        doThrow(new RuntimeException("password set failed"))
+                .when(cognitoUserService).createStoreAdmin(anyString(), anyString(), anyString());
+
+        // when / then
+        RegistrationException e = assertThrows(RegistrationException.class,
+                () -> service(true, true).register("user@example.com", "Sklep Testowy", "1.1.1.1"));
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
+        verify(storeDeletionService).deleteStore("s-1", StoreDeletionService.Guard.DEMO_ONLY);
+    }
+
+    @Test
     void demoModeRollsBackWhenSeedingFails() {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
@@ -234,24 +250,69 @@ class RegistrationServiceTest {
 
     @Test
     void rejectsBlankStoreName() {
-        // given
-        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
-
         // when / then
         RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false, false).register("user@firma.pl", "   ", "10.0.0.1"));
         assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
-        verifyNoInteractions(storeCreationService, cognitoUserService);
+        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
     }
 
     @Test
     void rejectsTooLongStoreName() {
-        // given
-        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
-
         // when / then
-        assertThrows(RegistrationException.class,
+        RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false, false).register("user@firma.pl", "x".repeat(61), "10.0.0.1"));
+        assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
+        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
+    }
+
+    @Test
+    void rejectsSingleCharacterStoreName() {
+        // when / then
+        RegistrationException e = assertThrows(RegistrationException.class,
+                () -> service(false, false).register("user@firma.pl", "x", "10.0.0.1"));
+        assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
+        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
+    }
+
+    @Test
+    void acceptsMinimumAndMaximumLengthStoreName() {
+        // given
+        String minName = "ab";
+        String maxName = "x".repeat(60);
+        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
+        when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
+        when(storeCreationService.createStore(CreateStoreRequest.bare(minName, null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.bare(maxName, null))).thenReturn(store("prod-store-2"));
+
+        // when
+        service(false, false).register("user@firma.pl", minName, "10.0.0.1");
+        service(false, false).register("user@firma.pl", maxName, "10.0.0.1");
+
+        // then
+        verify(storeCreationService).createStore(CreateStoreRequest.bare(minName, null));
+        verify(storeCreationService).createStore(CreateStoreRequest.bare(maxName, null));
+    }
+
+    @Test
+    void invalidStoreNameDoesNotConsumeRateLimitToken() {
+        // given
+        RegistrationService service = new RegistrationService(cognitoUserService, storeSeeder, storeCreationService,
+                storeDeletionService, new RegistrationRateLimiter(Clock.fixed(NOW, ZoneOffset.UTC), 3, 100),
+                Clock.fixed(NOW, ZoneOffset.UTC), 14, false, false);
+        when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+
+        // when
+        for (int i = 0; i < 3; i++) {
+            RegistrationException e = assertThrows(RegistrationException.class,
+                    () -> service.register("user@firma.pl", "x", "10.0.0.1"));
+            assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
+        }
+        RegistrationResult result = service.register("user@firma.pl", "Moja Firma", "10.0.0.1");
+
+        // then
+        assertEquals("prod-store-1", result.storeId());
     }
 
     @Test

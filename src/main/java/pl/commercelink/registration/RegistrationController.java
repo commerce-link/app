@@ -21,18 +21,21 @@ public class RegistrationController {
     private final RegistrationService registrationService;
     private final MessageSource messageSource;
     private final boolean demoMode;
+    private final int ttlDays;
 
     public RegistrationController(RegistrationService registrationService,
                                   MessageSource messageSource,
-                                  @Value("${app.registration.demo}") boolean demoMode) {
+                                  @Value("${app.registration.demo}") boolean demoMode,
+                                  @Value("${app.registration.ttl-days}") int ttlDays) {
         this.registrationService = registrationService;
         this.messageSource = messageSource;
         this.demoMode = demoMode;
+        this.ttlDays = ttlDays;
     }
 
     @GetMapping("/register")
     public String registerPage(Model model) {
-        model.addAttribute("demoMode", demoMode);
+        addDemoAttributes(model);
         return "register";
     }
 
@@ -46,7 +49,7 @@ public class RegistrationController {
         if (isNotBlank(honeypot)) {
             return "redirect:/register";
         }
-        model.addAttribute("demoMode", demoMode);
+        addDemoAttributes(model);
         String resolvedName = isNotBlank(storeName) ? storeName
                 : messageSource.getMessage("registration.store-name.placeholder", null, locale);
         try {
@@ -56,9 +59,15 @@ public class RegistrationController {
             return "register-success";
         } catch (RegistrationException e) {
             model.addAttribute("email", email);
+            model.addAttribute("storeName", storeName);
             model.addAttribute("errorMessage", messageSource.getMessage(e.messageKey(), null, locale));
             return "register";
         }
+    }
+
+    private void addDemoAttributes(Model model) {
+        model.addAttribute("demoMode", demoMode);
+        model.addAttribute("ttlDays", ttlDays);
     }
 
     @GetMapping("/demo/register")
