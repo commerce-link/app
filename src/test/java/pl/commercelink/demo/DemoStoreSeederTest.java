@@ -1,6 +1,13 @@
 package pl.commercelink.demo;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.localdev.CatalogSeed;
+import pl.commercelink.localdev.CatalogSeedRow;
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 
@@ -45,5 +52,54 @@ class DemoStoreSeederTest {
         // then
         assertEquals("Demo Store", store.getName());
         assertNull(store.getDemo());
+    }
+
+    @Test
+    void buildsTwoOrdersWithItemsInAllocation() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        List<Order> allocationOrders = demoOrders.orders().stream()
+                .filter(o -> o.getStatus() == OrderStatus.New)
+                .filter(o -> demoOrders.itemsByOrderId().get(o.getOrderId()).stream()
+                        .anyMatch(i -> i.getStatus() == FulfilmentStatus.Allocation))
+                .toList();
+        assertEquals(2, allocationOrders.size());
+        allocationOrders.forEach(o -> {
+            assertEquals("a@b.pl", o.getBillingDetails().getEmail());
+            assertNotNull(o.getShippingDetails());
+            assertTrue(o.getTotalPrice() > 0);
+            demoOrders.itemsByOrderId().get(o.getOrderId()).forEach(i -> {
+                assertTrue(i.isInAllocation());
+                assertNotNull(i.getEan());
+                assertNotNull(i.getManufacturerCode());
+                assertNotNull(i.getDeliveryId());
+                assertTrue(i.getCost() > 0);
+            });
+        });
+    }
+
+    @Test
+    void buildsPersistedDeliveryWithOrderedItems() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        Delivery delivery = demoOrders.delivery();
+        assertNotNull(delivery.getEstimatedDeliveryAt());
+        assertEquals("store-1", delivery.getStoreId());
+        List<OrderItem> orderedItems = demoOrders.itemsByOrderId().values().stream()
+                .flatMap(List::stream)
+                .filter(i -> i.getStatus() == FulfilmentStatus.Ordered)
+                .toList();
+        assertFalse(orderedItems.isEmpty());
+        orderedItems.forEach(i -> assertEquals(delivery.getDeliveryId(), i.getDeliveryId()));
     }
 }
