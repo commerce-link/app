@@ -52,6 +52,19 @@ class DemoEnvironmentBannerAdviceTest {
         // when / then
         assertTrue(advice.demoEnvironment());
         assertNotNull(advice.demoExpiresAt());
+        assertEquals(3L, advice.demoDaysLeft());
+    }
+
+    @Test
+    void bannerRoundsExactDayCountDown() {
+        // given
+        Store store = new Store();
+        store.setDemo(new DemoStoreMetadata("a@b.pl", Instant.now().toString(),
+                Instant.now().plusSeconds(2 * 24 * 3600).toString()));
+        when(storesRepository.findById("s-1")).thenReturn(store);
+        DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
+
+        // when / then
         assertEquals(2L, advice.demoDaysLeft());
     }
 

@@ -27,9 +27,15 @@
                             <span class="tag is-light" th:if="${store.demo.expiresAt != null and #strings.length(store.demo.expiresAt) >= 10}"
                                   th:text="#{store.demo.expires} + ' ' + ${#strings.substring(store.demo.expiresAt, 0, 10)}"></span>
                         </div>
-                        <form th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
+                        <form th:if="${store.demo != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
                               style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
                               th:attr="data-confirm=${deleteConfirm}">
+                            <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
+                        </form>
+                        <form th:if="${store.demo == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
+                              style="display:inline" onsubmit="this.confirmStoreId.value = prompt(this.dataset.confirm); return this.confirmStoreId.value !== null;"
+                              th:attr="data-confirm=${deleteConfirm}">
+                            <input type="hidden" name="confirmStoreId">
                             <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
                         </form>
                     </td>

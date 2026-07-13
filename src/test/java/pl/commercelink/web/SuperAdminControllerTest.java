@@ -36,14 +36,18 @@ class SuperAdminControllerTest {
     private final Locale locale = Locale.forLanguageTag("pl");
 
     @Test
-    void showsSuccessWhenDemoStoreFullyDeleted() {
+    void showsSuccessWhenStoreFullyDeleted() {
         // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
         when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
@@ -54,12 +58,16 @@ class SuperAdminControllerTest {
     @Test
     void showsErrorWhenCascadeCompletesPartially() {
         // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(false);
         when(messageSource.getMessage("store.delete.error", null, locale)).thenReturn("Błąd usuwania");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
@@ -70,17 +78,79 @@ class SuperAdminControllerTest {
     @Test
     void showsErrorWhenDeletionThrows() {
         // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY))
                 .thenThrow(new IllegalStateException("not a demo store"));
         when(messageSource.getMessage("store.delete.error", null, locale)).thenReturn("Błąd usuwania");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
         assertEquals("Błąd usuwania", redirectAttributes.getFlashAttributes().get("errorMessage"));
+    }
+
+    @Test
+    void deleteRegularStoreRequiresMatchingConfirmId() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage("store.delete.confirm.mismatch", null, locale)).thenReturn("Nie pasuje");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, "wrong-id", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals("Nie pasuje", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        verifyNoInteractions(storeDeletionService);
+    }
+
+    @Test
+    void deleteRegularStoreProceedsWithMatchingConfirmId() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
+        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, STORE_ID, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+    }
+
+    @Test
+    void deleteDemoStoreProceedsWithoutConfirmId() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
+        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
     }
 
     @Test

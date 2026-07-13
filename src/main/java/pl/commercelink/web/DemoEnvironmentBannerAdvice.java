@@ -37,7 +37,12 @@ public class DemoEnvironmentBannerAdvice {
     @ModelAttribute("demoDaysLeft")
     public Long demoDaysLeft() {
         Instant expiresAt = expiresAt();
-        return expiresAt == null ? null : Math.max(0, Duration.between(Instant.now(), expiresAt).toDays());
+        if (expiresAt == null) {
+            return null;
+        }
+        long millisLeft = Duration.between(Instant.now(), expiresAt).toMillis();
+        long days = (long) Math.ceil(millisLeft / 86_400_000.0);
+        return Math.max(0, days);
     }
 
     private Instant expiresAt() {

@@ -111,7 +111,15 @@ public class SuperAdminController {
     }
 
     @PostMapping("/dashboard/store/{storeId}/delete")
-    public String deleteStore(@PathVariable String storeId, Locale locale, RedirectAttributes redirectAttributes) {
+    public String deleteStore(@PathVariable String storeId,
+                              @RequestParam(required = false) String confirmStoreId,
+                              Locale locale, RedirectAttributes redirectAttributes) {
+        Store store = storesRepository.findById(storeId);
+        if (store != null && store.getDemo() == null && !storeId.equals(confirmStoreId)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.delete.confirm.mismatch", null, locale));
+            return "redirect:/dashboard/stores";
+        }
         try {
             if (storeDeletionService.deleteStore(storeId, StoreDeletionService.Guard.ANY)) {
                 redirectAttributes.addFlashAttribute("successMessage",
