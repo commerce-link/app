@@ -4,12 +4,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import pl.commercelink.demo.DemoStoreSeeder;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
+import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSeedingException;
 import pl.commercelink.users.CognitoUserService;
 
@@ -30,7 +30,7 @@ public class RegistrationService {
     private static final int STORE_NAME_MAX = 60;
 
     private final CognitoUserService cognitoUserService;
-    private final DemoStoreSeeder demoStoreSeeder;
+    private final StoreSeeder storeSeeder;
     private final StoreCreationService storeCreationService;
     private final StoreDeletionService storeDeletionService;
     private final RegistrationRateLimiter rateLimiter;
@@ -42,19 +42,19 @@ public class RegistrationService {
 
     @Autowired
     public RegistrationService(CognitoUserService cognitoUserService,
-                                DemoStoreSeeder demoStoreSeeder,
+                                StoreSeeder storeSeeder,
                                 StoreCreationService storeCreationService,
                                 StoreDeletionService storeDeletionService,
                                 RegistrationRateLimiter rateLimiter,
                                 @Value("${app.registration.ttl-days}") int ttlDays,
                                 @Value("${app.registration.reveal-password}") boolean revealPassword,
                                 @Value("${app.registration.demo}") boolean demoMode) {
-        this(cognitoUserService, demoStoreSeeder, storeCreationService, storeDeletionService, rateLimiter,
+        this(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService, rateLimiter,
                 Clock.systemUTC(), ttlDays, revealPassword, demoMode);
     }
 
     RegistrationService(CognitoUserService cognitoUserService,
-                        DemoStoreSeeder demoStoreSeeder,
+                        StoreSeeder storeSeeder,
                         StoreCreationService storeCreationService,
                         StoreDeletionService storeDeletionService,
                         RegistrationRateLimiter rateLimiter,
@@ -63,7 +63,7 @@ public class RegistrationService {
                         boolean revealPassword,
                         boolean demoMode) {
         this.cognitoUserService = cognitoUserService;
-        this.demoStoreSeeder = demoStoreSeeder;
+        this.storeSeeder = storeSeeder;
         this.storeCreationService = storeCreationService;
         this.storeDeletionService = storeDeletionService;
         this.rateLimiter = rateLimiter;
@@ -130,7 +130,7 @@ public class RegistrationService {
         Store store;
         try {
             store = storeCreationService.createStore(
-                    CreateStoreRequest.seeded(storeName, metadata, demoStoreSeeder));
+                    CreateStoreRequest.seeded(storeName, metadata, storeSeeder));
         } catch (StoreSeedingException e) {
             System.err.println("[Registration] Store seeding failed for " + email + ", rolling back store " + e.getStoreId() + ": " + e.getMessage());
             rollBack(e.getStoreId(), StoreDeletionService.Guard.DEMO_ONLY);

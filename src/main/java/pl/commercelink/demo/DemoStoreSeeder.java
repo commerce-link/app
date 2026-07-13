@@ -79,27 +79,32 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     @Override
     public void seed(Store store) {
-        seedStore(store.getStoreId(), store.getName(), store.getDemo());
+        applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
+        seedStoreData(store.getStoreId(), store.getDemo());
     }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
+        applyStoreConfiguration(store, storeId, storeName, demo);
+        mapper.save(store);
+        seedStoreData(storeId, demo);
+        return store;
+    }
+
+    private void seedStoreData(String storeId, DemoStoreMetadata demo) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
 
-        Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
-        applyStoreConfiguration(store, storeId, storeName, demo);
-        mapper.save(store);
-
         saveCatalog(mapper, clobber, rows, storeId);
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
         savePricelist(storeId);
-        saveOrders(mapper, storeId, ownerEmailOrFallback(demo), rows);
-        return store;
+        saveOrders(mapper, clobber, storeId, ownerEmailOrFallback(demo), rows);
     }
 
     static void applyStoreConfiguration(Store store, String storeId, String storeName, DemoStoreMetadata demo) {
@@ -225,11 +230,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         }
     }
 
-    private void saveOrders(DynamoDBMapper mapper, String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+    private void saveOrders(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
         DemoOrders demoOrders = buildDemoOrders(storeId, ownerEmail, rows);
-        demoOrders.orders().forEach(mapper::save);
+        demoOrders.orders().forEach(order -> mapper.save(order, clobber));
         demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
-        mapper.save(demoOrders.delivery());
+        mapper.save(demoOrders.delivery(), clobber);
     }
 
     private static String ownerEmailOrFallback(DemoStoreMetadata demo) {
@@ -241,17 +246,18 @@ public class DemoStoreSeeder implements StoreSeeder {
         List<Order> orders = new ArrayList<>();
         Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
 
-        Order first = demoOrder(storeId, ownerEmail, "Jan", "Kowalski");
+        Order first = demoOrder(storeId, ownerEmail, "Jan", "Kowalski", "demo-order-001");
         itemsByOrderId.put(first.getOrderId(), List.of(
                 allocationItem(first.getOrderId(), catalogRows.get(0), ACME, 1, 1),
                 allocationItem(first.getOrderId(), catalogRows.get(1), ACME_B, 2, 2)));
-        Order second = demoOrder(storeId, ownerEmail, "Anna", "Nowak");
+        Order second = demoOrder(storeId, ownerEmail, "Anna", "Nowak", "demo-order-002");
         itemsByOrderId.put(second.getOrderId(), List.of(
                 allocationItem(second.getOrderId(), catalogRows.get(2), ACME, 1, 1)));
 
         Delivery delivery = new Delivery(storeId, "DEMO-DELIV-001", ACME,
                 LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
-        Order third = demoOrder(storeId, ownerEmail, "Piotr", "Wisniewski");
+        delivery.setDeliveryId("demo-delivery-001");
+        Order third = demoOrder(storeId, ownerEmail, "Piotr", "Wisniewski", "demo-order-003");
         OrderItem orderedItem = allocationItem(third.getOrderId(), catalogRows.get(0), delivery.getDeliveryId(), 1, 1);
         orderedItem.setStatus(FulfilmentStatus.Ordered);
         itemsByOrderId.put(third.getOrderId(), List.of(orderedItem));
@@ -264,8 +270,9 @@ public class DemoStoreSeeder implements StoreSeeder {
         return new DemoOrders(orders, itemsByOrderId, delivery);
     }
 
-    private static Order demoOrder(String storeId, String ownerEmail, String name, String surname) {
+    private static Order demoOrder(String storeId, String ownerEmail, String name, String surname, String orderId) {
         Order order = new Order(storeId);
+        order.setOrderId(orderId);
         BillingDetails billing = new BillingDetails();
         billing.setName(name);
         billing.setSurname(surname);
@@ -284,6 +291,7 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static OrderItem allocationItem(String orderId, CatalogSeedRow row, String deliveryId, int qty, int position) {
         OrderItem item = new OrderItem(orderId, row.category(), row.name(), qty, row.priceGross(), row.mfn(), false, position);
+        item.setItemId("demo-item-" + position);
         item.setEan(row.ean());
         item.setManufacturerCode(row.mfn());
         item.setCost(Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN));

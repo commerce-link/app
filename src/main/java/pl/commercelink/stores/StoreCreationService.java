@@ -22,7 +22,8 @@ public class StoreCreationService {
         store.setCreatedAt(Instant.now().toString());
         if (request.demoMetadata() != null) {
             store.setDemo(request.demoMetadata());
-        } else {
+        }
+        if (request.welcomeNotification()) {
             store.getNotifications().add(new StoreNotification(
                     StoreNotificationSeverity.INFO, StoreNotificationType.WELCOME, null, null));
         }
@@ -30,6 +31,7 @@ public class StoreCreationService {
         if (request.seeder() != null) {
             try {
                 request.seeder().seed(store);
+                storesRepository.save(store);
             } catch (RuntimeException e) {
                 throw new StoreSeedingException(store.getStoreId(), e);
             }

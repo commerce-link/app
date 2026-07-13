@@ -2,6 +2,7 @@ package pl.commercelink.stores;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -62,6 +63,8 @@ class StoreCreationServiceTest {
         // when / then
         assertThrows(IllegalStateException.class,
                 () -> service.createStore(CreateStoreRequest.bare("Sklep X", null)));
+        verify(storesRepository, never()).save(any());
+        verify(storesRepository, times(5)).findById(anyString());
     }
 
     @Test
@@ -75,8 +78,10 @@ class StoreCreationServiceTest {
 
         // then
         assertSame(demo, store.getDemo());
-        verify(storesRepository).save(store);
-        verify(seeder).seed(store);
+        InOrder inOrder = inOrder(storesRepository, seeder);
+        inOrder.verify(storesRepository).save(store);
+        inOrder.verify(seeder).seed(store);
+        inOrder.verify(storesRepository).save(store);
     }
 
     @Test
@@ -130,6 +135,19 @@ class StoreCreationServiceTest {
 
         // when
         Store store = service.createStore(CreateStoreRequest.seeded("Sklep demo", demo, seeder));
+
+        // then
+        assertTrue(store.getNotifications().stream()
+                .noneMatch(n -> n.getType() == StoreNotificationType.WELCOME));
+    }
+
+    @Test
+    void skipsWelcomeNotificationWhenFlagDisabled() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", null, false));
 
         // then
         assertTrue(store.getNotifications().stream()

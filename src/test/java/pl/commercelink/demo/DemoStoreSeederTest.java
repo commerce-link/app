@@ -7,10 +7,13 @@ import pl.commercelink.localdev.CatalogSeedRow;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -73,6 +76,10 @@ class DemoStoreSeederTest {
             assertEquals("a@b.pl", o.getBillingDetails().getEmail());
             assertNotNull(o.getShippingDetails());
             assertTrue(o.getTotalPrice() > 0);
+            assertEquals(FulfilmentType.WarehouseFulfilment, o.getFulfilmentType());
+            assertEquals("Demo", o.getSource().getName());
+            assertEquals(OrderSourceType.PointOfSale, o.getSource().getType());
+            assertEquals(LocalDate.now().plusDays(3), o.getEstimatedShippingAt());
             demoOrders.itemsByOrderId().get(o.getOrderId()).forEach(i -> {
                 assertTrue(i.isInAllocation());
                 assertNotNull(i.getEan());
@@ -101,5 +108,25 @@ class DemoStoreSeederTest {
                 .toList();
         assertFalse(orderedItems.isEmpty());
         orderedItems.forEach(i -> assertEquals(delivery.getDeliveryId(), i.getDeliveryId()));
+    }
+
+    @Test
+    void buildsDeterministicIdsForIdempotentReseeding() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders firstRun = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+        DemoOrders secondRun = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        List<String> orderIds = firstRun.orders().stream().map(Order::getOrderId).toList();
+        assertEquals(List.of("demo-order-001", "demo-order-002", "demo-order-003"), orderIds);
+        assertEquals(orderIds, secondRun.orders().stream().map(Order::getOrderId).toList());
+        assertEquals("demo-delivery-001", firstRun.delivery().getDeliveryId());
+        assertEquals(firstRun.delivery().getDeliveryId(), secondRun.delivery().getDeliveryId());
+        firstRun.itemsByOrderId().forEach((orderId, items) ->
+                assertEquals(items.stream().map(OrderItem::getItemId).toList(),
+                        secondRun.itemsByOrderId().get(orderId).stream().map(OrderItem::getItemId).toList()));
     }
 }

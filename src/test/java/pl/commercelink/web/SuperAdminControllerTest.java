@@ -169,4 +169,21 @@ class SuperAdminControllerTest {
         verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"));
         verifyNoMoreInteractions(storeCreationService);
     }
+
+    @Test
+    void createStoreSkipsWelcomeNotificationOnDemoEnvironment() {
+        // given
+        controller.demoEnvironment = true;
+        Store created = new Store();
+        created.setStoreId("srv-gen-002");
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", null, false))).thenReturn(created);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createStore("Nowy sklep", null, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/srv-gen-002", view);
+        verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", null, false));
+    }
 }

@@ -5,12 +5,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.demo.DemoStoreSeeder;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
+import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSeedingException;
 import pl.commercelink.users.CognitoUserService;
 
@@ -32,13 +32,13 @@ class RegistrationServiceTest {
     private static final Instant NOW = Instant.parse("2026-07-08T10:00:00Z");
 
     @Mock private CognitoUserService cognitoUserService;
-    @Mock private DemoStoreSeeder demoStoreSeeder;
+    @Mock private StoreSeeder storeSeeder;
     @Mock private StoreCreationService storeCreationService;
     @Mock private StoreDeletionService storeDeletionService;
     @Mock private RegistrationRateLimiter rateLimiter;
 
     private RegistrationService service(boolean demoMode, boolean revealPassword) {
-        return new RegistrationService(cognitoUserService, demoStoreSeeder, storeCreationService, storeDeletionService,
+        return new RegistrationService(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService,
                 rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC), 14, revealPassword, demoMode);
     }
 
@@ -62,7 +62,7 @@ class RegistrationServiceTest {
         // then
         verify(storeCreationService).createStore(requestCaptor.capture());
         assertEquals("Sklep Testowy", requestCaptor.getValue().name());
-        assertSame(demoStoreSeeder, requestCaptor.getValue().seeder());
+        assertSame(storeSeeder, requestCaptor.getValue().seeder());
         assertEquals("user@example.com", requestCaptor.getValue().demoMetadata().getOwnerEmail());
         assertEquals(NOW.toString(), requestCaptor.getValue().demoMetadata().getCreatedAt());
         assertEquals(NOW.plusSeconds(14 * 24 * 3600).toString(), requestCaptor.getValue().demoMetadata().getExpiresAt());
@@ -93,7 +93,7 @@ class RegistrationServiceTest {
         RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(true, false).register("not-an-email", "Sklep Testowy", "1.1.1.1"));
         assertEquals(RegistrationException.Reason.INVALID_EMAIL, e.getReason());
-        verifyNoInteractions(demoStoreSeeder, cognitoUserService, storeCreationService);
+        verifyNoInteractions(storeSeeder, cognitoUserService, storeCreationService);
     }
 
     @Test
@@ -215,7 +215,7 @@ class RegistrationServiceTest {
         assertNull(result.revealedPassword());
         verify(storeCreationService).createStore(CreateStoreRequest.bare("Moja Firma", null));
         verify(cognitoUserService).createStoreAdmin("user@firma.pl", "prod-store-1");
-        verifyNoInteractions(demoStoreSeeder);
+        verifyNoInteractions(storeSeeder);
     }
 
     @Test
