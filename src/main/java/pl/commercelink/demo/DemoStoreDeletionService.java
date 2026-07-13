@@ -1,6 +1,5 @@
 package pl.commercelink.demo;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
@@ -18,6 +17,7 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.users.CognitoUserService;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 
 import java.util.List;
@@ -36,7 +36,7 @@ public class DemoStoreDeletionService {
     private final DemoStoreWipeRepository wipeRepository;
     private final FileStorage fileStorage;
     private final StoreInventoryCache storeInventoryCache;
-    private final ObjectProvider<DemoUserService> demoUserService;
+    private final CognitoUserService cognitoUserService;
     private final String storesBucket;
 
     public DemoStoreDeletionService(StoresRepository storesRepository,
@@ -50,7 +50,7 @@ public class DemoStoreDeletionService {
                                     DemoStoreWipeRepository wipeRepository,
                                     FileStorage fileStorage,
                                     StoreInventoryCache storeInventoryCache,
-                                    ObjectProvider<DemoUserService> demoUserService,
+                                    CognitoUserService cognitoUserService,
                                     @Value("${s3.bucket.stores}") String storesBucket) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
@@ -63,7 +63,7 @@ public class DemoStoreDeletionService {
         this.wipeRepository = wipeRepository;
         this.fileStorage = fileStorage;
         this.storeInventoryCache = storeInventoryCache;
-        this.demoUserService = demoUserService;
+        this.cognitoUserService = cognitoUserService;
         this.storesBucket = storesBucket;
     }
 
@@ -98,11 +98,7 @@ public class DemoStoreDeletionService {
     }
 
     private void deleteCognitoUser(Store store) {
-        DemoUserService userService = demoUserService.getIfAvailable();
-        if (userService == null) {
-            throw new IllegalStateException("Demo user service unavailable, enable app.demo.registration.enabled");
-        }
-        userService.deleteUser(store.getDemo().getOwnerEmail());
+        cognitoUserService.deleteUser(store.getDemo().getOwnerEmail());
     }
 
     private void deleteOrders(String storeId) {

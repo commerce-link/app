@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.users;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,18 +24,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DemoUserServiceTest {
+class CognitoUserServiceTest {
 
     private static final String POOL_ID = "eu-central-1_test";
 
     @Mock
     private CognitoIdentityProviderClient cognitoClient;
 
-    private DemoUserService demoUserService;
+    private CognitoUserService cognitoUserService;
 
     @BeforeEach
     void setUp() {
-        demoUserService = new DemoUserService(cognitoClient, POOL_ID);
+        cognitoUserService = new CognitoUserService(cognitoClient, POOL_ID);
     }
 
     @Test
@@ -45,7 +45,7 @@ class DemoUserServiceTest {
                 .thenThrow(UserNotFoundException.builder().message("missing").build());
 
         // when / then
-        assertFalse(demoUserService.userExists("user@example.com"));
+        assertFalse(cognitoUserService.userExists("user@example.com"));
     }
 
     @Test
@@ -54,7 +54,7 @@ class DemoUserServiceTest {
         ArgumentCaptor<AdminCreateUserRequest> captor = ArgumentCaptor.forClass(AdminCreateUserRequest.class);
 
         // when
-        demoUserService.createDemoAdmin("user@example.com", "abc123def4");
+        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4");
 
         // then
         verify(cognitoClient).adminCreateUser(captor.capture());
@@ -77,7 +77,7 @@ class DemoUserServiceTest {
         ArgumentCaptor<AdminSetUserPasswordRequest> passwordCaptor = ArgumentCaptor.forClass(AdminSetUserPasswordRequest.class);
 
         // when
-        demoUserService.createDemoAdmin("user@example.com", "abc123def4", "Demo1!secret");
+        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4", "Demo1!secret");
 
         // then
         verify(cognitoClient).adminCreateUser(createCaptor.capture());
@@ -94,6 +94,6 @@ class DemoUserServiceTest {
                 .thenThrow(UserNotFoundException.builder().message("missing").build());
 
         // when / then
-        assertDoesNotThrow(() -> demoUserService.deleteUser("user@example.com"));
+        assertDoesNotThrow(() -> cognitoUserService.deleteUser("user@example.com"));
     }
 }

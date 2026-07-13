@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.stores.DemoStoreMetadata;
+import pl.commercelink.users.CognitoUserService;
 
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -21,7 +22,7 @@ public class DemoRegistrationService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final String PASSWORD_CHARS = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-    private final DemoUserService demoUserService;
+    private final CognitoUserService demoUserService;
     private final DemoStoreSeeder demoStoreSeeder;
     private final DemoStoreDeletionService demoStoreDeletionService;
     private final DemoRegistrationRateLimiter rateLimiter;
@@ -31,7 +32,7 @@ public class DemoRegistrationService {
     private final SecureRandom random = new SecureRandom();
 
     @Autowired
-    public DemoRegistrationService(DemoUserService demoUserService,
+    public DemoRegistrationService(CognitoUserService demoUserService,
                                    DemoStoreSeeder demoStoreSeeder,
                                    DemoStoreDeletionService demoStoreDeletionService,
                                    DemoRegistrationRateLimiter rateLimiter,
@@ -40,7 +41,7 @@ public class DemoRegistrationService {
         this(demoUserService, demoStoreSeeder, demoStoreDeletionService, rateLimiter, Clock.systemUTC(), ttlDays, revealPassword);
     }
 
-    DemoRegistrationService(DemoUserService demoUserService,
+    DemoRegistrationService(CognitoUserService demoUserService,
                             DemoStoreSeeder demoStoreSeeder,
                             DemoStoreDeletionService demoStoreDeletionService,
                             DemoRegistrationRateLimiter rateLimiter,
@@ -77,10 +78,10 @@ public class DemoRegistrationService {
             demoStoreSeeder.seedStore(storeId, "Sklep demo — " + normalized, metadata);
             if (revealPassword) {
                 String password = generatePassword();
-                demoUserService.createDemoAdmin(normalized, storeId, password);
+                demoUserService.createStoreAdmin(normalized, storeId, password);
                 return new DemoRegistrationResult(storeId, password);
             }
-            demoUserService.createDemoAdmin(normalized, storeId);
+            demoUserService.createStoreAdmin(normalized, storeId);
             return new DemoRegistrationResult(storeId, null);
         } catch (RuntimeException e) {
             System.err.println("[DemoRegistration] User creation failed for " + normalized + ", rolling back store " + storeId + ": " + e.getMessage());

@@ -1,7 +1,6 @@
-package pl.commercelink.demo;
+package pl.commercelink.users;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.security.UserRole;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
@@ -15,13 +14,12 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActi
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 
 @Service
-@ConditionalOnProperty(name = "app.demo.registration.enabled", havingValue = "true")
-public class DemoUserService {
+public class CognitoUserService {
 
     private final CognitoIdentityProviderClient cognitoClient;
     private final String userPoolId;
 
-    public DemoUserService(CognitoIdentityProviderClient cognitoClient,
+    public CognitoUserService(CognitoIdentityProviderClient cognitoClient,
                            @Value("${cognito.user-pool-id}") String userPoolId) {
         this.cognitoClient = cognitoClient;
         this.userPoolId = userPoolId;
@@ -39,11 +37,11 @@ public class DemoUserService {
         }
     }
 
-    public void createDemoAdmin(String email, String storeId) {
+    public void createStoreAdmin(String email, String storeId) {
         cognitoClient.adminCreateUser(createUserRequest(email, storeId).build());
     }
 
-    public void createDemoAdmin(String email, String storeId, String permanentPassword) {
+    public void createStoreAdmin(String email, String storeId, String permanentPassword) {
         cognitoClient.adminCreateUser(createUserRequest(email, storeId)
                 .messageAction(MessageActionType.SUPPRESS)
                 .build());

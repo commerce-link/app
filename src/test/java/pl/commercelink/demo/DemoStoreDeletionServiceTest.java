@@ -6,7 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -31,6 +30,7 @@ import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.users.CognitoUserService;
 
 import java.util.List;
 
@@ -54,8 +54,7 @@ class DemoStoreDeletionServiceTest {
     @Mock private DemoStoreWipeRepository wipeRepository;
     @Mock private FileStorage fileStorage;
     @Mock private StoreInventoryCache storeInventoryCache;
-    @Mock private ObjectProvider<DemoUserService> demoUserServiceProvider;
-    @Mock private DemoUserService demoUserService;
+    @Mock private CognitoUserService cognitoUserService;
 
     private DemoStoreDeletionService service;
 
@@ -63,7 +62,7 @@ class DemoStoreDeletionServiceTest {
     void setUp() {
         service = new DemoStoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
-                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, demoUserServiceProvider,
+                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
                 "stores");
     }
 
@@ -103,7 +102,6 @@ class DemoStoreDeletionServiceTest {
         // given
         Store store = demoStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(demoUserServiceProvider.getIfAvailable()).thenReturn(demoUserService);
         Order order = new Order();
         order.setStoreId(STORE_ID);
         order.setOrderId("order-1");
@@ -151,7 +149,7 @@ class DemoStoreDeletionServiceTest {
 
         // then
         assertTrue(deleted);
-        verify(demoUserService).deleteUser("user@example.com");
+        verify(cognitoUserService).deleteUser("user@example.com");
         verify(wipeRepository).deleteAll(List.of(basket));
         verify(wipeRepository).deleteAll(List.of(delivery));
         verify(wipeRepository).deleteAll(List.of(orderItem));
@@ -175,8 +173,7 @@ class DemoStoreDeletionServiceTest {
         // given
         Store store = demoStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(demoUserServiceProvider.getIfAvailable()).thenReturn(demoUserService);
-        doThrow(new RuntimeException("cognito down")).when(demoUserService).deleteUser(any());
+        doThrow(new RuntimeException("cognito down")).when(cognitoUserService).deleteUser(any());
         when(ordersRepository.findAll(STORE_ID)).thenReturn(List.of());
         when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
         when(rmaCentersRepository.findByStoreId(STORE_ID)).thenReturn(List.of());
