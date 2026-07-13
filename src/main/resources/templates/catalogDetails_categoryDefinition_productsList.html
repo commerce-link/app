@@ -25,7 +25,7 @@
                     <div class="field">
                         <label class="label" th:text="#{product.category}"></label>
                         <div class="control">
-                            <span th:text="${categoryDefinition.category}"></span>
+                            <span th:replace="~{fragments/category-picker :: categoryName(${categoryDefinition.category})}"></span>
                         </div>
                     </div>
                 </div>

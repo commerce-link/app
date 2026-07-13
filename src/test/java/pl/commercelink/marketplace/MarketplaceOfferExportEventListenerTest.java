@@ -30,6 +30,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.List;
 import java.util.Optional;
@@ -143,9 +144,13 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty) {
+        configureCategoryWith(def, product, warehouseQty, "Laptops");
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory("Laptops");
+        category.setCategory(categoryName);
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));
@@ -289,6 +294,41 @@ class MarketplaceOfferExportEventListenerTest {
         List<MarketplaceOfferSnapshot> saved = captureSavedSnapshots();
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).getRemovalAttempts()).isEqualTo(5);
+    }
+
+    @Test
+    void exportsProductGroupResolvedThroughIcecatBridgeForLeafCategory() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne");
+        priceFor(product, 100, 2);
+        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
+        when(categoryLocalizer.localize("Karty graficzne", "plural")).thenReturn("Karty graficzne");
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).categoryName()).isEqualTo("Podzespoły komputerowe / Karty graficzne");
+    }
+
+    @Test
+    void exportsCategoryWithoutProductGroupWhenCategoryIsOutsideTheBridge() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Kołdry");
+        priceFor(product, 100, 2);
+        when(categoryLocalizer.localize("Kołdry", "plural")).thenReturn("Kołdry");
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).categoryName()).isEqualTo("Kołdry");
     }
 
     @Test

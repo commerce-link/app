@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -175,7 +176,8 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("productCategories", icecatCategories.leafNamesUnder(store.getEnabledCategories()));
+        model.addAttribute("productCategories", icecatCategories.categoryOptions(
+                store.getEnabledCategories(), Collections.singletonList(categoryDefinition.getCategory())));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
@@ -186,17 +188,37 @@ public class ProductCatalogController {
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category")
-    public String saveCategoryDefinition(@PathVariable String catalogId, @ModelAttribute CategoryDefinition categoryDefinition, Model model) {
+    public String saveCategoryDefinition(@PathVariable String catalogId, @ModelAttribute CategoryDefinition categoryDefinition, Model model, RedirectAttributes redirectAttributes) {
         if (categoryDefinition.isComplete()) {
             // Save the category definition
             ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
             productCatalog.addOrUpdateCategoryDefinition(categoryDefinition);
             productCatalogRepository.save(productCatalog);
+            warnWhenCategoryHasNoInventory(categoryDefinition, redirectAttributes);
         } else {
             throw new RuntimeException("Category definition is not complete");
         }
 
         return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryDefinition.getCategoryId();
+    }
+
+    private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
+        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+            return;
+        }
+
+        String inventoryCategory = InventoryCategoryBridge.toInventoryCategory(categoryDefinition.getCategory());
+        boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
+                .findAllByProductCategory(inventoryCategory)
+                .stream()
+                .anyMatch(MatchedInventory::hasAnyOffers);
+
+        if (!hasAnyOffers) {
+            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
+                    "catalog.category.emptyInventory",
+                    new Object[]{categoryDefinition.getCategory()},
+                    LocaleContextHolder.getLocale()));
+        }
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")
@@ -488,7 +510,9 @@ public class ProductCatalogController {
 
         Store store = storesRepository.findById(getStoreId());
 
-        model.addAttribute("productCategories", icecatCategories.leafNamesUnder(store.getEnabledCategories()));
+        model.addAttribute("productCategories", icecatCategories.categoryOptions(
+                store.getEnabledCategories(),
+                product.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList()));
         model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
         model.addAttribute("labels", categoryDefinition.getGroupingOrder());
         model.addAttribute("availabilityTypes", ProductAvailabilityType.values());

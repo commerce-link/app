@@ -16,6 +16,26 @@ class InventoryCategoryBridgeTest {
     }
 
     @Test
+    void translatesIcecatLeafNamesToInventoryCategoriesThatHadNoLeafBefore() {
+        // when / then
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Serwery")).isEqualTo("Servers");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Ładowarki do urządzeń przenośnych")).isEqualTo("Chargers");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Uchwyty i stojaki do monitorów")).isEqualTo("MonitorMounts");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Drukarki etykiet")).isEqualTo("LabelPrinters");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Podnóżki")).isEqualTo("Footrests");
+    }
+
+    @Test
+    void translatesIcecatLeafNamesForMobileAccessoriesAndGamingFurniture() {
+        // when / then
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Banki mocy")).isEqualTo("Powerbanks");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Pokrowce na telefony komórkowe")).isEqualTo("SmartphoneCases");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Ochraniacze na ekran i tył telefonu")).isEqualTo("ScreenProtectors");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Fotele do gier")).isEqualTo("GamingChairs");
+        assertThat(InventoryCategoryBridge.toInventoryCategory("Biurka komputerowe")).isEqualTo("GamingDesks");
+    }
+
+    @Test
     void passesThroughLegacyEnumValues() {
         // when / then
         assertThat(InventoryCategoryBridge.toInventoryCategory("Case")).isEqualTo("Case");

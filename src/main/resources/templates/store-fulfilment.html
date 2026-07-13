@@ -52,19 +52,6 @@
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.enabled.categories}"></label>
-                        <p th:if="${#lists.isEmpty(categoryNames)}" th:text="#{store.enabled.categories.unavailable}"></p>
-                        <div th:each="categoryName : ${categoryNames}" class="field">
-                            <label class="checkbox">
-                                <input type="checkbox"
-                                       th:value="${categoryName}"
-                                       th:field="*{store.fulfilmentConfiguration.enabledCategories}" />
-                                <span th:text="${categoryName}"></span>
-                            </label>
-                        </div>
-                    </div>
-
                     <div class="field" th:if="${isSuperAdmin}">
                         <label class="checkbox">
                             <input type="checkbox" class="global-suppliers-toggle"

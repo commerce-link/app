@@ -407,7 +407,6 @@ public class StoreController {
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("categoryNames", icecatCategories.topLevelNames());
         model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
@@ -416,6 +415,63 @@ public class StoreController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "store-fulfilment";
+    }
+
+    @GetMapping("/dashboard/store/categories")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String storeCategories(Model model) {
+        return renderStoreCategories(getStoreId(), model);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/categories")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminStoreCategories(@PathVariable String storeId, Model model) {
+        return renderStoreCategories(storeId, model);
+    }
+
+    private String renderStoreCategories(String storeId, Model model) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            model.addAttribute("error", "Store not found");
+            return "error";
+        }
+
+        model.addAttribute("storeId", storeId);
+        model.addAttribute("categoryNames", icecatCategories.topLevelNames());
+        model.addAttribute("enabledCategories", store.getEnabledCategories());
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
+
+        return "store-categories";
+    }
+
+    @PostMapping("/dashboard/store/categories")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public String updateStoreCategories(@RequestParam String storeId,
+                                        @RequestParam(required = false) List<String> enabledCategories,
+                                        Locale locale, RedirectAttributes redirectAttributes) {
+        String targetStoreId = isSuperAdmin() ? storeId : getStoreId();
+
+        Store store = storesRepository.findById(targetStoreId);
+        if (store == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Store not found.");
+            return redirectToCategories(targetStoreId);
+        }
+        if (store.getFulfilmentConfiguration() == null) {
+            store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        }
+        store.getFulfilmentConfiguration().setEnabledCategories(
+                enabledCategories != null ? enabledCategories : new ArrayList<>());
+        storesRepository.save(store);
+
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("store.categories.update.success", null, locale));
+        return redirectToCategories(targetStoreId);
+    }
+
+    private String redirectToCategories(String storeId) {
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/categories", storeId)
+                : "redirect:/dashboard/store/categories";
     }
 
     @GetMapping("/dashboard/store/payments")

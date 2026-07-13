@@ -2,6 +2,7 @@ package pl.commercelink.offer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.products.InventoryCategoryBridge;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.taxonomy.ProductCategory;
@@ -49,7 +50,8 @@ public class ProductCategoryTree {
         this.maxQty = categoryDefinition.getMaxQty();
 
         this.productCategory = categoryDefinition.getCategory();
-        this.productGroup = ProductCategories.tryParse(categoryDefinition.getCategory())
+        this.productGroup = ProductCategories
+                .tryParse(InventoryCategoryBridge.toInventoryCategory(categoryDefinition.getCategory()))
                 .map(ProductCategory::getProductGroup)
                 .orElse(null);
 

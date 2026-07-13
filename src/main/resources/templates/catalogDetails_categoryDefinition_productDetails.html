@@ -108,11 +108,7 @@
                 <tbody>
                 <tr th:each="filter, iterStat : ${product.customAttributesFilters}">
                     <td>
-                        <div class="select">
-                            <select th:field="*{customAttributesFilters[__${iterStat.index}__].category}">
-                                <option th:each="category : ${productCategories}" th:value="${category}" th:text="${category}"></option>
-                            </select>
-                        </div>
+                        <div th:replace="~{fragments/category-picker :: picker('customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, false)}"></div>
                     </td>
                     <td>
                         <input class="input" type="text" th:field="*{customAttributesFilters[__${iterStat.index}__].name}" />
@@ -267,6 +263,7 @@
         </div>
     </form>
 
+    <div th:replace="~{fragments/category-picker :: pickerScript(${productCategories})}"></div>
 </div>
 
 </body>

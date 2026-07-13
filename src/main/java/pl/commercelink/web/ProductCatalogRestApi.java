@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import pl.commercelink.products.InventoryCategoryBridge;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.offer.*;
 import pl.commercelink.pricelist.AvailabilityAndPriceListFactory;
@@ -66,7 +67,7 @@ public class ProductCatalogRestApi {
                         c,
                         categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(d.getCategory(), c.getCategory())),
                         categoryLocalizer.localize(c.getCategory(), "plural"),
-                        ProductCategories.tryParse(c.getCategory())
+                        ProductCategories.tryParse(InventoryCategoryBridge.toInventoryCategory(c.getCategory()))
                                 .map(ProductCategory::getProductGroup)
                                 .map(enumLocalizer::localize)
                                 .orElse(null)))

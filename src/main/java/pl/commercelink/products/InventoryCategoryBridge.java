@@ -60,6 +60,16 @@ public final class InventoryCategoryBridge {
         ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Telefony", ProductCategory.StationaryPhones);
         ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Telefony voip", ProductCategory.StationaryPhones);
         ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Tablets", ProductCategory.Tablets);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Serwery", ProductCategory.Servers);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Ładowarki do urządzeń przenośnych", ProductCategory.Chargers);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Uchwyty i stojaki do monitorów", ProductCategory.MonitorMounts);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Drukarki etykiet", ProductCategory.LabelPrinters);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Podnóżki", ProductCategory.Footrests);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Banki mocy", ProductCategory.Powerbanks);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Pokrowce na telefony komórkowe", ProductCategory.SmartphoneCases);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Ochraniacze na ekran i tył telefonu", ProductCategory.ScreenProtectors);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Fotele do gier", ProductCategory.GamingChairs);
+        ICECAT_LEAF_TO_INVENTORY_CATEGORY.put("Biurka komputerowe", ProductCategory.GamingDesks);
     }
 
     private InventoryCategoryBridge() {

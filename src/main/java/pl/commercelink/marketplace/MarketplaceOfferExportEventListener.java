@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import pl.commercelink.products.InventoryCategoryBridge;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -93,7 +94,8 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
-        String localizedGroup = ProductCategories.tryParse(category.getCategory())
+        String localizedGroup = ProductCategories
+                .tryParse(InventoryCategoryBridge.toInventoryCategory(category.getCategory()))
                 .map(ProductCategory::getProductGroup)
                 .map(enumLocalizer::localize)
                 .orElse(null);

@@ -72,7 +72,9 @@ public class ProductDetails {
                 product.getBrand(),
                 product.getLabel(),
                 product.getName(),
-                ProductCategories.tryParse(product.getCategory()).map(ProductCategory::getProductGroup).orElse(null),
+                ProductCategories.tryParse(InventoryCategoryBridge.toInventoryCategory(product.getCategory()))
+                        .map(ProductCategory::getProductGroup)
+                        .orElse(null),
                 product.getCategory()
         );
 
