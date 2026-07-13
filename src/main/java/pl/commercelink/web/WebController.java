@@ -1,11 +1,13 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.starter.util.PaginationUtil;
 import pl.commercelink.web.dtos.InventoryItemView;
@@ -27,6 +29,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -67,11 +70,39 @@ public class WebController {
     @Autowired
     private ManualSupplierService manualSupplierService;
 
+    @Value("${app.registration.demo}")
+    private boolean demoEnvironment;
+
     private static final int CLIENTS_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard")
     public String index(Model model) {
+        String storeId = getStoreId();
+        if (storeId != null) {
+            Store store = storesRepository.findById(storeId);
+            if (store != null) {
+                model.addAttribute("welcomeMessage", welcomeVisible(store, demoEnvironment));
+            }
+        }
         return "dashboard";
+    }
+
+    @PostMapping("/dashboard/welcome/dismiss")
+    public String dismissWelcome() {
+        String storeId = getStoreId();
+        if (storeId != null) {
+            Store store = storesRepository.findById(storeId);
+            if (store != null && store.getNotifications() != null
+                    && store.getNotifications().removeIf(n -> n.getType() == StoreNotificationType.WELCOME)) {
+                storesRepository.save(store);
+            }
+        }
+        return "redirect:/dashboard";
+    }
+
+    static boolean welcomeVisible(Store store, boolean demoEnvironment) {
+        return !demoEnvironment && store.getNotifications() != null && store.getNotifications().stream()
+                .anyMatch(n -> n.getType() == StoreNotificationType.WELCOME);
     }
 
     @GetMapping("/dashboard/clients")

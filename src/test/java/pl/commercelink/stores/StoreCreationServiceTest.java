@@ -108,4 +108,31 @@ class StoreCreationServiceTest {
         assertEquals(10, e.getStoreId().length());
         assertSame(cause, e.getCause());
     }
+
+    @Test
+    void addsWelcomeNotificationForNonDemoStore() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", null));
+
+        // then
+        assertTrue(store.getNotifications().stream()
+                .anyMatch(n -> n.getType() == StoreNotificationType.WELCOME));
+    }
+
+    @Test
+    void skipsWelcomeNotificationForDemoStore() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+        DemoStoreMetadata demo = new DemoStoreMetadata("a@b.pl", "2026-07-13T10:00:00Z", "2026-07-16T10:00:00Z");
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.seeded("Sklep demo", demo, seeder));
+
+        // then
+        assertTrue(store.getNotifications().stream()
+                .noneMatch(n -> n.getType() == StoreNotificationType.WELCOME));
+    }
 }

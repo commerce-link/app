@@ -1,5 +1,6 @@
 package pl.commercelink.stores;
 
 public enum StoreNotificationSeverity {
-    WARNING
+    WARNING,
+    INFO
 }
