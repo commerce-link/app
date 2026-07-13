@@ -25,7 +25,7 @@ public class RegistrationController {
 
     public RegistrationController(RegistrationService registrationService,
                                   MessageSource messageSource,
-                                  @Value("${app.registration.demo}") boolean demoMode,
+                                  @Value("${app.registration.demo:false}") boolean demoMode,
                                   @Value("${app.registration.ttl-days}") int ttlDays) {
         this.registrationService = registrationService;
         this.messageSource = messageSource;

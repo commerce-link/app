@@ -48,7 +48,7 @@ public class RegistrationService {
                                 RegistrationRateLimiter rateLimiter,
                                 @Value("${app.registration.ttl-days}") int ttlDays,
                                 @Value("${app.registration.reveal-password}") boolean revealPassword,
-                                @Value("${app.registration.demo}") boolean demoMode) {
+                                @Value("${app.registration.demo:false}") boolean demoMode) {
         this(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService, rateLimiter,
                 Clock.systemUTC(), ttlDays, revealPassword, demoMode);
     }

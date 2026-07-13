@@ -11,7 +11,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.Instant;
 
 @Component
-@ConditionalOnProperty(name = {"app.registration.enabled", "app.registration.demo"}, havingValue = "true")
+@ConditionalOnProperty(name = "app.registration.demo", havingValue = "true")
 @RequiredArgsConstructor
 public class DemoStoreCleanupJob {
 

@@ -70,7 +70,7 @@ public class WebController {
     @Autowired
     private ManualSupplierService manualSupplierService;
 
-    @Value("${app.registration.demo}")
+    @Value("${app.registration.demo:false}")
     private boolean demoEnvironment;
 
     private static final int CLIENTS_PAGE_SIZE = 25;

@@ -41,7 +41,7 @@ public class SuperAdminController {
     @Autowired
     private StoreCreationService storeCreationService;
 
-    @Value("${app.registration.demo}")
+    @Value("${app.registration.demo:false}")
     boolean demoEnvironment;
 
     @GetMapping("/dashboard/stores")

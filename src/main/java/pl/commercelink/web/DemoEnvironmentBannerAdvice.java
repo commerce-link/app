@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -7,6 +8,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -15,11 +17,18 @@ import java.time.ZoneId;
 public class DemoEnvironmentBannerAdvice {
 
     private final StoresRepository storesRepository;
+    private final Clock clock;
     private final boolean demoEnvironment;
 
+    @Autowired
     public DemoEnvironmentBannerAdvice(StoresRepository storesRepository,
-                                        @Value("${app.registration.demo}") boolean demoEnvironment) {
+                                        @Value("${app.registration.demo:false}") boolean demoEnvironment) {
+        this(storesRepository, Clock.systemUTC(), demoEnvironment);
+    }
+
+    DemoEnvironmentBannerAdvice(StoresRepository storesRepository, Clock clock, boolean demoEnvironment) {
         this.storesRepository = storesRepository;
+        this.clock = clock;
         this.demoEnvironment = demoEnvironment;
     }
 
@@ -40,7 +49,7 @@ public class DemoEnvironmentBannerAdvice {
         if (expiresAt == null) {
             return null;
         }
-        long millisLeft = Duration.between(Instant.now(), expiresAt).toMillis();
+        long millisLeft = Duration.between(clock.instant(), expiresAt).toMillis();
         long days = (long) Math.ceil(millisLeft / 86_400_000.0);
         return Math.max(0, days);
     }

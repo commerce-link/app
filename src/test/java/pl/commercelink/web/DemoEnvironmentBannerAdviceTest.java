@@ -8,7 +8,9 @@ import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -16,13 +18,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DemoEnvironmentBannerAdviceTest {
 
+    private static final Instant NOW = Instant.parse("2026-07-08T12:00:00Z");
+    private static final Clock FIXED_CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+
     @Mock
     private StoresRepository storesRepository;
 
     @Test
     void bannerDisabledOutsideDemoEnvironment() {
         // given
-        DemoEnvironmentBannerAdvice advice = new DemoEnvironmentBannerAdvice(storesRepository, false);
+        DemoEnvironmentBannerAdvice advice = new DemoEnvironmentBannerAdvice(storesRepository, FIXED_CLOCK, false);
 
         // when / then
         assertFalse(advice.demoEnvironment());
@@ -44,8 +49,7 @@ class DemoEnvironmentBannerAdviceTest {
     void bannerShowsExpiryForDemoStore() {
         // given
         Store store = new Store();
-        store.setDemo(new DemoStoreMetadata("a@b.pl", Instant.now().toString(),
-                Instant.now().plusSeconds(2 * 24 * 3600 + 60).toString()));
+        store.setDemo(new DemoStoreMetadata("a@b.pl", "2026-07-08T00:00:00Z", "2026-07-10T12:01:00Z"));
         when(storesRepository.findById("s-1")).thenReturn(store);
         DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
 
@@ -59,13 +63,48 @@ class DemoEnvironmentBannerAdviceTest {
     void bannerRoundsExactDayCountDown() {
         // given
         Store store = new Store();
-        store.setDemo(new DemoStoreMetadata("a@b.pl", Instant.now().toString(),
-                Instant.now().plusSeconds(2 * 24 * 3600).toString()));
+        store.setDemo(new DemoStoreMetadata("a@b.pl", "2026-07-08T00:00:00Z", "2026-07-10T12:00:00Z"));
         when(storesRepository.findById("s-1")).thenReturn(store);
         DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
 
         // when / then
         assertEquals(2L, advice.demoDaysLeft());
+    }
+
+    @Test
+    void expiredStoreClampsDaysLeftToZero() {
+        // given
+        Store store = new Store();
+        store.setDemo(new DemoStoreMetadata("a@b.pl", "2026-07-01T00:00:00Z", "2026-07-07T12:00:00Z"));
+        when(storesRepository.findById("s-1")).thenReturn(store);
+        DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
+
+        // when / then
+        assertEquals(0L, advice.demoDaysLeft());
+    }
+
+    @Test
+    void bannerHiddenWhenExpiresAtMissing() {
+        // given
+        Store store = new Store();
+        store.setDemo(new DemoStoreMetadata("a@b.pl", "2026-07-08T00:00:00Z", null));
+        when(storesRepository.findById("s-1")).thenReturn(store);
+        DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
+
+        // when / then
+        assertNull(advice.demoExpiresAt());
+        assertNull(advice.demoDaysLeft());
+    }
+
+    @Test
+    void bannerHiddenWhenStoreNotFound() {
+        // given
+        when(storesRepository.findById("s-1")).thenReturn(null);
+        DemoEnvironmentBannerAdvice advice = adviceWithStoreId("s-1", true);
+
+        // when / then
+        assertNull(advice.demoExpiresAt());
+        assertNull(advice.demoDaysLeft());
     }
 
     @Test
@@ -83,7 +122,7 @@ class DemoEnvironmentBannerAdviceTest {
     }
 
     private DemoEnvironmentBannerAdvice adviceWithStoreId(String storeId, boolean demoEnvironment) {
-        return new DemoEnvironmentBannerAdvice(storesRepository, demoEnvironment) {
+        return new DemoEnvironmentBannerAdvice(storesRepository, FIXED_CLOCK, demoEnvironment) {
             @Override
             String currentStoreId() {
                 return storeId;
