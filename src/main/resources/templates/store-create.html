@@ -9,7 +9,6 @@
             <h1 class="title" th:text="#{store.create}"></h1>
 
             <form th:action="@{/dashboard/store/create}" th:object="${store}" method="post">
-                <input type="hidden" th:field="*{storeId}" />
                 <div class="field">
                     <label class="label" for="storeName" th:text="#{store.name}"></label>
                     <div class="control">

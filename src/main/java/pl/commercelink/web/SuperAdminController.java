@@ -9,9 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
-import pl.commercelink.starter.util.UniqueIdentifierGenerator;
+import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
+import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoresRepository;
 
@@ -35,6 +36,9 @@ public class SuperAdminController {
 
     @Autowired
     private DemoStoreDeletionService demoStoreDeletionService;
+
+    @Autowired
+    private StoreCreationService storeCreationService;
 
     @GetMapping("/dashboard/stores")
     public String store(Model model) {
@@ -60,15 +64,16 @@ public class SuperAdminController {
 
     @GetMapping("/dashboard/store/create")
     public String createStorePage(Model model) {
-        Store store = new Store();
-        store.setStoreId(UniqueIdentifierGenerator.generate());
-        model.addAttribute("store", store);
+        model.addAttribute("store", new Store());
         return "store-create";
     }
 
     @PostMapping("/dashboard/store/create")
-    public String createStore(@ModelAttribute Store store, Locale locale, RedirectAttributes redirectAttributes) {
-        storesRepository.save(store);
+    public String createStore(@RequestParam String name,
+                              @RequestParam(required = false) String apiKey,
+                              Locale locale,
+                              RedirectAttributes redirectAttributes) {
+        Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey));
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
         return String.format("redirect:/dashboard/store/%s", store.getStoreId());
     }

@@ -9,7 +9,10 @@ import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
+import pl.commercelink.stores.CreateStoreRequest;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
+import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Locale;
@@ -27,6 +30,7 @@ class SuperAdminControllerTest {
     @Mock private StoreCopyService storeCopyService;
     @Mock private OrphanedProductCleanupService orphanedProductCleanupService;
     @Mock private DemoStoreDeletionService demoStoreDeletionService;
+    @Mock private StoreCreationService storeCreationService;
     @InjectMocks private SuperAdminController controller;
 
     private final Locale locale = Locale.forLanguageTag("pl");
@@ -76,5 +80,22 @@ class SuperAdminControllerTest {
         // then
         assertEquals("redirect:/dashboard/stores", view);
         assertEquals("Błąd usuwania", redirectAttributes.getFlashAttributes().get("errorMessage"));
+    }
+
+    @Test
+    void createStoreDelegatesToCreationServiceAndIgnoresClientStoreId() {
+        // given
+        Store created = new Store();
+        created.setStoreId("srv-gen-001");
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"))).thenReturn(created);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createStore("Nowy sklep", "key-9", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/srv-gen-001", view);
+        verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"));
+        verifyNoMoreInteractions(storeCreationService);
     }
 }
