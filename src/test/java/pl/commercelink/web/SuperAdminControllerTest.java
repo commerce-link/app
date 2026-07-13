@@ -7,12 +7,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
-import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
 import pl.commercelink.stores.StoreCreationService;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Locale;
@@ -29,7 +29,7 @@ class SuperAdminControllerTest {
     @Mock private MessageSource messageSource;
     @Mock private StoreCopyService storeCopyService;
     @Mock private OrphanedProductCleanupService orphanedProductCleanupService;
-    @Mock private DemoStoreDeletionService demoStoreDeletionService;
+    @Mock private StoreDeletionService storeDeletionService;
     @Mock private StoreCreationService storeCreationService;
     @InjectMocks private SuperAdminController controller;
 
@@ -38,12 +38,12 @@ class SuperAdminControllerTest {
     @Test
     void showsSuccessWhenDemoStoreFullyDeleted() {
         // given
-        when(demoStoreDeletionService.deleteDemoStore(STORE_ID)).thenReturn(true);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
         when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteDemoStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
@@ -54,12 +54,12 @@ class SuperAdminControllerTest {
     @Test
     void showsErrorWhenCascadeCompletesPartially() {
         // given
-        when(demoStoreDeletionService.deleteDemoStore(STORE_ID)).thenReturn(false);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(false);
         when(messageSource.getMessage("store.delete.error", null, locale)).thenReturn("Błąd usuwania");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteDemoStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
@@ -70,12 +70,13 @@ class SuperAdminControllerTest {
     @Test
     void showsErrorWhenDeletionThrows() {
         // given
-        when(demoStoreDeletionService.deleteDemoStore(STORE_ID)).thenThrow(new IllegalStateException("not a demo store"));
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY))
+                .thenThrow(new IllegalStateException("not a demo store"));
         when(messageSource.getMessage("store.delete.error", null, locale)).thenReturn("Błąd usuwania");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteDemoStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);

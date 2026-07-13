@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Instant;
@@ -18,7 +19,7 @@ import static org.mockito.Mockito.*;
 class DemoStoreCleanupJobTest {
 
     @Mock private StoresRepository storesRepository;
-    @Mock private DemoStoreDeletionService demoStoreDeletionService;
+    @Mock private StoreDeletionService storeDeletionService;
     @InjectMocks private DemoStoreCleanupJob job;
 
     private Store store(String storeId, DemoStoreMetadata demo) {
@@ -41,9 +42,9 @@ class DemoStoreCleanupJobTest {
         job.deleteExpiredDemoStores(now);
 
         // then
-        verify(demoStoreDeletionService).deleteDemoStore("expired0001");
-        verify(demoStoreDeletionService, never()).deleteDemoStore("regular0001");
-        verify(demoStoreDeletionService, never()).deleteDemoStore("active00001");
+        verify(storeDeletionService).deleteDemoStore("expired0001");
+        verify(storeDeletionService, never()).deleteDemoStore("regular0001");
+        verify(storeDeletionService, never()).deleteDemoStore("active00001");
     }
 
     @Test
@@ -58,8 +59,8 @@ class DemoStoreCleanupJobTest {
         job.deleteExpiredDemoStores(now);
 
         // then
-        verify(demoStoreDeletionService).deleteDemoStore("expired0001");
-        verify(demoStoreDeletionService, never()).deleteDemoStore("corrupt0001");
+        verify(storeDeletionService).deleteDemoStore("expired0001");
+        verify(storeDeletionService, never()).deleteDemoStore("corrupt0001");
     }
 
     @Test
@@ -69,12 +70,12 @@ class DemoStoreCleanupJobTest {
         Store first = store("expired0001", new DemoStoreMetadata("a@example.com", "2026-06-01T00:00:00Z", "2026-07-01T00:00:00Z"));
         Store second = store("expired0002", new DemoStoreMetadata("b@example.com", "2026-06-01T00:00:00Z", "2026-07-01T00:00:00Z"));
         when(storesRepository.findAll()).thenReturn(List.of(first, second));
-        doThrow(new RuntimeException("boom")).when(demoStoreDeletionService).deleteDemoStore("expired0001");
+        doThrow(new RuntimeException("boom")).when(storeDeletionService).deleteDemoStore("expired0001");
 
         // when
         job.deleteExpiredDemoStores(now);
 
         // then
-        verify(demoStoreDeletionService).deleteDemoStore("expired0002");
+        verify(storeDeletionService).deleteDemoStore("expired0002");
     }
 }

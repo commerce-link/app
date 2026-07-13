@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.rma.RMA;
-import pl.commercelink.stores.Store;
 import pl.commercelink.templates.EmailTemplate;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
@@ -18,11 +17,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Repository
-public class DemoStoreWipeRepository {
+public class StoreWipeRepository {
 
     private final DynamoDBMapper mapper;
 
-    public DemoStoreWipeRepository(AmazonDynamoDB dynamoDB) {
+    public StoreWipeRepository(AmazonDynamoDB dynamoDB) {
         this.mapper = new DynamoDBMapper(dynamoDB);
     }
 
@@ -79,10 +78,6 @@ public class DemoStoreWipeRepository {
             return;
         }
         mapper.batchDelete(entities);
-    }
-
-    public void deleteStore(Store store) {
-        mapper.delete(store);
     }
 
     private <T> List<T> query(Class<T> clazz, T hashKey) {

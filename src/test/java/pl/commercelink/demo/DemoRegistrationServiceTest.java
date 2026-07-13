@@ -6,6 +6,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.stores.DemoStoreMetadata;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.users.CognitoUserService;
 
 import java.time.Clock;
@@ -26,11 +27,11 @@ class DemoRegistrationServiceTest {
 
     @Mock private CognitoUserService demoUserService;
     @Mock private DemoStoreSeeder demoStoreSeeder;
-    @Mock private DemoStoreDeletionService demoStoreDeletionService;
+    @Mock private StoreDeletionService storeDeletionService;
     @Mock private DemoRegistrationRateLimiter rateLimiter;
 
     private DemoRegistrationService service(boolean revealPassword) {
-        return new DemoRegistrationService(demoUserService, demoStoreSeeder, demoStoreDeletionService,
+        return new DemoRegistrationService(demoUserService, demoStoreSeeder, storeDeletionService,
                 rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC), 14, revealPassword);
     }
 
@@ -115,7 +116,7 @@ class DemoRegistrationServiceTest {
                 () -> service(false).register("user@example.com", "1.1.1.1"));
         assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
         ArgumentCaptor<String> storeIdCaptor = ArgumentCaptor.forClass(String.class);
-        verify(demoStoreDeletionService).deleteDemoStore(storeIdCaptor.capture());
+        verify(storeDeletionService).deleteDemoStore(storeIdCaptor.capture());
         verify(demoStoreSeeder).seedStore(eq(storeIdCaptor.getValue()), anyString(), any());
     }
 
@@ -130,7 +131,7 @@ class DemoRegistrationServiceTest {
         DemoRegistrationException e = assertThrows(DemoRegistrationException.class,
                 () -> service(false).register("user@example.com", "1.1.1.1"));
         assertEquals(DemoRegistrationException.Reason.CREATION_FAILED, e.getReason());
-        verify(demoStoreDeletionService).deleteDemoStore(anyString());
+        verify(storeDeletionService).deleteDemoStore(anyString());
         verify(demoUserService, never()).createStoreAdmin(anyString(), anyString());
         verify(demoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
     }
@@ -141,7 +142,7 @@ class DemoRegistrationServiceTest {
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
         when(demoUserService.userExists("user@example.com")).thenReturn(false);
         doThrow(new RuntimeException("cognito down")).when(demoUserService).createStoreAdmin(anyString(), anyString());
-        doThrow(new RuntimeException("dynamo down")).when(demoStoreDeletionService).deleteDemoStore(anyString());
+        doThrow(new RuntimeException("dynamo down")).when(storeDeletionService).deleteDemoStore(anyString());
 
         // when / then
         DemoRegistrationException e = assertThrows(DemoRegistrationException.class,

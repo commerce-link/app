@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.stores;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,15 +15,15 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.storage.FileStorage;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.users.CognitoUserService;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 
 import java.util.List;
 
 @Service
-public class DemoStoreDeletionService {
+public class StoreDeletionService {
+
+    public enum Guard { DEMO_ONLY, ANY }
 
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
@@ -33,13 +33,13 @@ public class DemoStoreDeletionService {
     private final ProductRepository productRepository;
     private final RMACentersRepository rmaCentersRepository;
     private final RMAItemsRepository rmaItemsRepository;
-    private final DemoStoreWipeRepository wipeRepository;
+    private final StoreWipeRepository wipeRepository;
     private final FileStorage fileStorage;
     private final StoreInventoryCache storeInventoryCache;
     private final CognitoUserService cognitoUserService;
     private final String storesBucket;
 
-    public DemoStoreDeletionService(StoresRepository storesRepository,
+    public StoreDeletionService(StoresRepository storesRepository,
                                     OrdersRepository ordersRepository,
                                     OrderItemsRepository orderItemsRepository,
                                     OrderEventsRepository orderEventsRepository,
@@ -47,7 +47,7 @@ public class DemoStoreDeletionService {
                                     ProductRepository productRepository,
                                     RMACentersRepository rmaCentersRepository,
                                     RMAItemsRepository rmaItemsRepository,
-                                    DemoStoreWipeRepository wipeRepository,
+                                    StoreWipeRepository wipeRepository,
                                     FileStorage fileStorage,
                                     StoreInventoryCache storeInventoryCache,
                                     CognitoUserService cognitoUserService,
@@ -68,16 +68,22 @@ public class DemoStoreDeletionService {
     }
 
     public boolean deleteDemoStore(String storeId) {
+        return deleteStore(storeId, Guard.DEMO_ONLY);
+    }
+
+    public boolean deleteStore(String storeId, Guard guard) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return true;
         }
-        if (store.getDemo() == null) {
-            throw new IllegalStateException("Refusing to delete non-demo store: " + storeId);
+        if (guard == Guard.DEMO_ONLY && store.getDemo() == null) {
+            throw new IllegalStateException("Refusing to delete non-demo store " + storeId);
         }
 
         boolean allSucceeded = true;
-        allSucceeded &= step(storeId, "cognito user", () -> deleteCognitoUser(store));
+        if (store.getDemo() != null) {
+            allSucceeded &= step(storeId, "cognito user", () -> deleteCognitoUser(store));
+        }
         allSucceeded &= step(storeId, "orders", () -> deleteOrders(storeId));
         allSucceeded &= step(storeId, "baskets", () -> wipeRepository.deleteAll(wipeRepository.findBaskets(storeId)));
         allSucceeded &= step(storeId, "deliveries", () -> wipeRepository.deleteAll(wipeRepository.findDeliveries(storeId)));
@@ -89,10 +95,10 @@ public class DemoStoreDeletionService {
         allSucceeded &= step(storeId, "inventory cache", () -> storeInventoryCache.evict(storeId));
 
         if (allSucceeded) {
-            wipeRepository.deleteStore(store);
-            System.out.println("[DemoStoreDeletion] Deleted demo store " + storeId);
+            storesRepository.delete(store);
+            System.out.println("[StoreDeletion] Deleted store " + storeId);
         } else {
-            System.err.println("[DemoStoreDeletion] Store " + storeId + " kept for retry after failed steps");
+            System.err.println("[StoreDeletion] Store " + storeId + " kept for retry after failed steps");
         }
         return allSucceeded;
     }
@@ -145,7 +151,7 @@ public class DemoStoreDeletionService {
             action.run();
             return true;
         } catch (RuntimeException e) {
-            System.err.println("[DemoStoreDeletion] Step '" + name + "' failed for store " + storeId + ": " + e.getMessage());
+            System.err.println("[StoreDeletion] Step '" + name + "' failed for store " + storeId + ": " + e.getMessage());
             return false;
         }
     }

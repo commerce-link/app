@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.stores.DemoStoreMetadata;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.users.CognitoUserService;
 
 import java.security.SecureRandom;
@@ -24,7 +25,7 @@ public class DemoRegistrationService {
 
     private final CognitoUserService demoUserService;
     private final DemoStoreSeeder demoStoreSeeder;
-    private final DemoStoreDeletionService demoStoreDeletionService;
+    private final StoreDeletionService storeDeletionService;
     private final DemoRegistrationRateLimiter rateLimiter;
     private final Clock clock;
     private final int ttlDays;
@@ -34,23 +35,23 @@ public class DemoRegistrationService {
     @Autowired
     public DemoRegistrationService(CognitoUserService demoUserService,
                                    DemoStoreSeeder demoStoreSeeder,
-                                   DemoStoreDeletionService demoStoreDeletionService,
+                                   StoreDeletionService storeDeletionService,
                                    DemoRegistrationRateLimiter rateLimiter,
                                    @Value("${app.demo.registration.ttl-days}") int ttlDays,
                                    @Value("${app.demo.registration.reveal-password}") boolean revealPassword) {
-        this(demoUserService, demoStoreSeeder, demoStoreDeletionService, rateLimiter, Clock.systemUTC(), ttlDays, revealPassword);
+        this(demoUserService, demoStoreSeeder, storeDeletionService, rateLimiter, Clock.systemUTC(), ttlDays, revealPassword);
     }
 
     DemoRegistrationService(CognitoUserService demoUserService,
                             DemoStoreSeeder demoStoreSeeder,
-                            DemoStoreDeletionService demoStoreDeletionService,
+                            StoreDeletionService storeDeletionService,
                             DemoRegistrationRateLimiter rateLimiter,
                             Clock clock,
                             int ttlDays,
                             boolean revealPassword) {
         this.demoUserService = demoUserService;
         this.demoStoreSeeder = demoStoreSeeder;
-        this.demoStoreDeletionService = demoStoreDeletionService;
+        this.storeDeletionService = storeDeletionService;
         this.rateLimiter = rateLimiter;
         this.clock = clock;
         this.ttlDays = ttlDays;
@@ -92,7 +93,7 @@ public class DemoRegistrationService {
 
     private void rollBack(String storeId) {
         try {
-            demoStoreDeletionService.deleteDemoStore(storeId);
+            storeDeletionService.deleteDemoStore(storeId);
         } catch (RuntimeException e) {
             System.err.println("[DemoRegistration] Rollback failed for store " + storeId + ": " + e.getMessage());
         }

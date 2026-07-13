@@ -7,12 +7,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
 import pl.commercelink.stores.StoreCreationService;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoresRepository;
 
@@ -35,7 +35,7 @@ public class SuperAdminController {
     private OrphanedProductCleanupService orphanedProductCleanupService;
 
     @Autowired
-    private DemoStoreDeletionService demoStoreDeletionService;
+    private StoreDeletionService storeDeletionService;
 
     @Autowired
     private StoreCreationService storeCreationService;
@@ -111,9 +111,9 @@ public class SuperAdminController {
     }
 
     @PostMapping("/dashboard/store/{storeId}/delete")
-    public String deleteDemoStore(@PathVariable String storeId, Locale locale, RedirectAttributes redirectAttributes) {
+    public String deleteStore(@PathVariable String storeId, Locale locale, RedirectAttributes redirectAttributes) {
         try {
-            if (demoStoreDeletionService.deleteDemoStore(storeId)) {
+            if (storeDeletionService.deleteStore(storeId, StoreDeletionService.Guard.ANY)) {
                 redirectAttributes.addFlashAttribute("successMessage",
                         messageSource.getMessage("store.delete.success", null, locale));
             } else {
@@ -121,7 +121,7 @@ public class SuperAdminController {
                         messageSource.getMessage("store.delete.error", null, locale));
             }
         } catch (Exception e) {
-            System.err.println("[DemoStoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
+            System.err.println("[StoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.delete.error", null, locale));
         }
