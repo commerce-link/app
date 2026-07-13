@@ -8,7 +8,7 @@ import java.util.Locale;
 public class RegistrationException extends RuntimeException {
 
     public enum Reason {
-        INVALID_EMAIL, RATE_LIMITED, EMAIL_EXISTS, CREATION_FAILED
+        INVALID_EMAIL, RATE_LIMITED, EMAIL_EXISTS, CREATION_FAILED, INVALID_STORE_NAME
     }
 
     private final Reason reason;

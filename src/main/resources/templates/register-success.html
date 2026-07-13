@@ -69,7 +69,8 @@
 
 <div class="demo-card">
     <h1 th:text="#{registration.success.title}"></h1>
-    <p th:if="${revealedPassword == null}" th:text="#{registration.success.message(${email})}"></p>
+    <p th:if="${revealedPassword == null and demoMode}" th:text="#{registration.success.message(${email})}"></p>
+    <p th:if="${revealedPassword == null and !demoMode}" th:text="#{registration.success.invite(${email})}"></p>
     <div th:if="${revealedPassword != null}">
         <p th:text="#{registration.success.password.lead(${email})}"></p>
         <div class="notification is-info is-light">

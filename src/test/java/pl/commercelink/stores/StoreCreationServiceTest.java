@@ -90,4 +90,22 @@ class StoreCreationServiceTest {
         // then
         verifyNoInteractions(seeder);
     }
+
+    @Test
+    void wrapsSeederFailureInStoreSeedingException() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+        RuntimeException cause = new RuntimeException("s3 down");
+        doThrow(cause).when(seeder).seed(any());
+        DemoStoreMetadata demo = new DemoStoreMetadata("a@b.pl", "2026-07-13T10:00:00Z", "2026-07-16T10:00:00Z");
+
+        // when
+        StoreSeedingException e = assertThrows(StoreSeedingException.class,
+                () -> service.createStore(CreateStoreRequest.seeded("Sklep demo", demo, seeder)));
+
+        // then
+        assertNotNull(e.getStoreId());
+        assertEquals(10, e.getStoreId().length());
+        assertSame(cause, e.getCause());
+    }
 }

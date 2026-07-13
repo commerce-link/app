@@ -1,7 +1,7 @@
 package pl.commercelink.registration;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
@@ -16,19 +16,29 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Controller
 @ConditionalOnProperty(name = "app.registration.enabled", havingValue = "true")
-@RequiredArgsConstructor
 public class RegistrationController {
 
     private final RegistrationService registrationService;
     private final MessageSource messageSource;
+    private final boolean demoMode;
+
+    public RegistrationController(RegistrationService registrationService,
+                                  MessageSource messageSource,
+                                  @Value("${app.registration.demo}") boolean demoMode) {
+        this.registrationService = registrationService;
+        this.messageSource = messageSource;
+        this.demoMode = demoMode;
+    }
 
     @GetMapping("/register")
-    public String registerPage() {
+    public String registerPage(Model model) {
+        model.addAttribute("demoMode", demoMode);
         return "register";
     }
 
     @PostMapping("/register")
     public String register(@RequestParam String email,
+                           @RequestParam(required = false) String storeName,
                            @RequestParam(name = "company", required = false) String honeypot,
                            HttpServletRequest request,
                            Model model,
@@ -36,8 +46,11 @@ public class RegistrationController {
         if (isNotBlank(honeypot)) {
             return "redirect:/register";
         }
+        model.addAttribute("demoMode", demoMode);
+        String resolvedName = isNotBlank(storeName) ? storeName
+                : messageSource.getMessage("registration.store-name.placeholder", null, locale);
         try {
-            RegistrationResult result = registrationService.register(email, clientIp(request));
+            RegistrationResult result = registrationService.register(email, resolvedName, clientIp(request));
             model.addAttribute("email", email);
             model.addAttribute("revealedPassword", result.revealedPassword());
             return "register-success";

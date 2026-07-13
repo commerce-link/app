@@ -25,7 +25,11 @@ public class StoreCreationService {
         }
         storesRepository.save(store);
         if (request.seeder() != null) {
-            request.seeder().seed(store);
+            try {
+                request.seeder().seed(store);
+            } catch (RuntimeException e) {
+                throw new StoreSeedingException(store.getStoreId(), e);
+            }
         }
         return store;
     }

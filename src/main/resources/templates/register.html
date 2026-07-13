@@ -70,12 +70,20 @@
 <div class="demo-card">
     <h1 th:text="#{registration.title}"></h1>
     <p th:text="#{registration.lead}"></p>
+    <div th:if="${demoMode}" class="notification is-info is-light" th:text="#{registration.demo-notice}"></div>
     <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
     <form method="post" action="/register">
         <div class="field">
             <div class="control">
                 <input class="input" type="email" name="email" required
                        th:placeholder="#{registration.email.placeholder}" th:value="${email}">
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" th:text="#{registration.store-name.label}"></label>
+            <div class="control">
+                <input class="input" type="text" name="storeName" maxlength="60"
+                       th:placeholder="#{registration.store-name.placeholder}">
             </div>
         </div>
         <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
