@@ -154,6 +154,23 @@ class RegistrationServiceTest {
     }
 
     @Test
+    void demoModeMapsStoreCreationFailureToCreationFailed() {
+        // given
+        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
+        when(cognitoUserService.userExists("a@b.pl")).thenReturn(false);
+        when(storeCreationService.createStore(any(CreateStoreRequest.class)))
+                .thenThrow(new RuntimeException("dynamo down"));
+
+        // when / then
+        RegistrationException e = assertThrows(RegistrationException.class,
+                () -> service(true, false).register("a@b.pl", "Sklep Testowy", "10.0.0.1"));
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
+        verify(storeDeletionService, never()).deleteStore(anyString(), any());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void reportsCreationFailureWhenRollbackAlsoFails() {
         // given
         when(rateLimiter.tryAcquire("1.1.1.1")).thenReturn(true);
@@ -249,6 +266,23 @@ class RegistrationServiceTest {
 
         // then
         assertNull(result.revealedPassword());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void productionModeMapsStoreCreationFailureToCreationFailed() {
+        // given
+        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
+        when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null)))
+                .thenThrow(new RuntimeException("dynamo down"));
+
+        // when / then
+        RegistrationException e = assertThrows(RegistrationException.class,
+                () -> service(false, false).register("user@firma.pl", "Moja Firma", "10.0.0.1"));
+        assertEquals(RegistrationException.Reason.CREATION_FAILED, e.getReason());
+        verify(storeDeletionService, never()).deleteStore(anyString(), any());
+        verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString());
         verify(cognitoUserService, never()).createStoreAdmin(anyString(), anyString(), anyString());
     }
 

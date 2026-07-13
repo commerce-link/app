@@ -106,7 +106,13 @@ public class RegistrationService {
     }
 
     private RegistrationResult registerProduction(String email, String storeName) {
-        Store store = storeCreationService.createStore(CreateStoreRequest.bare(storeName, null));
+        Store store;
+        try {
+            store = storeCreationService.createStore(CreateStoreRequest.bare(storeName, null));
+        } catch (RuntimeException e) {
+            System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
+            throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
+        }
         try {
             cognitoUserService.createStoreAdmin(email, store.getStoreId());
             return new RegistrationResult(store.getStoreId(), null);
@@ -128,6 +134,9 @@ public class RegistrationService {
         } catch (StoreSeedingException e) {
             System.err.println("[Registration] Store seeding failed for " + email + ", rolling back store " + e.getStoreId() + ": " + e.getMessage());
             rollBack(e.getStoreId(), StoreDeletionService.Guard.DEMO_ONLY);
+            throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
+        } catch (RuntimeException e) {
+            System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
         try {
