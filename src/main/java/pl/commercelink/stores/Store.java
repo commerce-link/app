@@ -62,6 +62,8 @@ public class Store {
     private ShippingConfiguration shippingConfiguration;
     @DynamoDBAttribute(attributeName = "demo")
     private DemoStoreMetadata demo;
+    @DynamoDBAttribute(attributeName = "createdAt")
+    private String createdAt;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -391,6 +393,14 @@ public class Store {
 
     public void setDemo(DemoStoreMetadata demo) {
         this.demo = demo;
+    }
+
+    public String getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(String createdAt) {
+        this.createdAt = createdAt;
     }
 
     @DynamoDBIgnore
