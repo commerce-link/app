@@ -28,6 +28,7 @@ import pl.commercelink.stores.Parcel;
 import pl.commercelink.stores.RMAConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.starter.storage.FileStorage;
@@ -41,7 +42,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Service
-public class DemoStoreSeeder {
+public class DemoStoreSeeder implements StoreSeeder {
 
     public static final String CATALOG_ID = "cat-local-01";
 
@@ -64,6 +65,11 @@ public class DemoStoreSeeder {
         this.dynamoDB = dynamoDB;
         this.fileStorage = fileStorage;
         this.storesBucket = storesBucket;
+    }
+
+    @Override
+    public void seed(Store store) {
+        seedStore(store.getStoreId(), store.getName(), store.getDemo());
     }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
