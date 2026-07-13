@@ -99,7 +99,8 @@ public class MarketplaceOfferExportEventListener {
                 .map(ProductCategory::getProductGroup)
                 .map(enumLocalizer::localize)
                 .orElse(null);
-        String localizedCategory = categoryLocalizer.localize(category.getCategory(), "plural");
+        String localizedCategory = categoryLocalizer.localize(
+                InventoryCategoryBridge.toInventoryCategory(category.getCategory()), "plural");
         String categoryName = localizedGroup == null ? localizedCategory : localizedGroup + " / " + localizedCategory;
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {

@@ -17,6 +17,19 @@ class LocalizedOrderItemTest {
     private CategoryLocalizer categoryLocalizer;
 
     @Test
+    void keepsTheCategoryDefinitionNameVerbatimEvenWhenItCollidesWithAnIcecatLeaf() {
+        // given
+        OrderItem orderItem = new OrderItem("order-1", "Karty graficzne", "RTX 5090", 1, 9000.0, "SKU-1", false);
+        when(categoryLocalizer.localize("Karty graficzne", "singular")).thenReturn("Karty graficzne");
+
+        // when
+        LocalizedOrderItem localized = LocalizedOrderItem.fromOrderItem(orderItem, categoryLocalizer);
+
+        // then
+        assertThat(localized.getCategory()).isEqualTo("Karty graficzne");
+    }
+
+    @Test
     void localizesCategoryByKeyEvenWhenOutsideEnum() {
         // given
         OrderItem orderItem = new OrderItem("order-1", "Smartwatches", "Watch 5", 2, 900.0, "SKU-1", false);

@@ -65,10 +65,25 @@ class ProductCatalogRestApiTest {
     private ProductCatalogRestApi restApi;
 
     @Test
+    void categoryTreeLocalizesLeafThroughTheInventoryCategorySoOtherLanguagesStillResolve() {
+        // given
+        catalogWithSingleDefinition("Karty graficzne");
+        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Graphics cards");
+        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("PC components");
+
+        // when
+        List<ProductCategoryTree> tree = categoriesTree();
+
+        // then
+        assertThat(tree).hasSize(1);
+        assertThat(tree.get(0).getCategoryTree()).isEqualTo("PC components/Graphics cards");
+    }
+
+    @Test
     void categoryTreeResolvesProductGroupThroughIcecatBridgeForLeafCategory() {
         // given
         catalogWithSingleDefinition("Karty graficzne");
-        when(categoryLocalizer.localize("Karty graficzne", "plural")).thenReturn("Karty graficzne");
+        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
         when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
 
         // when
@@ -93,14 +108,40 @@ class ProductCatalogRestApiTest {
         assertThat(tree.get(0).getCategoryTree()).isEqualTo("Kołdry");
     }
 
-    private void catalogWithSingleDefinition(String category) {
-        CategoryDefinition definition = new CategoryDefinition();
-        definition.setCategoryId("category-1");
-        definition.setName("Karta graficzna");
-        definition.setCategory(category);
+    @Test
+    void marksDefinitionsAsDuplicatedWhenTheirCategoriesResolveToTheSameInventoryCategory() {
+        // given
+        catalogWithDefinitions(
+                definition("category-1", "Karty RTX", "GPU"),
+                definition("category-2", "Karty GTX", "Karty graficzne"));
+        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
+        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
 
+        // when
+        List<ProductCategoryTree> tree = categoriesTree();
+
+        // then
+        assertThat(tree).extracting(ProductCategoryTree::getCategoryTree)
+                .containsExactly(
+                        "Podzespoły komputerowe/Karty graficzne/Karty RTX",
+                        "Podzespoły komputerowe/Karty graficzne/Karty GTX");
+    }
+
+    private void catalogWithSingleDefinition(String category) {
+        catalogWithDefinitions(definition("category-1", "Karta graficzna", category));
+    }
+
+    private void catalogWithDefinitions(CategoryDefinition... definitions) {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
-        when(catalog.getCategories()).thenReturn(List.of(definition));
+        when(catalog.getCategories()).thenReturn(List.of(definitions));
+    }
+
+    private CategoryDefinition definition(String categoryId, String name, String category) {
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId(categoryId);
+        definition.setName(name);
+        definition.setCategory(category);
+        return definition;
     }
 
     @SuppressWarnings("unchecked")

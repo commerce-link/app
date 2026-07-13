@@ -65,8 +65,10 @@ public class ProductCatalogRestApi {
         return categoryDefinitions.stream()
                 .map(c -> new ProductCategoryTree(
                         c,
-                        categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(d.getCategory(), c.getCategory())),
-                        categoryLocalizer.localize(c.getCategory(), "plural"),
+                        categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(
+                                InventoryCategoryBridge.toInventoryCategory(d.getCategory()),
+                                InventoryCategoryBridge.toInventoryCategory(c.getCategory()))),
+                        categoryLocalizer.localize(InventoryCategoryBridge.toInventoryCategory(c.getCategory()), "plural"),
                         ProductCategories.tryParse(InventoryCategoryBridge.toInventoryCategory(c.getCategory()))
                                 .map(ProductCategory::getProductGroup)
                                 .map(enumLocalizer::localize)

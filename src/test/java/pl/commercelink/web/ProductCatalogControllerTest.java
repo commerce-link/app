@@ -24,6 +24,7 @@ import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.starter.security.model.CustomUser;
 
@@ -33,6 +34,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +48,9 @@ class ProductCatalogControllerTest {
 
     @Mock
     private ProductCatalogRepository productCatalogRepository;
+
+    @Mock
+    private ProductRepository productRepository;
 
     @Mock
     private Inventory inventory;
@@ -74,6 +81,21 @@ class ProductCatalogControllerTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void keepsProductsWhenAnotherDefinitionResolvesToTheSameInventoryCategory() {
+        // given
+        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, "Karty graficzne");
+        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, "GPU");
+        when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
+        when(catalog.getCategories()).thenReturn(List.of(remaining));
+
+        // when
+        controller.deleteCategoryDefinition(CATALOG_ID, removed.getCategoryId());
+
+        // then
+        verify(productRepository, never()).delete(anyList());
     }
 
     @Test

@@ -297,13 +297,31 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
+    void localizesLeafCategoryThroughTheInventoryCategorySoOtherLanguagesStillResolve() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne");
+        priceFor(product, 100, 2);
+        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("PC components");
+        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Graphics cards");
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).categoryName()).isEqualTo("PC components / Graphics cards");
+    }
+
+    @Test
     void exportsProductGroupResolvedThroughIcecatBridgeForLeafCategory() {
         // given
         Product product = product("pim-A", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne");
         priceFor(product, 100, 2);
         when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
-        when(categoryLocalizer.localize("Karty graficzne", "plural")).thenReturn("Karty graficzne");
+        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
 
         // when
         listener.handleMessage(request());
