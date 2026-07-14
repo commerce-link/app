@@ -109,6 +109,25 @@ class CategoryPickerFragmentTest {
         assertThat(html).doesNotContain("/dashboard/store/categories");
     }
 
+    @Test
+    void emptyHintIsSkippedEntirelyWhenTheCategoryFieldIsLockedForEditing() {
+        // given
+        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
+        IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
+        WebContext context = new WebContext(exchange);
+        context.setVariable("categories", List.of());
+        context.setVariable("edit", true);
+
+        // when
+        String html = templateEngine().process(
+                "<div th:unless=\"${edit}\">"
+                        + "<div th:replace=\"~{fragments/category-picker :: emptyHint(${categories})}\"></div>"
+                        + "</div>", context);
+
+        // then
+        assertThat(html).doesNotContain("/dashboard/store/categories");
+    }
+
     private String renderEmptyHint(List<String> categories) {
         JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
         IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());

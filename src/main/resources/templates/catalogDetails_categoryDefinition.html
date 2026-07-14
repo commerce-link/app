@@ -17,8 +17,9 @@
 
         <div class="field" style="max-width: 30rem;">
             <label class="label" th:text="#{catalog.category}"></label>
-            <div th:unless="${edit}"
-                 th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
+            <div th:unless="${edit}">
+                <div th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
+            </div>
             <div class="control">
                 <div th:replace="~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, true)}"></div>
             </div>
