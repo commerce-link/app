@@ -3,7 +3,6 @@ package pl.commercelink.orders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

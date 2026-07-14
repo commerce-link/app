@@ -19,7 +19,6 @@ import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.inventory.supplier.api.XmlItem;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
@@ -65,7 +64,7 @@ class StoreScopedFeedLoaderTest {
         private String mfn;
         private String brand;
         private String name;
-        private ProductCategory category;
+        private String category;
         private double netPrice;
         private int qty;
         private String currency;
@@ -74,7 +73,7 @@ class StoreScopedFeedLoaderTest {
         public String getMfn() { return mfn; }
         public String getBrand() { return brand; }
         public String getName() { return name; }
-        public ProductCategory getCategory() { return category; }
+        public String getCategory() { return category; }
         public double getNetPrice() { return netPrice; }
         public int getQty() { return qty; }
         public String getCurrency() { return currency; }
