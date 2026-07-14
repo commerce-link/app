@@ -15,6 +15,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
@@ -267,6 +268,10 @@ public class DemoStoreSeeder implements StoreSeeder {
         orders.add(third);
         orders.forEach(order -> order.setTotalPrice(itemsByOrderId.get(order.getOrderId()).stream()
                 .mapToDouble(OrderItem::getTotalPrice).sum()));
+        first.setPayments(new ArrayList<>(List.of(
+                Payment.bankTransfer("DEMO-PAY-001", "Jan Kowalski", Math.round(first.getTotalPrice() / 2.0)))));
+        second.setPayments(new ArrayList<>(List.of(
+                Payment.bankTransfer("DEMO-PAY-002", "Anna Nowak", second.getTotalPrice()))));
         return new DemoOrders(orders, itemsByOrderId, delivery);
     }
 

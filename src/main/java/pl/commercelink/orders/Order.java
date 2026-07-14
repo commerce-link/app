@@ -364,7 +364,7 @@ public class Order {
 
     @DynamoDBIgnore
     public Payment getLatestPayment() {
-        return payments.get(payments.size() - 1);
+        return payments.isEmpty() ? null : payments.get(payments.size() - 1);
     }
 
     @DynamoDBIgnore

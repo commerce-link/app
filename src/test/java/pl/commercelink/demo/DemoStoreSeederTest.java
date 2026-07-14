@@ -91,6 +91,35 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void seedsPartialFullAndMissingPaymentsAcrossOrders() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        Order first = orderById(demoOrders, "demo-order-001");
+        assertEquals("DEMO-PAY-001", first.getLatestPayment().getReferenceNo());
+        assertTrue(first.getUnpaidAmount() > 0);
+        assertFalse(first.isFullyPaid());
+
+        Order second = orderById(demoOrders, "demo-order-002");
+        assertEquals("DEMO-PAY-002", second.getLatestPayment().getReferenceNo());
+        assertTrue(second.isFullyPaid());
+
+        Order third = orderById(demoOrders, "demo-order-003");
+        assertTrue(third.getPayments().isEmpty());
+        assertNull(third.getLatestPayment());
+    }
+
+    private static Order orderById(DemoOrders demoOrders, String orderId) {
+        return demoOrders.orders().stream()
+                .filter(o -> orderId.equals(o.getOrderId()))
+                .findFirst().orElseThrow();
+    }
+
+    @Test
     void buildsPersistedDeliveryWithOrderedItems() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
