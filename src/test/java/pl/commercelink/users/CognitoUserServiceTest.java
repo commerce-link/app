@@ -35,7 +35,8 @@ class CognitoUserServiceTest {
 
     @BeforeEach
     void setUp() {
-        cognitoUserService = new CognitoUserService(cognitoClient, POOL_ID);
+        cognitoUserService = new CognitoUserService(cognitoClient);
+        cognitoUserService.userPoolId = POOL_ID;
     }
 
     @Test

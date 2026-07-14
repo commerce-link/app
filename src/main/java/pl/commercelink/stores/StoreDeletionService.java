@@ -1,5 +1,6 @@
 package pl.commercelink.stores;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
@@ -21,6 +22,7 @@ import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class StoreDeletionService {
 
     public enum Guard { DEMO_ONLY, ANY }
@@ -37,35 +39,10 @@ public class StoreDeletionService {
     private final FileStorage fileStorage;
     private final StoreInventoryCache storeInventoryCache;
     private final CognitoUserService cognitoUserService;
-    private final String storesBucket;
 
-    public StoreDeletionService(StoresRepository storesRepository,
-                                    OrdersRepository ordersRepository,
-                                    OrderItemsRepository orderItemsRepository,
-                                    OrderEventsRepository orderEventsRepository,
-                                    ProductCatalogRepository productCatalogRepository,
-                                    ProductRepository productRepository,
-                                    RMACentersRepository rmaCentersRepository,
-                                    RMAItemsRepository rmaItemsRepository,
-                                    StoreWipeRepository wipeRepository,
-                                    FileStorage fileStorage,
-                                    StoreInventoryCache storeInventoryCache,
-                                    CognitoUserService cognitoUserService,
-                                    @Value("${s3.bucket.stores}") String storesBucket) {
-        this.storesRepository = storesRepository;
-        this.ordersRepository = ordersRepository;
-        this.orderItemsRepository = orderItemsRepository;
-        this.orderEventsRepository = orderEventsRepository;
-        this.productCatalogRepository = productCatalogRepository;
-        this.productRepository = productRepository;
-        this.rmaCentersRepository = rmaCentersRepository;
-        this.rmaItemsRepository = rmaItemsRepository;
-        this.wipeRepository = wipeRepository;
-        this.fileStorage = fileStorage;
-        this.storeInventoryCache = storeInventoryCache;
-        this.cognitoUserService = cognitoUserService;
-        this.storesBucket = storesBucket;
-    }
+    @Value("${s3.bucket.stores}")
+    String storesBucket;
+
 
     public boolean deleteDemoStore(String storeId) {
         return deleteStore(storeId, Guard.DEMO_ONLY);

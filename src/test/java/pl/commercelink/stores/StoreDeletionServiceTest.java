@@ -59,8 +59,8 @@ class StoreDeletionServiceTest {
     void setUp() {
         service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
-                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
-                "stores");
+                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService);
+        service.storesBucket = "stores";
     }
 
     private Store demoStore() {

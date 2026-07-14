@@ -3,6 +3,7 @@ package pl.commercelink.demo;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class DemoStoreSeeder implements StoreSeeder {
 
     public static final String CATALOG_ID = "cat-local-01";
@@ -68,15 +70,9 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private final AmazonDynamoDB dynamoDB;
     private final FileStorage fileStorage;
-    private final String storesBucket;
 
-    public DemoStoreSeeder(AmazonDynamoDB dynamoDB,
-                           FileStorage fileStorage,
-                           @Value("${s3.bucket.stores}") String storesBucket) {
-        this.dynamoDB = dynamoDB;
-        this.fileStorage = fileStorage;
-        this.storesBucket = storesBucket;
-    }
+    @Value("${s3.bucket.stores}")
+    String storesBucket;
 
     @Override
     public void seed(Store store) {

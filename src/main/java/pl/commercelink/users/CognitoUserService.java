@@ -1,5 +1,6 @@
 package pl.commercelink.users;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.security.UserRole;
@@ -14,16 +15,13 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActi
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 
 @Service
+@RequiredArgsConstructor
 public class CognitoUserService {
 
     private final CognitoIdentityProviderClient cognitoClient;
-    private final String userPoolId;
 
-    public CognitoUserService(CognitoIdentityProviderClient cognitoClient,
-                           @Value("${cognito.user-pool-id}") String userPoolId) {
-        this.cognitoClient = cognitoClient;
-        this.userPoolId = userPoolId;
-    }
+    @Value("${cognito.user-pool-id}")
+    String userPoolId;
 
     public boolean userExists(String email) {
         try {
