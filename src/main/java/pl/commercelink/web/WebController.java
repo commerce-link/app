@@ -71,7 +71,7 @@ public class WebController {
     private ManualSupplierService manualSupplierService;
 
     @Value("${app.registration.demo:false}")
-    private boolean demoEnvironment;
+    boolean demoEnvironment;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -81,28 +81,21 @@ public class WebController {
         if (storeId != null) {
             Store store = storesRepository.findById(storeId);
             if (store != null) {
-                model.addAttribute("welcomeMessage", welcomeVisible(store, demoEnvironment));
+                model.addAttribute("welcomeMessage", consumeWelcome(store));
             }
         }
         return "dashboard";
     }
 
-    @PostMapping("/dashboard/welcome/dismiss")
-    public String dismissWelcome() {
-        String storeId = getStoreId();
-        if (storeId != null) {
-            Store store = storesRepository.findById(storeId);
-            if (store != null && store.getNotifications() != null
-                    && store.getNotifications().removeIf(n -> n.getType() == StoreNotificationType.WELCOME)) {
-                storesRepository.save(store);
-            }
+    private boolean consumeWelcome(Store store) {
+        if (demoEnvironment || store.getNotifications() == null) {
+            return false;
         }
-        return "redirect:/dashboard";
-    }
-
-    static boolean welcomeVisible(Store store, boolean demoEnvironment) {
-        return !demoEnvironment && store.getNotifications() != null && store.getNotifications().stream()
-                .anyMatch(n -> n.getType() == StoreNotificationType.WELCOME);
+        boolean removed = store.getNotifications().removeIf(n -> n.getType() == StoreNotificationType.WELCOME);
+        if (removed) {
+            storesRepository.save(store);
+        }
+        return removed;
     }
 
     @GetMapping("/dashboard/clients")

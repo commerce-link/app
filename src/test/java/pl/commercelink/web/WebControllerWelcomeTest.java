@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
@@ -18,11 +19,11 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,65 +64,38 @@ class WebControllerWelcomeTest {
     }
 
     @Test
-    void welcomeVisibleWhenNotificationPresent() {
-        // when / then
-        assertTrue(WebController.welcomeVisible(storeWithWelcome(), false));
-    }
-
-    @Test
-    void welcomeHiddenWithoutNotification() {
+    void welcomeShownOnFirstDashboardVisitAndConsumed() {
         // given
-        Store store = new Store();
+        Store store = givenCurrentStore(storeWithWelcome());
+        ExtendedModelMap model = new ExtendedModelMap();
 
-        // when / then
-        assertFalse(WebController.welcomeVisible(store, false));
+        // when
+        String view = controller.index(model);
+
+        // then
+        assertEquals("dashboard", view);
+        assertEquals(true, model.getAttribute("welcomeMessage"));
+        assertTrue(store.getNotifications().isEmpty());
+        verify(storesRepository).save(store);
     }
 
     @Test
-    void welcomeHiddenOnDemoEnvironment() {
-        // when / then
-        assertFalse(WebController.welcomeVisible(storeWithWelcome(), true));
-    }
-
-    @Test
-    void welcomeIgnoresOtherNotificationTypes() {
-        // given
-        Store store = new Store();
-        store.getNotifications().add(new StoreNotification(
-                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "morele", "token expired"));
-
-        // when / then
-        assertFalse(WebController.welcomeVisible(store, false));
-    }
-
-    @Test
-    void dismissRemovesWelcomeNotificationAndSavesStore() {
+    void welcomeHiddenOnSecondDashboardVisit() {
         // given
         Store store = givenCurrentStore(storeWithWelcome());
 
         // when
-        String view = controller.dismissWelcome();
+        controller.index(new ExtendedModelMap());
+        ExtendedModelMap secondVisit = new ExtendedModelMap();
+        controller.index(secondVisit);
 
         // then
-        assertTrue(store.getNotifications().isEmpty());
-        verify(storesRepository).save(store);
-        assertEquals("redirect:/dashboard", view);
+        assertEquals(false, secondVisit.getAttribute("welcomeMessage"));
+        verify(storesRepository, times(1)).save(store);
     }
 
     @Test
-    void dismissIsIdempotentAndSkipsSaveWhenNothingRemoved() {
-        // given
-        givenCurrentStore(new Store());
-
-        // when
-        controller.dismissWelcome();
-
-        // then
-        verify(storesRepository, never()).save(any());
-    }
-
-    @Test
-    void dismissRemovesOnlyWelcomeNotifications() {
+    void welcomeConsumptionKeepsOtherNotifications() {
         // given
         StoreNotification unauthenticated = new StoreNotification(
                 StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "morele", "token expired");
@@ -130,7 +104,7 @@ class WebControllerWelcomeTest {
         givenCurrentStore(store);
 
         // when
-        controller.dismissWelcome();
+        controller.index(new ExtendedModelMap());
 
         // then
         assertEquals(List.of(unauthenticated), store.getNotifications());
@@ -138,17 +112,49 @@ class WebControllerWelcomeTest {
     }
 
     @Test
-    void dismissNoOpsForLegacyStoreWithoutNotifications() {
+    void welcomeHiddenWithoutNotificationAndNothingSaved() {
+        // given
+        givenCurrentStore(new Store());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.index(model);
+
+        // then
+        assertEquals(false, model.getAttribute("welcomeMessage"));
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void welcomeHiddenAndKeptOnDemoEnvironment() {
+        // given
+        controller.demoEnvironment = true;
+        Store store = givenCurrentStore(storeWithWelcome());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.index(model);
+
+        // then
+        assertEquals(false, model.getAttribute("welcomeMessage"));
+        assertEquals(1, store.getNotifications().size());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void welcomeNoOpsForLegacyStoreWithoutNotifications() {
         // given
         Store store = new Store();
         store.setNotifications(null);
         givenCurrentStore(store);
+        ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.dismissWelcome();
+        String view = controller.index(model);
 
         // then
-        assertEquals("redirect:/dashboard", view);
+        assertEquals("dashboard", view);
+        assertEquals(false, model.getAttribute("welcomeMessage"));
         verify(storesRepository, never()).save(any());
     }
 }
