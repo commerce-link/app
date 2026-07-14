@@ -95,19 +95,40 @@ class RegistrationControllerTest {
     }
 
     @Test
-    void blankStoreNameFallsBackToPlaceholder() {
+    void demoModeIgnoresSubmittedStoreNameAndUsesDefault() {
         // given
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3);
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.1");
-        when(messageSource.getMessage("registration.store-name.placeholder", null, Locale.ROOT)).thenReturn("Mój sklep");
+        when(messageSource.getMessage("registration.store-name.default", null, Locale.ROOT)).thenReturn("Mój sklep");
         when(registrationService.register("user@firma.pl", "Mój sklep", "10.0.0.1"))
-                .thenReturn(new RegistrationResult("prod-store-1", null));
+                .thenReturn(new RegistrationResult("demo-store-1", null));
 
         // when
-        controller.register("user@firma.pl", "  ", null, request, new ExtendedModelMap(), Locale.ROOT);
+        demoController.register("user@firma.pl", "Sklep Testowy", null, request, new ExtendedModelMap(), Locale.ROOT);
 
         // then
         verify(registrationService).register("user@firma.pl", "Mój sklep", "10.0.0.1");
+    }
+
+    @Test
+    void productionModeShowsErrorWhenStoreNameMissing() {
+        // given
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
+        when(registrationService.register("user@firma.pl", "  ", "10.0.0.1"))
+                .thenThrow(new RegistrationException(RegistrationException.Reason.STORE_NAME_REQUIRED));
+        when(messageSource.getMessage(eq("registration.error.store-name-required"), any(), any(Locale.class)))
+                .thenReturn("Podaj nazwę sklepu.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.register("user@firma.pl", "  ", null, request, model, Locale.ROOT);
+
+        // then
+        assertEquals("register", view);
+        assertEquals("Podaj nazwę sklepu.", model.getAttribute("errorMessage"));
+        verify(messageSource, never()).getMessage(eq("registration.store-name.default"), any(), any(Locale.class));
     }
 
     @Test
@@ -140,12 +161,13 @@ class RegistrationControllerTest {
         RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 7);
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("1.1.1.1");
-        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1"))
+        when(messageSource.getMessage(eq("registration.store-name.default"), any(), any(Locale.class))).thenReturn("Mój sklep");
+        when(registrationService.register("user@example.com", "Mój sklep", "1.1.1.1"))
                 .thenReturn(new RegistrationResult("abc123def4", null));
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = demoController.register("user@example.com", "Sklep Testowy", null, request, model, Locale.forLanguageTag("pl"));
+        String view = demoController.register("user@example.com", null, null, request, model, Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("register-success", view);

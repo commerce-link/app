@@ -50,8 +50,9 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addDemoAttributes(model);
-        String resolvedName = isNotBlank(storeName) ? storeName
-                : messageSource.getMessage("registration.store-name.placeholder", null, locale);
+        String resolvedName = demoMode
+                ? messageSource.getMessage("registration.store-name.default", null, locale)
+                : storeName;
         try {
             RegistrationResult result = registrationService.register(email, resolvedName, clientIp(request));
             model.addAttribute("email", email);

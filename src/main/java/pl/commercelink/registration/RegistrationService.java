@@ -101,8 +101,11 @@ public class RegistrationService {
         }
     }
 
-    private static String validatedStoreName(String storeName) {
+    private String validatedStoreName(String storeName) {
         String trimmed = storeName == null ? "" : storeName.trim();
+        if (!demoMode && trimmed.isEmpty()) {
+            throw new RegistrationException(RegistrationException.Reason.STORE_NAME_REQUIRED);
+        }
         if (trimmed.length() < STORE_NAME_MIN || trimmed.length() > STORE_NAME_MAX) {
             throw new RegistrationException(RegistrationException.Reason.INVALID_STORE_NAME);
         }

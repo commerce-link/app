@@ -79,10 +79,10 @@
                        th:placeholder="#{registration.email.placeholder}" th:value="${email}">
             </div>
         </div>
-        <div class="field">
+        <div class="field" th:unless="${demoMode}">
             <label class="label" th:text="#{registration.store-name.label}"></label>
             <div class="control">
-                <input class="input" type="text" name="storeName" maxlength="60"
+                <input class="input" type="text" name="storeName" required minlength="2" maxlength="60"
                        th:placeholder="#{registration.store-name.placeholder}" th:value="${storeName}">
             </div>
         </div>

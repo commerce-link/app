@@ -249,10 +249,19 @@ class RegistrationServiceTest {
     }
 
     @Test
-    void rejectsBlankStoreName() {
+    void productionModeRequiresStoreName() {
         // when / then
         RegistrationException e = assertThrows(RegistrationException.class,
                 () -> service(false, false).register("user@firma.pl", "   ", "10.0.0.1"));
+        assertEquals(RegistrationException.Reason.STORE_NAME_REQUIRED, e.getReason());
+        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
+    }
+
+    @Test
+    void demoModeRejectsBlankStoreNameAsInvalid() {
+        // when / then
+        RegistrationException e = assertThrows(RegistrationException.class,
+                () -> service(true, false).register("user@firma.pl", "   ", "10.0.0.1"));
         assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
         verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
     }
