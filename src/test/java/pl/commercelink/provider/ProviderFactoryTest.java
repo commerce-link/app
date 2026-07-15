@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.provider.api.AuthConfig;
 import pl.commercelink.provider.api.ProviderDescriptor;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.rest.client.ConfigurableOAuth2AuthorizationService;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
 import pl.commercelink.rest.client.OAuth2RefreshToken;
 import pl.commercelink.rest.client.OAuth2TokenStore;
@@ -263,5 +264,38 @@ class ProviderFactoryTest {
         @SuppressWarnings("unchecked")
         Map<String, String> headers = (Map<String, String>) defaultHeadersField.get(restApi);
         return headers;
+    }
+
+    @Test
+    void createAuthServiceResolvesRelativeAuthAndAbsoluteRefreshEndpoints() throws Exception {
+        // given
+        OAuth2Descriptor descriptor = new OAuth2Descriptor();
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
+        AuthConfig.OAuth2 oauth2 = new AuthConfig.OAuth2(
+                "https://api.example.com", "/auth/register", "https://auth.example.com/token",
+                7776000L, "application/vnd.allegro.public.v1+json", "refreshToken");
+
+        // when
+        ConfigurableOAuth2AuthorizationService authService = factory.createAuthService(store, descriptor, oauth2);
+
+        // then
+        String[] endpoints = authEndpointsOf(authService);
+        assertEquals("https://api.example.com/auth/register", endpoints[0]);
+        assertEquals("https://auth.example.com/token", endpoints[1]);
+    }
+
+    private static String[] authEndpointsOf(ConfigurableOAuth2AuthorizationService authService) throws Exception {
+        Field authorizationEndpointField = ConfigurableOAuth2AuthorizationService.class
+                .getDeclaredField("authorizationEndpoint");
+        authorizationEndpointField.setAccessible(true);
+
+        Field refreshTokenEndpointField = ConfigurableOAuth2AuthorizationService.class
+                .getDeclaredField("refreshTokenEndpoint");
+        refreshTokenEndpointField.setAccessible(true);
+
+        return new String[] {
+                (String) authorizationEndpointField.get(authService),
+                (String) refreshTokenEndpointField.get(authService)
+        };
     }
 }

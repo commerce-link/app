@@ -85,9 +85,24 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     private Map<String, Object> buildOAuth2Context(
             Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
         String apiUrl = oauth2.apiUrl();
+
+        ConfigurableOAuth2AuthorizationService authService = createAuthService(store, descriptor, oauth2);
+
+        RestApi.Builder restApiBuilder = RestApi.builder(apiUrl);
+        oauth2DefaultHeaders(oauth2).forEach(restApiBuilder::defaultHeader);
+
+        RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
+                restApiBuilder.build(),
+                () -> authService.getAccessToken(store.getStoreId()));
+
+        return Map.of("restApi", restApiWithRetry);
+    }
+
+    ConfigurableOAuth2AuthorizationService createAuthService(Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
+        String apiUrl = oauth2.apiUrl();
         String credentialName = resolveCredentialName(descriptor);
 
-        ConfigurableOAuth2AuthorizationService authService = new ConfigurableOAuth2AuthorizationService(
+        return new ConfigurableOAuth2AuthorizationService(
                 credentialStore, tokenStore,
                 credentialName,
                 resolveAuthEndpoint(apiUrl, oauth2.authEndpointPath()),
@@ -98,15 +113,6 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                     onAuthorizationLost(s, descriptor);
                     storesRepository.save(s);
                 });
-
-        RestApi.Builder restApiBuilder = RestApi.builder(apiUrl);
-        oauth2DefaultHeaders(oauth2).forEach(restApiBuilder::defaultHeader);
-
-        RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
-                restApiBuilder.build(),
-                () -> authService.getAccessToken(store.getStoreId()));
-
-        return Map.of("restApi", restApiWithRetry);
     }
 
     static String resolveAuthEndpoint(String apiUrl, String path) {
