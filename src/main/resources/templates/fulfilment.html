@@ -10,6 +10,18 @@
     <style>
         body { padding-bottom: 96px; }
 
+        .range-dual { position: relative; height: 18px; }
+        .range-dual input[type=range] { position: absolute; left: 0; top: 0; width: 100%; height: 18px; margin: 0;
+            -webkit-appearance: none; appearance: none; background: none; pointer-events: none; }
+        .range-dual input[type=range]::-webkit-slider-runnable-track { -webkit-appearance: none; height: 18px; background: transparent; }
+        .range-dual input[type=range]::-moz-range-track { background: transparent; }
+        .range-dual input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; pointer-events: auto;
+            width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; background: #3e8ed0; border: none; cursor: pointer; }
+        .range-dual input[type=range]::-moz-range-thumb { pointer-events: auto; width: 14px; height: 14px;
+            border-radius: 50%; background: #3e8ed0; border: none; cursor: pointer; }
+        .rd-track { position: absolute; top: 6px; left: 0; right: 0; height: 6px; border-radius: 3px; background: #dfe3e7; }
+        .rd-fill { position: absolute; top: 6px; height: 6px; border-radius: 3px; background: #3e8ed0; }
+
         .fl-toolbar { position: sticky; top: 0; z-index: 30; background: #fff;
             border-bottom: 1px solid #e6e8eb; padding: .7rem 0 .55rem 0; box-shadow: 0 2px 6px rgba(0,0,0,.04); margin-bottom: 1rem; }
 
@@ -24,6 +36,14 @@
         .order-chip.none { background: #fdecec; color: #c0392b; }
         .order-chip.active { outline: 2px solid #3273dc; outline-offset: 1px; }
         .order-chip .frac { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+        .prov-filter { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+        .prov-chip-btn { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600;
+            padding: .2rem .6rem; border-radius: 999px; border: 1px solid transparent; cursor: pointer; user-select: none;
+            color: #fff; background: var(--accent, #b5b5b5); }
+        .prov-chip-btn.inactive { opacity: .35; }
+        .prov-chip-btn.active { outline: 2px solid #3273dc; outline-offset: 1px; }
+        .prov-chip-btn .cnt { background: rgba(255,255,255,.25); border-radius: 999px; padding: 0 .4rem; font-size: .7rem; }
 
         .cat-section { margin-bottom: 1.2rem; }
         .cat-header { display: flex; align-items: center; gap: .55rem; padding: .5rem .9rem; background: #f4f5f7;
@@ -112,6 +132,16 @@
                         <label class="checkbox is-size-7 mr-3"><input type="checkbox" id="fOnlyUnaccepted"> <span th:text="#{fulfilment.filter.unaccepted}"></span></label>
                         <label class="checkbox is-size-7"><input type="checkbox" id="fAboveCost"> <span th:text="#{fulfilment.filter.above.cost}"></span></label>
                     </div>
+                    <div class="level-item">
+                        <span class="is-size-7 has-text-grey mr-2" style="white-space:nowrap;" th:text="#{fulfilment.filter.net}"></span>
+                        <div class="range-dual" style="width:200px;">
+                            <div class="rd-track"></div>
+                            <div class="rd-fill" id="fNetFill"></div>
+                            <input type="range" id="fNetMin" min="0" max="100" step="1" value="0">
+                            <input type="range" id="fNetMax" min="0" max="100" step="1" value="100">
+                        </div>
+                        <span class="is-size-7 has-text-weight-semibold ml-2" id="fNetRangeVal" style="white-space:nowrap; min-width:8.5rem;"></span>
+                    </div>
                 </div>
                 <div class="level-right">
                     <div class="level-item buttons are-small mb-0">
@@ -119,6 +149,12 @@
                             <span class="icon"><i class="fas fa-eraser"></i></span><span th:text="#{fulfilment.clear.selection}"></span>
                         </button>
                     </div>
+                </div>
+            </div>
+            <div class="level is-mobile mb-2">
+                <div class="level-left" style="flex:1;">
+                    <span class="is-size-7 has-text-grey mr-3" style="white-space:nowrap;"><i class="fas fa-truck mr-1"></i><span th:text="#{fulfilment.filter.supplier}"></span></span>
+                    <div class="prov-filter" id="providerFilter"></div>
                 </div>
             </div>
             <div class="level is-mobile mb-0" th:unless="${isWarehouse}">
@@ -270,6 +306,7 @@
         const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const cards = () => Array.from(document.querySelectorAll('.group-card'));
         let activeOrder = null;
+        let activeProvider = null;
 
         const isAccepted = c => c.dataset.accepted === 'true';
         const gross = c => parseFloat(c.dataset.gross) || 0;
@@ -300,6 +337,29 @@
             const cf = document.getElementById('clearFocus');
             if (cf) cf.style.display = 'none';
             render();
+        }
+
+        function focusProvider(prov) {
+            activeProvider = (activeProvider === prov) ? null : prov;
+            if (activeProvider) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
+            renderProviderFilter();
+            applyFilters();
+        }
+
+        function renderProviderFilter() {
+            const bar = document.getElementById('providerFilter');
+            if (!bar) return;
+            const counts = {};
+            cards().forEach(c => { counts[c.dataset.provider] = (counts[c.dataset.provider] || 0) + 1; });
+            bar.innerHTML = '';
+            Object.keys(counts).sort().forEach(p => {
+                const chip = document.createElement('span');
+                chip.className = 'prov-chip-btn' + (activeProvider === p ? ' active' : (activeProvider ? ' inactive' : ''));
+                chip.style.setProperty('--accent', provColor(p));
+                chip.onclick = () => focusProvider(p);
+                chip.innerHTML = '<i class="fas fa-truck"></i>' + p + '<span class="cnt">' + counts[p] + '</span>';
+                bar.appendChild(chip);
+            });
         }
 
         /* winner per order-item = cheapest ACCEPTED card containing it */
@@ -550,14 +610,42 @@
             else warn.style.display = 'none';
         }
 
+        function initNetSlider() {
+            const lo = document.getElementById('fNetMin'), hi = document.getElementById('fNetMax');
+            const maxNet = Math.ceil(Math.max(0, ...cards().map(net)));
+            lo.max = maxNet; hi.max = maxNet;
+            lo.value = 0; hi.value = maxNet;
+            updateNetSlider();
+        }
+
+        function netRange() {
+            return [parseFloat(document.getElementById('fNetMin').value), parseFloat(document.getElementById('fNetMax').value)];
+        }
+
+        function updateNetSlider() {
+            const lo = document.getElementById('fNetMin'), hi = document.getElementById('fNetMax');
+            if (parseFloat(lo.value) > parseFloat(hi.value)) {
+                if (document.activeElement === hi) hi.value = lo.value; else lo.value = hi.value;
+            }
+            const [minV, maxV] = netRange();
+            const range = parseFloat(hi.max) || 1;
+            const fill = document.getElementById('fNetFill');
+            fill.style.left = (minV / range * 100) + '%';
+            fill.style.width = ((maxV - minV) / range * 100) + '%';
+            document.getElementById('fNetRangeVal').textContent = fmt(minV) + ' – ' + fmt(maxV) + ' zł';
+        }
+
         function applyFilters() {
             const onlyUn = document.getElementById('fOnlyUnaccepted').checked;
             const aboveCost = document.getElementById('fAboveCost').checked;
+            const [minNet, maxNet] = netRange();
             cards().forEach(c => {
                 let show = true;
                 if (onlyUn && (isAccepted(c) || c.dataset.redundant === '1')) show = false;
                 if (aboveCost && parseFloat(c.dataset.margin) <= 0) show = false;
                 if (activeOrder && !cardOrders(c).includes(activeOrder)) show = false;
+                if (activeProvider && c.dataset.provider !== activeProvider) show = false;
+                if (net(c) < minNet || net(c) > maxNet) show = false;
                 c.classList.toggle('is-hidden', !show);
                 c.classList.toggle('is-focus-match', !!activeOrder && cardOrders(c).includes(activeOrder));
             });
@@ -668,8 +756,12 @@
 
         document.getElementById('fOnlyUnaccepted').addEventListener('change', applyFilters);
         document.getElementById('fAboveCost').addEventListener('change', applyFilters);
+        document.getElementById('fNetMin').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
+        document.getElementById('fNetMax').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
 
         buildGroups();
+        renderProviderFilter();
+        initNetSlider();
         render();
     </script>
 
