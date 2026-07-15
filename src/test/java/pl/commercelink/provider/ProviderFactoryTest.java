@@ -19,6 +19,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -89,12 +92,10 @@ class ProviderFactoryTest {
     }
 
     private ProviderFactory<OAuth2Descriptor, Object> factoryWith(OAuth2Descriptor descriptor) {
-        return new ProviderFactory<>(OAuth2Descriptor.class, null,
-                configurationManager, credentialStore, tokenStore, storesRepository) {
-            {
-                registerDescriptor(descriptor);
-            }
-        };
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository);
+        factory.registerDescriptor(descriptor);
+        return factory;
     }
 
     @Test
@@ -120,6 +121,7 @@ class ProviderFactoryTest {
     void saveConfigurationSeedsRefreshTokenForOAuth2Descriptor() {
         // given
         when(store.getStoreId()).thenReturn("store-1");
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(true);
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new OAuth2Descriptor());
 
         // when
@@ -127,8 +129,23 @@ class ProviderFactoryTest {
 
         // then
         verify(tokenStore).storeToken(eq("store-1"), eq("TestOAuth"), eq("refresh_token"),
-                argThat(t -> ((OAuth2RefreshToken) t).getTokenValue().equals("rt-123")));
+                argThat(t -> ((OAuth2RefreshToken) t).getTokenValue().equals("rt-123")
+                        && ((OAuth2RefreshToken) t).getExpiresAt().getEpochSecond()
+                                - ((OAuth2RefreshToken) t).getIssuedAt().getEpochSecond() == 7776000L));
         verify(tokenStore).deleteToken("store-1", "TestOAuth", "access_token");
+    }
+
+    @Test
+    void saveConfigurationSkipsSeedingWhenConfigurationNotPersisted() {
+        // given
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(false);
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new OAuth2Descriptor());
+
+        // when
+        factory.saveConfiguration(store, "TestOAuth", Map.of("refreshToken", "rt-1"));
+
+        // then
+        verifyNoInteractions(tokenStore);
     }
 
     @Test

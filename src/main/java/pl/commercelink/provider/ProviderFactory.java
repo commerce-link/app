@@ -175,8 +175,10 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         D descriptor = descriptors.get(providerName);
         if (descriptor != null && configuration != null) {
             String configName = resolveCredentialName(descriptor);
-            configurationManager.saveConfiguration(store, configName, descriptor, configuration);
-            seedRefreshToken(store, descriptor, configName, configuration);
+            boolean persisted = configurationManager.saveConfiguration(store, configName, descriptor, configuration);
+            if (persisted) {
+                seedRefreshToken(store, descriptor, configName, configuration);
+            }
         }
     }
 
