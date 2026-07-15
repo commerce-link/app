@@ -15,7 +15,7 @@ import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
-public class IcecatCategories {
+public class PimCategoryOptions {
 
     private static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
 

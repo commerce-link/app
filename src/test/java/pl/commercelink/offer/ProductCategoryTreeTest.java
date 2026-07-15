@@ -1,84 +1,65 @@
 package pl.commercelink.offer;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.taxonomy.ProductGroup;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ProductCategoryTreeTest {
 
     @Test
-    @DisplayName("resolves product group from a category key known to the legacy enum")
-    void resolvesProductGroupFromKnownCategoryKey() {
-        // given
-        CategoryDefinition definition = definition("CPU", "Gaming CPUs");
-
-        // when
-        ProductCategoryTree tree = new ProductCategoryTree(definition, false, "Procesory", "Podzespoly");
-
-        // then
-        assertThat(tree.getProductCategory()).isEqualTo("CPU");
-        assertThat(tree.getProductGroup()).isEqualTo(ProductGroup.PcComponents);
-        assertThat(tree.getCategoryTree()).isEqualTo("Podzespoly/Procesory");
-    }
-
-    @Test
-    @DisplayName("keeps unknown category key without product group instead of failing")
-    void keepsUnknownCategoryKeyWithoutProductGroup() {
-        // given
-        CategoryDefinition definition = definition("IcecatFreeCategory", "Custom");
-
-        // when
-        ProductCategoryTree tree = new ProductCategoryTree(definition, false, "IcecatFreeCategory", null);
-
-        // then
-        assertThat(tree.getProductCategory()).isEqualTo("IcecatFreeCategory");
-        assertThat(tree.getProductGroup()).isNull();
-        assertThat(tree.getCategoryTree()).isEqualTo("IcecatFreeCategory");
-    }
-
-    @Test
-    @DisplayName("resolves product group for an IceCat leaf name that maps onto the legacy enum")
-    void resolvesProductGroupFromIcecatLeafName() {
+    @DisplayName("builds path from catalog name and definition name")
+    void buildsPathFromCatalogAndDefinitionName() {
         // given
         CategoryDefinition definition = definition("Procesory", "Gaming CPUs");
 
         // when
-        ProductCategoryTree tree = new ProductCategoryTree(definition, false, "Procesory", "Podzespoly");
+        ProductCategoryTree tree = new ProductCategoryTree(definition, "Elektronika");
 
         // then
-        assertThat(tree.getProductCategory()).isEqualTo("Procesory");
-        assertThat(tree.getProductGroup()).isEqualTo(ProductGroup.PcComponents);
-        assertThat(tree.getCategoryTree()).isEqualTo("Podzespoly/Procesory");
+        assertThat(tree.getPath()).isEqualTo("Elektronika/Gaming CPUs");
+        assertThat(tree.getCategoryId()).isEqualTo("cat-1");
+        assertThat(tree.getName()).isEqualTo("Gaming CPUs");
+        assertThat(tree.getGroupingOrder()).isEqualTo(List.of("A", "B"));
+        assertThat(tree.getMaxQty()).isEqualTo(3);
+        assertThat(tree.getSequenceNumber()).isEqualTo(7);
+        assertThat(tree.isRequiredDuringOrder()).isTrue();
     }
 
     @Test
-    @DisplayName("leaves product group empty for an IceCat leaf with no legacy enum counterpart")
-    void leavesProductGroupEmptyForIcecatOnlyLeaf() {
+    @DisplayName("falls back to definition name when catalog has no name")
+    void fallsBackToDefinitionNameWhenCatalogHasNoName() {
         // given
-        CategoryDefinition definition = definition("Kołdry", "Pościel");
+        CategoryDefinition definition = definition("Procesory", "Gaming CPUs");
 
         // when
-        ProductCategoryTree tree = new ProductCategoryTree(definition, false, "Kołdry", null);
+        ProductCategoryTree tree = new ProductCategoryTree(definition, null);
 
         // then
-        assertThat(tree.getProductGroup()).isNull();
-        assertThat(tree.getCategoryTree()).isEqualTo("Kołdry");
+        assertThat(tree.getPath()).isEqualTo("Gaming CPUs");
     }
 
     @Test
-    @DisplayName("appends definition name to the tree path when category key is duplicated in the catalog")
-    void appendsDefinitionNameWhenCategoryKeyDuplicated() {
+    @DisplayName("serializes exactly the agreed JSON field set")
+    void serializesExactlyTheAgreedJsonFieldSet() throws Exception {
         // given
-        CategoryDefinition definition = definition("CPU", "Office CPUs");
+        ProductCategoryTree tree = new ProductCategoryTree(definition("Procesory", "Gaming CPUs"), "Elektronika");
 
         // when
-        ProductCategoryTree tree = new ProductCategoryTree(definition, true, "Procesory", "Podzespoly");
+        JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(tree));
 
         // then
-        assertThat(tree.getCategoryTree()).isEqualTo("Podzespoly/Procesory/Office CPUs");
+        List<String> fields = new ArrayList<>();
+        json.fieldNames().forEachRemaining(fields::add);
+        assertThat(fields).containsExactlyInAnyOrder(
+                "categoryId", "name", "path", "requiredDuringOrder", "sequenceNumber", "groupingOrder", "maxQty");
+        assertThat(json.get("path").asText()).isEqualTo("Elektronika/Gaming CPUs");
     }
 
     private CategoryDefinition definition(String categoryKey, String name) {
@@ -86,6 +67,10 @@ class ProductCategoryTreeTest {
         definition.setCategoryId("cat-1");
         definition.setName(name);
         definition.setCategory(categoryKey);
+        definition.setGroupingOrder(List.of("A", "B"));
+        definition.setMaxQty(3);
+        definition.setSequenceNumber(7);
+        definition.setRequiredDuringOrder(true);
         return definition;
     }
 }

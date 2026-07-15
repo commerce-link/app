@@ -14,13 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class IcecatCategoriesTest {
+class PimCategoryOptionsTest {
 
     @Mock
     private PimCatalog pimCatalog;
 
-    private IcecatCategories icecatCategories() {
-        return new IcecatCategories(pimCatalog);
+    private PimCategoryOptions pimCategoryOptions() {
+        return new PimCategoryOptions(pimCatalog);
     }
 
     @Test
@@ -34,7 +34,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> names = icecatCategories().topLevelNames();
+        List<String> names = pimCategoryOptions().topLevelNames();
 
         // then
         assertThat(names).containsExactly("Dom", "Łóżka", "Meble");
@@ -46,7 +46,7 @@ class IcecatCategoriesTest {
         when(pimCatalog.allCategories()).thenReturn(List.of());
 
         // when / then
-        assertThat(icecatCategories().topLevelNames()).isEmpty();
+        assertThat(pimCategoryOptions().topLevelNames()).isEmpty();
     }
 
     @Test
@@ -62,7 +62,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> names = icecatCategories().leafNamesUnder(List.of("Dom"));
+        List<String> names = pimCategoryOptions().leafNamesUnder(List.of("Dom"));
 
         // then
         assertThat(names).containsExactly("Krzesła", "Stoły");
@@ -79,7 +79,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> names = icecatCategories().leafNamesUnder(List.of("Dom", "Biuro"));
+        List<String> names = pimCategoryOptions().leafNamesUnder(List.of("Dom", "Biuro"));
 
         // then
         assertThat(names).containsExactly("Ławki", "Stoły");
@@ -94,7 +94,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> names = icecatCategories().topLevelNames();
+        List<String> names = pimCategoryOptions().topLevelNames();
 
         // then
         assertThat(names).containsExactly("Dom");
@@ -109,7 +109,7 @@ class IcecatCategoriesTest {
         ));
 
         // when / then
-        assertThat(icecatCategories().topLevelNames()).isEmpty();
+        assertThat(pimCategoryOptions().topLevelNames()).isEmpty();
     }
 
     @Test
@@ -121,7 +121,7 @@ class IcecatCategoriesTest {
         ));
 
         // when / then
-        assertThat(icecatCategories().leafNamesUnder(List.of("Dom"))).isEmpty();
+        assertThat(pimCategoryOptions().leafNamesUnder(List.of("Dom"))).isEmpty();
     }
 
     @Test
@@ -133,7 +133,7 @@ class IcecatCategoriesTest {
         ));
 
         // when / then
-        assertThat(icecatCategories().leafNamesUnder(List.of("Computers"))).isEmpty();
+        assertThat(pimCategoryOptions().leafNamesUnder(List.of("Computers"))).isEmpty();
     }
 
     @Test
@@ -145,7 +145,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> options = icecatCategories().categoryOptions(List.of("Dom"), List.of("CPU"));
+        List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), List.of("CPU"));
 
         // then
         assertThat(options).containsExactly("CPU", "Stoły");
@@ -160,7 +160,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> options = icecatCategories().categoryOptions(List.of("Dom"), List.of("Łóżka"));
+        List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), List.of("Łóżka"));
 
         // then
         assertThat(options).containsExactly("Łóżka", "Meble");
@@ -175,7 +175,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> options = icecatCategories().categoryOptions(List.of("Dom"), List.of("Stoły", "Stoły"));
+        List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), List.of("Stoły", "Stoły"));
 
         // then
         assertThat(options).containsExactly("Stoły");
@@ -190,7 +190,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> options = icecatCategories().categoryOptions(
+        List<String> options = pimCategoryOptions().categoryOptions(
                 List.of("Dom"), Arrays.asList(null, "", "  "));
 
         // then
@@ -206,7 +206,7 @@ class IcecatCategoriesTest {
         ));
 
         // when
-        List<String> options = icecatCategories().categoryOptions(List.of("Dom"), List.of("Services"));
+        List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), List.of("Services"));
 
         // then
         assertThat(options).containsExactly("Stoły");

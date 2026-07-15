@@ -16,9 +16,6 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.starter.localization.EnumLocalizer;
-import pl.commercelink.taxonomy.CategoryLocalizer;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.List;
 
@@ -53,86 +50,31 @@ class ProductCatalogRestApiTest {
     private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
 
     @Mock
-    private EnumLocalizer enumLocalizer;
-
-    @Mock
-    private CategoryLocalizer categoryLocalizer;
-
-    @Mock
     private ProductCatalog catalog;
 
     @InjectMocks
     private ProductCatalogRestApi restApi;
 
     @Test
-    void categoryTreeLocalizesLeafThroughTheInventoryCategorySoOtherLanguagesStillResolve() {
+    void categoryTreeBuildsPathFromCatalogAndDefinitionNames() {
         // given
-        catalogWithSingleDefinition("Karty graficzne");
-        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Graphics cards");
-        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("PC components");
+        catalogWithDefinitions("Elektronika",
+                definition("category-1", "Karty RTX", "Karty graficzne"),
+                definition("category-2", "Procesory do gier", "Procesory"));
 
         // when
         List<ProductCategoryTree> tree = categoriesTree();
 
         // then
-        assertThat(tree).hasSize(1);
-        assertThat(tree.get(0).getCategoryTree()).isEqualTo("PC components/Graphics cards");
+        assertThat(tree).extracting(ProductCategoryTree::getPath)
+                .containsExactly("Elektronika/Karty RTX", "Elektronika/Procesory do gier");
+        assertThat(tree).extracting(ProductCategoryTree::getCategoryId)
+                .containsExactly("category-1", "category-2");
     }
 
-    @Test
-    void categoryTreeResolvesProductGroupThroughIcecatBridgeForLeafCategory() {
-        // given
-        catalogWithSingleDefinition("Karty graficzne");
-        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
-        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
-
-        // when
-        List<ProductCategoryTree> tree = categoriesTree();
-
-        // then
-        assertThat(tree).hasSize(1);
-        assertThat(tree.get(0).getCategoryTree()).isEqualTo("Podzespoły komputerowe/Karty graficzne");
-    }
-
-    @Test
-    void categoryTreeHasNoProductGroupPrefixForCategoryOutsideTheBridge() {
-        // given
-        catalogWithSingleDefinition("Kołdry");
-        when(categoryLocalizer.localize("Kołdry", "plural")).thenReturn("Kołdry");
-
-        // when
-        List<ProductCategoryTree> tree = categoriesTree();
-
-        // then
-        assertThat(tree).hasSize(1);
-        assertThat(tree.get(0).getCategoryTree()).isEqualTo("Kołdry");
-    }
-
-    @Test
-    void marksDefinitionsAsDuplicatedWhenTheirCategoriesResolveToTheSameInventoryCategory() {
-        // given
-        catalogWithDefinitions(
-                definition("category-1", "Karty RTX", "GPU"),
-                definition("category-2", "Karty GTX", "Karty graficzne"));
-        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
-        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
-
-        // when
-        List<ProductCategoryTree> tree = categoriesTree();
-
-        // then
-        assertThat(tree).extracting(ProductCategoryTree::getCategoryTree)
-                .containsExactly(
-                        "Podzespoły komputerowe/Karty graficzne/Karty RTX",
-                        "Podzespoły komputerowe/Karty graficzne/Karty GTX");
-    }
-
-    private void catalogWithSingleDefinition(String category) {
-        catalogWithDefinitions(definition("category-1", "Karta graficzna", category));
-    }
-
-    private void catalogWithDefinitions(CategoryDefinition... definitions) {
+    private void catalogWithDefinitions(String catalogName, CategoryDefinition... definitions) {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getName()).thenReturn(catalogName);
         when(catalog.getCategories()).thenReturn(List.of(definitions));
     }
 

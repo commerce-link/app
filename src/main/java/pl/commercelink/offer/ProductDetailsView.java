@@ -1,7 +1,6 @@
 package pl.commercelink.offer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import pl.commercelink.taxonomy.ProductGroup;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.products.ProductCustomAttribute;
 import pl.commercelink.products.ProductCustomAttributeFilter;
@@ -23,10 +22,6 @@ public class ProductDetailsView {
     private String label;
     @JsonProperty("name")
     private String name;
-    @JsonProperty("group")
-    private ProductGroup group;
-    @JsonProperty("category")
-    private String category;
 
     // store specific, product related information
     @JsonProperty("recommendation")
@@ -44,15 +39,13 @@ public class ProductDetailsView {
     public ProductDetailsView() {
     }
 
-    public ProductDetailsView(String categoryId, String pimId, String manufacturerCode, String brand, String label, String name, ProductGroup group, String category) {
+    public ProductDetailsView(String categoryId, String pimId, String manufacturerCode, String brand, String label, String name) {
         this.categoryId = categoryId;
         this.pimId = pimId;
         this.manufacturerCode = manufacturerCode;
         this.brand = brand;
         this.label = label;
         this.name = name;
-        this.group = group;
-        this.category = category;
     }
 
     // setters and getters for generally available information
@@ -103,22 +96,6 @@ public class ProductDetailsView {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
-    }
-
-    public ProductGroup getGroup() {
-        return group;
-    }
-
-    public void setGroup(ProductGroup group) {
-        this.group = group;
     }
 
     // setters and getters for manually provided information

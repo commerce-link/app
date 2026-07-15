@@ -18,7 +18,6 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.List;
 import java.util.Optional;
@@ -57,7 +56,7 @@ class ProductDetailsTest {
     private ProductDetails productDetails;
 
     @Test
-    void managedProductWithIcecatLeafCategoryExposesProductGroup() {
+    void managedProductExposesIdentityResolvableThroughCategoryId() {
         // given
         managedDefinition();
         when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product("Karty graficzne"));
@@ -66,39 +65,14 @@ class ProductDetailsTest {
         ProductDetailsView view = productDetails.generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
 
         // then
-        assertThat(view.getGroup()).isEqualTo(ProductGroup.PcComponents);
-        assertThat(view.getCategory()).isEqualTo("Karty graficzne");
+        assertThat(view.getCategoryId()).isEqualTo(CATEGORY_ID);
+        assertThat(view.getPimId()).isEqualTo(PIM_ID);
+        assertThat(view.getName()).isEqualTo("Gigabyte RTX 5070");
+        assertThat(view.getBrand()).isEqualTo("Gigabyte");
     }
 
     @Test
-    void managedProductWithLegacyEnumCategoryExposesTheSameProductGroup() {
-        // given
-        managedDefinition();
-        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product("GPU"));
-
-        // when
-        ProductDetailsView view = productDetails.generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
-
-        // then
-        assertThat(view.getGroup()).isEqualTo(ProductGroup.PcComponents);
-    }
-
-    @Test
-    void managedProductWithUnmappedCategoryHasNoProductGroup() {
-        // given
-        managedDefinition();
-        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product("Kołdry"));
-
-        // when
-        ProductDetailsView view = productDetails.generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
-
-        // then
-        assertThat(view.getGroup()).isNull();
-        assertThat(view.getCategory()).isEqualTo("Kołdry");
-    }
-
-    @Test
-    void dynamicDefinitionWithIcecatLeafCategoryExposesProductGroup() {
+    void dynamicDefinitionBuildsDetailsFromRecommendation() {
         // given
         dynamicDefinition("Karty graficzne");
         when(pimCatalog.findByPimId(PIM_ID)).thenReturn(Optional.of(pimEntry()));
@@ -111,8 +85,9 @@ class ProductDetailsTest {
         ProductDetailsView view = productDetails.generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
 
         // then
-        assertThat(view.getGroup()).isEqualTo(ProductGroup.PcComponents);
-        assertThat(view.getCategory()).isEqualTo("Karty graficzne");
+        assertThat(view.getCategoryId()).isEqualTo(CATEGORY_ID);
+        assertThat(view.getPimId()).isEqualTo(PIM_ID);
+        assertThat(view.getName()).isEqualTo("Gigabyte RTX 5070");
     }
 
     private void managedDefinition() {

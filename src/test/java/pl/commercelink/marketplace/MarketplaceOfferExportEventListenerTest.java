@@ -10,8 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
-import pl.commercelink.starter.localization.EnumLocalizer;
-import pl.commercelink.taxonomy.CategoryLocalizer;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -30,7 +28,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.List;
 import java.util.Optional;
@@ -59,8 +56,6 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private Inventory inventory;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Mock private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-    @Mock private EnumLocalizer enumLocalizer;
-    @Mock private CategoryLocalizer categoryLocalizer;
 
     @Mock private Store store;
     @Mock private ProductCatalog catalog;
@@ -148,9 +143,14 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName) {
+        configureCategoryWith(def, product, warehouseQty, categoryName, null);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName, String definitionName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
         category.setCategory(categoryName);
+        category.setName(definitionName);
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));
@@ -297,13 +297,11 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void localizesLeafCategoryThroughTheInventoryCategorySoOtherLanguagesStillResolve() {
+    void exportsCategoryDefinitionNameAsTheOfferCategory() {
         // given
         Product product = product("pim-A", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne");
+        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne", "Karty do gier");
         priceFor(product, 100, 2);
-        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("PC components");
-        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Graphics cards");
 
         // when
         listener.handleMessage(request());
@@ -311,42 +309,7 @@ class MarketplaceOfferExportEventListenerTest {
         // then
         List<MarketplaceOffer> published = capturePublishedOffers();
         assertThat(published).hasSize(1);
-        assertThat(published.get(0).categoryName()).isEqualTo("PC components / Graphics cards");
-    }
-
-    @Test
-    void exportsProductGroupResolvedThroughIcecatBridgeForLeafCategory() {
-        // given
-        Product product = product("pim-A", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne");
-        priceFor(product, 100, 2);
-        when(enumLocalizer.localize(ProductGroup.PcComponents)).thenReturn("Podzespoły komputerowe");
-        when(categoryLocalizer.localize("GPU", "plural")).thenReturn("Karty graficzne");
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        List<MarketplaceOffer> published = capturePublishedOffers();
-        assertThat(published).hasSize(1);
-        assertThat(published.get(0).categoryName()).isEqualTo("Podzespoły komputerowe / Karty graficzne");
-    }
-
-    @Test
-    void exportsCategoryWithoutProductGroupWhenCategoryIsOutsideTheBridge() {
-        // given
-        Product product = product("pim-A", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Kołdry");
-        priceFor(product, 100, 2);
-        when(categoryLocalizer.localize("Kołdry", "plural")).thenReturn("Kołdry");
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        List<MarketplaceOffer> published = capturePublishedOffers();
-        assertThat(published).hasSize(1);
-        assertThat(published.get(0).categoryName()).isEqualTo("Kołdry");
+        assertThat(published.get(0).categoryName()).isEqualTo("Karty do gier");
     }
 
     @Test

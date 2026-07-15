@@ -21,7 +21,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.printing.PrintProviderRegistry;
-import pl.commercelink.products.IcecatCategories;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.stores.*;
@@ -76,7 +76,7 @@ public class StoreController {
     private ManualSupplierService manualSupplierService;
 
     @Autowired
-    private IcecatCategories icecatCategories;
+    private PimCategoryOptions pimCategoryOptions;
 
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
@@ -437,7 +437,7 @@ public class StoreController {
         }
 
         model.addAttribute("storeId", storeId);
-        model.addAttribute("categoryNames", icecatCategories.topLevelNames());
+        model.addAttribute("categoryNames", pimCategoryOptions.topLevelNames());
         model.addAttribute("enabledCategories", store.getEnabledCategories());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 

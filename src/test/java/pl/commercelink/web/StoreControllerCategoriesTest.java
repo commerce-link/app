@@ -16,7 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
-import pl.commercelink.products.IcecatCategories;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -40,7 +40,7 @@ class StoreControllerCategoriesTest {
     private StoresRepository storesRepository;
 
     @Mock
-    private IcecatCategories icecatCategories;
+    private PimCategoryOptions pimCategoryOptions;
 
     @Mock
     private MessageSource messageSource;
@@ -121,7 +121,7 @@ class StoreControllerCategoriesTest {
         config.setEnabledCategories(List.of("Dom"));
         store.setFulfilmentConfiguration(config);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(icecatCategories.topLevelNames()).thenReturn(List.of("Biuro", "Dom"));
+        when(pimCategoryOptions.topLevelNames()).thenReturn(List.of("Biuro", "Dom"));
         Model model = new ExtendedModelMap();
 
         // when
