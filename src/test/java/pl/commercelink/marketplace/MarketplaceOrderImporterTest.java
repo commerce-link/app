@@ -28,6 +28,22 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
+    void rendersRawStreetWhenNoPickupPoint() {
+        // given
+        MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(
+                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
+                "500600700", null, shippingAddress, shippingAddress);
+
+        // when
+        ShippingDetails shipping = importer.toShippingDetails(customer);
+
+        // then
+        assertEquals("Prosta 1", shipping.getStreetAndNumber());
+    }
+
+    @Test
     void toleratesNullShippingName() {
         // given
         MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(

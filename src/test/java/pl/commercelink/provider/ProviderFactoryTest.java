@@ -11,9 +11,12 @@ import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
 import pl.commercelink.rest.client.OAuth2RefreshToken;
 import pl.commercelink.rest.client.OAuth2TokenStore;
+import pl.commercelink.rest.client.RestApi;
+import pl.commercelink.rest.client.RestApiWithRetry;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
@@ -79,6 +82,16 @@ class ProviderFactoryTest {
         @Override
         public AuthConfig authConfig() {
             return AuthConfig.None.INSTANCE;
+        }
+    }
+
+    static class OAuth2WithContentTypeDescriptor extends OAuth2Descriptor {
+        @Override
+        public AuthConfig authConfig() {
+            return new AuthConfig.OAuth2("https://api.example.com",
+                    "https://auth.example.com/token", "https://auth.example.com/token",
+                    7776000L, "application/vnd.allegro.public.v1+json", "refreshToken",
+                    "application/vnd.allegro.public.v1+json");
         }
     }
 
@@ -222,5 +235,33 @@ class ProviderFactoryTest {
 
         // when / then
         assertTrue(ProviderFactory.oauth2DefaultHeaders(oauth2).isEmpty());
+    }
+
+    @Test
+    void buildContextWiresAcceptAndContentTypeHeadersOntoRestApi() throws Exception {
+        // given
+        OAuth2WithContentTypeDescriptor descriptor = new OAuth2WithContentTypeDescriptor();
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
+
+        // when
+        Map<String, Object> context = factory.buildContext(store, descriptor);
+
+        // then
+        assertTrue(context.get("restApi") instanceof RestApiWithRetry);
+        Map<String, String> headers = defaultHeadersOf((RestApiWithRetry) context.get("restApi"));
+        assertEquals("application/vnd.allegro.public.v1+json", headers.get("Accept"));
+        assertEquals("application/vnd.allegro.public.v1+json", headers.get("Content-Type"));
+    }
+
+    private static Map<String, String> defaultHeadersOf(RestApiWithRetry restApiWithRetry) throws Exception {
+        Field restApiField = RestApiWithRetry.class.getDeclaredField("restApi");
+        restApiField.setAccessible(true);
+        RestApi restApi = (RestApi) restApiField.get(restApiWithRetry);
+
+        Field defaultHeadersField = RestApi.class.getDeclaredField("defaultHeaders");
+        defaultHeadersField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> headers = (Map<String, String>) defaultHeadersField.get(restApi);
+        return headers;
     }
 }
