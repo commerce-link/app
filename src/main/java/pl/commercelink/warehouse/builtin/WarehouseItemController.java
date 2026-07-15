@@ -1,32 +1,45 @@
 package pl.commercelink.warehouse.builtin;
 
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 class WarehouseItemController {
 
+    static final List<FulfilmentStatus> NEW_ITEM_STATUSES = List.of(
+            FulfilmentStatus.New,
+            FulfilmentStatus.Allocation
+    );
+
     @Autowired
     private Warehouse warehouse;
+
+    @Autowired
+    private TaxonomyCache taxonomyCache;
+
+    @Autowired
+    private MessageSource messageSource;
 
     @Autowired
     private StoreCategories storeCategories;
@@ -79,11 +92,40 @@ class WarehouseItemController {
                     .filter(s -> s != FulfilmentStatus.Replaced)
                     .collect(Collectors.toList());
         }
-        return Arrays.asList(
-                FulfilmentStatus.New,
-                FulfilmentStatus.Allocation,
-                FulfilmentStatus.Delivered
+        return NEW_ITEM_STATUSES;
+    }
+
+    @PostMapping("/dashboard/warehouse/items/quick-add")
+    String quickAddWarehouseItem(@RequestParam String manufacturerCode, @RequestParam double cost,
+                                 @RequestParam int qty, @RequestParam FulfilmentStatus status,
+                                 @RequestParam String supplier, Model model, Locale locale,
+                                 RedirectAttributes redirectAttributes) {
+        String mfn = UnifiedProductIdentifiers.unifyMfn(manufacturerCode);
+        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+
+        String name = taxonomy != null ? taxonomy.name() : null;
+        String ean = taxonomy != null ? taxonomy.ean() : null;
+        String category = taxonomy != null && Strings.isNotBlank(taxonomy.category())
+                ? taxonomy.category()
+                : Categorized.OTHER;
+
+        WarehouseItem item = new WarehouseItem(getStoreId(), supplier, category, name, ean, mfn, cost, qty);
+        item.setStatus(status);
+
+        if (Strings.isBlank(name) || Strings.isBlank(ean)) {
+            model.addAttribute("errorMessage", messageSource.getMessage("warehouse.item.mfn.not.found", null, locale));
+            return showWarehouseItemDetails(model, item);
+        }
+
+        OperationResult<?> result = warehouseInternalReceiptService.addItem(
+                getStoreId(), item, CustomSecurityContext.getLoggedInUserName()
         );
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+        } else {
+            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("warehouse.item.quick.add.success", null, locale));
+        }
+        return "redirect:/dashboard/warehouse";
     }
 
     @PostMapping("/dashboard/warehouse/items/{itemId}/save")

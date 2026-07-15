@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
@@ -159,6 +160,8 @@ class WarehouseController {
         model.addAttribute("selectedStatuses", statusEnums.stream().map(FulfilmentStatus::name).collect(Collectors.toList()));
         model.addAttribute("isAdmin", isAdmin());
         model.addAttribute("hasExternalWarehouse", hasExternalWarehouse);
+        model.addAttribute("quickAddStatuses", WarehouseItemController.NEW_ITEM_STATUSES);
+        model.addAttribute("defaultVatRate", Price.DEFAULT_VAT_RATE);
 
         return "warehouse";
     }
