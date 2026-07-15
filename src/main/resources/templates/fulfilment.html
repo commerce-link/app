@@ -36,6 +36,8 @@
         .order-chip.none { background: #fdecec; color: #c0392b; }
         .order-chip.active { outline: 2px solid #3273dc; outline-offset: 1px; }
         .order-chip .frac { font-variant-numeric: tabular-nums; font-weight: 700; }
+        .ord-open { color: inherit; text-decoration: underline dotted; }
+        .ord-open:hover { text-decoration: underline; }
 
         .prov-filter { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
         .prov-chip-btn { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600;
@@ -435,7 +437,8 @@
                     pill.title = ch.lost ? (MSG.coveredCheaper + ' — ' + ch.by) : '';
                     if (!isWh) pill.onclick = (e) => { e.stopPropagation(); focusOrder(ord); };
                     else pill.style.cursor = 'default';
-                    pill.innerHTML = (isWh ? ref : '#' + ref) + ' <span style="opacity:.6;">&times;' + ch.qty + '</span>' +
+                    pill.innerHTML = (isWh ? ref : '<a class="ord-open" href="' + ch.row.dataset.url + '" target="_blank" onclick="event.stopPropagation()">#' + ref + '</a>') +
+                        ' <span style="opacity:.6;">&times;' + ch.qty + '</span>' +
                         '<span class="ord-price">' + fmt(ch.price) + ' zł</span>' +
                         (ch.lost ? '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span>' : '');
                     ho.appendChild(pill);
@@ -581,7 +584,7 @@
             document.querySelectorAll('tr[data-item]').forEach(r => {
                 const ord = r.dataset.order, it = r.dataset.item;
                 if (!ord) return;
-                orders[ord] = orders[ord] || { items: new Set(), ref: r.dataset.ref };
+                orders[ord] = orders[ord] || { items: new Set(), ref: r.dataset.ref, url: r.dataset.url };
                 orders[ord].items.add(it);
             });
             bar.innerHTML = '';
@@ -599,7 +602,7 @@
                 const chip = document.createElement('span');
                 chip.className = 'order-chip ' + cls + (activeOrder === ord ? ' active' : '');
                 chip.onclick = () => focusOrder(ord);
-                chip.innerHTML = '<i class="fas ' + icon + '"></i><strong>#' + orders[ord].ref + '</strong>' +
+                chip.innerHTML = '<i class="fas ' + icon + '"></i><a class="ord-open" href="' + orders[ord].url + '" target="_blank" onclick="event.stopPropagation()"><strong>#' + orders[ord].ref + '</strong></a>' +
                     (split ? '<span class="icon is-small" title="' + MSG.splitProviders + '"><i class="fas fa-code-branch"></i></span>' : '') +
                     '<span class="bar"><i style="width:' + (ratio * 100) + '%; background:' + (cls === 'full' ? '#2ecc71' : cls === 'none' ? '#e74c3c' : '#f5a623') + ';"></i></span>' +
                     '<span class="frac">' + accepted + '/' + total + '</span>';
