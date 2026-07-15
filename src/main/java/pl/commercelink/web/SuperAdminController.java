@@ -1,17 +1,19 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.demo.DemoStoreDeletionService;
 import pl.commercelink.products.OrphanedProductCleanupService;
-import pl.commercelink.starter.util.UniqueIdentifierGenerator;
+import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
+import pl.commercelink.stores.StoreCreationService;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoresRepository;
 
@@ -34,7 +36,13 @@ public class SuperAdminController {
     private OrphanedProductCleanupService orphanedProductCleanupService;
 
     @Autowired
-    private DemoStoreDeletionService demoStoreDeletionService;
+    private StoreDeletionService storeDeletionService;
+
+    @Autowired
+    private StoreCreationService storeCreationService;
+
+    @Value("${app.registration.demo:false}")
+    boolean demoEnvironment;
 
     @GetMapping("/dashboard/stores")
     public String store(Model model) {
@@ -60,17 +68,26 @@ public class SuperAdminController {
 
     @GetMapping("/dashboard/store/create")
     public String createStorePage(Model model) {
-        Store store = new Store();
-        store.setStoreId(UniqueIdentifierGenerator.generate());
-        model.addAttribute("store", store);
+        model.addAttribute("store", new Store());
         return "store-create";
     }
 
     @PostMapping("/dashboard/store/create")
-    public String createStore(@ModelAttribute Store store, Locale locale, RedirectAttributes redirectAttributes) {
-        storesRepository.save(store);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
-        return String.format("redirect:/dashboard/store/%s", store.getStoreId());
+    public String createStore(@RequestParam String name,
+                              @RequestParam(required = false) String apiKey,
+                              Locale locale,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey, !demoEnvironment));
+            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
+            return String.format("redirect:/dashboard/store/%s", store.getStoreId());
+        } catch (Exception e) {
+            System.err.println("[StoreCreation] Failed to create store '" + name + "': " + e.getMessage());
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.create.error", null, locale));
+            return "redirect:/dashboard/store/create";
+        }
     }
 
     @GetMapping("/dashboard/store/{storeId}/copy")
@@ -106,9 +123,22 @@ public class SuperAdminController {
     }
 
     @PostMapping("/dashboard/store/{storeId}/delete")
-    public String deleteDemoStore(@PathVariable String storeId, Locale locale, RedirectAttributes redirectAttributes) {
+    public String deleteStore(@PathVariable String storeId,
+                              @RequestParam(required = false) String confirmStoreId,
+                              Locale locale, RedirectAttributes redirectAttributes) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.delete.missing", null, locale));
+            return "redirect:/dashboard/stores";
+        }
+        if (store.getDemo() == null && (confirmStoreId == null || !storeId.equals(confirmStoreId.trim()))) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("store.delete.confirm.mismatch", null, locale));
+            return "redirect:/dashboard/stores";
+        }
         try {
-            if (demoStoreDeletionService.deleteDemoStore(storeId)) {
+            if (storeDeletionService.deleteStore(storeId, StoreDeletionService.Guard.ANY)) {
                 redirectAttributes.addFlashAttribute("successMessage",
                         messageSource.getMessage("store.delete.success", null, locale));
             } else {
@@ -116,7 +146,7 @@ public class SuperAdminController {
                         messageSource.getMessage("store.delete.error", null, locale));
             }
         } catch (Exception e) {
-            System.err.println("[DemoStoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
+            System.err.println("[StoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.delete.error", null, locale));
         }

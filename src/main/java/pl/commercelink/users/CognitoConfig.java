@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.users;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,8 +12,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityPr
 import java.net.URI;
 
 @Configuration
-@ConditionalOnProperty(name = "app.demo.registration.enabled", havingValue = "true")
-public class DemoCognitoConfig {
+public class CognitoConfig {
 
     @Value("${amazon.aws.region}")
     private String region;

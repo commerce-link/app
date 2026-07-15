@@ -1,4 +1,4 @@
-package pl.commercelink.demo;
+package pl.commercelink.stores;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -6,7 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -28,9 +27,7 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
 import pl.commercelink.starter.storage.FileStorage;
-import pl.commercelink.stores.DemoStoreMetadata;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.users.CognitoUserService;
 
 import java.util.List;
 
@@ -39,7 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DemoStoreDeletionServiceTest {
+class StoreDeletionServiceTest {
 
     private static final String STORE_ID = "abc123def4";
 
@@ -51,20 +48,19 @@ class DemoStoreDeletionServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private RMACentersRepository rmaCentersRepository;
     @Mock private RMAItemsRepository rmaItemsRepository;
-    @Mock private DemoStoreWipeRepository wipeRepository;
+    @Mock private StoreWipeRepository wipeRepository;
     @Mock private FileStorage fileStorage;
     @Mock private StoreInventoryCache storeInventoryCache;
-    @Mock private ObjectProvider<DemoUserService> demoUserServiceProvider;
-    @Mock private DemoUserService demoUserService;
+    @Mock private CognitoUserService cognitoUserService;
 
-    private DemoStoreDeletionService service;
+    private StoreDeletionService service;
 
     @BeforeEach
     void setUp() {
-        service = new DemoStoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
+        service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
-                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, demoUserServiceProvider,
-                "stores");
+                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService);
+        service.storesBucket = "stores";
     }
 
     private Store demoStore() {
@@ -74,11 +70,29 @@ class DemoStoreDeletionServiceTest {
         return store;
     }
 
+    private Store regularStore() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        return store;
+    }
+
+    private void stubEmptyCascade() {
+        when(ordersRepository.findAll(STORE_ID)).thenReturn(List.of());
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
+        when(rmaCentersRepository.findByStoreId(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findRmas(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findWarehouseDocuments(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findWarehouseItems(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findWarehouseDocumentSequences(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findEmailTemplates(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findBaskets(STORE_ID)).thenReturn(List.of());
+        when(wipeRepository.findDeliveries(STORE_ID)).thenReturn(List.of());
+    }
+
     @Test
     void refusesToDeleteStoreWithoutDemoMarker() {
         // given
-        Store regular = new Store();
-        regular.setStoreId(STORE_ID);
+        Store regular = regularStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(regular);
 
         // when / then
@@ -103,7 +117,6 @@ class DemoStoreDeletionServiceTest {
         // given
         Store store = demoStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(demoUserServiceProvider.getIfAvailable()).thenReturn(demoUserService);
         Order order = new Order();
         order.setStoreId(STORE_ID);
         order.setOrderId("order-1");
@@ -151,7 +164,7 @@ class DemoStoreDeletionServiceTest {
 
         // then
         assertTrue(deleted);
-        verify(demoUserService).deleteUser("user@example.com");
+        verify(cognitoUserService).deleteUser("user@example.com");
         verify(wipeRepository).deleteAll(List.of(basket));
         verify(wipeRepository).deleteAll(List.of(delivery));
         verify(wipeRepository).deleteAll(List.of(orderItem));
@@ -165,9 +178,9 @@ class DemoStoreDeletionServiceTest {
         verify(wipeRepository).deleteAll(List.of(document));
         verify(wipeRepository, never()).deleteAll(List.of(sharedCenter));
         verify(fileStorage).deleteAll("stores", STORE_ID + "/");
-        InOrder lastStep = inOrder(storeInventoryCache, wipeRepository);
+        InOrder lastStep = inOrder(storeInventoryCache, storesRepository);
         lastStep.verify(storeInventoryCache).evict(STORE_ID);
-        lastStep.verify(wipeRepository).deleteStore(store);
+        lastStep.verify(storesRepository).delete(store);
     }
 
     @Test
@@ -175,24 +188,58 @@ class DemoStoreDeletionServiceTest {
         // given
         Store store = demoStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(demoUserServiceProvider.getIfAvailable()).thenReturn(demoUserService);
-        doThrow(new RuntimeException("cognito down")).when(demoUserService).deleteUser(any());
-        when(ordersRepository.findAll(STORE_ID)).thenReturn(List.of());
-        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
-        when(rmaCentersRepository.findByStoreId(STORE_ID)).thenReturn(List.of());
-        when(wipeRepository.findRmas(STORE_ID)).thenReturn(List.of());
-        when(wipeRepository.findWarehouseDocuments(STORE_ID)).thenReturn(List.of());
-        when(wipeRepository.findWarehouseItems(STORE_ID)).thenReturn(List.of());
-        when(wipeRepository.findWarehouseDocumentSequences(STORE_ID)).thenReturn(List.of());
-        when(wipeRepository.findEmailTemplates(STORE_ID)).thenReturn(List.of());
+        doThrow(new RuntimeException("cognito down")).when(cognitoUserService).deleteUser(any());
+        stubEmptyCascade();
 
         // when
         boolean deleted = service.deleteDemoStore(STORE_ID);
 
         // then
         assertFalse(deleted);
-        verify(wipeRepository, never()).deleteStore(any());
+        verify(storesRepository, never()).delete(any(Store.class));
         verify(fileStorage).deleteAll("stores", STORE_ID + "/");
         verify(storeInventoryCache).evict(STORE_ID);
+    }
+
+    @Test
+    void anyGuardDeletesRegularStore() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        boolean result = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(result);
+        verify(storesRepository).delete(store);
+        verifyNoInteractions(cognitoUserService);
+    }
+
+    @Test
+    void demoOnlyGuardRefusesRegularStore() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when / then
+        assertThrows(IllegalStateException.class,
+                () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.DEMO_ONLY));
+        verifyNoInteractions(wipeRepository, fileStorage, storeInventoryCache);
+    }
+
+    @Test
+    void anyGuardStillDeletesCognitoUserForDemoStore() {
+        // given
+        Store store = demoStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verify(cognitoUserService).deleteUser("user@example.com");
     }
 }

@@ -99,8 +99,8 @@
                     </td>
                     <td th:text="${order.unpaidAmountNet}"></td>
                     <td th:text="${order.unpaidAmountGross}"></td>
-                    <td th:text="${order.latestPayment.referenceNo}"></td>
-                    <td th:text="${order.latestPayment.source}"></td>
+                    <td th:text="${order.latestPayment?.referenceNo}"></td>
+                    <td th:text="${order.latestPayment?.source}"></td>
                     <td>
                         <button type="button" class="button is-small is-primary"
                                 th:with="pp=${order.pendingPayment}"

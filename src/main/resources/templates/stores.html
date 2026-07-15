@@ -21,17 +21,23 @@
                         <a th:href="@{'/dashboard/store/' + ${store.storeId}}" th:text="${store.storeId}"></a>
                     </td>
                     <td th:text="${store.name}"></td>
-                    <td>
-                        <div th:if="${store.demo != null}">
+                    <td th:with="deleteConfirm=${store.demo != null} ? #{store.delete.confirm} : #{store.delete.confirm.regular}">
+                        <div th:if="${store.demo != null}" style="display:inline-block">
                             <span class="tag is-warning" th:text="#{store.demo.badge}"></span>
                             <span class="tag is-light" th:if="${store.demo.expiresAt != null and #strings.length(store.demo.expiresAt) >= 10}"
                                   th:text="#{store.demo.expires} + ' ' + ${#strings.substring(store.demo.expiresAt, 0, 10)}"></span>
-                            <form th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
-                                  style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
-                                  th:attr="data-confirm=#{store.delete.confirm}">
-                                <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
-                            </form>
                         </div>
+                        <form th:if="${store.demo != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
+                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
+                              th:attr="data-confirm=${deleteConfirm}">
+                            <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
+                        </form>
+                        <form th:if="${store.demo == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
+                              style="display:inline" onsubmit="var id = prompt(this.dataset.confirm); if (id === null) return false; this.confirmStoreId.value = id; return true;"
+                              th:attr="data-confirm=${deleteConfirm}">
+                            <input type="hidden" name="confirmStoreId">
+                            <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
+                        </form>
                     </td>
                 </tr>
                 </tbody>

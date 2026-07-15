@@ -5,17 +5,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Instant;
 
 @Component
-@ConditionalOnProperty(name = "app.demo.registration.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "app.registration.demo", havingValue = "true")
 @RequiredArgsConstructor
 public class DemoStoreCleanupJob {
 
     private final StoresRepository storesRepository;
-    private final DemoStoreDeletionService demoStoreDeletionService;
+    private final StoreDeletionService storeDeletionService;
 
     @Scheduled(cron = "0 15 * * * ?")
     public void deleteExpiredDemoStores() {
@@ -26,7 +27,7 @@ public class DemoStoreCleanupJob {
         for (Store store : storesRepository.findAll()) {
             try {
                 if (store.isDemoExpired(now)) {
-                    demoStoreDeletionService.deleteDemoStore(store.getStoreId());
+                    storeDeletionService.deleteDemoStore(store.getStoreId());
                 }
             } catch (RuntimeException e) {
                 System.err.println("[DemoStoreCleanup] Failed to delete expired store " + store.getStoreId() + ": " + e.getMessage());

@@ -5,6 +5,11 @@
 <body>
 
 <div layout:fragment="content">
+    <div th:if="${welcomeMessage}" class="notification is-info">
+        <p class="has-text-weight-bold" th:text="#{dashboard.welcome.title}"></p>
+        <p th:text="#{dashboard.welcome.body}"></p>
+    </div>
+
     <h1 class="title" th:text="#{dashboard.welcome}"></h1>
 </div>
 

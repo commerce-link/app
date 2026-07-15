@@ -33,6 +33,7 @@ public class WebSecurityConfiguration {
                             "/store/*/individual/offer/**",
                             "/store/*/client/rma/**",
                             "/StoreLogo/**",
+                            "/register",
                             "/demo/register",
                             "/login",
                             "/logout-success"

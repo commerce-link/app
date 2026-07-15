@@ -191,6 +191,15 @@
     <span th:text="${errorMessage}"></span>
 </div>
 
+<div th:if="${demoEnvironment}" class="notification is-warning mb-0" style="border-radius: 0;">
+    <p>
+        <strong th:text="#{banner.demo.title}"></strong>
+        <span th:text="#{banner.demo.integrations}"></span>
+        <span th:if="${demoExpiresAt != null}"
+              th:text="#{banner.demo.expiry(${demoExpiresAt}, ${demoDaysLeft})}"></span>
+    </p>
+</div>
+
 <section class="section">
     <div class="container content is-fluid" layout:fragment="content">
     </div>

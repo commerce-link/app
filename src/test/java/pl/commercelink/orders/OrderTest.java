@@ -10,6 +10,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderTest {
 
     @Test
+    @DisplayName("getLatestPayment returns null when order has no payments")
+    void latestPaymentIsNullWhenNoPayments() {
+        Order order = new Order("store-1");
+
+        assertThat(order.getLatestPayment()).isNull();
+    }
+
+    @Test
+    @DisplayName("getLatestPayment returns the most recent payment")
+    void latestPaymentReturnsLastPayment() {
+        Order order = new Order("store-1");
+        order.setPayments(new java.util.LinkedList<>(java.util.List.of(
+                Payment.bankTransfer("REF-1", "First", 10),
+                Payment.bankTransfer("REF-2", "Second", 20))));
+
+        assertThat(order.getLatestPayment().getReferenceNo()).isEqualTo("REF-2");
+    }
+
+    @Test
     @DisplayName("getIssuableDocumentTypes returns empty for non-B2B order")
     void returnsEmptyForNonB2B() {
         Order order = b2cOrder();

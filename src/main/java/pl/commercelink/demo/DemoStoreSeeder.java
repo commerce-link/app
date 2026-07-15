@@ -3,14 +3,23 @@ package pl.commercelink.demo;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.rma.RMACenter;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -28,6 +37,7 @@ import pl.commercelink.stores.Parcel;
 import pl.commercelink.stores.RMAConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.starter.storage.FileStorage;
@@ -36,12 +46,16 @@ import pl.commercelink.warehouse.builtin.WarehouseItem;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
-public class DemoStoreSeeder {
+@RequiredArgsConstructor
+public class DemoStoreSeeder implements StoreSeeder {
 
     public static final String CATALOG_ID = "cat-local-01";
 
@@ -56,33 +70,38 @@ public class DemoStoreSeeder {
 
     private final AmazonDynamoDB dynamoDB;
     private final FileStorage fileStorage;
-    private final String storesBucket;
 
-    public DemoStoreSeeder(AmazonDynamoDB dynamoDB,
-                           FileStorage fileStorage,
-                           @Value("${s3.bucket.stores}") String storesBucket) {
-        this.dynamoDB = dynamoDB;
-        this.fileStorage = fileStorage;
-        this.storesBucket = storesBucket;
+    @Value("${s3.bucket.stores}")
+    String storesBucket;
+
+    @Override
+    public void seed(Store store) {
+        applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
+        seedStoreData(store.getStoreId(), store.getDemo());
     }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
+        applyStoreConfiguration(store, storeId, storeName, demo);
+        mapper.save(store);
+        seedStoreData(storeId, demo);
+        return store;
+    }
+
+    private void seedStoreData(String storeId, DemoStoreMetadata demo) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
 
-        Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
-        applyStoreConfiguration(store, storeId, storeName, demo);
-        mapper.save(store);
-
         saveCatalog(mapper, clobber, rows, storeId);
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
         savePricelist(storeId);
-        return store;
+        saveOrders(mapper, clobber, storeId, ownerEmailOrFallback(demo), rows);
     }
 
     static void applyStoreConfiguration(Store store, String storeId, String storeName, DemoStoreMetadata demo) {
@@ -206,6 +225,80 @@ public class DemoStoreSeeder {
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write demo pricelist for store " + storeId, e);
         }
+    }
+
+    private void saveOrders(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+        DemoOrders demoOrders = buildDemoOrders(storeId, ownerEmail, rows);
+        demoOrders.orders().forEach(order -> mapper.save(order, clobber));
+        demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
+        mapper.save(demoOrders.delivery(), clobber);
+    }
+
+    private static String ownerEmailOrFallback(DemoStoreMetadata demo) {
+        return demo != null ? demo.getOwnerEmail() : "demo@commercelink.local";
+    }
+
+    static DemoOrders buildDemoOrders(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+        List<CatalogSeedRow> catalogRows = rows.stream().filter(CatalogSeedRow::inCatalog).toList();
+        List<Order> orders = new ArrayList<>();
+        Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
+
+        Order first = demoOrder(storeId, ownerEmail, "Jan", "Kowalski", "demo-order-001");
+        itemsByOrderId.put(first.getOrderId(), List.of(
+                allocationItem(first.getOrderId(), catalogRows.get(0), ACME, 1, 1),
+                allocationItem(first.getOrderId(), catalogRows.get(1), ACME_B, 2, 2)));
+        Order second = demoOrder(storeId, ownerEmail, "Anna", "Nowak", "demo-order-002");
+        itemsByOrderId.put(second.getOrderId(), List.of(
+                allocationItem(second.getOrderId(), catalogRows.get(2), ACME, 1, 1)));
+
+        Delivery delivery = new Delivery(storeId, "DEMO-DELIV-001", ACME,
+                LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
+        delivery.setDeliveryId("demo-delivery-001");
+        Order third = demoOrder(storeId, ownerEmail, "Piotr", "Wisniewski", "demo-order-003");
+        OrderItem orderedItem = allocationItem(third.getOrderId(), catalogRows.get(0), delivery.getDeliveryId(), 1, 1);
+        orderedItem.setStatus(FulfilmentStatus.Ordered);
+        itemsByOrderId.put(third.getOrderId(), List.of(orderedItem));
+
+        orders.add(first);
+        orders.add(second);
+        orders.add(third);
+        orders.forEach(order -> order.setTotalPrice(itemsByOrderId.get(order.getOrderId()).stream()
+                .mapToDouble(OrderItem::getTotalPrice).sum()));
+        first.setPayments(new ArrayList<>(List.of(
+                Payment.bankTransfer("DEMO-PAY-001", "Jan Kowalski", Math.round(first.getTotalPrice() / 2.0)))));
+        second.setPayments(new ArrayList<>(List.of(
+                Payment.bankTransfer("DEMO-PAY-002", "Anna Nowak", second.getTotalPrice()))));
+        return new DemoOrders(orders, itemsByOrderId, delivery);
+    }
+
+    private static Order demoOrder(String storeId, String ownerEmail, String name, String surname, String orderId) {
+        Order order = new Order(storeId);
+        order.setOrderId(orderId);
+        BillingDetails billing = new BillingDetails();
+        billing.setName(name);
+        billing.setSurname(surname);
+        billing.setEmail(ownerEmail);
+        billing.setStreetAndNumber("ul. Przykladowa 5");
+        billing.setPostalCode("00-002");
+        billing.setCity("Warszawa");
+        billing.setCountry("PL");
+        order.setBillingDetails(billing);
+        order.setShippingDetails(warehouseAddress());
+        order.setSource(new OrderSource("Demo", OrderSourceType.PointOfSale));
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setEstimatedShippingAt(LocalDate.now().plusDays(3));
+        return order;
+    }
+
+    private static OrderItem allocationItem(String orderId, CatalogSeedRow row, String deliveryId, int qty, int position) {
+        OrderItem item = new OrderItem(orderId, row.category(), row.name(), qty, row.priceGross(), row.mfn(), false, position);
+        item.setItemId("demo-item-" + position);
+        item.setEan(row.ean());
+        item.setManufacturerCode(row.mfn());
+        item.setCost(Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN));
+        item.setDeliveryId(deliveryId);
+        item.setStatus(FulfilmentStatus.Allocation);
+        return item;
     }
 
     private static List<String> distinctCategories(List<CatalogSeedRow> rows) {

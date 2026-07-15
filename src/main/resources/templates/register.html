@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Demo - CommerceLink</title>
+    <title>CommerceLink</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <style>
         html, body {
@@ -68,16 +68,27 @@
 <body>
 
 <div class="demo-card">
-    <h1 th:text="#{demo.register.success.title}"></h1>
-    <p th:if="${revealedPassword == null}" th:text="#{demo.register.success.message(${email})}"></p>
-    <div th:if="${revealedPassword != null}">
-        <p th:text="#{demo.register.success.password.lead(${email})}"></p>
-        <div class="notification is-info is-light">
-            <strong th:text="${revealedPassword}"></strong>
+    <h1 th:text="#{registration.title}"></h1>
+    <p th:text="#{registration.lead}"></p>
+    <div th:if="${demoMode}" class="notification is-info is-light" th:text="#{registration.demo-notice(${ttlDays})}"></div>
+    <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
+    <form method="post" action="/register">
+        <div class="field">
+            <div class="control">
+                <input class="input" type="email" name="email" required
+                       th:placeholder="#{registration.email.placeholder}" th:value="${email}">
+            </div>
         </div>
-        <p th:text="#{demo.register.success.password.note}"></p>
-    </div>
-    <a class="button is-primary" href="/login" th:text="#{demo.register.success.login}"></a>
+        <div class="field" th:unless="${demoMode}">
+            <label class="label" th:text="#{registration.store-name.label}"></label>
+            <div class="control">
+                <input class="input" type="text" name="storeName" required minlength="2" maxlength="60"
+                       th:placeholder="#{registration.store-name.placeholder}" th:value="${storeName}">
+            </div>
+        </div>
+        <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
+        <button type="submit" class="button is-primary" th:text="#{registration.submit}"></button>
+    </form>
 </div>
 
 </body>
