@@ -151,6 +151,7 @@ class ProviderFactoryTest {
     @Test
     void saveConfigurationSkipsSeedingWhenRefreshTokenBlank() {
         // given
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(true);
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new OAuth2Descriptor());
 
         // when
@@ -163,6 +164,7 @@ class ProviderFactoryTest {
     @Test
     void saveConfigurationSkipsSeedingForNonOAuth2Descriptor() {
         // given
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(true);
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new NoneAuthDescriptor());
 
         // when
@@ -175,6 +177,7 @@ class ProviderFactoryTest {
     @Test
     void saveConfigurationSkipsSeedingWhenNoRefreshTokenFieldKeyDeclared() {
         // given
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(true);
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new NoFieldKeyDescriptor());
 
         // when

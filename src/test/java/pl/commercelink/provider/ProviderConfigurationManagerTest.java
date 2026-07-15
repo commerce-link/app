@@ -158,9 +158,10 @@ class ProviderConfigurationManagerTest {
                 .thenReturn(Map.of("password", "stored-password", "host", "ftp.example.com"));
 
         // when
-        manager.saveConfiguration(store, "acme", descriptor, Map.of("host", "ftp.example.com", "password", ""));
+        boolean persisted = manager.saveConfiguration(store, "acme", descriptor, Map.of("host", "ftp.example.com", "password", ""));
 
         // then
+        assertTrue(persisted);
         verify(secretsManager).updateSecret(
                 eq("store-1-acme"),
                 eq(Map.of("host", "ftp.example.com", "password", "stored-password")));
@@ -178,10 +179,11 @@ class ProviderConfigurationManagerTest {
         when(secretsManager.exists("store-1-acme")).thenReturn(false);
 
         // when
-        manager.saveConfiguration(store, "acme", descriptor,
+        boolean persisted = manager.saveConfiguration(store, "acme", descriptor,
                 Map.of("host", "ftp.example.com", "password", "s3cr3t"));
 
         // then
+        assertTrue(persisted);
         verify(secretsManager).createSecret(
                 eq("store-1-acme"),
                 eq(Map.of("host", "ftp.example.com", "password", "s3cr3t")));
@@ -199,9 +201,10 @@ class ProviderConfigurationManagerTest {
         when(secretsManager.exists("store-1-acme")).thenReturn(false);
 
         // when
-        manager.saveConfiguration(store, "acme", descriptor, Map.of("host", "", "password", "s3cr3t"));
+        boolean persisted = manager.saveConfiguration(store, "acme", descriptor, Map.of("host", "", "password", "s3cr3t"));
 
         // then
+        assertFalse(persisted);
         verify(secretsManager, never()).createSecret(anyString(), any());
         verify(secretsManager, never()).updateSecret(anyString(), any());
     }
