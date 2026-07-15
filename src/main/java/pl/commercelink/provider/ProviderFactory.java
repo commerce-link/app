@@ -100,11 +100,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 });
 
         RestApi.Builder restApiBuilder = RestApi.builder(apiUrl);
-        String acceptHeader = oauth2.acceptHeader();
-        if (acceptHeader != null) {
-            restApiBuilder.defaultHeader("Accept", acceptHeader);
-            restApiBuilder.defaultHeader("Content-Type", acceptHeader);
-        }
+        oauth2DefaultHeaders(oauth2).forEach(restApiBuilder::defaultHeader);
 
         RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
                 restApiBuilder.build(),
@@ -115,6 +111,17 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     static String resolveAuthEndpoint(String apiUrl, String path) {
         return path.startsWith("http") ? path : apiUrl + path;
+    }
+
+    static Map<String, String> oauth2DefaultHeaders(AuthConfig.OAuth2 oauth2) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (oauth2.acceptHeader() != null) {
+            headers.put("Accept", oauth2.acceptHeader());
+        }
+        if (oauth2.contentTypeHeader() != null) {
+            headers.put("Content-Type", oauth2.contentTypeHeader());
+        }
+        return headers;
     }
 
     protected void onAuthorizationLost(Store store, D descriptor) {

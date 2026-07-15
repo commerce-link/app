@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -164,5 +165,42 @@ class ProviderFactoryTest {
 
         // then
         verifyNoInteractions(tokenStore);
+    }
+
+    @Test
+    void oauth2DefaultHeadersSetsAcceptOnly() {
+        // given
+        AuthConfig.OAuth2 oauth2 = new AuthConfig.OAuth2(
+                "https://api.example.com", "/auth", "/refresh", 100L, "application/vnd.morele+json");
+
+        // when
+        Map<String, String> headers = ProviderFactory.oauth2DefaultHeaders(oauth2);
+
+        // then
+        assertEquals(Map.of("Accept", "application/vnd.morele+json"), headers);
+    }
+
+    @Test
+    void oauth2DefaultHeadersSetsContentTypeWhenDeclared() {
+        // given
+        AuthConfig.OAuth2 oauth2 = new AuthConfig.OAuth2(
+                "https://api.example.com", "/auth", "/refresh", 100L,
+                "application/vnd.allegro.public.v1+json", "refreshToken", "application/vnd.allegro.public.v1+json");
+
+        // when
+        Map<String, String> headers = ProviderFactory.oauth2DefaultHeaders(oauth2);
+
+        // then
+        assertEquals("application/vnd.allegro.public.v1+json", headers.get("Accept"));
+        assertEquals("application/vnd.allegro.public.v1+json", headers.get("Content-Type"));
+    }
+
+    @Test
+    void oauth2DefaultHeadersEmptyWhenNothingDeclared() {
+        // given
+        AuthConfig.OAuth2 oauth2 = AuthConfig.OAuth2.of("https://api.example.com", "/auth", "/refresh", 100L);
+
+        // when / then
+        assertTrue(ProviderFactory.oauth2DefaultHeaders(oauth2).isEmpty());
     }
 }
