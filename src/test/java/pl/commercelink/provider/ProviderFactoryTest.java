@@ -284,6 +284,30 @@ class ProviderFactoryTest {
         assertEquals("https://auth.example.com/token", endpoints[1]);
     }
 
+    @Test
+    void seedsRefreshTokenUnderProviderSpecificCredentialName() {
+        // given
+        when(store.getStoreId()).thenReturn("store-1");
+        when(configurationManager.saveConfiguration(any(), anyString(), any(), anyMap())).thenReturn(true);
+        OAuth2Descriptor descriptor = new OAuth2Descriptor();
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository) {
+            @Override
+            protected String resolveCredentialName(OAuth2Descriptor descriptor) {
+                return "testoauth_marketplace";
+            }
+        };
+        factory.registerDescriptor(descriptor);
+
+        // when
+        factory.saveConfiguration(store, "TestOAuth", Map.of("refreshToken", "rt-1"));
+
+        // then
+        verify(tokenStore).storeToken(eq("store-1"), eq("testoauth_marketplace"),
+                eq(ConfigurableOAuth2AuthorizationService.REFRESH_TOKEN), any());
+        verify(configurationManager).saveConfiguration(any(), eq("testoauth_marketplace"), any(), anyMap());
+    }
+
     private static String[] authEndpointsOf(ConfigurableOAuth2AuthorizationService authService) throws Exception {
         Field authorizationEndpointField = ConfigurableOAuth2AuthorizationService.class
                 .getDeclaredField("authorizationEndpoint");

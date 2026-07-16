@@ -81,7 +81,7 @@ public class MarketplaceOrderImporter {
         ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    private BillingDetails toBillingDetails(MarketplaceCustomer customer) {
+    BillingDetails toBillingDetails(MarketplaceCustomer customer) {
         BillingDetails billing = new BillingDetails();
         MarketplaceCustomer.Address address = customer.billingAddress();
 
@@ -89,7 +89,7 @@ public class MarketplaceOrderImporter {
             billing.setCompanyName(address.name());
             billing.setTaxId(customer.taxId());
         } else {
-            String[] parts = address.name().split(" ");
+            String[] parts = address.name() != null ? address.name().split(" ") : new String[] {""};
             billing.setName(parts[0]);
             billing.setSurname(parts.length > 1 ? parts[1] : "");
         }
