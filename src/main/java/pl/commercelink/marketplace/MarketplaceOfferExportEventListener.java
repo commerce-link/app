@@ -16,12 +16,8 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
-import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.CategoryLocalizer;
-import pl.commercelink.taxonomy.ProductCategories;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -42,8 +38,6 @@ public class MarketplaceOfferExportEventListener {
     private final Inventory inventory;
     private final MarketplaceProviderFactory providerFactory;
     private final MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-    private final EnumLocalizer enumLocalizer;
-    private final CategoryLocalizer categoryLocalizer;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -93,12 +87,7 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
-        String localizedGroup = ProductCategories.tryParse(category.getCategory())
-                .map(ProductCategory::getProductGroup)
-                .map(enumLocalizer::localize)
-                .orElse(null);
-        String localizedCategory = categoryLocalizer.localize(category.getCategory(), "plural");
-        String categoryName = localizedGroup == null ? localizedCategory : localizedGroup + " / " + localizedCategory;
+        String categoryName = category.getName();
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 

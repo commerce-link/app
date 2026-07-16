@@ -10,8 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
-import pl.commercelink.starter.localization.EnumLocalizer;
-import pl.commercelink.taxonomy.CategoryLocalizer;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -58,8 +56,6 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private Inventory inventory;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Mock private MarketplaceOfferExportRepository marketplaceOfferExportRepository;
-    @Mock private EnumLocalizer enumLocalizer;
-    @Mock private CategoryLocalizer categoryLocalizer;
 
     @Mock private Store store;
     @Mock private ProductCatalog catalog;
@@ -143,9 +139,18 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty) {
+        configureCategoryWith(def, product, warehouseQty, "Laptops");
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName) {
+        configureCategoryWith(def, product, warehouseQty, categoryName, null);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName, String definitionName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory("Laptops");
+        category.setCategory(categoryName);
+        category.setName(definitionName);
         category.setMarketplaceDefinitions(List.of(def));
 
         when(catalog.getCategories()).thenReturn(List.of(category));
@@ -289,6 +294,22 @@ class MarketplaceOfferExportEventListenerTest {
         List<MarketplaceOfferSnapshot> saved = captureSavedSnapshots();
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).getRemovalAttempts()).isEqualTo(5);
+    }
+
+    @Test
+    void exportsCategoryDefinitionNameAsTheOfferCategory() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, /* warehouseQty */ 10, "Karty graficzne", "Karty do gier");
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).categoryName()).isEqualTo("Karty do gier");
     }
 
     @Test

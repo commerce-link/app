@@ -1,0 +1,284 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<span th:fragment="categoryName(value)"
+      th:text="${value == 'Services'} ? #{catalog.category.services} : ${value}"></span>
+
+<div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}"
+     class="notification is-warning is-light">
+    <span th:text="#{catalog.category.noneEnabled}"></span>
+    <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
+</div>
+
+<div th:fragment="picker(fieldName, selected, disabled, includeServices, required)" class="category-picker">
+    <input type="hidden" th:name="${fieldName}" th:value="${selected}" data-picker-value>
+
+    <div th:if="${disabled}" class="control">
+        <input class="input" type="text" disabled
+               th:value="${selected == 'Services'} ? #{catalog.category.services} : ${selected}">
+    </div>
+
+    <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-picker
+         th:attr="data-picker-services=${includeServices} ? #{catalog.category.services} : null,
+                  data-picker-required=${required} ? 'true' : null">
+        <div class="dropdown-trigger">
+            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
+                <span data-picker-label th:text="${#strings.isEmpty(selected)}
+                        ? #{catalog.category.unset}
+                        : (${selected == 'Services'} ? #{catalog.category.services} : ${selected})"></span>
+                <span class="icon is-small">
+                    <i class="fas fa-angle-down"></i>
+                </span>
+            </button>
+        </div>
+        <div class="dropdown-menu" role="listbox">
+            <div class="dropdown-content">
+                <div class="dropdown-item">
+                    <div class="control has-icons-left">
+                        <input class="input" type="search" autocomplete="off" data-picker-search
+                               th:placeholder="#{catalog.category.filter}">
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
+                <div data-picker-list></div>
+                <div class="dropdown-item">
+                    <p class="help" data-picker-count></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:fragment="pickerScript(categories)">
+    <style>
+        .category-picker .dropdown-trigger .button {
+            justify-content: space-between;
+            font-weight: 400;
+        }
+
+        .category-picker .dropdown-menu {
+            width: 100%;
+            min-width: 20rem;
+        }
+
+        .category-picker [data-picker-list] {
+            max-height: 20rem;
+            overflow-y: auto;
+            border-top: 1px solid #dbdbdb;
+            border-bottom: 1px solid #dbdbdb;
+        }
+
+        .category-picker .dropdown-item.is-active {
+            background-color: #eef3ff;
+            color: #363636;
+        }
+
+        .category-picker .dropdown-item {
+            white-space: normal;
+            padding-right: 1rem;
+        }
+
+        .category-picker mark {
+            background-color: #ffe9a8;
+            padding: 0;
+        }
+
+        .category-picker .help {
+            margin-top: 0;
+        }
+    </style>
+
+    <script th:inline="javascript">
+        (function () {
+            const CHUNK = 60;
+            const categories = /*[[${categories}]]*/ [];
+            const messages = {
+                empty: /*[[#{catalog.category.empty}]]*/ '',
+                count: /*[[#{catalog.category.count}]]*/ '',
+                unset: /*[[#{catalog.category.unset}]]*/ ''
+            };
+
+            const format = (template, ...values) =>
+                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template);
+
+            const normalize = text => text.toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\u0142/g, 'l');
+
+            const escapeHtml = text => {
+                const holder = document.createElement('span');
+                holder.textContent = text;
+                return holder.innerHTML;
+            };
+
+            const highlight = (label, query) => {
+                if (!query) {
+                    return escapeHtml(label);
+                }
+                const start = normalize(label).indexOf(query);
+                if (start < 0) {
+                    return escapeHtml(label);
+                }
+                return escapeHtml(label.substring(0, start))
+                        + '<mark>' + escapeHtml(label.substring(start, start + query.length)) + '</mark>'
+                        + escapeHtml(label.substring(start + query.length));
+            };
+
+            const setUp = picker => {
+                const field = picker.parentElement.querySelector('[data-picker-value]');
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const label = picker.querySelector('[data-picker-label]');
+                const search = picker.querySelector('[data-picker-search]');
+                const list = picker.querySelector('[data-picker-list]');
+                const counter = picker.querySelector('[data-picker-count]');
+                const services = picker.dataset.pickerServices;
+
+                const options = services
+                        ? [{value: 'Services', label: services}].concat(categories.map(name => ({value: name, label: name})))
+                        : categories.map(name => ({value: name, label: name}));
+
+                let matches = [];
+                let shown = [];
+                let active = -1;
+                let query = '';
+
+                const labelFor = value => {
+                    const option = options.find(candidate => candidate.value === value);
+                    return option ? option.label : value;
+                };
+
+                const showSelection = () => {
+                    label.textContent = field.value ? labelFor(field.value) : messages.unset;
+                };
+
+                const select = value => {
+                    field.value = value;
+                    trigger.classList.remove('is-danger');
+                    showSelection();
+                    close();
+                };
+
+                const appendChunk = () => {
+                    matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
+                        const item = document.createElement('a');
+                        item.className = 'dropdown-item';
+                        item.href = '#';
+                        item.setAttribute('role', 'option');
+                        item.innerHTML = highlight(option.label, query);
+                        item.addEventListener('click', event => {
+                            event.preventDefault();
+                            select(option.value);
+                        });
+                        list.appendChild(item);
+                        shown.push(option);
+                    });
+                };
+
+                const render = () => {
+                    query = normalize(search.value.trim());
+                    matches = query
+                            ? options.filter(option => normalize(option.label).includes(query))
+                            : options;
+                    shown = [];
+                    active = -1;
+                    list.innerHTML = '';
+                    list.scrollTop = 0;
+
+                    if (!matches.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'dropdown-item has-text-grey';
+                        empty.textContent = messages.empty;
+                        list.appendChild(empty);
+                    }
+
+                    appendChunk();
+                    counter.textContent = format(messages.count, matches.length, options.length);
+                };
+
+                list.addEventListener('scroll', () => {
+                    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 48) {
+                        appendChunk();
+                    }
+                });
+
+                const highlightActive = () => {
+                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
+                        item.classList.toggle('is-active', index === active);
+                        if (index === active) {
+                            item.scrollIntoView({block: 'nearest'});
+                        }
+                    });
+                };
+
+                const move = step => {
+                    if (!shown.length) {
+                        return;
+                    }
+                    if (active + step >= shown.length - 1) {
+                        appendChunk();
+                    }
+                    active = Math.min(Math.max(active + step, 0), shown.length - 1);
+                    highlightActive();
+                };
+
+                const open = () => {
+                    picker.classList.add('is-active');
+                    search.value = '';
+                    render();
+                    search.focus();
+                };
+
+                const close = () => picker.classList.remove('is-active');
+
+                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                search.addEventListener('input', render);
+
+                search.addEventListener('keydown', event => {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        move(1);
+                    } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        move(-1);
+                    } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (active >= 0) {
+                            select(shown[active].value);
+                        } else if (shown.length === 1) {
+                            select(shown[0].value);
+                        }
+                    } else if (event.key === 'Escape') {
+                        close();
+                        trigger.focus();
+                    }
+                });
+
+                document.addEventListener('click', event => {
+                    if (!picker.contains(event.target)) {
+                        close();
+                    }
+                });
+
+                if (field.form && picker.dataset.pickerRequired) {
+                    field.form.addEventListener('submit', event => {
+                        if (!field.value) {
+                            event.preventDefault();
+                            trigger.classList.add('is-danger');
+                            open();
+                        }
+                    });
+                }
+
+                showSelection();
+            };
+
+            document.querySelectorAll('[data-category-picker]').forEach(setUp);
+        })();
+    </script>
+</th:block>
+
+</body>
+</html>

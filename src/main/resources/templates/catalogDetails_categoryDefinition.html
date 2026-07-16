@@ -15,15 +15,13 @@
             </div>
         </div>
 
-        <div class="field">
+        <div class="field" style="max-width: 30rem;">
             <label class="label" th:text="#{catalog.category}"></label>
+            <div th:unless="${edit}">
+                <div th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
+            </div>
             <div class="control">
-                <div class="select">
-                    <select th:field="*{category}" th:disabled="${edit}">
-                        <option th:each="cat : ${productCategories}" th:value="${cat}" th:text="${cat}"></option>
-                    </select>
-                </div>
-                <input type="hidden" th:field="*{category}" th:if="${edit}">
+                <div th:replace="~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, true)}"></div>
             </div>
         </div>
 
@@ -325,6 +323,10 @@
             </div>
         </div>
     </form>
+
+    <div th:unless="${edit}">
+        <div th:replace="~{fragments/category-picker :: pickerScript(${productCategories})}"></div>
+    </div>
 </div>
 
 </body>

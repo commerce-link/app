@@ -52,18 +52,6 @@
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.enabled.product.groups}"></label>
-                        <div th:each="type : ${productGroupTypes}" class="field">
-                            <label class="checkbox">
-                                <input type="checkbox"
-                                       th:value="${type}"
-                                       th:field="*{store.fulfilmentConfiguration.enabledProductGroups}" />
-                                <span th:text="${enumI18n.localize(type)}"></span>
-                            </label>
-                        </div>
-                    </div>
-
                     <div class="field" th:if="${isSuperAdmin}">
                         <label class="checkbox">
                             <input type="checkbox" class="global-suppliers-toggle"
