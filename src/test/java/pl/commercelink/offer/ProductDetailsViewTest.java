@@ -10,28 +10,17 @@ class ProductDetailsViewTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void serializesCategoryAsPlainString() throws Exception {
+    void serializesCategoryIdWithoutCategoryAndGroup() throws Exception {
         // given
         ProductDetailsView view = new ProductDetailsView(
-                "cat-1", "pim-1", "MFN-1", "Intel", "Core", "Intel Core i7", null, "CPU");
+                "cat-1", "pim-1", "MFN-1", "Intel", "Core", "Intel Core i7");
 
         // when
         String json = objectMapper.writeValueAsString(view);
 
         // then
-        assertThat(json).contains("\"category\":\"CPU\"");
-    }
-
-    @Test
-    void serializesNonEnumCategoryValue() throws Exception {
-        // given
-        ProductDetailsView view = new ProductDetailsView(
-                "cat-1", "pim-1", "MFN-1", "Asus", "ROG", "Asus ROG Strix", null, "Graphics Cards");
-
-        // when
-        String json = objectMapper.writeValueAsString(view);
-
-        // then
-        assertThat(json).contains("\"category\":\"Graphics Cards\"");
+        assertThat(json).contains("\"categoryId\":\"cat-1\"");
+        assertThat(json).doesNotContain("\"category\":");
+        assertThat(json).doesNotContain("\"group\":");
     }
 }

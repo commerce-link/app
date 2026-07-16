@@ -48,6 +48,7 @@ public class WebConfig {
                         .addPathPatterns("/dashboard/store/**")
                         .excludePathPatterns(
                                 "/dashboard/store/branding/**",
+                                "/dashboard/store/categories/**",
                                 "/dashboard/store/invoicing/**",
                                 "/dashboard/store/warehouse/**",
                                 "/dashboard/store/shipping/**",

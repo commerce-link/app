@@ -191,6 +191,11 @@
     <span th:text="${errorMessage}"></span>
 </div>
 
+<div th:if="${warningMessage}" class="notification is-warning is-small has-text-centered">
+    <button class="delete" onclick="hideNotification(this)"></button>
+    <span th:text="${warningMessage}"></span>
+</div>
+
 <div th:if="${demoEnvironment}" class="notification is-warning mb-0" style="border-radius: 0;">
     <p>
         <strong th:text="#{banner.demo.title}"></strong>

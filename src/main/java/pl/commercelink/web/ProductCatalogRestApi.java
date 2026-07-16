@@ -6,16 +6,11 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.offer.*;
 import pl.commercelink.pricelist.AvailabilityAndPriceListFactory;
 import pl.commercelink.pricelist.PricelistRepository;
-import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
-import pl.commercelink.starter.localization.EnumLocalizer;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.taxonomy.CategoryLocalizer;
-import pl.commercelink.taxonomy.ProductCategories;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.web.dtos.ObjectIdDto;
 
 import java.util.List;
@@ -34,8 +29,6 @@ public class ProductCatalogRestApi {
     private final ProductRecommendationEngine recommendationEngine;
     private final PricelistRepository pricelistRepository;
     private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
-    private final EnumLocalizer enumLocalizer;
-    private final CategoryLocalizer categoryLocalizer;
 
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
@@ -60,16 +53,9 @@ public class ProductCatalogRestApi {
     @GetMapping("/Categories")
     @ResponseBody
     private List<ProductCategoryTree> getCategoriesTree(@PathVariable("storeId") String storeId, @PathVariable("catalogId") String catalogId) {
-        List<CategoryDefinition> categoryDefinitions = productCatalogRepository.findById(storeId, catalogId).getCategories();
-        return categoryDefinitions.stream()
-                .map(c -> new ProductCategoryTree(
-                        c,
-                        categoryDefinitions.stream().anyMatch(d -> d != c && Objects.equals(d.getCategory(), c.getCategory())),
-                        categoryLocalizer.localize(c.getCategory(), "plural"),
-                        ProductCategories.tryParse(c.getCategory())
-                                .map(ProductCategory::getProductGroup)
-                                .map(enumLocalizer::localize)
-                                .orElse(null)))
+        ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
+        return catalog.getCategories().stream()
+                .map(c -> new ProductCategoryTree(c, catalog.getName()))
                 .collect(Collectors.toList());
     }
 

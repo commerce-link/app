@@ -99,6 +99,11 @@ public class StoreSupplierConnectionService {
 
     private void prepareSubmittedConfiguration(Store existingStore, FulfilmentConfiguration submitted,
                                                List<SupplierSelectionForm> selections, boolean isSuperAdmin) {
+        FulfilmentConfiguration existing = existingStore.getFulfilmentConfiguration();
+        submitted.setEnabledProductGroups(existing != null ? existing.getEnabledProductGroups() : null);
+        if (submitted.getEnabledCategories() == null) {
+            submitted.setEnabledCategories(existing != null ? existing.getEnabledCategories() : null);
+        }
         boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
         submitted.setCanUseGlobalSuppliers(canUseGlobal);
         List<StoreSupplierConnection> connections = buildConnections(selections, canUseGlobal);

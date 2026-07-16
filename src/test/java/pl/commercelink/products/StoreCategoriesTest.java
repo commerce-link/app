@@ -114,6 +114,19 @@ class StoreCategoriesTest {
     }
 
     @Test
+    void serviceNamesIgnoreDefinitionsMappedToIcecatLeaves() {
+        // given
+        CategoryDefinition service = definition("Montaż", 1);
+        service.setCategory("Services");
+        CategoryDefinition regular = definition("Obudowa", 2);
+        regular.setCategory("Zabezpieczenia & uchwyty komputerów");
+
+        // when / then
+        assertThat(storeCategories.serviceNames(List.of(catalog("A", service, regular))))
+                .containsExactly("Montaż");
+    }
+
+    @Test
     void serviceNamesReadsGivenCatalogsWithoutTouchingTheRepository() {
         // given
         CategoryDefinition services = definition("Usługi dodatkowe", 1);
