@@ -58,7 +58,7 @@ class DemoStoreSeederTest {
     }
 
     @Test
-    void buildsTwoOrdersWithItemsInAllocation() {
+    void buildsFirstOrderWithNewItemsWithoutAssignedSupplier() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
@@ -66,13 +66,49 @@ class DemoStoreSeederTest {
         DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
 
         // then
-        List<Order> allocationOrders = demoOrders.orders().stream()
-                .filter(o -> o.getStatus() == OrderStatus.New)
-                .filter(o -> demoOrders.itemsByOrderId().get(o.getOrderId()).stream()
-                        .anyMatch(i -> i.getStatus() == FulfilmentStatus.Allocation))
-                .toList();
-        assertEquals(2, allocationOrders.size());
-        allocationOrders.forEach(o -> {
+        Order first = orderById(demoOrders, "demo-order-001");
+        assertEquals(OrderStatus.New, first.getStatus());
+        List<OrderItem> items = demoOrders.itemsByOrderId().get(first.getOrderId());
+        assertEquals(2, items.size());
+        items.forEach(i -> {
+            assertEquals(FulfilmentStatus.New, i.getStatus());
+            assertNull(i.getDeliveryId());
+            assertFalse(i.hasAllocationDetails());
+            assertNotNull(i.getEan());
+            assertNotNull(i.getManufacturerCode());
+        });
+    }
+
+    @Test
+    void buildsSecondOrderWithItemsInAllocation() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        Order second = orderById(demoOrders, "demo-order-002");
+        assertEquals(OrderStatus.New, second.getStatus());
+        demoOrders.itemsByOrderId().get(second.getOrderId()).forEach(i -> {
+            assertTrue(i.isInAllocation());
+            assertNotNull(i.getEan());
+            assertNotNull(i.getManufacturerCode());
+            assertNotNull(i.getDeliveryId());
+            assertTrue(i.getCost() > 0);
+        });
+    }
+
+    @Test
+    void buildsOrdersWithCommonDemoDetails() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        demoOrders.orders().forEach(o -> {
             assertEquals("a@b.pl", o.getBillingDetails().getEmail());
             assertNotNull(o.getShippingDetails());
             assertTrue(o.getTotalPrice() > 0);
@@ -80,13 +116,6 @@ class DemoStoreSeederTest {
             assertEquals("Demo", o.getSource().getName());
             assertEquals(OrderSourceType.PointOfSale, o.getSource().getType());
             assertEquals(LocalDate.now().plusDays(3), o.getEstimatedShippingAt());
-            demoOrders.itemsByOrderId().get(o.getOrderId()).forEach(i -> {
-                assertTrue(i.isInAllocation());
-                assertNotNull(i.getEan());
-                assertNotNull(i.getManufacturerCode());
-                assertNotNull(i.getDeliveryId());
-                assertTrue(i.getCost() > 0);
-            });
         });
     }
 
