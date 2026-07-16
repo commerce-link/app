@@ -49,6 +49,7 @@ public class RestockSuggestionService {
         List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedMfns)
                 .stream()
                 .filter(s -> s.getPriceCategory() != null)
+                .sorted(Comparator.comparing(RestockSuggestion::getPriceCategory))
                 .collect(Collectors.toList());
 
         return withoutItemsInStock(storeId, suggestions);

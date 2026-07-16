@@ -90,6 +90,38 @@ class RestockSuggestionServiceTest {
     }
 
     @Test
+    void sortsDeliverySuggestionsByPriceCategoryAttractiveness() {
+        // given
+        StockProductLevel goodDeal = new StockProductLevel("CPU", "MFN-1", "AAA", 1_000_000, 0, 3);
+        StockProductLevel hotDeal = new StockProductLevel("CPU", "MFN-2", "ZZZ", 1_000_000, 0, 3);
+        hotDeal.setRestockPriceHotDeal(1_000_000);
+
+        InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
+
+        when(storesRepository.findById("store")).thenReturn(store);
+        when(store.isEnabledSupplier("Action")).thenReturn(true);
+        when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
+        when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
+        when(catalog.getCatalogId()).thenReturn("cat");
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+                .thenReturn(List.of(goodDeal, hotDeal));
+        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
+        when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
+        when(stockQueryService.searchByMfns(eq("store"), any())).thenReturn(List.of());
+
+        // when
+        List<RestockSuggestion> result = service.suggestForDelivery("store", "Action", Collections.emptySet());
+
+        // then
+        assertThat(result).extracting(RestockSuggestion::getPriceCategory)
+                .containsExactly(RestockPriceCategory.HotDeal, RestockPriceCategory.GoodDeal);
+        assertThat(result).extracting(RestockSuggestion::getName)
+                .containsExactly("ZZZ", "AAA");
+    }
+
+    @Test
     void skipsOffersWithoutHistoricalThresholds() {
         // given
         StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 0, 0, 3);
