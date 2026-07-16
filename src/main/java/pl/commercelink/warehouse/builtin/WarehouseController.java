@@ -21,9 +21,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.warehouse.RestockPriceCategory;
 import pl.commercelink.warehouse.RestockScope;
-import pl.commercelink.warehouse.StockLevels;
-import pl.commercelink.warehouse.StockProductLevel;
+import pl.commercelink.warehouse.RestockSuggestion;
+import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationItem;
@@ -51,7 +52,7 @@ class WarehouseController {
     private ManualWarehouseFulfilment manualWarehouseFulfilment;
 
     @Autowired
-    private StockLevels stockLevels;
+    private RestockSuggestionService restockSuggestionService;
 
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
@@ -293,23 +294,22 @@ class WarehouseController {
     String restock(@RequestParam String catalogId,
                    @RequestParam(required = false) String categoryId,
                    @RequestParam RestockScope scope,
-                   @RequestParam String restockPrice,
+                   @RequestParam(required = false) RestockPriceCategory restockPrice,
                    @RequestParam(required = false) boolean onlyMissingItems,
                    Model model) {
-        List<StockProductLevel> stockProductLevels = stockLevels.calculate(getStoreId(), catalogId, categoryId, scope, onlyMissingItems);
+        List<RestockSuggestion> suggestions = restockSuggestionService.suggestForRestock(
+                getStoreId(), catalogId, categoryId, scope, onlyMissingItems, restockPrice);
 
-        List<OrderItem> orderItems = stockProductLevels.stream()
-                .filter(sl -> scope != RestockScope.ExpectedStockQty || sl.qualifiesForRestock())
-                .map(sl -> new OrderItem(
+        List<OrderItem> orderItems = suggestions.stream()
+                .map(suggestion -> new OrderItem(
                         null,
-                        sl.getCategory(),
-                        sl.getName(),
-                        scope == RestockScope.ExpectedStockQty ? sl.getMissingQuantity() : 1,
-                        getRestockPrice(sl, restockPrice),
-                        sl.getManufacturerCode(),
+                        suggestion.getCategory(),
+                        suggestion.getName(),
+                        scope == RestockScope.ExpectedStockQty ? suggestion.getMissingQuantity() : 1,
+                        getRestockPrice(suggestion, restockPrice),
+                        suggestion.getManufacturerCode(),
                         false
                 ))
-                .filter(orderItem -> scope != RestockScope.WholeCatalog || orderItem.getPrice() > 0)
                 .collect(Collectors.toList());
 
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
@@ -319,19 +319,11 @@ class WarehouseController {
         return "fulfilment";
     }
 
-    private int getRestockPrice(StockProductLevel sl, String restockPrice) {
-        if ("Promo".equalsIgnoreCase(restockPrice)) {
-            return sl.getRestockPricePromo();
-        } else if ("Standard".equalsIgnoreCase(restockPrice)) {
-            return sl.getRestockPriceStandard();
-        } else if ("Lowest".equalsIgnoreCase(restockPrice)) {
-            return sl.getRestockPriceLowest();
-        } else if ("HotDeal".equalsIgnoreCase(restockPrice)) {
-            return sl.getRestockPriceHotDeal();
-        } else {
-            // basically unlimited budget
+    private int getRestockPrice(RestockSuggestion suggestion, RestockPriceCategory budget) {
+        if (budget == null) {
             return 100000;
         }
+        return suggestion.restockPriceFor(budget);
     }
 
     @PostMapping("/dashboard/warehouse/fulfilment/commit")

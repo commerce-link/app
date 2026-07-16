@@ -18,10 +18,12 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.time.LocalDate;
@@ -62,7 +64,7 @@ public class DeliveriesController {
     private DeliveryCreationService deliveryCreationService;
 
     @Autowired
-    private DeliverySuggestionService deliverySuggestionService;
+    private RestockSuggestionService restockSuggestionService;
 
     @Autowired
     private DeliveryReceptionService deliveryReceptionService;
@@ -374,7 +376,10 @@ public class DeliveriesController {
                 .filter(Objects::nonNull)
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
-        form.setSuggestedItems(deliverySuggestionService.suggestFor(storeId, provider, existingMfns));
+        form.setSuggestedItems(restockSuggestionService.suggestForDelivery(storeId, provider, existingMfns)
+                .stream()
+                .map(SuggestedDeliveryItem::from)
+                .collect(Collectors.toList()));
 
         model.addAttribute("form", form);
         model.addAttribute("delivery", delivery);

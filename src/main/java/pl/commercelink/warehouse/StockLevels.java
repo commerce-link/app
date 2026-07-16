@@ -63,7 +63,7 @@ public class StockLevels {
             List<Product> products = resolveProducts(category, scope, enabledInventory);
 
             for (Product product : products) {
-                int expectedQty = scope == RestockScope.ExpectedStockQty ? product.getStockExpectedQty() : 1;
+                int expectedQty = product.getStockExpectedQty();
                 if (scope == RestockScope.ExpectedStockQty && expectedQty <= 0) {
                     continue;
                 }

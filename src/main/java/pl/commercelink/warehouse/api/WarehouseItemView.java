@@ -41,6 +41,10 @@ public class WarehouseItemView {
         return itemId;
     }
 
+    public String getMfn() {
+        return mfn;
+    }
+
     public int getQty() {
         return qty;
     }
