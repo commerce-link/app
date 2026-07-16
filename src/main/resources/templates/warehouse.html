@@ -114,8 +114,8 @@
                     <div class="select is-small is-fullwidth">
                         <select id="restockOperation" name="restockPrice" required>
                             <option value="HotDeal" th:text="#{warehouse.restock.hotdeal}">Hot deal</option>
-                            <option value="Lowest" th:text="#{warehouse.restock.lowest}">Najniższa cena</option>
-                            <option value="Promo" th:text="#{warehouse.restock.promo}">Promocyjna</option>
+                            <option value="LowestPrice" th:text="#{warehouse.restock.lowest}">Najniższa cena</option>
+                            <option value="GoodDeal" th:text="#{warehouse.restock.promo}">Promocyjna</option>
                             <option value="Standard" th:text="#{warehouse.restock.standard}">Standardowa</option>
                             <option value="" th:text="#{warehouse.restock.current}">Aktualna</option>
                         </select>
@@ -136,14 +136,92 @@
             </div>
         </form>
         <div class="buttons is-centered mt-2">
-            <a href="/dashboard/warehouse/items/add" class="button is-link is-light is-small">
+            <button type="button" class="button is-link is-light is-small" onclick="openQuickAddModal()">
                 <span class="icon is-small"><i class="fas fa-plus"></i></span>
                 <span th:text="#{warehouse.add.item}">Dodaj przedmiot ręcznie</span>
-            </a>
+            </button>
             <a href="/dashboard/warehouse/items/destroyed" class="button is-danger is-light is-small">
                 <span class="icon is-small"><i class="fas fa-trash"></i></span>
                 <span th:text="#{warehouse.view.destroyed.items}"></span>
             </a>
+        </div>
+    </div>
+
+    <div id="quickAddModal" class="modal">
+        <div class="modal-background" onclick="toggleQuickAddModal(false)"></div>
+        <div class="modal-card" style="width: 480px; max-width: 90vw;">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{warehouse.add.item}"></p>
+                <button class="delete" type="button" onclick="toggleQuickAddModal(false)"></button>
+            </header>
+
+            <form id="quickAddForm" method="post" onsubmit="normalizeQuickAddPrice()"
+                  th:action="@{/dashboard/warehouse/items/quick-add}">
+                <section class="modal-card-body">
+                    <div class="field">
+                        <label class="label" th:text="#{general.manufacturer.code}"></label>
+                        <div class="control">
+                            <input class="input" type="text" id="quickAddMfn" name="manufacturerCode" required
+                                   th:placeholder="#{inventory.product.code.placeholder}"/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.price.purchase}"></label>
+                        <div class="field has-addons mb-0">
+                            <div class="control is-expanded">
+                                <input class="input" type="text" id="quickAddPrice" name="cost" required
+                                       th:attr="data-tax=${defaultVatRate}"
+                                       oninput="updateQuickAddPriceHint()"/>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAddPriceTypeNet" class="button is-primary is-selected"
+                                        onclick="setQuickAddPriceType('net')"
+                                        th:text="#{order.item.price.type.net}"></button>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="quickAddPriceTypeGross" class="button"
+                                        onclick="setQuickAddPriceType('gross')"
+                                        th:text="#{order.item.price.type.gross}"></button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="quickAddPriceType" value="net"/>
+                        <p class="help" id="quickAddPriceHint" style="display: none;"
+                           th:attr="data-template=#{order.item.price.net.hint}"></p>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{warehouse.item.quantity}"></label>
+                        <div class="control">
+                            <input class="input" type="number" id="quickAddQty" name="qty" min="1" value="1" required/>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{warehouse.item.status}"></label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select id="quickAddStatus" name="status">
+                                    <option th:each="status : ${quickAddStatuses}" th:value="${status}"
+                                            th:text="${enumI18n.localize(status)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" th:text="#{order.item.supplier}"></label>
+                        <div class="control">
+                            <input class="input" type="text" id="quickAddSupplier" name="supplier" required/>
+                        </div>
+                    </div>
+                </section>
+
+                <footer class="modal-card-foot">
+                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                    <button class="button" type="button" onclick="toggleQuickAddModal(false)" th:text="#{general.cancel}"></button>
+                </footer>
+            </form>
         </div>
     </div>
 
@@ -213,6 +291,67 @@
                 categorySelect.appendChild(opt);
             });
         });
+
+        function toggleQuickAddModal(show) {
+            document.getElementById('quickAddModal').classList.toggle('is-active', show);
+        }
+
+        function openQuickAddModal() {
+            document.getElementById('quickAddMfn').value = '';
+            document.getElementById('quickAddPrice').value = '';
+            document.getElementById('quickAddQty').value = '1';
+            document.getElementById('quickAddSupplier').value = '';
+            setQuickAddPriceType('net');
+            toggleQuickAddModal(true);
+        }
+
+        function setQuickAddPriceType(type) {
+            document.getElementById('quickAddPriceType').value = type;
+            document.getElementById('quickAddPriceTypeNet').classList.toggle('is-primary', type === 'net');
+            document.getElementById('quickAddPriceTypeNet').classList.toggle('is-selected', type === 'net');
+            document.getElementById('quickAddPriceTypeGross').classList.toggle('is-primary', type === 'gross');
+            document.getElementById('quickAddPriceTypeGross').classList.toggle('is-selected', type === 'gross');
+            updateQuickAddPriceHint();
+        }
+
+        function normalizeQuickAddPrice() {
+            const priceInput = document.getElementById('quickAddPrice');
+            priceInput.value = priceInput.value.replace(',', '.').trim();
+
+            const net = calculateQuickAddNetPrice();
+            if (net !== null) {
+                priceInput.value = net.toFixed(2);
+            }
+        }
+
+        function calculateQuickAddNetPrice() {
+            const priceInput = document.getElementById('quickAddPrice');
+            const gross = parseFloat((priceInput.value || '').replace(',', '.'));
+            const tax = parseFloat(priceInput.getAttribute('data-tax'));
+            const isGross = document.getElementById('quickAddPriceType').value === 'gross';
+
+            if (!isGross || isNaN(gross) || isNaN(tax) || tax < 1) {
+                return null;
+            }
+            return gross / tax;
+        }
+
+        function updateQuickAddPriceHint() {
+            const hint = document.getElementById('quickAddPriceHint');
+            const net = calculateQuickAddNetPrice();
+
+            if (net === null) {
+                hint.style.display = 'none';
+                return;
+            }
+
+            const tax = parseFloat(document.getElementById('quickAddPrice').getAttribute('data-tax'));
+            const vatPercent = Math.round((tax - 1) * 10000) / 100;
+            hint.textContent = hint.getAttribute('data-template')
+                .replace('{0}', net.toFixed(2))
+                .replace('{1}', vatPercent);
+            hint.style.display = '';
+        }
     </script>
 
 </div>
