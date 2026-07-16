@@ -19,7 +19,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.warehouse.StockLevels;
+import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Collections;
@@ -48,7 +48,7 @@ class WarehouseControllerTest {
     @Mock
     private ManualWarehouseFulfilment manualWarehouseFulfilment;
     @Mock
-    private StockLevels stockLevels;
+    private RestockSuggestionService restockSuggestionService;
     @Mock
     private ProductCatalogRepository productCatalogRepository;
     @Mock

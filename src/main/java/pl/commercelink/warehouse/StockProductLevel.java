@@ -47,6 +47,33 @@ public class StockProductLevel {
         return missingQuantity > 0;
     }
 
+    public RestockPriceCategory categorizeOfferPrice(double offerGross) {
+        if (isWithinBudget(offerGross, RestockPriceCategory.HotDeal)) {
+            return RestockPriceCategory.HotDeal;
+        }
+        if (isWithinBudget(offerGross, RestockPriceCategory.LowestPrice)) {
+            return RestockPriceCategory.LowestPrice;
+        }
+        if (isWithinBudget(offerGross, RestockPriceCategory.GoodDeal)) {
+            return RestockPriceCategory.GoodDeal;
+        }
+        return null;
+    }
+
+    public boolean isWithinBudget(double offerGross, RestockPriceCategory budget) {
+        int threshold = restockPriceFor(budget);
+        return threshold > 0 && offerGross <= threshold;
+    }
+
+    public int restockPriceFor(RestockPriceCategory budget) {
+        return switch (budget) {
+            case HotDeal -> restockPriceHotDeal;
+            case LowestPrice -> restockPriceLowest;
+            case GoodDeal -> restockPricePromo;
+            case Standard -> restockPriceStandard;
+        };
+    }
+
     public String getCategory() {
         return category;
     }

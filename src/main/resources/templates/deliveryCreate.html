@@ -220,10 +220,22 @@
                             </div>
                         </div>
 
-                        <div th:if="${suggested.lowestPrice}">
-                            <span class="tag is-success is-small">
+                        <div class="tags mb-0">
+                            <span th:if="${suggested.priceCategory != null and suggested.priceCategory.name() == 'HotDeal'}" class="tag is-danger">
+                                <span class="icon is-small mr-1"><i class="fas fa-fire"></i></span>
+                                <span th:text="#{RestockPriceCategory.HotDeal}">Promotion</span>
+                            </span>
+                            <span th:if="${suggested.priceCategory != null and suggested.priceCategory.name() == 'LowestPrice'}" class="tag is-success">
                                 <span class="icon is-small mr-1"><i class="fas fa-tag"></i></span>
-                                <span th:text="#{deliveries.create.suggestions.lowestPrice}">Currently the lowest price</span>
+                                <span th:text="#{RestockPriceCategory.LowestPrice}">Currently the lowest price</span>
+                            </span>
+                            <span th:if="${suggested.priceCategory != null and suggested.priceCategory.name() == 'GoodDeal'}" class="tag is-info">
+                                <span class="icon is-small mr-1"><i class="fas fa-thumbs-up"></i></span>
+                                <span th:text="#{RestockPriceCategory.GoodDeal}">Good deal</span>
+                            </span>
+                            <span th:if="${suggested.expectedQty > 0}" class="tag is-warning">
+                                <span class="icon is-small mr-1"><i class="fas fa-warehouse"></i></span>
+                                <span th:text="#{deliveries.create.suggestions.expectedInWarehouse}">Expected in warehouse</span>
                             </span>
                         </div>
 

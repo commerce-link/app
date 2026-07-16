@@ -1,6 +1,8 @@
 package pl.commercelink.web.dtos;
 
 import pl.commercelink.inventory.deliveries.DeliveryItem;
+import pl.commercelink.warehouse.RestockPriceCategory;
+import pl.commercelink.warehouse.RestockSuggestion;
 
 import java.util.Collections;
 
@@ -12,24 +14,23 @@ public class SuggestedDeliveryItem {
     private String mfn;
     private int expectedQty;
     private int availableAtSupplier;
-    private boolean lowestPrice;
+    private RestockPriceCategory priceCategory;
     private double unitCost;
     private int requestedQty;
 
     public SuggestedDeliveryItem() {
     }
 
-    public static SuggestedDeliveryItem of(String category, String name, String ean, String mfn,
-                                           int expectedQty, int availableAtSupplier, boolean lowestPrice, double unitCost) {
+    public static SuggestedDeliveryItem from(RestockSuggestion suggestion) {
         SuggestedDeliveryItem item = new SuggestedDeliveryItem();
-        item.category = category;
-        item.name = name;
-        item.ean = ean;
-        item.mfn = mfn;
-        item.expectedQty = expectedQty;
-        item.availableAtSupplier = availableAtSupplier;
-        item.lowestPrice = lowestPrice;
-        item.unitCost = unitCost;
+        item.category = suggestion.getCategory();
+        item.name = suggestion.getName();
+        item.ean = suggestion.getEan();
+        item.mfn = suggestion.getOfferMfn();
+        item.expectedQty = suggestion.getExpectedQuantity();
+        item.availableAtSupplier = suggestion.getAvailableQty();
+        item.priceCategory = suggestion.getPriceCategory();
+        item.unitCost = suggestion.getNetPrice();
         item.requestedQty = 0;
         return item;
     }
@@ -88,12 +89,12 @@ public class SuggestedDeliveryItem {
         this.availableAtSupplier = availableAtSupplier;
     }
 
-    public boolean isLowestPrice() {
-        return lowestPrice;
+    public RestockPriceCategory getPriceCategory() {
+        return priceCategory;
     }
 
-    public void setLowestPrice(boolean lowestPrice) {
-        this.lowestPrice = lowestPrice;
+    public void setPriceCategory(RestockPriceCategory priceCategory) {
+        this.priceCategory = priceCategory;
     }
 
     public double getUnitCost() {

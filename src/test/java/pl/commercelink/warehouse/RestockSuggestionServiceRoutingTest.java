@@ -1,4 +1,4 @@
-package pl.commercelink.inventory.deliveries;
+package pl.commercelink.warehouse;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,7 +12,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.warehouse.StockLevels;
+import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
 import java.util.Set;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class DeliverySuggestionServiceRoutingTest {
+class RestockSuggestionServiceRoutingTest {
 
     private static final String STORE_ID = "store-1";
     private static final String SUPPLIER = "supplier-a";
@@ -40,20 +40,22 @@ class DeliverySuggestionServiceRoutingTest {
     private Store store;
     @Mock
     private InventoryView inventoryView;
+    @Mock
+    private Warehouse warehouse;
 
     @Test
-    void suggestForCallsInventoryWithFulfilmentScope() {
+    void suggestForDeliveryCallsInventoryWithFulfilmentScope() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.isEnabledSupplier(SUPPLIER)).thenReturn(true);
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
 
-        DeliverySuggestionService service = new DeliverySuggestionService(
-                inventory, stockLevels, productCatalogRepository, storesRepository);
+        RestockSuggestionService service = new RestockSuggestionService(
+                inventory, stockLevels, productCatalogRepository, storesRepository, warehouse);
 
         // when
-        service.suggestFor(STORE_ID, SUPPLIER, Set.of());
+        service.suggestForDelivery(STORE_ID, SUPPLIER, Set.of());
 
         // then
         verify(inventory).withEnabledSuppliersOnly(eq(STORE_ID), eq(SupplierScope.FULFILMENT));
