@@ -2,11 +2,8 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.products.ProductGroupListConverter;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +21,7 @@ public class FulfilmentConfiguration {
     @DynamoDBTypeConvertedEnum
     private FulfilmentType defaultFulfilmentType = FulfilmentType.WarehouseFulfilment;
     @DynamoDBAttribute(attributeName = "enabledProductGroups")
-    @DynamoDBTypeConverted(converter = ProductGroupListConverter.class)
-    private List<ProductGroup> enabledProductGroups;
+    private List<String> enabledProductGroups;
     @DynamoDBAttribute(attributeName = "enabledCategories")
     private List<String> enabledCategories;
     @DynamoDBAttribute(attributeName = "canUseGlobalSuppliers")
@@ -70,11 +66,11 @@ public class FulfilmentConfiguration {
         this.defaultFulfilmentType = defaultFulfilmentType;
     }
 
-    public List<ProductGroup> getEnabledProductGroups() {
+    public List<String> getEnabledProductGroups() {
         return enabledProductGroups;
     }
 
-    public void setEnabledProductGroups(List<ProductGroup> enabledProductGroups) {
+    public void setEnabledProductGroups(List<String> enabledProductGroups) {
         this.enabledProductGroups = enabledProductGroups;
     }
 
