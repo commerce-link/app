@@ -19,7 +19,6 @@ import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RmaGoodsInService;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.List;

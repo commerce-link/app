@@ -13,7 +13,6 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierSelectionForm;
-import pl.commercelink.taxonomy.ProductGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -161,7 +160,7 @@ class StoreSupplierConnectionServiceTest {
     void applyCarriesOverLegacyEnabledProductGroupsIntoSubmittedConfiguration() {
         // given
         Store existing = storeWith(true);
-        existing.getFulfilmentConfiguration().setEnabledProductGroups(List.of(ProductGroup.Computers));
+        existing.getFulfilmentConfiguration().setEnabledProductGroups(List.of("Computers"));
         FulfilmentConfiguration submitted = configWith(true);
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
@@ -171,7 +170,7 @@ class StoreSupplierConnectionServiceTest {
         service.apply(existing, submitted, List.of(), Map.of(), true);
 
         // then
-        assertThat(submitted.getEnabledProductGroups()).containsExactly(ProductGroup.Computers);
+        assertThat(submitted.getEnabledProductGroups()).containsExactly("Computers");
     }
 
     @Test

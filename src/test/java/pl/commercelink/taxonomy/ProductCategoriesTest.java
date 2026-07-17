@@ -9,7 +9,7 @@ class ProductCategoriesTest {
     @Test
     void parsesKnownCategoryKey() {
         // when / then
-        assertThat(ProductCategories.tryParse("CPU")).contains(ProductCategory.CPU);
+        assertThat(ProductCategories.tryParse("CPU")).contains("CPU");
     }
 
     @Test

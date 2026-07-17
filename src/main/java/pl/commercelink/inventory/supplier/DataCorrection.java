@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.taxonomy.ProductCategories;
-import pl.commercelink.taxonomy.ProductCategory;
 import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -44,7 +43,7 @@ class DataCorrection {
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
             if (entry.category() != null && !Categorized.OTHER.equals(entry.category()))
-                category = ProductCategories.tryParse(entry.category()).map(ProductCategory::name).orElse(category);
+                category = ProductCategories.tryParse(entry.category()).orElse(category);
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;

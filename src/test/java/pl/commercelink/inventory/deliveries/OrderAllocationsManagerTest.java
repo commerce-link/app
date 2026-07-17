@@ -16,7 +16,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.List;
 

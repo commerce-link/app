@@ -85,7 +85,7 @@ public class StockLevels {
                     spl.setExpectedQuantity(Math.max(spl.getExpectedQuantity(), expectedQty));
                 } else {
                     StockProductLevel spl = new StockProductLevel(
-                            product.getCategory(),
+                            category.getCategory(),
                             product.getManufacturerCode(),
                             product.getName(),
                             restockPricePromo,

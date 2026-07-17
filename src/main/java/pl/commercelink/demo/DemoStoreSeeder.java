@@ -176,7 +176,7 @@ public class DemoStoreSeeder implements StoreSeeder {
                 continue;
             }
             Product product = new Product(CatalogSeed.categoryId(row.category(), storeId), row.pimId(), row.ean(),
-                    row.mfn(), row.brand(), row.label(), row.name(), row.category(), null);
+                    row.mfn(), row.brand(), row.label(), row.name(), null);
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());

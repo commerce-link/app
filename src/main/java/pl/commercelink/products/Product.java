@@ -34,8 +34,6 @@ public class Product {
     private String label;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
-    @DynamoDBAttribute(attributeName = "category")
-    private String category;
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled = true;
 
@@ -75,14 +73,13 @@ public class Product {
     public Product() {
     }
 
-    public Product(String categoryId, String category) {
+    public Product(String categoryId) {
         this.categoryId = categoryId;
         this.productId = UUID.randomUUID().toString();
-        this.category = category;
     }
 
-    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String label, String name, String category, String pricingGroup) {
-        this(categoryId, category);
+    public Product(String categoryId, String pimId, String ean, String manufacturerCode, String brand, String label, String name, String pricingGroup) {
+        this(categoryId);
 
         this.pimId = pimId;
         this.ean = ean;
@@ -169,14 +166,6 @@ public class Product {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
     }
 
     public List<ProductCustomAttributeFilter> getCustomAttributesFilters() {

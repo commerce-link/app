@@ -25,7 +25,6 @@ import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.starter.email.EmailNotification;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
