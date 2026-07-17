@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.07.46</version>
+    <version>2026.07.47</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -74,7 +74,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>pim-api</artifactId>
-            <version>0.1.4</version>
+            <version>0.1.5</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
