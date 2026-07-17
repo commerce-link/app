@@ -37,11 +37,11 @@ public class ProviderConfigurationManager {
         return masked;
     }
 
-    public void saveConfiguration(Store store, ProviderDescriptor<?> descriptor, Map<String, String> configuration) {
-        saveConfiguration(store, descriptor.name(), descriptor, configuration);
+    public boolean saveConfiguration(Store store, ProviderDescriptor<?> descriptor, Map<String, String> configuration) {
+        return saveConfiguration(store, descriptor.name(), descriptor, configuration);
     }
 
-    public void saveConfiguration(Store store, String configName, ProviderDescriptor<?> descriptor, Map<String, String> configuration) {
+    public boolean saveConfiguration(Store store, String configName, ProviderDescriptor<?> descriptor, Map<String, String> configuration) {
         String secretName = store.getSecretesName(configName);
 
         Map<String, String> merged = new HashMap<>(configuration);
@@ -55,13 +55,16 @@ public class ProviderConfigurationManager {
             }
             secretsManager.updateSecret(secretName, merged);
             cache.remove(secretName);
+            return true;
         } else {
             boolean hasAllRequired = descriptor.configurationFields().stream()
                     .filter(ProviderField::required)
                     .noneMatch(f -> isBlank(merged.get(f.key())));
             if (hasAllRequired) {
                 secretsManager.createSecret(secretName, merged);
+                return true;
             }
+            return false;
         }
     }
 

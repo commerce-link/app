@@ -81,7 +81,7 @@ public class MarketplaceOrderImporter {
         ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    private BillingDetails toBillingDetails(MarketplaceCustomer customer) {
+    BillingDetails toBillingDetails(MarketplaceCustomer customer) {
         BillingDetails billing = new BillingDetails();
         MarketplaceCustomer.Address address = customer.billingAddress();
 
@@ -89,7 +89,7 @@ public class MarketplaceOrderImporter {
             billing.setCompanyName(address.name());
             billing.setTaxId(customer.taxId());
         } else {
-            String[] parts = address.name().split(" ");
+            String[] parts = address.name() != null ? address.name().split(" ") : new String[] {""};
             billing.setName(parts[0]);
             billing.setSurname(parts.length > 1 ? parts[1] : "");
         }
@@ -104,22 +104,31 @@ public class MarketplaceOrderImporter {
         return billing;
     }
 
-    private ShippingDetails toShippingDetails(MarketplaceCustomer customer) {
+    ShippingDetails toShippingDetails(MarketplaceCustomer customer) {
         ShippingDetails shipping = new ShippingDetails();
         MarketplaceCustomer.Address address = customer.shippingAddress();
 
-        String[] parts = address.name().split(" ");
+        String[] parts = address.name() != null ? address.name().split(" ") : new String[] {""};
         shipping.setName(parts[0]);
         shipping.setSurname(parts.length > 1 ? parts[1] : "");
         shipping.setCompanyName(customer.company());
         shipping.setEmail(customer.email());
         shipping.setPhone(address.phone());
-        shipping.setStreetAndNumber(address.street());
+        shipping.setStreetAndNumber(renderStreet(address));
         shipping.setPostalCode(address.postalCode());
         shipping.setCity(address.city());
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
 
         return shipping;
+    }
+
+    private String renderStreet(MarketplaceCustomer.Address address) {
+        if (address.pickupPoint() == null) {
+            return address.street();
+        }
+        MarketplaceCustomer.PickupPoint point = address.pickupPoint();
+        String label = point.name() != null ? point.id() + " (" + point.name() + ")" : point.id();
+        return address.street() != null ? label + ", " + address.street() : label;
     }
 
     private String resolveProductCategory(String mfn) {
