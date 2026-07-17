@@ -128,7 +128,7 @@ class MarketplaceOfferExportEventListenerTest {
 
     private Product product(String pimId, String ean) {
         Product p = new Product(CATEGORY_ID, pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name-" + pimId,
-                "Laptops", "default");
+                "default");
         return p;
     }
 
@@ -172,7 +172,7 @@ class MarketplaceOfferExportEventListenerTest {
         AvailabilityAndPrice ap = new AvailabilityAndPrice(
                 product.getPimId(), product.getEan(), product.getManufacturerCode(),
                 product.getBrand(), product.getLabel(), product.getName(),
-                product.getCategory(), price, 0L, deliveryDays, 0L
+                "Laptops", price, 0L, deliveryDays, 0L
         );
         when(pricelist.findByPimId(product.getPimId())).thenReturn(Optional.of(ap));
     }

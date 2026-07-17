@@ -59,7 +59,7 @@ class ProductDetailsTest {
     void managedProductExposesIdentityResolvableThroughCategoryId() {
         // given
         managedDefinition();
-        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product("Karty graficzne"));
+        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product());
 
         // when
         ProductDetailsView view = productDetails.generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
@@ -110,9 +110,9 @@ class ProductDetailsTest {
         when(catalog.findCategoryDefinition(CATEGORY_ID)).thenReturn(definition);
     }
 
-    private Product product(String category) {
+    private Product product() {
         return new Product(CATEGORY_ID, PIM_ID, "5900000000001", "MFN-1", "Gigabyte", "RTX 5070",
-                "Gigabyte RTX 5070", category, "default");
+                "Gigabyte RTX 5070", "default");
     }
 
     private PimEntry pimEntry() {

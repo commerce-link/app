@@ -289,7 +289,7 @@ public class ProductCatalogController {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
         CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
 
-        Product product = new Product(categoryDefinition.getCategoryId(), categoryDefinition.getCategory());
+        Product product = new Product(categoryDefinition.getCategoryId());
         return showEditProductForm( model,catalogId, product, categoryDefinition);
     }
 
