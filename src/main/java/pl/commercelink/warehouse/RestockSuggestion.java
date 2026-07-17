@@ -55,6 +55,17 @@ public class RestockSuggestion {
         return hasOffer() ? offer.qty() : 0;
     }
 
+    public double offerVsAggregatePriceRatio() {
+        if (!hasOffer() || priceCategory == null) {
+            return Double.MAX_VALUE;
+        }
+        int aggregatePrice = level.restockPriceFor(priceCategory);
+        if (aggregatePrice <= 0) {
+            return Double.MAX_VALUE;
+        }
+        return Price.fromNet(offer.netPrice()).grossValue() / aggregatePrice;
+    }
+
     public boolean isWithinBudget(RestockPriceCategory budget) {
         return hasOffer() && level.isWithinBudget(Price.fromNet(offer.netPrice()).grossValue(), budget);
     }

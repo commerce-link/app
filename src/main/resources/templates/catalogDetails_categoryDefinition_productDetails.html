@@ -27,12 +27,6 @@
             </div>
         </div>
         <div class="field">
-            <label class="label" th:text="#{product.category}"></label>
-            <div class="control">
-                <span id="category" th:text="${product.category}"></span>
-            </div>
-        </div>
-        <div class="field">
             <label class="label" th:text="#{product.brand}"></label>
             <div class="control">
                 <span id="brand" th:text="${product.brand}"></span>
@@ -44,7 +38,6 @@
         <input type="hidden" th:field="*{categoryId}" />
         <input type="hidden" th:field="*{productId}" />
         <input type="hidden" th:field="*{pimId}" />
-        <input type="hidden" th:field="*{category}" />
         <input type="hidden" th:field="*{brand}" />
 
         <div class="field">

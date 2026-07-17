@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class RestockSuggestionService {
 
+    private static final int MAX_DELIVERY_SUGGESTIONS = 50;
+
     private final Inventory inventory;
     private final StockLevels stockLevels;
     private final ProductCatalogRepository productCatalogRepository;
@@ -49,7 +51,9 @@ public class RestockSuggestionService {
         List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedMfns)
                 .stream()
                 .filter(s -> s.getPriceCategory() != null)
-                .sorted(Comparator.comparing(RestockSuggestion::getPriceCategory))
+                .sorted(Comparator.comparing(RestockSuggestion::getPriceCategory)
+                        .thenComparingDouble(RestockSuggestion::offerVsAggregatePriceRatio))
+                .limit(MAX_DELIVERY_SUGGESTIONS)
                 .collect(Collectors.toList());
 
         return withoutItemsInStock(storeId, suggestions);

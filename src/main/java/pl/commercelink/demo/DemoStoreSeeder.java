@@ -176,7 +176,7 @@ public class DemoStoreSeeder implements StoreSeeder {
                 continue;
             }
             Product product = new Product(CatalogSeed.categoryId(row.category(), storeId), row.pimId(), row.ean(),
-                    row.mfn(), row.brand(), row.label(), row.name(), row.category(), null);
+                    row.mfn(), row.brand(), row.label(), row.name(), null);
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
@@ -245,8 +245,8 @@ public class DemoStoreSeeder implements StoreSeeder {
 
         Order first = demoOrder(storeId, ownerEmail, "Jan", "Kowalski", "demo-order-001");
         itemsByOrderId.put(first.getOrderId(), List.of(
-                allocationItem(first.getOrderId(), catalogRows.get(0), ACME, 1, 1),
-                allocationItem(first.getOrderId(), catalogRows.get(1), ACME_B, 2, 2)));
+                unassignedItem(first.getOrderId(), catalogRows.get(0), 1, 1),
+                unassignedItem(first.getOrderId(), catalogRows.get(1), 2, 2)));
         Order second = demoOrder(storeId, ownerEmail, "Anna", "Nowak", "demo-order-002");
         itemsByOrderId.put(second.getOrderId(), List.of(
                 allocationItem(second.getOrderId(), catalogRows.get(2), ACME, 1, 1)));
@@ -291,13 +291,18 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private static OrderItem allocationItem(String orderId, CatalogSeedRow row, String deliveryId, int qty, int position) {
+        OrderItem item = unassignedItem(orderId, row, qty, position);
+        item.setCost(Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN));
+        item.setDeliveryId(deliveryId);
+        item.setStatus(FulfilmentStatus.Allocation);
+        return item;
+    }
+
+    private static OrderItem unassignedItem(String orderId, CatalogSeedRow row, int qty, int position) {
         OrderItem item = new OrderItem(orderId, row.category(), row.name(), qty, row.priceGross(), row.mfn(), false, position);
         item.setItemId("demo-item-" + position);
         item.setEan(row.ean());
         item.setManufacturerCode(row.mfn());
-        item.setCost(Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN));
-        item.setDeliveryId(deliveryId);
-        item.setStatus(FulfilmentStatus.Allocation);
         return item;
     }
 

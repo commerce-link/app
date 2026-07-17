@@ -13,7 +13,6 @@ import java.util.Optional;
 public class ProductRecommendation {
 
     private String catagoryId;
-    private String productCategory;
 
     private String pimId;
     private String brand;
@@ -31,7 +30,6 @@ public class ProductRecommendation {
 
     public ProductRecommendation(CategoryDefinition categoryDefinition, MatchedInventory matchedInventory, Optional<PimEntry> pimEntry) {
         this.catagoryId = categoryDefinition.getCategoryId();
-        this.productCategory = categoryDefinition.getCategory();
 
         Taxonomy taxonomy = matchedInventory.getTaxonomy();
 
@@ -79,7 +77,6 @@ public class ProductRecommendation {
                 brand,
                 label,
                 name,
-                productCategory,
                 pricingGroup
         );
     }

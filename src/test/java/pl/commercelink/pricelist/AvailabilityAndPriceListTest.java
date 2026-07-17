@@ -80,7 +80,6 @@ class AvailabilityAndPriceListTest {
         product.setBrand("Fractal Design");
         product.setLabel("label");
         product.setName("Fractal Design North");
-        product.setCategory("Case");
         product.setAvailabilityType(ProductAvailabilityType.AlwaysAvailable);
         product.setSuggestedRetailPrice(1000);
         product.setEstimatedDeliveryDays(3);
