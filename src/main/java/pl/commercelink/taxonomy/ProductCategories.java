@@ -5,6 +5,8 @@ import java.util.Set;
 
 public final class ProductCategories {
 
+    public static final String OTHER = "Other";
+
     static final Set<String> KNOWN = Set.of(
             "CPU",
             "Cooler",
@@ -16,7 +18,7 @@ public final class ProductCategories {
             "Case",
             "Fan",
             "ModdingPC",
-            "Other",
+            OTHER,
             "Services",
             "Laptops",
             "Desktops",

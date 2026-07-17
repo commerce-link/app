@@ -20,8 +20,12 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrderStatus;
+import org.springframework.ui.ExtendedModelMap;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -49,6 +53,10 @@ class OrdersControllerTest {
 
     @Mock
     private OrdersRepository ordersRepository;
+    @Mock
+    private OrderItemsRepository orderItemsRepository;
+    @Mock
+    private StoreCategories storeCategories;
     @Mock
     private MessageSource messageSource;
     @Mock
@@ -312,6 +320,81 @@ class OrdersControllerTest {
 
         // then
         verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    void savingDeliveryItemWithBlankCategoryKeepsItsServiceFlag() {
+        // given
+        OrderItem deliveryItem = existingOrderItem(null, true);
+        OrderItem posted = postedOrderItem("");
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, deliveryItem.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(deliveryItem.isService()).isTrue();
+        assertThat(deliveryItem.getCategory()).isNull();
+        verify(orderItemsRepository).save(deliveryItem);
+    }
+
+    @Test
+    void savingItemMovedToAServiceCategorySetsTheFlag() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        OrderItem posted = postedOrderItem("Montaż");
+        when(storeCategories.isService(STORE_ID, "Montaż")).thenReturn(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isTrue();
+        assertThat(item.getCategory()).isEqualTo("Montaż");
+    }
+
+    @Test
+    void savingItemMovedToAProductCategoryClearsTheFlag() {
+        // given
+        OrderItem item = existingOrderItem("Montaż", true);
+        OrderItem posted = postedOrderItem("Obudowy");
+        when(storeCategories.namesFor(STORE_ID)).thenReturn(List.of("Obudowy", "Montaż"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isFalse();
+        assertThat(item.getCategory()).isEqualTo("Obudowy");
+    }
+
+    @Test
+    void savingMigratedLegacyItemKeepsItsServiceFlagWhenCategoryIsUnknown() {
+        // given
+        OrderItem item = existingOrderItem("Services", true);
+        OrderItem posted = postedOrderItem("Services");
+        when(storeCategories.namesFor(STORE_ID)).thenReturn(List.of("Obudowy", "Montaż"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isTrue();
+    }
+
+    private OrderItem existingOrderItem(String category, boolean service) {
+        OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
+        item.setService(service);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        return item;
+    }
+
+    private OrderItem postedOrderItem(String category) {
+        OrderItem posted = new OrderItem();
+        posted.setCategory(category);
+        posted.setName("pozycja");
+        posted.setQty(1);
+        return posted;
     }
 
     private Order orderBase() {

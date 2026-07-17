@@ -145,6 +145,29 @@ class OfferControllerTest {
     }
 
     @Test
+    @DisplayName("updateOffer keeps a migrated service item without a category and normalizes blank to null")
+    void updateOfferKeepsMigratedServiceItemWithoutCategory() {
+        // given
+        Basket existing = basketBase();
+        BasketItem migratedService = basketItem("MONTAZ-1", "");
+        migratedService.setService(true);
+        Basket payload = new Basket();
+        payload.setBasketItems(List.of(migratedService));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
+
+        // when
+        offerController.updateOffer(OFFER_ID, payload);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).hasSize(1);
+        assertThat(savedItems.get(0).isService()).isTrue();
+        assertThat(savedItems.get(0).getCategory()).isNull();
+    }
+
+    @Test
     @DisplayName("updateOffer marks items whose category is a service catalog definition as services")
     void updateOfferMarksItemsFromServiceDefinitionsAsServices() {
         // given
@@ -375,16 +398,17 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Montaz",
-                "Services", 49L, 1L, 3, 0L);
+                "Usługi dodatkowe", 49L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
         when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
-                catalog(categoryDefinition("Services", 3)));
+                catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
         // when
         offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Services", "GroupLabel", "Montaz");
+                "Usługi dodatkowe", "GroupLabel", "Montaz");
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);

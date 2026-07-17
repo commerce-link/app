@@ -34,13 +34,19 @@ class CategoryPickerFragmentTest {
     private static final String PICKER = "<div th:replace=\"~{fragments/category-picker :: picker(%s)}\"></div>";
 
     private String render(String fieldName, String selected, boolean disabled, boolean includeServices) {
-        return render(fieldName, selected, disabled, includeServices, includeServices);
+        return render(fieldName, selected, disabled, includeServices, includeServices, false);
     }
 
     private String render(String fieldName, String selected, boolean disabled, boolean includeServices,
                           boolean required) {
-        String arguments = "'%s', %s, %s, %s, %s".formatted(
-                fieldName, selected == null ? "null" : "'" + selected + "'", disabled, includeServices, required);
+        return render(fieldName, selected, disabled, includeServices, required, false);
+    }
+
+    private String render(String fieldName, String selected, boolean disabled, boolean includeServices,
+                          boolean required, boolean serviceSelected) {
+        String arguments = "'%s', %s, %s, %s, %s, %s".formatted(
+                fieldName, selected == null ? "null" : "'" + selected + "'", disabled, includeServices, required,
+                serviceSelected);
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
@@ -140,18 +146,18 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void servicesMagicValueIsShownTranslatedOnCategoryLists() {
+    void serviceDefinitionIsShownUnderItsLocalizedNameOnCategoryLists() {
         // given
         Context context = new Context();
-        context.setVariable("value", "Services");
+        context.setVariable("value", null);
+        context.setVariable("service", true);
 
         // when
         String html = templateEngine().process(
-                "<td th:replace=\"~{fragments/category-picker :: categoryName(${value})}\"></td>", context);
+                "<td th:replace=\"~{fragments/category-picker :: categoryName(${value}, ${service})}\"></td>", context);
 
         // then
         assertThat(html).contains("Usługi");
-        assertThat(html).doesNotContain("Services");
     }
 
     @Test
@@ -160,7 +166,7 @@ class CategoryPickerFragmentTest {
         Context context = new Context();
         context.setVariable("leaf", "Karty graficzne");
         context.setVariable("legacyEnum", "CPU");
-        String cell = "<td th:replace=\"~{fragments/category-picker :: categoryName(${%s})}\"></td>";
+        String cell = "<td th:replace=\"~{fragments/category-picker :: categoryName(${%s}, false)}\"></td>";
 
         // when
         String leaf = templateEngine().process(cell.formatted("leaf"), context);
@@ -182,13 +188,35 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void savedServicesCategoryIsShownUnderItsLocalizedName() {
+    void serviceDefinitionIsShownUnderItsLocalizedNameInThePicker() {
         // when
-        String html = render("category", "Services", false, true);
+        String html = render("category", null, false, true, true, true);
 
         // then
-        assertThat(html).contains("value=\"Services\"");
         assertThat(html).contains("Usługi");
+        assertThat(html).doesNotContain("Services\"");
+    }
+
+    @Test
+    void serviceStateIsCarriedByAHiddenServiceField() {
+        // when
+        String withServices = render("category", null, false, true, true, true);
+        String withoutServices = render("customAttributesFilters[0].category", "Procesory", false, false);
+
+        // then
+        assertThat(withServices).contains("name=\"service\"");
+        assertThat(withServices).contains("data-picker-service");
+        assertThat(withoutServices).doesNotContain("name=\"service\"");
+    }
+
+    @Test
+    void disabledServiceDefinitionShowsItsLocalizedNameInsteadOfABlank() {
+        // when
+        String html = render("category", null, true, true, true, true);
+
+        // then
+        assertThat(html).contains("Usługi");
+        assertThat(html).doesNotContain("data-picker-trigger");
     }
 
     @Test
@@ -243,7 +271,7 @@ class CategoryPickerFragmentTest {
         context.setVariable("filters", List.of(new ProductFilter("Procesory"), new ProductFilter("Kołdry")));
         String rows = "<table><tr th:each=\"filter, iterStat : ${filters}\"><td>"
                 + "<div th:replace=\"~{fragments/category-picker :: picker("
-                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, false)}\"></div>"
+                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, false, false)}\"></div>"
                 + "</td></tr></table>";
 
         // when
@@ -264,7 +292,7 @@ class CategoryPickerFragmentTest {
         context.setVariable("categoryDefinition", new ProductFilter("CPU"));
         context.setVariable("edit", true);
         String form = "<form th:object=\"${categoryDefinition}\">"
-                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, true)}\"></div>"
+                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, true, false)}\"></div>"
                 + "</form>";
 
         // when

@@ -51,10 +51,10 @@ class StoreCategoriesTest {
     }
 
     @Test
-    void isServiceRecognizesDefinitionMappedToServicesCategory() {
+    void isServiceRecognizesDefinitionFlaggedAsService() {
         // given
         CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
+        services.setService(true);
         CategoryDefinition regular = definition("Obudowa", 2);
         regular.setCategory("Case");
         when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog("A", services, regular)));
@@ -63,6 +63,16 @@ class StoreCategoriesTest {
         assertThat(storeCategories.isService("store-1", "Usługi dodatkowe")).isTrue();
         assertThat(storeCategories.isService("store-1", "Obudowa")).isFalse();
         assertThat(storeCategories.isService("store-1", "Nieznana kategoria")).isFalse();
+    }
+
+    @Test
+    void legacyServicesCategoryStringAloneDoesNotMarkDefinitionAsService() {
+        // given
+        CategoryDefinition legacy = definition("Usługi dodatkowe", 1);
+        legacy.setCategory("Services");
+
+        // when / then
+        assertThat(storeCategories.serviceNames(List.of(catalog("A", legacy)))).isEmpty();
     }
 
     @Test
@@ -102,11 +112,11 @@ class StoreCategoriesTest {
     void serviceNamesForReturnsNamesOfServiceDefinitionsOnly() {
         // given
         CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
+        services.setService(true);
         CategoryDefinition regular = definition("Obudowa", 2);
         regular.setCategory("Case");
         CategoryDefinition blankService = definition(" ", 3);
-        blankService.setCategory("Services");
+        blankService.setService(true);
         when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog("A", services, regular, blankService)));
 
         // when / then
@@ -117,7 +127,7 @@ class StoreCategoriesTest {
     void serviceNamesIgnoreDefinitionsMappedToIcecatLeaves() {
         // given
         CategoryDefinition service = definition("Montaż", 1);
-        service.setCategory("Services");
+        service.setService(true);
         CategoryDefinition regular = definition("Obudowa", 2);
         regular.setCategory("Zabezpieczenia & uchwyty komputerów");
 
@@ -130,7 +140,7 @@ class StoreCategoriesTest {
     void serviceNamesReadsGivenCatalogsWithoutTouchingTheRepository() {
         // given
         CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
+        services.setService(true);
         CategoryDefinition regular = definition("Obudowa", 2);
         regular.setCategory("Case");
 

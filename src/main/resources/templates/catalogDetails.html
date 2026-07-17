@@ -59,7 +59,7 @@
                             <tbody>
                             <tr th:each="category : ${productCatalog.categories}">
                                 <td><span th:text="${category.name}"></span></td>
-                                <td><span th:replace="~{fragments/category-picker :: categoryName(${category.category})}"></span></td>
+                                <td><span th:replace="~{fragments/category-picker :: categoryName(${category.category}, ${category.service})}"></span></td>
                                 <td><span th:text="${category.type}"></span></td>
                                 <td><span th:text="${category.requiredDuringOrder}"></span></td>
                                 <td><span th:text="${category.sequenceNumber}"></span></td>

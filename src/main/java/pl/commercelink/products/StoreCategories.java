@@ -3,7 +3,7 @@ package pl.commercelink.products;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 
 import java.util.Comparator;
 import java.util.List;
@@ -45,8 +45,8 @@ public class StoreCategories {
                         .collect(Collectors.toList())))
                 .filter(group -> !group.names().isEmpty())
                 .collect(Collectors.toList());
-        if (groups.stream().noneMatch(group -> group.names().contains(Categorized.OTHER)))
-            groups.add(new Group(Categorized.OTHER, List.of(Categorized.OTHER)));
+        if (groups.stream().noneMatch(group -> group.names().contains(ProductCategories.OTHER)))
+            groups.add(new Group(ProductCategories.OTHER, List.of(ProductCategories.OTHER)));
         return groups;
     }
 
@@ -61,7 +61,7 @@ public class StoreCategories {
     public Set<String> serviceNames(List<ProductCatalog> catalogs) {
         return catalogs.stream()
                 .flatMap(catalog -> catalog.getCategories().stream())
-                .filter(definition -> Categorized.SERVICES.equals(definition.getCategory()))
+                .filter(CategoryDefinition::isService)
                 .map(CategoryDefinition::getName)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());

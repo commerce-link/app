@@ -28,7 +28,7 @@ import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.util.List;
@@ -98,7 +98,8 @@ class BasketOrderImporterTest {
         assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, PositionGroup.DELIVERY_POSITION);
 
         OrderItem deliveryLine = savedItems.get(savedItems.size() - 1);
-        assertThat(deliveryLine.getCategory()).isEqualTo(Categorized.SERVICES);
+        assertThat(deliveryLine.getCategory()).isNull();
+        assertThat(deliveryLine.isService()).isTrue();
         assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
     }
 
@@ -125,7 +126,7 @@ class BasketOrderImporterTest {
 
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-" + mfn, "Product " + mfn, mfn,
-                Categorized.OTHER, 100.0, 0, 1, null, 3, false);
+                ProductCategories.OTHER, 100.0, 0, 1, null, 3, false);
     }
 
     private DeliveryOption deliveryOption(String name, double price) {

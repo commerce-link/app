@@ -2,8 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<span th:fragment="categoryName(value)"
-      th:text="${value == 'Services'} ? #{catalog.category.services} : ${value}"></span>
+<span th:fragment="categoryName(value, service)"
+      th:text="${service} ? #{catalog.category.services} : ${value}"></span>
 
 <div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}"
      class="notification is-warning is-light">
@@ -11,12 +11,14 @@
     <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
 </div>
 
-<div th:fragment="picker(fieldName, selected, disabled, includeServices, required)" class="category-picker">
+<div th:fragment="picker(fieldName, selected, disabled, includeServices, required, serviceSelected)" class="category-picker">
     <input type="hidden" th:name="${fieldName}" th:value="${selected}" data-picker-value>
+    <input type="hidden" th:if="${includeServices}" name="service"
+           th:value="${serviceSelected} ? 'true' : 'false'" data-picker-service>
 
     <div th:if="${disabled}" class="control">
         <input class="input" type="text" disabled
-               th:value="${selected == 'Services'} ? #{catalog.category.services} : ${selected}">
+               th:value="${serviceSelected} ? #{catalog.category.services} : ${selected}">
     </div>
 
     <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-picker
@@ -24,9 +26,9 @@
                   data-picker-required=${required} ? 'true' : null">
         <div class="dropdown-trigger">
             <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
-                <span data-picker-label th:text="${#strings.isEmpty(selected)}
-                        ? #{catalog.category.unset}
-                        : (${selected == 'Services'} ? #{catalog.category.services} : ${selected})"></span>
+                <span data-picker-label th:text="${serviceSelected}
+                        ? #{catalog.category.services}
+                        : (${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected})"></span>
                 <span class="icon is-small">
                     <i class="fas fa-angle-down"></i>
                 </span>
@@ -129,6 +131,7 @@
 
             const setUp = picker => {
                 const field = picker.parentElement.querySelector('[data-picker-value]');
+                const serviceField = picker.parentElement.querySelector('[data-picker-service]');
                 const trigger = picker.querySelector('[data-picker-trigger]');
                 const label = picker.querySelector('[data-picker-label]');
                 const search = picker.querySelector('[data-picker-search]');
@@ -137,25 +140,29 @@
                 const services = picker.dataset.pickerServices;
 
                 const options = services
-                        ? [{value: 'Services', label: services}].concat(categories.map(name => ({value: name, label: name})))
-                        : categories.map(name => ({value: name, label: name}));
+                        ? [{value: '', service: true, label: services}].concat(categories.map(name => ({value: name, service: false, label: name})))
+                        : categories.map(name => ({value: name, service: false, label: name}));
 
                 let matches = [];
                 let shown = [];
                 let active = -1;
                 let query = '';
 
-                const labelFor = value => {
-                    const option = options.find(candidate => candidate.value === value);
-                    return option ? option.label : value;
-                };
+                const serviceSelected = () => serviceField && serviceField.value === 'true';
 
                 const showSelection = () => {
-                    label.textContent = field.value ? labelFor(field.value) : messages.unset;
+                    if (serviceSelected()) {
+                        label.textContent = services;
+                    } else {
+                        label.textContent = field.value ? field.value : messages.unset;
+                    }
                 };
 
-                const select = value => {
-                    field.value = value;
+                const select = option => {
+                    field.value = option.value;
+                    if (serviceField) {
+                        serviceField.value = option.service ? 'true' : 'false';
+                    }
                     trigger.classList.remove('is-danger');
                     showSelection();
                     close();
@@ -170,7 +177,7 @@
                         item.innerHTML = highlight(option.label, query);
                         item.addEventListener('click', event => {
                             event.preventDefault();
-                            select(option.value);
+                            select(option);
                         });
                         list.appendChild(item);
                         shown.push(option);
@@ -246,9 +253,9 @@
                     } else if (event.key === 'Enter') {
                         event.preventDefault();
                         if (active >= 0) {
-                            select(shown[active].value);
+                            select(shown[active]);
                         } else if (shown.length === 1) {
-                            select(shown[0].value);
+                            select(shown[0]);
                         }
                     } else if (event.key === 'Escape') {
                         close();
@@ -264,7 +271,7 @@
 
                 if (field.form && picker.dataset.pickerRequired) {
                     field.form.addEventListener('submit', event => {
-                        if (!field.value) {
+                        if (!field.value && !serviceSelected()) {
                             event.preventDefault();
                             trigger.classList.add('is-danger');
                             open();

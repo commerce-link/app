@@ -112,6 +112,7 @@ public class StoreCopyService {
                 newCategory.setCategoryId(newCategoryId);
                 newCategory.setName(sourceCategory.getName());
                 newCategory.setCategory(sourceCategory.getCategory());
+                newCategory.setService(sourceCategory.isService());
                 newCategory.setType(sourceCategory.getType());
                 newCategory.setRequiredDuringOrder(sourceCategory.isRequiredDuringOrder());
                 newCategory.setSequenceNumber(sourceCategory.getSequenceNumber());
@@ -156,6 +157,7 @@ public class StoreCopyService {
                 target.setLabel(source.getLabel());
                 target.setName(source.getName());
                 target.setEnabled(source.isEnabled());
+                target.setService(source.isService());
                 target.setCustomAttributesFilters(copyList(source.getCustomAttributesFilters()));
                 target.setCustomAttributes(copyList(source.getCustomAttributes()));
                 target.setRecommendation(source.getRecommendation());

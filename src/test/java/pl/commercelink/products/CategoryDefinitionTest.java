@@ -32,6 +32,22 @@ class CategoryDefinitionTest {
         assertThat(definition.isComplete()).isTrue();
     }
 
+    @Test
+    void definitionIsNotServiceByDefault() {
+        // when / then
+        assertThat(new CategoryDefinition().isService()).isFalse();
+    }
+
+    @Test
+    void serviceDefinitionWithoutCategoryIsComplete() {
+        // given
+        CategoryDefinition definition = completeDefinitionWithoutCategory();
+        definition.setService(true);
+
+        // when / then
+        assertThat(definition.isComplete()).isTrue();
+    }
+
     private CategoryDefinition completeDefinitionWithoutCategory() {
         StockDefinition stock = new StockDefinition();
         stock.setCriticalStockThreshold(1);

@@ -9,6 +9,7 @@ import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ObjectIdInvoiceNoDto;
@@ -16,6 +17,7 @@ import pl.commercelink.web.dtos.ObjectIdInvoiceNoDto;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/Store/{storeId}/Basket")
@@ -29,6 +31,8 @@ public class BasketsRestApi {
     private InvoicingService invoicingService;
     @Autowired
     private PricelistRepository pricelistRepository;
+    @Autowired
+    private StoreCategories storeCategories;
     @Value("${commercelink.localization.fallback-locale:#{null}}")
     private Locale fallbackLocale;
 
@@ -71,6 +75,9 @@ public class BasketsRestApi {
 
     private void processBasket(Basket basket, CheckoutRequest req) {
         List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
+
+        Set<String> serviceNames = storeCategories.serviceNamesFor(basket.getStoreId());
+        items.forEach(item -> item.setService(serviceNames.contains(item.getCategory()) || item.isService()));
 
         basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());

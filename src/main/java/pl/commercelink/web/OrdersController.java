@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -321,7 +322,7 @@ public class OrdersController extends BaseController {
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
-                .filter(i -> i.isProduct())
+                .filter(i -> !i.isService())
                 .collect(Collectors.toList());
 
         Map<String, SplitGroupPreviewDto> splitGroupPreviews = orderItems.stream()
@@ -508,7 +509,10 @@ public class OrdersController extends BaseController {
         if (op.isPresent()) {
             OrderItem orderItem = op.get();
 
-            updatedItem.setService(storeCategories.isService(getStoreId(), updatedItem.getCategory()));
+            if (StringUtils.isBlank(updatedItem.getCategory())) {
+                updatedItem.setCategory(null);
+            }
+            updatedItem.setService(resolveServiceFlag(orderItem, updatedItem.getCategory()));
             orderItem.update(updatedItem);
             orderItemsRepository.save(orderItem);
 
@@ -517,6 +521,16 @@ public class OrdersController extends BaseController {
         }
 
         return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    private boolean resolveServiceFlag(OrderItem existingItem, String category) {
+        if (storeCategories.isService(getStoreId(), category)) {
+            return true;
+        }
+        if (category != null && storeCategories.namesFor(getStoreId()).contains(category)) {
+            return false;
+        }
+        return existingItem.isService();
     }
 
     @PostMapping("/dashboard/orders/{orderId}/assign-supplier")
@@ -686,7 +700,7 @@ public class OrdersController extends BaseController {
                 ));
 
         for (OrderItem item : orderItemsRepository.findByOrderId(orderId)) {
-            if (item.isProduct()) {
+            if (!item.isService()) {
                 item.setSerialNo(serialByItemId.get(item.getItemId()));
                 orderItemsRepository.save(item);
             }

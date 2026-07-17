@@ -7,7 +7,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -32,7 +32,7 @@ public class WarehouseItem extends Item {
     }
 
     public static WarehouseItem empty(String storeId) {
-        return new WarehouseItem(storeId, "Other", Categorized.OTHER, null, null, null, 0, 1);
+        return new WarehouseItem(storeId, "Other", ProductCategories.OTHER, null, null, null, 0, 1);
     }
 
     public WarehouseItem(String storeId, String deliveryId, String category, String name, String ean, String mfn, double unitCost, int qty) {

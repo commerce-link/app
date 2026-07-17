@@ -32,18 +32,43 @@ class BasketItemTest {
     }
 
     @Test
-    void legacyItemWithServicesCategoryIsStillService() {
+    void legacyServicesCategoryStringAloneDoesNotMakeItemAService() {
         // given
         BasketItem item = new BasketItem("id", "name", "mfn", "Services", 100, 80, 1, null, 1, false);
 
         // when / then
-        assertThat(item.isService()).isTrue();
+        assertThat(item.isService()).isFalse();
     }
 
     @Test
     void shippingItemIsService() {
         // when / then
         assertThat(BasketItem.shipping(10.0).isService()).isTrue();
+    }
+
+    @Test
+    void shippingItemHasNoCategoryString() {
+        // when / then
+        assertThat(BasketItem.shipping(10.0).getCategory()).isNull();
+    }
+
+    @Test
+    void serviceItemWithoutCategoryIsComplete() {
+        // given
+        BasketItem item = new BasketItem("id", "Montaż PC", "MONTAZ-1", null, 100, 80, 1, null, 1, false);
+        item.setService(true);
+
+        // when / then
+        assertThat(item.isComplete()).isTrue();
+    }
+
+    @Test
+    void productItemWithoutCategoryIsNotComplete() {
+        // given
+        BasketItem item = new BasketItem("id", "name", "mfn", null, 100, 80, 1, null, 1, false);
+
+        // when / then
+        assertThat(item.isComplete()).isFalse();
     }
 
     private AvailabilityAndPrice pricelistRow(String category) {

@@ -3,6 +3,7 @@ package pl.commercelink.orders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.stores.DeliveryOption;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,6 +23,23 @@ class OrderItemTest {
 
         // then
         assertThat(orderItem.getPosition()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("fromDeliveryOption creates a service item without any category string")
+    void fromDeliveryOptionCreatesServiceItemWithoutCategory() {
+        // given
+        DeliveryOption option = new DeliveryOption();
+        option.setName("Kurier DPD");
+        option.setPrice(20.0);
+
+        // when
+        OrderItem deliveryItem = OrderItem.fromDeliveryOption(ORDER_ID, option);
+
+        // then
+        assertThat(deliveryItem.isService()).isTrue();
+        assertThat(deliveryItem.getCategory()).isNull();
+        assertThat(deliveryItem.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
     }
 
     @Test

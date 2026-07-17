@@ -5,14 +5,14 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
-public class BasketItem implements Categorized {
+public class BasketItem {
 
     public static final String SHIPPING_MFN_CODE = "Shipping";
 
@@ -59,7 +59,7 @@ public class BasketItem implements Categorized {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return isNotBlank(name) && isNotBlank(mfn) && category != null && qty > 0 && unitPrice >= 0;
+        return isNotBlank(name) && isNotBlank(mfn) && (service || category != null) && qty > 0 && unitPrice >= 0;
     }
 
     public String getId() {
@@ -143,10 +143,9 @@ public class BasketItem implements Categorized {
         this.consolidated = consolidated;
     }
 
-    @Override
     @DynamoDBAttribute(attributeName = "service")
     public boolean isService() {
-        return service || hasCategory(SERVICES);
+        return service;
     }
 
     public void setService(boolean service) {
@@ -170,7 +169,7 @@ public class BasketItem implements Categorized {
         BasketItem item = new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
-                Categorized.SERVICES,
+                null,
                 shippingPrice,
                 0,
                 1,
@@ -225,7 +224,7 @@ public class BasketItem implements Categorized {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 "Brak produktu",
                 mfn,
-                Categorized.OTHER,
+                ProductCategories.OTHER,
                 0,
                 0,
                 qty,

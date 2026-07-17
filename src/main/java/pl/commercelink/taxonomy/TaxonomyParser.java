@@ -20,7 +20,7 @@ class TaxonomyParser {
         String mfn = row[1];
         String brand = row[2];
         String name = row[3];
-        String category = row[4] == null || row[4].isBlank() ? Categorized.OTHER : row[4];
+        String category = row[4] == null || row[4].isBlank() ? ProductCategories.OTHER : row[4];
         int dataAccuracyScore = parseScore(row[5]);
         Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
         Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;

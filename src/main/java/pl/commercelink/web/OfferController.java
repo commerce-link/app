@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -449,7 +450,12 @@ public class OfferController {
 
     private List<BasketItem> withResolvedServiceFlags(List<BasketItem> items) {
         Set<String> serviceNames = storeCategories.serviceNamesFor(getStoreId());
-        items.forEach(item -> item.setService(serviceNames.contains(item.getCategory()) || item.isService()));
+        items.forEach(item -> {
+            if (StringUtils.isBlank(item.getCategory())) {
+                item.setCategory(null);
+            }
+            item.setService(serviceNames.contains(item.getCategory()) || item.isService());
+        });
         return items;
     }
 

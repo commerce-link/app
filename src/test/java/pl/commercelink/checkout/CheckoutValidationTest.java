@@ -79,6 +79,23 @@ class CheckoutValidationTest {
         assertThat(productItem.isService()).isFalse();
     }
 
+    @Test
+    @DisplayName("item without a category never satisfies a required service definition without one")
+    void itemWithNullCategoryDoesNotSatisfyRequiredServiceDefinition() {
+        // given
+        CategoryDefinition serviceDefinition = new CategoryDefinition();
+        serviceDefinition.setName("Montaż");
+        serviceDefinition.setService(true);
+        serviceDefinition.setRequiredDuringOrder(true);
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(serviceDefinition));
+
+        // when / then
+        assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item(null))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Montaż");
+    }
+
     private ProductCatalog catalogWithRequired(String name, String category) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setName(name);

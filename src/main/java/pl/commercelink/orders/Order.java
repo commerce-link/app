@@ -298,7 +298,7 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> i.isProduct())
+                .filter(i -> !i.isService())
                 .allMatch(OrderItem::isReturned);
     }
 

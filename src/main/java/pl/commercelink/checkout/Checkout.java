@@ -129,7 +129,7 @@ public class Checkout {
     private PaymentLineItem consolidateLineItem(String name, List<BasketItem> items) {
         double totalGross = items.stream().mapToDouble(BasketItem::getTotalPrice).sum();
         String description = items.stream()
-                .filter(BasketItem::isProduct)
+                .filter(i -> !i.isService())
                 .map(i -> i.getQty() == 1 ? i.getName().trim() : i.getQty() + "x " + i.getName().trim())
                 .collect(Collectors.joining(", "));
         return new PaymentLineItem(name, description, (int) (totalGross * 100), 1);
@@ -201,7 +201,7 @@ public class Checkout {
 
     private boolean matchesCategory(BasketItem item, CategoryDefinition category) {
         return Objects.equals(item.getCategory(), category.getName())
-                || Objects.equals(item.getCategory(), category.getCategory());
+                || (category.getCategory() != null && Objects.equals(item.getCategory(), category.getCategory()));
     }
 
     static class CatalogProcessingResult {

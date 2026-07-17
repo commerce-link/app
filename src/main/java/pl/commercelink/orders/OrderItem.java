@@ -4,7 +4,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
-import pl.commercelink.taxonomy.Categorized;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import java.util.UUID;
@@ -280,7 +279,7 @@ public class OrderItem extends Item {
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
         OrderItem orderItem = new OrderItem(
                 orderId,
-                Categorized.SERVICES,
+                null,
                 opt.getName(),
                 1,
                 opt.getPrice(),

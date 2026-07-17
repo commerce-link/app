@@ -5,7 +5,7 @@ import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.taxonomy.TaxonomyResolver;
 import pl.commercelink.taxonomy.TaxonomyResolver.ResolvedProduct;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -60,7 +60,7 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, String provider, DeliveryItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), Categorized.OTHER);
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), ProductCategories.OTHER);
         return new WarehouseItem(
                 storeId, provider, resolved.category(), resolved.name(),
                 item.getEan(), item.getMfn(), item.getUnitCost(), item.getWarehouseQtyAdjustment()

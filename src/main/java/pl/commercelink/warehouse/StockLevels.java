@@ -52,6 +52,7 @@ public class StockLevels {
         Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
 
         List<CategoryDefinition> categories = catalog.getCategories().stream()
+                .filter(c -> !c.isService())
                 .filter(c -> categoryId == null || categoryId.isEmpty() || categoryId.equals(c.getCategoryId()))
                 .toList();
 
