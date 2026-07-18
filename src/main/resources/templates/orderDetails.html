@@ -313,7 +313,8 @@
     </div>
 
     <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
-        <input type="hidden" name="position" th:value="${#lists.size(orderItemsForm.orderItems)}"/>
+        <input type="hidden" name="position" th:value="${#lists.size(orderItemsForm.orderItems)}"
+               th:attr="data-default-position=${#lists.size(orderItemsForm.orderItems)}"/>
         <h2 class="subtitle" th:text="#{order.items}"></h2>
         <div class="box mb-5">
             <div class="table-container mb-4">
@@ -337,7 +338,8 @@
                     </tr>
                     </thead>
                     <tbody id="orderItemsRows">
-                    <tr th:each="item, iterStat : *{orderItems}">
+                    <tr th:each="item, iterStat : *{orderItems}"
+                        th:attr="data-category=${item.category},data-position=${item.position},data-service=${item.service}">
                         <td style="width: 60px;">
                             <input type="checkbox" th:field="*{orderItems[__${iterStat.index}__].selected}" th:disabled="${isCompletedOrder or hasWarehouseDocument}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
@@ -1381,6 +1383,25 @@
             if (!modal) return;
             modal.classList.toggle('is-active', show);
         }
+
+        function updateAddItemPosition(category) {
+            const positionInput = document.querySelector('#orderItemsForm input[name="position"]');
+            if (!positionInput) return;
+            let position = positionInput.dataset.defaultPosition;
+            document.querySelectorAll('#orderItemsRows tr[data-category]').forEach(row => {
+                if (row.dataset.service !== 'true' && row.dataset.category === category) {
+                    position = row.dataset.position;
+                }
+            });
+            positionInput.value = position;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const categorySelect = document.querySelector('#itemAddModalId select[name="category"]');
+            if (categorySelect) {
+                categorySelect.addEventListener('change', () => updateAddItemPosition(categorySelect.value));
+            }
+        });
 
         function toggleReceiptModal(show) {
             const modal = document.getElementById('receiptModal');
