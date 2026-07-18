@@ -125,6 +125,7 @@ public class OrderItem extends Item {
 
     public void copyFulfilmentFrom(ReservationConfirmation confirmation) {
         this.setQty(confirmation.qty());
+        this.appendComment(confirmation.comment());
         this.addFulfilment(
                 confirmation.ean(),
                 confirmation.mfn(),

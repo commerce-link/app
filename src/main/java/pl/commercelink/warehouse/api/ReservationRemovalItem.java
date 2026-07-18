@@ -13,6 +13,7 @@ public class ReservationRemovalItem {
     private double unitPrice;
     private double tax;
     private String serialNo;
+    private String comment;
     private boolean delivered;
 
     public static ReservationRemovalItem from(OrderItem orderItem) {
@@ -26,6 +27,7 @@ public class ReservationRemovalItem {
         item.unitPrice = orderItem.getCost();
         item.tax = orderItem.getTax();
         item.serialNo = orderItem.getSerialNo();
+        item.comment = orderItem.getComment();
         item.delivered = orderItem.isDelivered();
         return item;
     }
@@ -64,6 +66,10 @@ public class ReservationRemovalItem {
 
     public String getSerialNo() {
         return serialNo;
+    }
+
+    public String getComment() {
+        return comment;
     }
 
     public boolean isDelivered() {

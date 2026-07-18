@@ -8,5 +8,6 @@ public record ReservationConfirmation(
         String mfn,
         Price cost,
         int qty,
-        boolean inStock
+        boolean inStock,
+        String comment
 ) {}
