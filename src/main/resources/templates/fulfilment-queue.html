@@ -50,14 +50,16 @@
                                 <option th:value="@{${orderFulfilmentBasePath}(pathSelector='default')}" th:text="#{orders.choose.suppliers}"></option>
                                 <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest')}" th:text="#{orders.suggest.cheapest.suppliers}"></option>
                                 <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-min')}" th:text="#{orders.suggest.cheapest.suppliers.min.orders}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-local-min')}" th:text="#{orders.suggest.cheapest.local.suppliers.min.orders}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-local-avg')}" th:text="#{orders.suggest.cheapest.local.suppliers.avg.orders}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small ml-2" type="submit" th:text="#{orders.apply}"></button>
                         <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
                             <input type="checkbox" name="onlyWithProfit" value="true" />
                             <span class="ml-1" th:text="#{fulfilment.queue.only.with.profit}"></span>
+                        </label>
+                        <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
+                            <input type="checkbox" name="onlyLocalSuppliers" value="true" />
+                            <span class="ml-1" th:text="#{fulfilment.queue.only.local.suppliers}"></span>
                         </label>
                         <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
                             <input type="checkbox" name="onlyMultiOrder" value="true" />

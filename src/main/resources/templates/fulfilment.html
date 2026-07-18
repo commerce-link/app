@@ -235,6 +235,7 @@
         <input type="hidden" th:name="pathSelector" th:value="${form.pathSelector}" />
         <input type="hidden" th:name="onlyWithProfit" th:value="${form.onlyWithProfit}" />
         <input type="hidden" th:name="onlyMultiOrder" th:value="${form.onlyMultiOrder}" />
+        <input type="hidden" th:name="onlyLocalSuppliers" th:value="${form.onlyLocalSuppliers}" />
         <input type="hidden" th:name="orderByOrder" th:value="${form.orderByOrder}" />
         <div th:each="order, stat : ${form.selectedOrders}">
             <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />

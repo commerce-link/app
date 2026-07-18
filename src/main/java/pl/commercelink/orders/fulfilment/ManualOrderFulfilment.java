@@ -26,7 +26,7 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         this.supplierRegistry = supplierRegistry;
     }
 
-    public FulfilmentForm init(String storeId, List<String> selectedOrders, FulfilmentPathSelector pathSelector, boolean isSuperAdmin, boolean onlyWithProfit, boolean onlyMultiOrder) {
+    public FulfilmentForm init(String storeId, List<String> selectedOrders, FulfilmentPathSelector pathSelector, boolean isSuperAdmin, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
         String redirectUrl = isSuperAdmin ? "redirect:/dashboard/fulfilment/queue" : "redirect:/dashboard/orders";
 
         List<OrderItem> orderItems = selectedOrders.stream()
@@ -46,6 +46,9 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         }
         if (onlyMultiOrder) {
             builder.withMultiOrderFulfilmentOnly();
+        }
+        if (onlyLocalSuppliers) {
+            builder.withSupplierFilter(supplier -> supplierRegistry.get(supplier).isLocalFor("PL"));
         }
         if (orderItems.stream().map(OrderItem::getOrderId).filter(StringUtils::isNotBlank).distinct().count() > 1) {
             // in the case of multiple orders show only options that can satisfy demand
