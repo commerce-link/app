@@ -397,7 +397,7 @@
                                               th:text="#{order.item.assign.sku}"></span>
                                         <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
-                                           th:attr="data-item-id=${item.itemId},data-tax=${item.tax}"
+                                           th:attr="data-item-id=${item.itemId},data-tax=${item.tax},data-sku=${item.sku}"
                                            onclick="openQuickAssignModal(this); return false;"
                                            th:text="#{order.item.quick.assign}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
@@ -523,8 +523,10 @@
                         <label class="label" th:text="#{general.manufacturer.code}"></label>
                         <div class="control">
                             <input class="input" type="text" id="quickAssignMfn" name="manufacturerCode" required
+                                   autocomplete="off" oninput="highlightQuickAssignSku()"
                                    th:placeholder="#{inventory.product.code.placeholder}"/>
                         </div>
+                        <div class="tags mt-1 mb-0" id="quickAssignSkuOptions"></div>
                     </div>
 
                     <div class="field">
@@ -1531,6 +1533,13 @@
             modal.classList.toggle('is-active', show);
         }
 
+        function highlightQuickAssignSku() {
+            const value = document.getElementById('quickAssignMfn').value.trim();
+            document.querySelectorAll('#quickAssignSkuOptions .tag').forEach(tag => {
+                tag.classList.toggle('is-primary', tag.textContent === value);
+            });
+        }
+
         function toggleQuickAssignModal(show) {
             const modal = document.getElementById('quickAssignModal');
             if (!modal) return;
@@ -1546,6 +1555,23 @@
         function openQuickAssignModal(button) {
             document.getElementById('quickAssignItemId').value = button.getAttribute('data-item-id') || '';
             document.getElementById('quickAssignMfn').value = '';
+
+            const skuOptions = document.getElementById('quickAssignSkuOptions');
+            skuOptions.innerHTML = '';
+            (button.getAttribute('data-sku') || '').split(':')
+                .map(sku => sku.trim())
+                .filter(sku => sku.length > 0)
+                .forEach(sku => {
+                    const tag = document.createElement('a');
+                    tag.className = 'tag';
+                    tag.textContent = sku;
+                    tag.onclick = () => {
+                        document.getElementById('quickAssignMfn').value = sku;
+                        highlightQuickAssignSku();
+                    };
+                    skuOptions.appendChild(tag);
+                });
+            highlightQuickAssignSku();
             document.getElementById('quickAssignPrice').value = '';
             document.getElementById('quickAssignSupplier').value = '';
             document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
