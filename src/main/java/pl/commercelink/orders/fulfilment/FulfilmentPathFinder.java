@@ -5,6 +5,21 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Heuristic path finder that incrementally enumerates combinations of fulfilment candidates.
+ *
+ * Demands (allocation groups) are processed in descending value order; every partial path is extended
+ * with each viable candidate of the current demand, producing a growing cross-product of paths. Demands
+ * coverable from the internal warehouse are always assigned to it. To keep the explosion in check the
+ * finder applies pruning heuristics: per demand it considers candidates only within a price spread above
+ * the cheapest (after the first three), and once the working set exceeds 10000 paths it keeps the ~100
+ * cheapest paths per supplier count plus the ~1000 cheapest overall. Path cost is the sum of item values
+ * plus per-supplier shipping computed from aggregated supplier values (so free-shipping thresholds
+ * account for all groups of a supplier combined).
+ *
+ * Because of the pruning this finder is fast on huge inputs but may miss the global optimum — see
+ * {@link SupplierSubsetPathFinder} for the exact alternative offered next to it in the fulfilment queue.
+ */
 class FulfilmentPathFinder {
 
     private final SupplierRegistry supplierRegistry;
