@@ -44,13 +44,6 @@ class FulfilmentPathFinder {
                 long minPathSize = previousPaths.stream().mapToLong(FulfilmentPath::size).min().orElse(0);
                 long maxPathSize = previousPaths.stream().mapToLong(FulfilmentPath::size).max().orElse(0);
 
-                // best by localization
-                Set<FulfilmentPath> bestByLocalization = previousPaths.stream()
-                        .filter(FulfilmentPath::hasOnlyLocalProviders)
-                        .sorted(Comparator.comparing(FulfilmentPath::getEstimatedTotalValue))
-                        .limit(500)
-                        .collect(Collectors.toSet());
-
                 // best by path size
                 Set<FulfilmentPath> bestByPathSize = new HashSet<>();
                 for (long i = minPathSize; i < maxPathSize; i++) {
@@ -70,7 +63,6 @@ class FulfilmentPathFinder {
                         .collect(Collectors.toSet());
 
                 previousPaths = new HashSet<>();
-                previousPaths.addAll(bestByLocalization);
                 previousPaths.addAll(bestByPathSize);
                 previousPaths.addAll(bestOverall);
             }

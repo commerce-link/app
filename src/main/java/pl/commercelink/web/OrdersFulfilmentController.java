@@ -99,7 +99,7 @@ class FulfilmentController extends BaseController {
     private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers, boolean orderByOrder, Map<String, Double> committedSuppliers, Model model) {
         List<String> orders = orderByOrder ? sortByItemsToOrder(selectedOrders) : selectedOrders;
         List<String> ordersToFulfil = orderByOrder && !orders.isEmpty() ? List.of(orders.get(0)) : orders;
-        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, createPathSelector(pathSelector), isSuperAdmin(), onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers);
+        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, "suggest".equals(pathSelector), isSuperAdmin(), onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers);
         fulfilmentForm.setSelectedOrders(orders);
         fulfilmentForm.setPathSelector(pathSelector);
         fulfilmentForm.setOnlyWithProfit(onlyWithProfit);
@@ -116,17 +116,6 @@ class FulfilmentController extends BaseController {
         }
 
         return "fulfilment";
-    }
-
-    private FulfilmentPathSelector createPathSelector(String pathSelector) {
-        switch (pathSelector) {
-            case "cheapest":
-                return new CheapestFulfilmentPathSelector();
-            case "cheapest-min":
-                return new ShortestAndCheapestPathSelector();
-            default:
-                return new DefaultPathSelector();
-        }
     }
 
     @PostMapping("/dashboard/orders/fulfilment/commit")

@@ -25,6 +25,29 @@
         .fl-toolbar { position: sticky; top: 0; z-index: 30; background: #fff;
             border-bottom: 1px solid #e6e8eb; padding: .7rem 0 .55rem 0; box-shadow: 0 2px 6px rgba(0,0,0,.04); margin-bottom: 1rem; }
 
+        .variants { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: .55rem; }
+        .variant { flex: 1; min-width: 185px; max-width: 250px; background: #fff; border: 1px solid #e0e3e7; border-radius: 8px;
+            padding: .45rem .7rem; cursor: pointer; user-select: none; position: relative; transition: box-shadow .12s, border-color .12s; }
+        .variant:hover { box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+        .variant.active { border-color: #3273dc; outline: 2px solid #3273dc; background: #f6f9fe; }
+        .variant .v-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+        .variant .v-count { font-weight: 700; font-size: .8rem; white-space: nowrap; }
+        .variant .v-total { font-weight: 700; font-size: .88rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .variant .v-total small { display: block; font-weight: 500; font-size: .6rem; color: #9aa1ab; text-align: right; }
+        .variant .v-provs { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .3rem; }
+        .variant .v-provs .provider-chip { font-size: .68rem; padding: .1rem .5rem; }
+        .variant .v-badge { position: absolute; top: -0.55rem; left: .6rem; font-size: .6rem; font-weight: 700; letter-spacing: .03em;
+            background: #1b8f5a; color: #fff; border-radius: 999px; padding: .08rem .45rem; }
+        .variant .v-badge.blue { background: #3273dc; }
+        .variant.custom { border-style: dashed; color: #7a8290; display: flex; align-items: center; justify-content: center;
+            font-size: .78rem; font-weight: 600; }
+        .variant.custom.active { color: #3273dc; }
+
+        .filters-row { display: none; border-top: 1px dashed #e6e8eb; padding-top: .5rem; margin-top: .5rem;
+            align-items: center; gap: .8rem; flex-wrap: wrap; }
+        .filters-row.open { display: flex; }
+        .filters-btn-active { border-color: #3273dc !important; color: #3273dc !important; }
+
         .order-cov { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
         .order-chip { display: inline-flex; align-items: center; gap: .45rem; font-size: .78rem;
             padding: .2rem .6rem; border-radius: 999px; border: 1px solid transparent; cursor: pointer; user-select: none;
@@ -52,6 +75,7 @@
             border-radius: 8px; cursor: pointer; margin-bottom: .65rem; border: 1px solid rgba(0,0,0,.05); }
         .cat-header .cat-name { font-weight: 700; font-size: 1rem; color: #2d2d2d; }
         .cat-header .cat-count { font-size: .72rem; font-weight: 600; color: #5a5a5a; background: rgba(255,255,255,.7); }
+        .cat-header .cat-sel { font-size: .72rem; font-weight: 600; color: #1b8f5a; margin-left: auto; }
         .cat-header .chevron { color: #7a7a7a; }
         .cat-section.cat-collapsed .cat-header .chevron { transform: rotate(-90deg); }
         .cat-section.cat-collapsed .cat-body { display: none; }
@@ -128,47 +152,37 @@
 
     <div class="fl-toolbar">
         <div class="container">
-            <div class="level is-mobile mb-2">
-                <div class="level-left">
-                    <div class="level-item">
-                        <label class="checkbox is-size-7 mr-3"><input type="checkbox" id="fOnlyUnaccepted"> <span th:text="#{fulfilment.filter.unaccepted}"></span></label>
-                        <label class="checkbox is-size-7"><input type="checkbox" id="fAboveCost"> <span th:text="#{fulfilment.filter.above.cost}"></span></label>
-                    </div>
-                    <div class="level-item">
-                        <span class="is-size-7 has-text-grey mr-2" style="white-space:nowrap;" th:text="#{fulfilment.filter.net}"></span>
-                        <div class="range-dual" style="width:200px;">
-                            <div class="rd-track"></div>
-                            <div class="rd-fill" id="fNetFill"></div>
-                            <input type="range" id="fNetMin" min="0" max="100" step="1" value="0">
-                            <input type="range" id="fNetMax" min="0" max="100" step="1" value="100">
-                        </div>
-                        <span class="is-size-7 has-text-weight-semibold ml-2" id="fNetRangeVal" style="white-space:nowrap; min-width:8.5rem;"></span>
-                    </div>
-                </div>
-                <div class="level-right">
-                    <div class="level-item buttons are-small mb-0">
-                        <button type="button" class="button is-light" onclick="setAll(false)">
-                            <span class="icon"><i class="fas fa-eraser"></i></span><span th:text="#{fulfilment.clear.selection}"></span>
-                        </button>
-                    </div>
-                </div>
+            <div th:if="${!form.variants.isEmpty()}">
+                <div class="variants" id="variants"></div>
             </div>
-            <div class="level is-mobile mb-2">
-                <div class="level-left" style="flex:1;">
-                    <span class="is-size-7 has-text-grey mr-3" style="white-space:nowrap;"><i class="fas fa-truck mr-1"></i><span th:text="#{fulfilment.filter.supplier}"></span></span>
-                    <div class="prov-filter" id="providerFilter"></div>
-                </div>
-            </div>
-            <div class="level is-mobile mb-0" th:unless="${isWarehouse}">
-                <div class="level-left" style="flex:1;">
+            <div class="level is-mobile mb-0">
+                <div class="level-left" style="flex:1;" th:unless="${isWarehouse}">
                     <span class="is-size-7 has-text-grey mr-3" style="white-space:nowrap;"><i class="fas fa-receipt mr-1"></i><span th:text="#{fulfilment.coverage}"></span></span>
                     <div class="order-cov" id="orderCoverage"></div>
                 </div>
                 <div class="level-right">
-                    <button type="button" class="button is-small is-light" id="clearFocus" style="display:none;" onclick="clearFocus()">
-                        <span class="icon"><i class="fas fa-times"></i></span><span th:text="#{fulfilment.show.all}"></span>
-                    </button>
+                    <div class="level-item buttons are-small mb-0">
+                        <button type="button" class="button is-light" id="clearFocus" style="display:none;" onclick="clearFocus()">
+                            <span class="icon"><i class="fas fa-times"></i></span><span th:text="#{fulfilment.show.all}"></span>
+                        </button>
+                        <button type="button" class="button is-light" onclick="setAll(false)">
+                            <span class="icon"><i class="fas fa-eraser"></i></span><span th:text="#{fulfilment.clear.selection}"></span>
+                        </button>
+                        <button type="button" class="button is-light" id="filtersBtn" onclick="toggleFilters()"></button>
+                    </div>
                 </div>
+            </div>
+            <div class="filters-row" id="filtersRow">
+                <span class="is-size-7 has-text-grey" style="white-space:nowrap;" th:text="#{fulfilment.filter.net}"></span>
+                <div class="range-dual" style="width:200px;">
+                    <div class="rd-track"></div>
+                    <div class="rd-fill" id="fNetFill"></div>
+                    <input type="range" id="fNetMin" min="0" max="100" step="1" value="0">
+                    <input type="range" id="fNetMax" min="0" max="100" step="1" value="100">
+                </div>
+                <span class="is-size-7 has-text-weight-semibold" id="fNetRangeVal" style="white-space:nowrap; min-width:8.5rem;"></span>
+                <span class="is-size-7 has-text-grey ml-4" style="white-space:nowrap;"><i class="fas fa-truck mr-1"></i><span th:text="#{fulfilment.filter.supplier}"></span></span>
+                <div class="prov-filter" id="providerFilter"></div>
             </div>
         </div>
     </div>
@@ -181,6 +195,7 @@
     <div id="groups">
         <div class="group-card"
              th:each="entry : ${form.entries}"
+             th:data-groupid="${entry.id}"
              th:data-provider="${entry.source.provider}"
              th:data-name="${entry.source.name}"
              th:data-ean="${entry.source.ean}"
@@ -299,17 +314,27 @@
             coveredElsewhere: /*[[#{fulfilment.covered.elsewhere}]]*/ 'covered cheaper elsewhere',
             nothingSelected: /*[[#{fulfilment.nothing.selected}]]*/ 'Nothing selected',
             partialWarn: /*[[#{fulfilment.partial.warning}]]*/ '{0} partially covered',
-            splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers'
+            splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers',
+            filters: /*[[#{fulfilment.filters}]]*/ 'Filters',
+            selected: /*[[#{fulfilment.category.selected}]]*/ 'selected',
+            supplierOne: /*[[#{fulfilment.variants.supplier.one}]]*/ 'supplier',
+            supplierMany: /*[[#{fulfilment.variants.supplier.many}]]*/ 'suppliers',
+            variantCheapest: /*[[#{fulfilment.variants.cheapest}]]*/ 'cheapest',
+            variantFewest: /*[[#{fulfilment.variants.fewest.parcels}]]*/ 'fewest parcels',
+            variantCustom: /*[[#{fulfilment.variants.custom}]]*/ 'Custom selection',
+            variantEstimated: /*[[#{fulfilment.variants.estimated}]]*/ 'est. incl. shipping'
         };
         const IS_WAREHOUSE = /*[[${isWarehouse}]]*/ false;
         const COMMITTED_SUPPLIERS = /*[[${form.committedSuppliers}]]*/ {};
+        const VARIANTS = /*[[${form.variants}]]*/ [];
     </script>
 
     <script>
         const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const cards = () => Array.from(document.querySelectorAll('.group-card'));
         let activeOrder = null;
-        let activeProvider = null;
+        let activeProviders = new Set();
+        let activeVariant = null;
 
         const isAccepted = c => c.dataset.accepted === 'true';
         const gross = c => parseFloat(c.dataset.gross) || 0;
@@ -324,8 +349,83 @@
         }
 
         function setAccept(card, v) { card.dataset.accepted = v; }
-        function toggleAccept(btn) { const c = btn.closest('.group-card'); setAccept(c, !isAccepted(c)); render(); }
-        function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); render(); }
+        function toggleAccept(btn) { const c = btn.closest('.group-card'); setAccept(c, !isAccepted(c)); markCustomVariant(); render(); }
+        function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); markCustomVariant(); render(); }
+
+        function supplierCountLabel(n) { return n + ' ' + (n === 1 ? MSG.supplierOne : MSG.supplierMany); }
+        function variantChip(p) { return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + p + '</span>'; }
+
+        function variantMatchesCurrent(v) {
+            const acceptedIds = cards().filter(isAccepted).map(c => c.dataset.groupid).sort();
+            const ids = [...v.groupIds].sort();
+            return acceptedIds.length === ids.length && ids.every((id, i) => id === acceptedIds[i]);
+        }
+
+        function initVariantPicker() {
+            if (!VARIANTS.length) return;
+            const idx = VARIANTS.findIndex(variantMatchesCurrent);
+            activeVariant = idx >= 0 ? idx : 'custom';
+            renderVariants();
+        }
+
+        function selectVariant(i) {
+            activeVariant = i;
+            const ids = new Set(VARIANTS[i].groupIds);
+            cards().forEach(c => setAccept(c, ids.has(c.dataset.groupid)));
+            renderVariants();
+            render();
+        }
+
+        function selectCustomVariant() {
+            activeVariant = 'custom';
+            renderVariants();
+        }
+
+        function markCustomVariant() {
+            if (!VARIANTS.length || activeVariant === 'custom') return;
+            activeVariant = 'custom';
+            renderVariants();
+        }
+
+        function renderVariants() {
+            const wrap = document.getElementById('variants');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            VARIANTS.forEach((v, i) => {
+                const el = document.createElement('div');
+                el.className = 'variant' + (activeVariant === i ? ' active' : '');
+                el.onclick = () => selectVariant(i);
+                const badge = v.cheapest ? '<span class="v-badge">' + MSG.variantCheapest + '</span>'
+                    : (v.fewestSuppliers ? '<span class="v-badge blue">' + MSG.variantFewest + '</span>' : '');
+                el.innerHTML = badge +
+                    '<div class="v-head"><span class="v-count">' + supplierCountLabel(v.supplierCount) + '</span>' +
+                    '<span class="v-total">' + fmt(v.estimatedTotal) + ' zł<small>' + MSG.variantEstimated + '</small></span></div>' +
+                    '<div class="v-provs">' + v.providers.map(variantChip).join('') + '</div>';
+                wrap.appendChild(el);
+            });
+            const custom = document.createElement('div');
+            custom.className = 'variant custom' + (activeVariant === 'custom' ? ' active' : '');
+            custom.onclick = selectCustomVariant;
+            custom.textContent = MSG.variantCustom;
+            wrap.appendChild(custom);
+        }
+
+        function toggleFilters() {
+            document.getElementById('filtersRow').classList.toggle('open');
+            updateFiltersBtn();
+        }
+
+        function filtersActive() {
+            const [minNet, maxNet] = netRange();
+            return activeProviders.size > 0 || minNet > 0 || maxNet < parseFloat(document.getElementById('fNetMax').max);
+        }
+
+        function updateFiltersBtn() {
+            const btn = document.getElementById('filtersBtn');
+            const open = document.getElementById('filtersRow').classList.contains('open');
+            btn.classList.toggle('filters-btn-active', filtersActive());
+            btn.textContent = MSG.filters + (filtersActive() ? ' •' : '') + (open ? ' ▴' : ' ▾');
+        }
 
         function focusOrder(ord) {
             if (!ord) return;
@@ -343,8 +443,8 @@
         }
 
         function focusProvider(prov) {
-            activeProvider = (activeProvider === prov) ? null : prov;
-            if (activeProvider) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
+            if (activeProviders.has(prov)) activeProviders.delete(prov); else activeProviders.add(prov);
+            if (activeProviders.size) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
             renderProviderFilter();
             applyFilters();
         }
@@ -357,7 +457,7 @@
             bar.innerHTML = '';
             Object.keys(counts).sort().forEach(p => {
                 const chip = document.createElement('span');
-                chip.className = 'prov-chip-btn' + (activeProvider === p ? ' active' : (activeProvider ? ' inactive' : ''));
+                chip.className = 'prov-chip-btn' + (activeProviders.has(p) ? ' active' : (activeProviders.size ? ' inactive' : ''));
                 chip.style.setProperty('--accent', provColor(p));
                 chip.onclick = () => focusProvider(p);
                 chip.innerHTML = '<i class="fas fa-truck"></i>' + p + '<span class="cnt">' + counts[p] + '</span>';
@@ -520,7 +620,16 @@
             reorderClusters(winner);
             recalcFooter();
             if (!IS_WAREHOUSE) renderCoverage(winner);
+            updateCatSelection();
             applyFilters();
+        }
+
+        function updateCatSelection() {
+            document.querySelectorAll('.cat-section').forEach(sec => {
+                const selected = Array.from(sec.querySelectorAll('.group-card')).filter(isAccepted).length;
+                const el = sec.querySelector('.cat-sel');
+                if (el) el.textContent = selected ? '✓ ' + selected + ' ' + MSG.selected : '';
+            });
         }
 
         function reorderClusters(winner) {
@@ -640,15 +749,11 @@
         }
 
         function applyFilters() {
-            const onlyUn = document.getElementById('fOnlyUnaccepted').checked;
-            const aboveCost = document.getElementById('fAboveCost').checked;
             const [minNet, maxNet] = netRange();
             cards().forEach(c => {
                 let show = true;
-                if (onlyUn && (isAccepted(c) || c.dataset.redundant === '1')) show = false;
-                if (aboveCost && parseFloat(c.dataset.margin) <= 0) show = false;
                 if (activeOrder && !cardOrders(c).includes(activeOrder)) show = false;
-                if (activeProvider && c.dataset.provider !== activeProvider) show = false;
+                if (activeProviders.size && !activeProviders.has(c.dataset.provider)) show = false;
                 if (net(c) < minNet || net(c) > maxNet) show = false;
                 c.classList.toggle('is-hidden', !show);
                 c.classList.toggle('is-focus-match', !!activeOrder && cardOrders(c).includes(activeOrder));
@@ -657,6 +762,7 @@
                 const visible = sec.querySelectorAll('.group-card:not(.is-hidden)').length;
                 sec.style.display = visible ? '' : 'none';
             });
+            updateFiltersBtn();
         }
 
         /* meta-grouping by product category (ordered A-Z by label); within a category sort by target price desc */
@@ -679,7 +785,8 @@
                 head.className = 'cat-header';
                 head.innerHTML = '<span class="icon chevron"><i class="fas fa-chevron-down"></i></span>' +
                     '<span class="cat-name">' + cat + '</span>' +
-                    '<span class="tag cat-count">' + list.length + '</span>';
+                    '<span class="tag cat-count">' + list.length + '</span>' +
+                    '<span class="cat-sel"></span>';
                 head.onclick = () => sec.classList.toggle('cat-collapsed');
                 const body = document.createElement('div');
                 body.className = 'cat-body';
@@ -758,14 +865,13 @@
             container.appendChild(input);
         }
 
-        document.getElementById('fOnlyUnaccepted').addEventListener('change', applyFilters);
-        document.getElementById('fAboveCost').addEventListener('change', applyFilters);
         document.getElementById('fNetMin').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
         document.getElementById('fNetMax').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
 
         buildGroups();
         renderProviderFilter();
         initNetSlider();
+        initVariantPicker();
         render();
     </script>
 

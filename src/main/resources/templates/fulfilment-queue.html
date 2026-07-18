@@ -48,8 +48,7 @@
                         <div class="select is-small">
                             <select id="actionSelect" name="action" th:with="orderFulfilmentBasePath=${isSuperAdmin} ? '/dashboard/store/' + ${orders[0].storeId} + '/orders/fulfilment' : '/dashboard/orders/fulfilment'">
                                 <option th:value="@{${orderFulfilmentBasePath}(pathSelector='default')}" th:text="#{orders.choose.suppliers}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest')}" th:text="#{orders.suggest.cheapest.suppliers}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='cheapest-min')}" th:text="#{orders.suggest.cheapest.suppliers.min.orders}"></option>
+                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='suggest')}" th:text="#{orders.suggest.suppliers}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small ml-2" type="submit" th:text="#{orders.apply}"></button>

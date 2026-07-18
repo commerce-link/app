@@ -26,7 +26,7 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         this.supplierRegistry = supplierRegistry;
     }
 
-    public FulfilmentForm init(String storeId, List<String> selectedOrders, FulfilmentPathSelector pathSelector, boolean isSuperAdmin, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
+    public FulfilmentForm init(String storeId, List<String> selectedOrders, boolean suggestPaths, boolean isSuperAdmin, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
         String redirectUrl = isSuperAdmin ? "redirect:/dashboard/fulfilment/queue" : "redirect:/dashboard/orders";
 
         List<OrderItem> orderItems = selectedOrders.stream()
@@ -56,12 +56,14 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         }
         List<FulfilmentGroup> entries = builder.build().runWithGrouping(orderItems);
 
-        if (pathSelector.requiresPathCalculation()) {
+        FulfilmentForm form = new FulfilmentForm("orders", redirectUrl, selectedOrders, entries);
+        if (suggestPaths) {
             List<FulfilmentPath> paths = new FulfilmentPathFinder(supplierRegistry).resolve(entries);
-            pathSelector.select(paths).ifPresent(p -> p.accept(entries));
+            List<FulfilmentVariant> variants = FulfilmentVariant.listFrom(paths);
+            variants.stream().filter(FulfilmentVariant::isCheapest).findFirst().ifPresent(v -> v.applyTo(entries));
+            form.setVariants(variants);
         }
-
-        return new FulfilmentForm("orders", redirectUrl, selectedOrders, entries);
+        return form;
     }
 
     public void commit(String storeId, FulfilmentForm form) {

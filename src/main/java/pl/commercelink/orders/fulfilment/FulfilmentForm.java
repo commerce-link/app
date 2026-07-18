@@ -18,6 +18,7 @@ public class FulfilmentForm {
     private Map<String, Double> committedSuppliers = new LinkedHashMap<>();
     private List<String> selectedOrders = new LinkedList<>();
     private List<FulfilmentGroup> entries = new LinkedList<>();
+    private List<FulfilmentVariant> variants = new LinkedList<>();
 
     public FulfilmentForm() {
 
@@ -58,6 +59,14 @@ public class FulfilmentForm {
 
     public void setEntries(List<FulfilmentGroup> entries) {
         this.entries = entries;
+    }
+
+    public List<FulfilmentVariant> getVariants() {
+        return variants;
+    }
+
+    public void setVariants(List<FulfilmentVariant> variants) {
+        this.variants = variants;
     }
 
     public String getPathSelector() {
