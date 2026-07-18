@@ -61,7 +61,7 @@ class FulfilmentPathFinder {
 
                 // best by path size
                 Set<FulfilmentPath> bestByPathSize = new HashSet<>();
-                for (long i = minPathSize; i < maxPathSize; i++) {
+                for (long i = minPathSize; i <= maxPathSize; i++) {
                     long finalI = i;
                     Set<FulfilmentPath> bestBySize = previousPaths.stream()
                             .filter(p -> p.size() == finalI)

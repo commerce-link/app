@@ -99,7 +99,7 @@ class FulfilmentController extends BaseController {
     private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers, boolean orderByOrder, Map<String, Double> committedSuppliers, Model model) {
         List<String> orders = orderByOrder ? sortByItemsToOrder(selectedOrders) : selectedOrders;
         List<String> ordersToFulfil = orderByOrder && !orders.isEmpty() ? List.of(orders.get(0)) : orders;
-        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, pathSelector, isSuperAdmin(), onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers);
+        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers);
         fulfilmentForm.setSelectedOrders(orders);
         fulfilmentForm.setPathSelector(pathSelector);
         fulfilmentForm.setOnlyWithProfit(onlyWithProfit);
@@ -135,7 +135,7 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(getStoreId(), form);
-        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), "default", false, false, false, false, model);
+        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), form.isOnlyLocalSuppliers(), form.isOrderByOrder(), model);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commit")
@@ -172,6 +172,6 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String commitAndContinueFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(storeId, form);
-        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), "default", false, false, false, false, model);
+        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), form.isOnlyLocalSuppliers(), form.isOrderByOrder(), model);
     }
 }

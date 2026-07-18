@@ -844,6 +844,7 @@
             const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
             form.action = basePath + '/' + type + '/fulfilment/' + action;
 
+            document.querySelectorAll('.footer-bar button').forEach(b => b.disabled = true);
             form.submit();
         }
 
@@ -854,6 +855,7 @@
             const storeId = document.getElementById('storeId').value;
             const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
             form.action = basePath + '/orders/fulfilment/skip';
+            document.querySelectorAll('.footer-bar button').forEach(b => b.disabled = true);
             form.submit();
         }
 

@@ -26,8 +26,8 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         this.supplierRegistry = supplierRegistry;
     }
 
-    public FulfilmentForm init(String storeId, List<String> selectedOrders, String pathSelector, boolean isSuperAdmin, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
-        String redirectUrl = isSuperAdmin ? "redirect:/dashboard/fulfilment/queue" : "redirect:/dashboard/orders";
+    public FulfilmentForm init(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
+        String redirectUrl = "redirect:/dashboard/fulfilment/queue";
 
         List<OrderItem> orderItems = selectedOrders.stream()
                 .flatMap(orderId -> orderItemsRepository
