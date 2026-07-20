@@ -125,7 +125,7 @@ public class Checkout {
     private PaymentLineItem consolidateLineItem(String name, List<BasketItem> items) {
         double totalGross = items.stream().mapToDouble(BasketItem::getTotalPrice).sum();
         String description = items.stream()
-                .filter(i -> !i.isService())
+                .filter(BasketItem::isProduct)
                 .map(i -> i.getQty() == 1 ? i.getName().trim() : i.getQty() + "x " + i.getName().trim())
                 .collect(Collectors.joining(", "));
         return new PaymentLineItem(name, description, (int) (totalGross * 100), 1);

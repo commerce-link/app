@@ -265,6 +265,11 @@ public abstract class Item implements Delivered {
         this.service = service;
     }
 
+    @DynamoDBIgnore
+    public boolean isProduct() {
+        return !isService();
+    }
+
     public String getName() {
         return name;
     }

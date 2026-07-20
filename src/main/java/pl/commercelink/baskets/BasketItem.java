@@ -152,6 +152,11 @@ public class BasketItem {
         this.service = service;
     }
 
+    @DynamoDBIgnore
+    public boolean isProduct() {
+        return !isService();
+    }
+
     public int getPosition() {
         return position;
     }

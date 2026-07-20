@@ -322,7 +322,7 @@ public class OrdersController extends BaseController {
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
-                .filter(i -> !i.isService())
+                .filter(OrderItem::isProduct)
                 .collect(Collectors.toList());
 
         Map<String, SplitGroupPreviewDto> splitGroupPreviews = orderItems.stream()
@@ -689,7 +689,7 @@ public class OrdersController extends BaseController {
                 ));
 
         for (OrderItem item : orderItemsRepository.findByOrderId(orderId)) {
-            if (!item.isService()) {
+            if (item.isProduct()) {
                 item.setSerialNo(serialByItemId.get(item.getItemId()));
                 orderItemsRepository.save(item);
             }

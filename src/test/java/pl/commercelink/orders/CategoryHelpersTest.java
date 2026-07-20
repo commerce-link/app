@@ -68,6 +68,30 @@ class CategoryHelpersTest {
     }
 
     @Test
+    void isProductIsTheExactInverseOfTheServiceFlag() {
+        // given
+        OrderItem product = orderItemWithCategory("Laptops");
+        OrderItem service = orderItemWithCategory("Usługi dodatkowe");
+        service.setService(true);
+
+        // when / then
+        assertThat(product.isProduct()).isTrue();
+        assertThat(service.isProduct()).isFalse();
+    }
+
+    @Test
+    void isProductIsTheExactInverseOfTheServiceFlagForBasketItem() {
+        // given
+        BasketItem product = basketItemWithCategory("Laptops");
+        BasketItem service = basketItemWithCategory("Usługi dodatkowe");
+        service.setService(true);
+
+        // when / then
+        assertThat(product.isProduct()).isTrue();
+        assertThat(service.isProduct()).isFalse();
+    }
+
+    @Test
     void itemWithNullCategoryIsNotServiceWithoutException() {
         // given
         BasketItem item = new BasketItem();

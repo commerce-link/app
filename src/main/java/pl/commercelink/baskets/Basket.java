@@ -111,7 +111,7 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(i -> !i.isService()).collect(Collectors.toList());
+        return basketItems.stream().filter(BasketItem::isProduct).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
