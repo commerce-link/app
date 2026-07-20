@@ -72,6 +72,6 @@ class BasketItemTest {
     }
 
     private AvailabilityAndPrice pricelistRow(String category) {
-        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name", category, 100, 1, 1, 100);
+        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name", category, 100, 1, 1, 100, false);
     }
 }

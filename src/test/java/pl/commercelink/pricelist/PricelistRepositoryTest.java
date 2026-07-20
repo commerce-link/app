@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -156,5 +157,41 @@ class PricelistRepositoryTest {
         pricelistRepository.findTopNPricelist(storeId, catalogId, 3);
 
         verify(fileStorage).findTopN(bucketName, prefix, 3);
+    }
+
+    @Test
+    void rowsWithoutServiceColumnDefaultToFalse() {
+        // given — old-format CSV row, no trailing service column
+        String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
+        String csvData = "PimId;EAN;Mfn;Brand;Label;Name;Category;Price;Qty;Estimated Delivery Days;Lowest 30 Days Price\n" +
+                "pim2;ean2;mfc2;brand2;label2;name2;PSU;200;20;1;200";
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
+        when(fileStorage.canRead(bucketName, key)).thenReturn(true);
+        when(fileStorage.get(bucketName, key)).thenReturn(reader);
+
+        // when
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
+
+        // then
+        assertFalse(pricelist.getAvailabilityAndPrices().get(0).isService());
+    }
+
+    @Test
+    void rowsWithServiceColumnRoundTripTheFlag() {
+        // given — new-format CSV row with trailing service column set to true
+        String pricelistId = "pricelistId";
+        String key = prefix + "pricelistId.csv";
+        String csvData = "PimId;EAN;Mfn;Brand;Label;Name;Category;Price;Qty;Estimated Delivery Days;Lowest 30 Days Price;service\n" +
+                "pim2;ean2;mfc2;brand2;label2;name2;Usługi dodatkowe;200;20;1;200;true";
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
+        when(fileStorage.canRead(bucketName, key)).thenReturn(true);
+        when(fileStorage.get(bucketName, key)).thenReturn(reader);
+
+        // when
+        Pricelist pricelist = pricelistRepository.find(storeId, catalogId, pricelistId);
+
+        // then
+        assertTrue(pricelist.getAvailabilityAndPrices().get(0).isService());
     }
 }

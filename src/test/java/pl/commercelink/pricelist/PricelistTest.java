@@ -52,6 +52,6 @@ class PricelistTest {
     }
 
     private AvailabilityAndPrice item(String category, String label, String name) {
-        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", label, name, category, 100, 1, 1, 100);
+        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", label, name, category, 100, 1, 1, 100, false);
     }
 }

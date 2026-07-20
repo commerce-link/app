@@ -5,7 +5,7 @@ import pl.commercelink.starter.csv.CSVReady;
 
 public class AvailabilityAndPrice  implements CSVReady {
 
-    public static final String[] HEADERS = { "PimId","EAN", "Mfn", "Brand", "Label", "Name", "Category", "Price", "Qty", "Estimated Delivery Days", "Lowest 30 Days Price"};
+    public static final String[] HEADERS = { "PimId","EAN", "Mfn", "Brand", "Label", "Name", "Category", "Price", "Qty", "Estimated Delivery Days", "Lowest 30 Days Price", "service"};
 
     @JsonProperty("pimId")
     private String pimId;
@@ -29,14 +29,17 @@ public class AvailabilityAndPrice  implements CSVReady {
     private int estimatedDeliveryDays;
     @JsonProperty("lowest30DaysPrice")
     private long lowest30DaysPrice;
+    @JsonProperty("service")
+    private boolean service;
 
     private AvailabilityAndPrice() {
     }
-    
+
 
     public AvailabilityAndPrice(String pimId, String ean,  String manufacturerCode,
                                 String brand, String label, String name, String category,
-                                long price, long qty, int estimatedDeliveryDays, long lowest30DaysPrice) {
+                                long price, long qty, int estimatedDeliveryDays, long lowest30DaysPrice,
+                                boolean service) {
         this.ean = ean;
         this.pimId = pimId;
         this.manufacturerCode = manufacturerCode;
@@ -48,6 +51,7 @@ public class AvailabilityAndPrice  implements CSVReady {
         this.qty = qty;
         this.estimatedDeliveryDays = estimatedDeliveryDays;
         this.lowest30DaysPrice = lowest30DaysPrice;
+        this.service = service;
     }
 
     public String getEan() {
@@ -94,6 +98,10 @@ public class AvailabilityAndPrice  implements CSVReady {
         return lowest30DaysPrice;
     }
 
+    public boolean isService() {
+        return service;
+    }
+
     @Override
     public String[] asStringArray() {
         return new String[]{
@@ -107,7 +115,8 @@ public class AvailabilityAndPrice  implements CSVReady {
                 String.valueOf(price),
                 String.valueOf(qty),
                 String.valueOf(estimatedDeliveryDays),
-                String.valueOf(lowest30DaysPrice)
+                String.valueOf(lowest30DaysPrice),
+                String.valueOf(service)
         };
     }
 }

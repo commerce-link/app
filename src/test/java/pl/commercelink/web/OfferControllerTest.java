@@ -240,7 +240,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                "Laptops", 199L, 1L, 3, 0L);
+                "Laptops", 199L, 1L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -286,7 +286,7 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(existing));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                "Laptops", 199L, 1L, 3, 0L);
+                "Laptops", 199L, 1L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -312,7 +312,7 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(psu));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-CASE", "Brand", "GroupLabel", "Test Case",
-                "Case", 199L, 1L, 3, 0L);
+                "Case", 199L, 1L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -348,7 +348,7 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(firstCase, psu));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-2", "EAN-2", "MFN-CASE-2", "Brand", "GroupLabel", "Second Case",
-                "Case", 149L, 1L, 3, 0L);
+                "Case", 149L, 1L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -373,7 +373,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-S", "", "Montaż", "Montaż komputera",
-                "Usługi dodatkowe", 250L, 1L, 1, 0L);
+                "Usługi dodatkowe", 250L, 1L, 1, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -398,7 +398,7 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Montaz",
-                "Usługi dodatkowe", 49L, 1L, 3, 0L);
+                "Usługi dodatkowe", 49L, 1L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));

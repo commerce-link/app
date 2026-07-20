@@ -149,7 +149,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                "Laptops", 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -176,7 +176,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                "Services", 30L, 1L, 1, 0L);
+                "Services", 30L, 1L, 1, 0L, false);
         when(store.getStoreId()).thenReturn(STORE_ID);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(storeCategories.isService(STORE_ID, "Services")).thenReturn(false);
@@ -202,7 +202,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "", "MFN-S", "", "", "Montaż komputera",
-                "Usługi dodatkowe", 30L, 1L, 1, 0L);
+                "Usługi dodatkowe", 30L, 1L, 1, 0L, false);
         when(store.getStoreId()).thenReturn(STORE_ID);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(storeCategories.isService(STORE_ID, "Usługi dodatkowe")).thenReturn(true);
@@ -228,7 +228,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                "Laptops", 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 

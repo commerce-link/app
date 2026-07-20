@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 public class PricelistRepository {
 
     public static final int DEFAULT_ESTIMATED_DELIVERY_DAYS = 1;
+    private static final int IDX_SERVICE = 11;
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -118,7 +119,8 @@ public class PricelistRepository {
                 price,                                // price
                 Long.parseLong(fields[8]),             // qty
                 parseEstimatedDeliveryDays(fields, 9),  // estimatedDeliveryDays
-                lowest30DaysPrice                       // lowest30DaysPrice
+                lowest30DaysPrice,                       // lowest30DaysPrice
+                fields.length > IDX_SERVICE && Boolean.parseBoolean(fields[IDX_SERVICE])  // service
         );
     }
 

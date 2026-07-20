@@ -103,6 +103,22 @@ class AvailabilityAndPriceListTest {
     }
 
     @Test
+    void generatedRowCarriesProductServiceFlag() {
+        // given
+        product.setService(true);
+        when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(false);
+        when(categoryDefinition.getCategoryId()).thenReturn("cat-1");
+        when(productRepository.findAllProductsWithPimId("cat-1", true)).thenReturn(List.of(product));
+
+        // when
+        List<AvailabilityAndPrice> result = availabilityAndPriceList.generate("store-1", "catalog-1");
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isService()).isTrue();
+    }
+
+    @Test
     void dynamicCatalogRowTakesCategoryFromDefinitionNameNotFromProduct() {
         // given
         when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(true);

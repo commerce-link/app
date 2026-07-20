@@ -114,7 +114,8 @@ public class AvailabilityAndPriceList {
                 grossPrice,
                 totalAvailableQty,
                 estimatedDeliveryDays,
-                lowest30DaysPrice
+                lowest30DaysPrice,
+                p.isService()
         );
     }
 
