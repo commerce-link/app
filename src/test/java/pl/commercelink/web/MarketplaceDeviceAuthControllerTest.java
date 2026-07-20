@@ -149,6 +149,24 @@ class MarketplaceDeviceAuthControllerTest {
     }
 
     @Test
+    void startRejectsWhenCredentialSecretDoesNotExistYet() {
+        // given: Secrets Manager throws when the store never saved any configuration
+        when(marketplaceProviderFactory.getDescriptor("Allegro")).thenReturn(descriptor);
+        when(descriptor.authConfig()).thenReturn(DEVICE_FLOW_CONFIG);
+        when(marketplaceProviderFactory.resolveCredentialName("Allegro")).thenReturn("allegro_marketplace");
+        when(credentialStore.getSecrets("store-1", "allegro_marketplace"))
+                .thenThrow(new RuntimeException("Secrets Manager can't find the specified secret"));
+
+        // when
+        ResponseEntity<Map<String, Object>> response = controller.startDeviceAuthorization("Allegro");
+
+        // then
+        assertEquals(400, response.getStatusCode().value());
+        assertNotNull(response.getBody().get("error"));
+        verifyNoInteractions(deviceAuthorizationService);
+    }
+
+    @Test
     void pollSeedsTokenAndConnectsIntegrationOnAuthorized() {
         // given
         stubDeviceFlowProvider();

@@ -128,7 +128,12 @@ public class MarketplaceDeviceAuthController {
 
     private OAuth2Secrets savedSecrets(String providerName) {
         String credentialName = marketplaceProviderFactory.resolveCredentialName(providerName);
-        OAuth2Secrets secrets = credentialStore.getSecrets(CustomSecurityContext.getStoreId(), credentialName);
+        OAuth2Secrets secrets;
+        try {
+            secrets = credentialStore.getSecrets(CustomSecurityContext.getStoreId(), credentialName);
+        } catch (RuntimeException e) {
+            return null;
+        }
         if (secrets == null || StringUtils.isBlank(secrets.getClientId()) || StringUtils.isBlank(secrets.getClientSecret())) {
             return null;
         }
