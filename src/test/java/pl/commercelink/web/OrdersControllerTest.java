@@ -25,7 +25,6 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.products.StoreCategories;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -55,8 +54,6 @@ class OrdersControllerTest {
     private OrdersRepository ordersRepository;
     @Mock
     private OrderItemsRepository orderItemsRepository;
-    @Mock
-    private StoreCategories storeCategories;
     @Mock
     private MessageSource messageSource;
     @Mock
@@ -323,61 +320,46 @@ class OrdersControllerTest {
     }
 
     @Test
-    void savingDeliveryItemWithBlankCategoryKeepsItsServiceFlag() {
-        // given
-        OrderItem deliveryItem = existingOrderItem(null, true);
-        OrderItem posted = postedOrderItem("");
-
-        // when
-        ordersController.saveOrderItem(ORDER_ID, deliveryItem.getItemId(), posted, new ExtendedModelMap());
-
-        // then
-        assertThat(deliveryItem.isService()).isTrue();
-        assertThat(deliveryItem.getCategory()).isNull();
-        verify(orderItemsRepository).save(deliveryItem);
-    }
-
-    @Test
-    void savingItemMovedToAServiceCategorySetsTheFlag() {
+    void savingItemAppliesThePostedServiceFlag() {
         // given
         OrderItem item = existingOrderItem("Obudowy", false);
-        OrderItem posted = postedOrderItem("Montaż");
-        when(storeCategories.isService(STORE_ID, "Montaż")).thenReturn(true);
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(true);
 
         // when
         ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isTrue();
-        assertThat(item.getCategory()).isEqualTo("Montaż");
+        verify(orderItemsRepository).save(item);
     }
 
     @Test
-    void savingItemMovedToAProductCategoryClearsTheFlag() {
+    void savingItemCanClearTheServiceFlag() {
         // given
-        OrderItem item = existingOrderItem("Montaż", true);
+        OrderItem item = existingOrderItem("Obudowy", true);
         OrderItem posted = postedOrderItem("Obudowy");
-        when(storeCategories.namesFor(STORE_ID)).thenReturn(List.of("Obudowy", "Montaż"));
+        posted.setService(false);
 
         // when
         ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isFalse();
-        assertThat(item.getCategory()).isEqualTo("Obudowy");
     }
 
     @Test
-    void savingMigratedLegacyItemKeepsItsServiceFlagWhenCategoryIsUnknown() {
+    void savingItemWithBlankCategoryNormalizesItToNull() {
         // given
-        OrderItem item = existingOrderItem("Services", true);
-        OrderItem posted = postedOrderItem("Services");
-        when(storeCategories.namesFor(STORE_ID)).thenReturn(List.of("Obudowy", "Montaż"));
+        OrderItem item = existingOrderItem(null, true);
+        OrderItem posted = postedOrderItem("");
+        posted.setService(true);
 
         // when
         ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
 
         // then
+        assertThat(item.getCategory()).isNull();
         assertThat(item.isService()).isTrue();
     }
 

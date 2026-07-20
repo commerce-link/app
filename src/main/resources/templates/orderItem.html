@@ -33,6 +33,13 @@
                     </div>
 
                     <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{service}" th:disabled="${isCompletedOrder}" />
+                            <span th:text="#{product.service}"></span>
+                        </label>
+                    </div>
+
+                    <div class="field">
                         <label class="label" th:text="#{order.item.sku}">SKU</label>
                         <div class="control">
                             <input class="input" type="text" th:field="*{sku}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>

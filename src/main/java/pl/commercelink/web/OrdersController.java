@@ -512,7 +512,6 @@ public class OrdersController extends BaseController {
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);
             }
-            updatedItem.setService(resolveServiceFlag(orderItem, updatedItem.getCategory()));
             orderItem.update(updatedItem);
             orderItemsRepository.save(orderItem);
 
@@ -521,16 +520,6 @@ public class OrdersController extends BaseController {
         }
 
         return "redirect:/dashboard/orders/" + orderId;
-    }
-
-    private boolean resolveServiceFlag(OrderItem existingItem, String category) {
-        if (storeCategories.isService(getStoreId(), category)) {
-            return true;
-        }
-        if (category != null && storeCategories.namesFor(getStoreId()).contains(category)) {
-            return false;
-        }
-        return existingItem.isService();
     }
 
     @PostMapping("/dashboard/orders/{orderId}/assign-supplier")
