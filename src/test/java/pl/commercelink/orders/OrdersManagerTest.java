@@ -191,6 +191,30 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from availability and price treats a row without the service flag as a regular product")
+    void addOrderItemFromUnflaggedRowIsARegularProductEvenWithServiceLikeCategory() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
+                "Services", 30L, 1L, 1, 0L, false);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, availability, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        OrderItem savedItem = itemCaptor.getValue();
+        assertThat(savedItem.isService()).isFalse();
+        assertThat(savedItem.getPosition()).isEqualTo(3);
+        assertThat(savedItem.getDeliveryId()).isNull();
+        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.New);
+    }
+
+    @Test
     @DisplayName("addOrderItem stores the provided position and never scans existing items")
     void addOrderItemStoresProvidedPositionWithoutScanningExistingItems() {
         // given
