@@ -534,14 +534,17 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         form.setProviderConfiguration(new HashMap<>());
 
+        List<String> deviceAuthProviders = marketplaceProviderFactory.deviceAuthProviders();
         List<ConnectedIntegration> integrations = store.getMarketplaces().stream()
-                .map(m -> new ConnectedIntegration(m.getName(), m.isLoggedIn()))
+                .map(m -> new ConnectedIntegration(m.getName(), m.isLoggedIn(), false,
+                        deviceAuthProviders.contains(m.getName())))
                 .toList();
 
         model.addAttribute("form", form);
         model.addAttribute("availableProviders", marketplaceProviderFactory.availableProviders());
         model.addAttribute("selectedProviderName", form.getMarketplace());
         model.addAttribute("connectedIntegrations", integrations);
+        model.addAttribute("deviceAuthProviders", deviceAuthProviders);
 
         return "store-marketplaces";
     }

@@ -96,6 +96,26 @@ class ProviderFactoryTest {
         }
     }
 
+    static class DeviceFlowDescriptor extends OAuth2Descriptor {
+        @Override
+        public String name() {
+            return "TestDevice";
+        }
+
+        @Override
+        public String displayName() {
+            return "TestDevice";
+        }
+
+        @Override
+        public AuthConfig authConfig() {
+            return new AuthConfig.OAuth2("https://api.example.com",
+                    "https://auth.example.com/token", "https://auth.example.com/token",
+                    7776000L, "application/vnd.allegro.public.v1+json", null,
+                    "application/vnd.allegro.public.v1+json", "https://auth.example.com/device");
+        }
+    }
+
     static class NoFieldKeyDescriptor extends OAuth2Descriptor {
         @Override
         public AuthConfig authConfig() {
@@ -110,6 +130,60 @@ class ProviderFactoryTest {
                 configurationManager, credentialStore, tokenStore, storesRepository);
         factory.registerDescriptor(descriptor);
         return factory;
+    }
+
+    @Test
+    void seedRefreshTokenDirectlyStoresTokenAndEvictsAccessToken() {
+        // given
+        when(store.getStoreId()).thenReturn("store-1");
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new DeviceFlowDescriptor());
+
+        // when
+        factory.seedRefreshToken(store, "TestDevice", "rt-device-1");
+
+        // then
+        verify(tokenStore).storeToken(eq("store-1"), eq("TestDevice"), eq("refresh_token"),
+                argThat(t -> ((OAuth2RefreshToken) t).getTokenValue().equals("rt-device-1")
+                        && ((OAuth2RefreshToken) t).getExpiresAt().getEpochSecond()
+                                - ((OAuth2RefreshToken) t).getIssuedAt().getEpochSecond() == 7776000L));
+        verify(tokenStore).deleteToken("store-1", "TestDevice", "access_token");
+    }
+
+    @Test
+    void seedRefreshTokenDirectlyIgnoresBlankTokenAndUnknownProvider() {
+        // given
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new DeviceFlowDescriptor());
+
+        // when
+        factory.seedRefreshToken(store, "TestDevice", " ");
+        factory.seedRefreshToken(store, "Unknown", "rt-1");
+
+        // then
+        verifyNoInteractions(tokenStore);
+    }
+
+    @Test
+    void seedRefreshTokenDirectlySkipsNonOAuth2Descriptor() {
+        // given
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(new NoneAuthDescriptor());
+
+        // when
+        factory.seedRefreshToken(store, "TestOAuth", "rt-1");
+
+        // then
+        verifyNoInteractions(tokenStore);
+    }
+
+    @Test
+    void deviceAuthProvidersListsOnlyDescriptorsDeclaringDeviceUrl() {
+        // given
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository);
+        factory.registerDescriptor(new OAuth2Descriptor());
+        factory.registerDescriptor(new DeviceFlowDescriptor());
+
+        // when / then
+        assertEquals(List.of("TestDevice"), factory.deviceAuthProviders());
     }
 
     @Test
