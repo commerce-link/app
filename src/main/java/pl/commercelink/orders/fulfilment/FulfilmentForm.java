@@ -13,10 +13,12 @@ public class FulfilmentForm {
     private String pathSelector = "default";
     private boolean onlyWithProfit;
     private boolean onlyMultiOrder;
+    private boolean onlyLocalSuppliers;
     private boolean orderByOrder;
     private Map<String, Double> committedSuppliers = new LinkedHashMap<>();
     private List<String> selectedOrders = new LinkedList<>();
     private List<FulfilmentGroup> entries = new LinkedList<>();
+    private List<FulfilmentVariant> variants = new LinkedList<>();
 
     public FulfilmentForm() {
 
@@ -59,6 +61,14 @@ public class FulfilmentForm {
         this.entries = entries;
     }
 
+    public List<FulfilmentVariant> getVariants() {
+        return variants;
+    }
+
+    public void setVariants(List<FulfilmentVariant> variants) {
+        this.variants = variants;
+    }
+
     public String getPathSelector() {
         return pathSelector;
     }
@@ -81,6 +91,14 @@ public class FulfilmentForm {
 
     public void setOnlyMultiOrder(boolean onlyMultiOrder) {
         this.onlyMultiOrder = onlyMultiOrder;
+    }
+
+    public boolean isOnlyLocalSuppliers() {
+        return onlyLocalSuppliers;
+    }
+
+    public void setOnlyLocalSuppliers(boolean onlyLocalSuppliers) {
+        this.onlyLocalSuppliers = onlyLocalSuppliers;
     }
 
     public boolean isOrderByOrder() {

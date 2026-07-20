@@ -28,6 +28,7 @@ class WarehouseItemFactory {
         );
         warehouseItem.setTax(item.getTax());
         warehouseItem.setSerialNo(item.getSerialNo());
+        warehouseItem.setComment(item.getComment());
         warehouseItem.setStatus(item.isDelivered() ? FulfilmentStatus.Delivered : FulfilmentStatus.Ordered);
         return warehouseItem;
     }

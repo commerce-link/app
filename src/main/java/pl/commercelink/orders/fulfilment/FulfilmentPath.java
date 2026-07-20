@@ -28,8 +28,12 @@ public class FulfilmentPath {
         return selectedGroups.stream().map(sg -> sg.getSource().getProvider()).distinct().count();
     }
 
-    boolean hasOnlyLocalProviders() {
-        return selectedGroups.stream().allMatch(sg -> supplierRegistry.get(sg.getSource().getProvider()).isLocalFor("PL"));
+    List<String> getGroupIds() {
+        return selectedGroups.stream().map(FulfilmentGroup::getId).collect(Collectors.toList());
+    }
+
+    List<String> getProviders() {
+        return selectedGroups.stream().map(sg -> sg.getSource().getProvider()).distinct().collect(Collectors.toList());
     }
 
     double getEstimatedTotalValue() {
@@ -43,15 +47,6 @@ public class FulfilmentPath {
         }
 
         return selectedGroups.stream().mapToDouble(FulfilmentGroup::getSourceValue).sum() + estimatedShippingCost;
-    }
-
-    void accept(List<FulfilmentGroup> fulfilmentGroups) {
-        fulfilmentGroups.forEach(g -> g.setAccepted(false));
-
-        for (FulfilmentGroup selectedGroup : selectedGroups) {
-            FulfilmentGroup fulfilmentGroup = fulfilmentGroups.stream().filter(fg -> fg.getId().equalsIgnoreCase(selectedGroup.getId())).findFirst().get();
-            fulfilmentGroup.setAccepted(true);
-        }
     }
 
     FulfilmentPath copy() {

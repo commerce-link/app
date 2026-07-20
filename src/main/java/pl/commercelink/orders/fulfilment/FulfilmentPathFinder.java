@@ -5,6 +5,21 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Heuristic path finder that incrementally enumerates combinations of fulfilment candidates.
+ *
+ * Demands (allocation groups) are processed in descending value order; every partial path is extended
+ * with each viable candidate of the current demand, producing a growing cross-product of paths. Demands
+ * coverable from the internal warehouse are always assigned to it. To keep the explosion in check the
+ * finder applies pruning heuristics: per demand it considers candidates only within a price spread above
+ * the cheapest (after the first three), and once the working set exceeds 10000 paths it keeps the ~100
+ * cheapest paths per supplier count plus the ~1000 cheapest overall. Path cost is the sum of item values
+ * plus per-supplier shipping computed from aggregated supplier values (so free-shipping thresholds
+ * account for all groups of a supplier combined).
+ *
+ * Because of the pruning this finder is fast on huge inputs but may miss the global optimum — see
+ * {@link SupplierSubsetPathFinder} for the exact alternative offered next to it in the fulfilment queue.
+ */
 class FulfilmentPathFinder {
 
     private final SupplierRegistry supplierRegistry;
@@ -44,16 +59,9 @@ class FulfilmentPathFinder {
                 long minPathSize = previousPaths.stream().mapToLong(FulfilmentPath::size).min().orElse(0);
                 long maxPathSize = previousPaths.stream().mapToLong(FulfilmentPath::size).max().orElse(0);
 
-                // best by localization
-                Set<FulfilmentPath> bestByLocalization = previousPaths.stream()
-                        .filter(FulfilmentPath::hasOnlyLocalProviders)
-                        .sorted(Comparator.comparing(FulfilmentPath::getEstimatedTotalValue))
-                        .limit(500)
-                        .collect(Collectors.toSet());
-
                 // best by path size
                 Set<FulfilmentPath> bestByPathSize = new HashSet<>();
-                for (long i = minPathSize; i < maxPathSize; i++) {
+                for (long i = minPathSize; i <= maxPathSize; i++) {
                     long finalI = i;
                     Set<FulfilmentPath> bestBySize = previousPaths.stream()
                             .filter(p -> p.size() == finalI)
@@ -70,7 +78,6 @@ class FulfilmentPathFinder {
                         .collect(Collectors.toSet());
 
                 previousPaths = new HashSet<>();
-                previousPaths.addAll(bestByLocalization);
                 previousPaths.addAll(bestByPathSize);
                 previousPaths.addAll(bestOverall);
             }
