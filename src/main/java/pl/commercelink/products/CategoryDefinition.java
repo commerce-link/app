@@ -18,8 +18,6 @@ public class CategoryDefinition implements DeletionProtection {
     private String name;
     @DynamoDBAttribute(attributeName = "category")
     private String category;
-    @DynamoDBAttribute(attributeName = "service")
-    private boolean service;
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private CategoryDefinitionType type = CategoryDefinitionType.Managed;
@@ -109,7 +107,7 @@ public class CategoryDefinition implements DeletionProtection {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return StringUtils.isNotBlank(name) && (service || StringUtils.isNotBlank(category)) && type != null && stockDefinition != null && stockDefinition.isComplete()
+        return StringUtils.isNotBlank(name) && type != null && stockDefinition != null && stockDefinition.isComplete()
                 && availabilityDefinition != null && availabilityDefinition.isComplete()
                 && !priceDefinitions.isEmpty() && priceDefinitions.stream().anyMatch(PriceDefinition::isComplete);
     }
@@ -160,14 +158,6 @@ public class CategoryDefinition implements DeletionProtection {
 
     public void setCategory(String category) {
         this.category = category;
-    }
-
-    public boolean isService() {
-        return service;
-    }
-
-    public void setService(boolean service) {
-        this.service = service;
     }
 
     public boolean isRequiredDuringOrder() {

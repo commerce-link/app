@@ -39,18 +39,17 @@ class StoreCopyServiceTest {
     private StoreCopyService storeCopyService;
 
     @Test
-    void copiedServiceDefinitionAndItsProductsKeepTheServiceFlag() {
+    void copiedDefinitionsProductsKeepTheServiceFlag() {
         // given
         Store source = new Store();
         source.setStoreId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(source);
 
-        CategoryDefinition serviceDefinition = new CategoryDefinition();
-        serviceDefinition.setCategoryId("cat-def-1");
-        serviceDefinition.setName("Montaż");
-        serviceDefinition.setService(true);
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-1");
+        definition.setName("Montaż");
         ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
-        catalog.setCategories(List.of(serviceDefinition));
+        catalog.setCategories(List.of(definition));
         when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
 
         Product serviceProduct = new Product("cat-def-1");
@@ -62,10 +61,6 @@ class StoreCopyServiceTest {
         storeCopyService.copyStore("store-1", "Kopia");
 
         // then
-        ArgumentCaptor<ProductCatalog> catalogCaptor = ArgumentCaptor.forClass(ProductCatalog.class);
-        verify(productCatalogRepository).save(catalogCaptor.capture());
-        assertThat(catalogCaptor.getValue().getCategories().get(0).isService()).isTrue();
-
         verify(productRepository).batchSave(productsCaptor.capture());
         assertThat(productsCaptor.getValue().get(0).isService()).isTrue();
     }

@@ -61,13 +61,12 @@ class ProductRecommendationEngineTest {
     }
 
     @Test
-    void serviceDefinitionGetsNoRecommendationsAndNeverQueriesInventory() {
+    void definitionWithoutCategoryMappingGetsNoRecommendationsAndNeverQueriesInventory() {
         // given
-        CategoryDefinition serviceDefinition = new CategoryDefinition().withGeneratedId();
-        serviceDefinition.setService(true);
+        CategoryDefinition unmappedDefinition = new CategoryDefinition().withGeneratedId();
 
         // when
-        List<ProductRecommendation> recommendations = engine.getRecommendations(serviceDefinition, inventory);
+        List<ProductRecommendation> recommendations = engine.getRecommendations(unmappedDefinition, inventory);
 
         // then
         assertThat(recommendations).isEmpty();

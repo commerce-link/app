@@ -160,29 +160,27 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void savingServiceDefinitionNormalizesBlankCategoryToNull() {
+    void savingDefinitionWithBlankCategoryNormalizesItToNull() {
         // given
-        CategoryDefinition serviceDefinition = definition(CategoryDefinitionType.Managed, "");
-        serviceDefinition.setService(true);
+        CategoryDefinition blankCategoryDefinition = definition(CategoryDefinitionType.Managed, "");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.saveCategoryDefinition(CATALOG_ID, serviceDefinition, new ExtendedModelMap(), redirectAttributes);
+        controller.saveCategoryDefinition(CATALOG_ID, blankCategoryDefinition, new ExtendedModelMap(), redirectAttributes);
 
         // then
-        verify(catalog).addOrUpdateCategoryDefinition(serviceDefinition);
-        assertThat(serviceDefinition.getCategory()).isNull();
+        verify(catalog).addOrUpdateCategoryDefinition(blankCategoryDefinition);
+        assertThat(blankCategoryDefinition.getCategory()).isNull();
     }
 
     @Test
-    void savingDynamicServiceDefinitionDoesNotQueryInventoryForAWarning() {
+    void savingDynamicDefinitionWithoutMappingDoesNotQueryInventoryForAWarning() {
         // given
-        CategoryDefinition serviceDefinition = definition(CategoryDefinitionType.Dynamic, "");
-        serviceDefinition.setService(true);
+        CategoryDefinition unmappedDefinition = definition(CategoryDefinitionType.Dynamic, "");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.saveCategoryDefinition(CATALOG_ID, serviceDefinition, new ExtendedModelMap(), redirectAttributes);
+        controller.saveCategoryDefinition(CATALOG_ID, unmappedDefinition, new ExtendedModelMap(), redirectAttributes);
 
         // then
         verify(inventoryView, never()).findAllByProductCategory(any());

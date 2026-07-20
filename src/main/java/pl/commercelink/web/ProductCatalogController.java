@@ -206,7 +206,7 @@ public class ProductCatalogController {
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (categoryDefinition.isService() || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (categoryDefinition.getCategory() == null || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
             return;
         }
 

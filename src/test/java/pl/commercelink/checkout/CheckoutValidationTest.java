@@ -55,15 +55,14 @@ class CheckoutValidationTest {
     }
 
     @Test
-    @DisplayName("item without a category never satisfies a required service definition without one")
-    void itemWithNullCategoryDoesNotSatisfyRequiredServiceDefinition() {
+    @DisplayName("item without a category never satisfies a required definition without a category mapping")
+    void itemWithNullCategoryDoesNotSatisfyRequiredDefinitionWithoutCategoryMapping() {
         // given
-        CategoryDefinition serviceDefinition = new CategoryDefinition();
-        serviceDefinition.setName("Montaż");
-        serviceDefinition.setService(true);
-        serviceDefinition.setRequiredDuringOrder(true);
+        CategoryDefinition unmappedDefinition = new CategoryDefinition();
+        unmappedDefinition.setName("Montaż");
+        unmappedDefinition.setRequiredDuringOrder(true);
         ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
-        catalog.setCategories(List.of(serviceDefinition));
+        catalog.setCategories(List.of(unmappedDefinition));
 
         // when / then
         assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item(null))))

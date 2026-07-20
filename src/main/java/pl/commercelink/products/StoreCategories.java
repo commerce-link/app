@@ -7,7 +7,6 @@ import pl.commercelink.taxonomy.ProductCategories;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -48,22 +47,5 @@ public class StoreCategories {
         if (groups.stream().noneMatch(group -> group.names().contains(ProductCategories.OTHER)))
             groups.add(new Group(ProductCategories.OTHER, List.of(ProductCategories.OTHER)));
         return groups;
-    }
-
-    public boolean isService(String storeId, String categoryName) {
-        return serviceNamesFor(storeId).contains(categoryName);
-    }
-
-    public Set<String> serviceNamesFor(String storeId) {
-        return serviceNames(productCatalogRepository.findAll(storeId));
-    }
-
-    public Set<String> serviceNames(List<ProductCatalog> catalogs) {
-        return catalogs.stream()
-                .flatMap(catalog -> catalog.getCategories().stream())
-                .filter(CategoryDefinition::isService)
-                .map(CategoryDefinition::getName)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
     }
 }

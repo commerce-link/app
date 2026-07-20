@@ -29,7 +29,7 @@ public class ProductRecommendationEngine {
      * recommendations for products that are not currently available via PimIndex.
      */
     public List<ProductRecommendation> getRecommendations(CategoryDefinition categoryDefinition, InventoryView inventory) {
-        if (categoryDefinition.isService()) {
+        if (categoryDefinition.getCategory() == null) {
             return List.of();
         }
 

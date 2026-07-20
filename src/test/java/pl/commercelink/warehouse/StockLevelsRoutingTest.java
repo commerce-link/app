@@ -55,12 +55,12 @@ class StockLevelsRoutingTest {
     private StockLevels stockLevels;
 
     @Test
-    void serviceDefinitionsAreSkippedSoNullCategoryNeverReachesSorting() {
+    void serviceProductsAreSkippedEvenThoughBothDefinitionsAreMapped() {
         // given
-        CategoryDefinition serviceDefinition = new CategoryDefinition();
-        serviceDefinition.setCategoryId("cat-s");
-        serviceDefinition.setName("Montaż");
-        serviceDefinition.setService(true);
+        CategoryDefinition mixedDefinition = new CategoryDefinition();
+        mixedDefinition.setCategoryId("cat-s");
+        mixedDefinition.setName("Montaż");
+        mixedDefinition.setCategory("Assembly");
         CategoryDefinition regularDefinition = new CategoryDefinition();
         regularDefinition.setCategoryId("cat-r");
         regularDefinition.setName("Obudowy");
@@ -76,7 +76,7 @@ class StockLevelsRoutingTest {
         regularProduct.setStockExpectedQty(1);
 
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
-        when(catalog.getCategories()).thenReturn(List.of(serviceDefinition, regularDefinition));
+        when(catalog.getCategories()).thenReturn(List.of(mixedDefinition, regularDefinition));
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-s")).thenReturn(List.of(serviceProduct));
         when(productRepository.findAll("cat-r")).thenReturn(List.of(regularProduct));

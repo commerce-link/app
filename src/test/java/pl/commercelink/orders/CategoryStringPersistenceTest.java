@@ -142,6 +142,7 @@ class CategoryStringPersistenceTest {
         Map<String, AttributeValue> nested = attributes.get("categories").getL().get(0).getM();
         assertThat(nested.get("category").getS()).isEqualTo("CPU");
         assertThat(nested.get("category").getN()).isNull();
+        assertThat(nested).doesNotContainKey("service");
         assertThat(restored.getCategories().get(0).getCategory()).isEqualTo("CPU");
     }
 
