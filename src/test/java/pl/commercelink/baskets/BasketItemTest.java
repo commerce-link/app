@@ -20,6 +20,19 @@ class BasketItemTest {
     }
 
     @Test
+    void ofCopiesServiceFlagFromPricelistRow() {
+        // given
+        AvailabilityAndPrice serviceRow = new AvailabilityAndPrice("pim-1", "EAN", "MFN", "Brand",
+                "Label", "Montaż PC", "Usługi dodatkowe", 100, 1, 1, 100, true);
+
+        // when
+        BasketItem item = BasketItem.of(serviceRow, 1, "cat-1", false);
+
+        // then
+        assertThat(item.isService()).isTrue();
+    }
+
+    @Test
     void serviceFlagSetExplicitlyMakesItemAService() {
         // given
         BasketItem item = BasketItem.of(pricelistRow("Usługi dodatkowe"), 1, "catalog-1", false);

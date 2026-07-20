@@ -18,7 +18,6 @@ import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.pricelist.PricelistRepository;
-import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -28,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,8 +53,6 @@ class BasketsRestApiTest {
     private PricelistRepository pricelistRepository;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock
-    private StoreCategories storeCategories;
     @Mock
     private CheckoutRequest req;
 
@@ -160,25 +156,6 @@ class BasketsRestApiTest {
         ArgumentCaptor<Locale> localeCaptor = ArgumentCaptor.forClass(Locale.class);
         verify(invoicingService).createProforma(any(Basket.class), localeCaptor.capture(), eq(true));
         assertThat(localeCaptor.getValue()).isEqualTo(Locale.GERMAN);
-    }
-
-    @Test
-    @DisplayName("updateBasket marks items whose category is a service catalog definition as services")
-    void updateBasketMarksItemsFromServiceDefinitionsAsServices() {
-        // given
-        Basket basket = basketBase();
-        BasketItem serviceItem = new BasketItem("pim-1", "Montaż komputera", "MFN-S", "Usługi dodatkowe", 100, 0, 1, "cat-1", 1, false);
-        BasketItem productItem = new BasketItem("pim-2", "Obudowa ATX", "MFN-P", "Obudowy", 200, 0, 1, "cat-1", 1, false);
-        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
-        when(req.toBasketItems(STORE_ID, pricelistRepository)).thenReturn(List.of(serviceItem, productItem));
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
-
-        // when
-        basketsRestApi.updateBasket(STORE_ID, BASKET_ID, req);
-
-        // then
-        assertThat(serviceItem.isService()).isTrue();
-        assertThat(productItem.isService()).isFalse();
     }
 
     private Basket basketBase() {

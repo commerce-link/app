@@ -4,26 +4,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.StoreCategories;
 
 import java.util.List;
-import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CheckoutValidationTest {
-
-    @Mock
-    private StoreCategories storeCategories;
 
     @InjectMocks
     private Checkout checkout;
@@ -60,23 +52,6 @@ class CheckoutValidationTest {
         assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Procesor"))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Obudowa");
-    }
-
-    @Test
-    @DisplayName("items from a service catalog definition are marked as services during checkout")
-    void resolveServiceFlagsMarksItemsFromServiceDefinitions() {
-        // given
-        ProductCatalog catalog = catalogWithRequired("Obudowa", "Case");
-        BasketItem serviceItem = item("Usługi dodatkowe");
-        BasketItem productItem = item("Obudowa");
-        when(storeCategories.serviceNames(List.of(catalog))).thenReturn(Set.of("Usługi dodatkowe"));
-
-        // when
-        checkout.resolveServiceFlags(catalog, List.of(serviceItem, productItem));
-
-        // then
-        assertThat(serviceItem.isService()).isTrue();
-        assertThat(productItem.isService()).isFalse();
     }
 
     @Test

@@ -186,7 +186,7 @@ public class BasketItem {
     }
 
     public static BasketItem of(AvailabilityAndPrice availabilityAndPrice, long qty, String catalogId, boolean consolidated) {
-        return new BasketItem(
+        BasketItem item = new BasketItem(
                 availabilityAndPrice.getPimId(),
                 availabilityAndPrice.getName(),
                 availabilityAndPrice.getManufacturerCode(),
@@ -198,6 +198,8 @@ public class BasketItem {
                 availabilityAndPrice.getEstimatedDeliveryDays(),
                 consolidated
         );
+        item.setService(availabilityAndPrice.isService());
+        return item;
     }
 
     public static BasketItem of(MatchedInventory matchedInventory, long qty, boolean consolidated) {
