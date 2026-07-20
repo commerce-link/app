@@ -190,19 +190,19 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void savingNewProductUnderServiceDefinitionMarksItAsService() {
+    void savingProductWithServiceCheckboxMarksItAsService() {
         // given
-        CategoryDefinition serviceDefinition = definition(CategoryDefinitionType.Managed, null);
-        serviceDefinition.setService(true);
-        when(catalog.findCategoryDefinition(serviceDefinition.getCategoryId())).thenReturn(serviceDefinition);
-        when(productRepository.findByProductId(serviceDefinition.getCategoryId(), "prod-1")).thenReturn(null);
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, null);
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(null);
         when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
-        Product product = new Product(serviceDefinition.getCategoryId());
+        Product product = new Product(definition.getCategoryId());
         product.setProductId("prod-1");
         product.setName("Montaż PC");
+        product.setService(true);
 
         // when
-        controller.saveProduct(CATALOG_ID, serviceDefinition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
 
         // then
         ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
@@ -211,18 +211,43 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void savingNewProductUnderRegularDefinitionLeavesItAsProduct() {
+    void savingProductWithoutServiceCheckboxLeavesItAsProduct() {
         // given
-        CategoryDefinition regularDefinition = definition(CategoryDefinitionType.Managed, "Karty graficzne");
-        when(catalog.findCategoryDefinition(regularDefinition.getCategoryId())).thenReturn(regularDefinition);
-        when(productRepository.findByProductId(regularDefinition.getCategoryId(), "prod-1")).thenReturn(null);
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, "Karty graficzne");
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(null);
         when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
-        Product product = new Product(regularDefinition.getCategoryId());
+        Product product = new Product(definition.getCategoryId());
         product.setProductId("prod-1");
         product.setName("Karta graficzna");
+        product.setService(false);
 
         // when
-        controller.saveProduct(CATALOG_ID, regularDefinition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+
+        // then
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(productCaptor.capture());
+        assertThat(productCaptor.getValue().isService()).isFalse();
+    }
+
+    @Test
+    void editingProductCanClearTheServiceFlag() {
+        // given
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, "Karty graficzne");
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        Product existingProduct = new Product(definition.getCategoryId());
+        existingProduct.setProductId("prod-1");
+        existingProduct.setName("Montaż PC");
+        existingProduct.setService(true);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(existingProduct);
+        Product product = new Product(definition.getCategoryId());
+        product.setProductId("prod-1");
+        product.setName("Montaż PC");
+        product.setService(false);
+
+        // when
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
 
         // then
         ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);

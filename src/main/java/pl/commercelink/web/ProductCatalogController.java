@@ -551,6 +551,7 @@ public class ProductCatalogController {
         existingProduct.setName(product.getName());
         existingProduct.setRecommendation(product.getRecommendation());
         existingProduct.setEnabled(product.isEnabled());
+        existingProduct.setService(product.isService());
 
         existingProduct.setCustomAttributesFilters(product.getCustomAttributesFilters()
                 .stream()
@@ -572,9 +573,6 @@ public class ProductCatalogController {
                 .filter(Metadata::isComplete)
                 .collect(Collectors.toList())
         );
-
-        CategoryDefinition categoryDefinition = productCatalogRepository.findById(getStoreId(), catalogId).findCategoryDefinition(categoryId);
-        existingProduct.setService(categoryDefinition.isService());
 
         existingProduct.setAvailabilityType(product.getAvailabilityType());
         existingProduct.setSuggestedRetailPrice(product.getSuggestedRetailPrice());

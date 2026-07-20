@@ -87,6 +87,13 @@
             </div>
         </div>
 
+        <div class="field">
+            <label class="label" for="service" th:text="#{product.service}"></label>
+            <div class="control">
+                <input class="checkbox" type="checkbox" id="service" th:field="*{service}" />
+            </div>
+        </div>
+
         <fieldset class="box">
             <legend class="label" th:text="#{product.compatibility.filter}"></legend>
             <table class="table is-fullwidth is-striped">
