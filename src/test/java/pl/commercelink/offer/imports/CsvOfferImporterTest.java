@@ -43,6 +43,34 @@ class CsvOfferImporterTest {
         assertThat(items.get(0).getCategory()).isEqualTo("Obudowa");
     }
 
+    @Test
+    void importsRowWithServiceColumnSetToTrueAsService() throws IOException {
+        // given
+        OfferCreationDto dto = dtoWithCsv("Category;Name;Qty;Price;Cost;Mfn;Service\n" +
+                "Usługi dodatkowe;Montaż komputera;1;250;0;;true");
+
+        // when
+        List<BasketItem> items = importer.importOffer(dto);
+
+        // then
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).isService()).isTrue();
+    }
+
+    @Test
+    void importsOldFormatRowWithoutServiceColumnAsNotAService() throws IOException {
+        // given
+        OfferCreationDto dto = dtoWithCsv("Category;Name;Qty;Price;Cost;Mfn\n" +
+                "CPU;Ryzen 7;2;1500;1200.5;100-100000065BOX");
+
+        // when
+        List<BasketItem> items = importer.importOffer(dto);
+
+        // then
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).isService()).isFalse();
+    }
+
     private OfferCreationDto dtoWithCsv(String csv) {
         OfferCreationDto dto = new OfferCreationDto();
         dto.setCsvFile(new MockMultipartFile("csvFile", "offer.csv", "text/csv", csv.getBytes()));

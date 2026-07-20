@@ -42,7 +42,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,14 +167,16 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("updateOffer marks items whose category is a service catalog definition as services")
-    void updateOfferMarksItemsFromServiceDefinitionsAsServices() {
+    @DisplayName("updateOffer keeps the service flag posted from the offer edit form")
+    void updateOfferKeepsPostedServiceFlag() {
         // given
         Basket existing = basketBase();
+        BasketItem serviceItem = basketItem("MFN-S", "");
+        serviceItem.setService(true);
+        BasketItem productItem = basketItem("MFN-P", "Obudowa");
         Basket payload = new Basket();
-        payload.setBasketItems(List.of(basketItem("MFN-S", "Usługi dodatkowe"), basketItem("MFN-P", "Obudowa")));
+        payload.setBasketItems(List.of(serviceItem, productItem));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
 
         // when
         offerController.updateOffer(OFFER_ID, payload);
@@ -185,19 +186,20 @@ class OfferControllerTest {
         verify(basketsRepository).save(basketCaptor.capture());
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
         assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(BasketItem::isService);
+        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(i -> i.getCategory() == null);
         assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-P")).noneMatch(BasketItem::isService);
-        verify(storeCategories).serviceNamesFor(STORE_ID);
     }
 
     @Test
-    @DisplayName("saveAsTemplate marks items whose category is a service catalog definition as services")
-    void saveAsTemplateMarksItemsFromServiceDefinitionsAsServices() {
+    @DisplayName("saveAsTemplate keeps the service flag posted from the offer edit form")
+    void saveAsTemplateKeepsPostedServiceFlag() {
         // given
+        BasketItem serviceItem = basketItem("MFN-S", "");
+        serviceItem.setService(true);
         Basket payload = new Basket();
         payload.setName("Offer");
-        payload.setBasketItems(List.of(basketItem("MFN-S", "Usługi dodatkowe")));
+        payload.setBasketItems(List.of(serviceItem));
         when(storesRepository.findById(STORE_ID)).thenReturn(new pl.commercelink.stores.Store());
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
 
         // when
         offerController.saveAsTemplate(OFFER_ID, payload, new ConcurrentModel());
@@ -205,12 +207,14 @@ class OfferControllerTest {
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
-        assertThat(basketCaptor.getValue().getBasketItems()).allMatch(BasketItem::isService);
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).allMatch(BasketItem::isService);
+        assertThat(savedItems).allMatch(i -> i.getCategory() == null);
     }
 
     @Test
-    @DisplayName("createOfferFromImport marks imported items whose category is a service catalog definition as services")
-    void createOfferFromImportMarksItemsFromServiceDefinitionsAsServices() throws Exception {
+    @DisplayName("createOfferFromImport keeps the service flag as resolved by the importer")
+    void createOfferFromImportKeepsServiceFlagFromImporter() throws Exception {
         // given
         OfferCreationDto dto = new OfferCreationDto();
         dto.setType("CSV");
@@ -218,11 +222,12 @@ class OfferControllerTest {
         contact.setName("Jan");
         contact.setEmail("jan@test.local");
         dto.setContactDetails(contact);
+        BasketItem importedServiceItem = basketItem("MFN-S", "Usługi dodatkowe");
+        importedServiceItem.setService(true);
         when(offerImporters.stream()).thenReturn(Stream.of(offerImporter));
         when(offerImporter.getType()).thenReturn("CSV");
-        when(offerImporter.importOffer(dto)).thenReturn(new java.util.ArrayList<>(List.of(basketItem("MFN-S", "Usługi dodatkowe"))));
+        when(offerImporter.importOffer(dto)).thenReturn(new java.util.ArrayList<>(List.of(importedServiceItem)));
         when(storesRepository.findById(STORE_ID)).thenReturn(new pl.commercelink.stores.Store());
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
 
         // when
         offerController.createOfferFromImport(dto, new RedirectAttributesModelMap(), Locale.ENGLISH);
@@ -367,17 +372,16 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList marks a row from a service catalog definition as a service")
-    void addOfferItemFromPriceListMarksRowFromServiceDefinitionAsService() {
+    @DisplayName("addOfferItemFromPriceList marks a row carrying the service flag as a service")
+    void addOfferItemFromPriceListMarksRowCarryingServiceFlagAsService() {
         // given
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-S", "", "Montaż", "Montaż komputera",
-                "Usługi dodatkowe", 250L, 1L, 1, 0L, false);
+                "Usługi dodatkowe", 250L, 1L, 1, 0L, true);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
 
         // when
         offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
@@ -398,11 +402,10 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Montaz",
-                "Usługi dodatkowe", 49L, 1L, 3, 0L, false);
+                "Usługi dodatkowe", 49L, 1L, 3, 0L, true);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
-        when(storeCategories.serviceNamesFor(STORE_ID)).thenReturn(Set.of("Usługi dodatkowe"));
         when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
                 catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
