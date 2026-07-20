@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -115,7 +116,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 });
     }
 
-    static String resolveAuthEndpoint(String apiUrl, String path) {
+    public static String resolveAuthEndpoint(String apiUrl, String path) {
         return path.startsWith("http") ? path : apiUrl + path;
     }
 
@@ -200,6 +201,28 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         if (refreshToken == null || refreshToken.isBlank()) {
             return;
         }
+        storeRefreshToken(store, configName, oauth2, refreshToken);
+    }
+
+    public void seedRefreshToken(Store store, String providerName, String refreshToken) {
+        D descriptor = descriptors.get(providerName);
+        if (descriptor == null || refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        if (!(descriptor.authConfig() instanceof AuthConfig.OAuth2 oauth2) || tokenStore == null) {
+            return;
+        }
+        storeRefreshToken(store, resolveCredentialName(descriptor), oauth2, refreshToken);
+    }
+
+    public List<String> deviceAuthProviders() {
+        return descriptors.values().stream()
+                .filter(d -> d.authConfig() instanceof AuthConfig.OAuth2 oauth2 && oauth2.deviceAuthUrl() != null)
+                .map(ProviderDescriptor::name)
+                .toList();
+    }
+
+    private void storeRefreshToken(Store store, String configName, AuthConfig.OAuth2 oauth2, String refreshToken) {
         long now = System.currentTimeMillis();
         OAuth2RefreshToken token = new OAuth2RefreshToken(
                 refreshToken,

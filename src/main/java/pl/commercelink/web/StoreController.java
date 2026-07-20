@@ -542,6 +542,7 @@ public class StoreController {
         model.addAttribute("availableProviders", marketplaceProviderFactory.availableProviders());
         model.addAttribute("selectedProviderName", form.getMarketplace());
         model.addAttribute("connectedIntegrations", integrations);
+        model.addAttribute("deviceAuthProviders", marketplaceProviderFactory.deviceAuthProviders());
 
         return "store-marketplaces";
     }
