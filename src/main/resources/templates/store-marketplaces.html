@@ -16,9 +16,7 @@
             <div class="box" id="device-auth-box" style="display:none">
                 <h2 class="subtitle" th:text="#{store.integrations.deviceauth.title}"></h2>
                 <p class="mb-3" th:text="#{store.integrations.deviceauth.hint}"></p>
-                <button type="button" class="button is-link" id="device-auth-connect"
-                        th:text="#{store.integrations.deviceauth.connect}"></button>
-                <div id="device-auth-progress" class="mt-4" style="display:none">
+                <div id="device-auth-progress">
                     <p>
                         <span th:text="#{store.integrations.deviceauth.confirm}"></span>
                         <a id="device-auth-link" href="#" target="_blank" rel="noopener"></a>
@@ -36,7 +34,6 @@
 
     <script th:inline="javascript">
         (function () {
-            const deviceAuthProviders = /*[[${deviceAuthProviders}]]*/ [];
             const messages = {
                 waiting: /*[[#{store.integrations.deviceauth.waiting}]]*/ '',
                 success: /*[[#{store.integrations.deviceauth.success}]]*/ '',
@@ -44,23 +41,14 @@
                 expired: /*[[#{store.integrations.deviceauth.expired}]]*/ ''
             };
             const box = document.getElementById('device-auth-box');
-            const progress = document.getElementById('device-auth-progress');
+            const linkEl = document.getElementById('device-auth-link');
+            const codeEl = document.getElementById('device-auth-code');
             const statusEl = document.getElementById('device-auth-status');
-            const connectButton = document.getElementById('device-auth-connect');
-            const providerSelect = document.querySelector('select[name="providerName"]');
+            const connectButtons = document.querySelectorAll('.device-auth-row-connect');
             let pollTimer = null;
 
-            function selectedProvider() {
-                return providerSelect ? providerSelect.value : null;
-            }
-
-            function updateVisibility() {
-                const visible = deviceAuthProviders.includes(selectedProvider());
-                box.style.display = visible ? '' : 'none';
-                if (!visible) {
-                    stopPolling();
-                    progress.style.display = 'none';
-                }
+            function setButtonsDisabled(disabled) {
+                connectButtons.forEach(function (button) { button.disabled = disabled; });
             }
 
             function stopPolling() {
@@ -78,10 +66,15 @@
                 }).then(response => response.json().then(body => ({ok: response.ok, body: body})));
             }
 
+            function showFailure(error) {
+                statusEl.textContent = messages.failed + ' ' + (error || '');
+                setButtonsDisabled(false);
+            }
+
             function poll(providerName, deviceCode, intervalSeconds, deadline) {
                 if (Date.now() > deadline) {
                     statusEl.textContent = messages.expired;
-                    connectButton.disabled = false;
+                    setButtonsDisabled(false);
                     return;
                 }
                 pollTimer = setTimeout(function () {
@@ -93,8 +86,7 @@
                                 statusEl.textContent = messages.success;
                                 setTimeout(function () { window.location.reload(); }, 1500);
                             } else if (status === 'FAILED' || !result.ok) {
-                                statusEl.textContent = messages.failed + ' ' + (result.body.error || '');
-                                connectButton.disabled = false;
+                                showFailure(result.body.error);
                             } else {
                                 const nextInterval = status === 'SLOW_DOWN' ? intervalSeconds + 5 : intervalSeconds;
                                 poll(providerName, deviceCode, nextInterval, deadline);
@@ -106,38 +98,36 @@
                 }, intervalSeconds * 1000);
             }
 
-            connectButton.addEventListener('click', function () {
-                const providerName = selectedProvider();
+            function startFlow(providerName) {
                 stopPolling();
-                connectButton.disabled = true;
+                setButtonsDisabled(true);
+                linkEl.textContent = '';
+                codeEl.textContent = '';
                 statusEl.textContent = '';
+                box.style.display = '';
                 post('/dashboard/store/integrations/device-auth/start', {providerName: providerName})
                     .then(function (result) {
                         if (!result.ok) {
-                            statusEl.textContent = messages.failed + ' ' + (result.body.error || '');
-                            progress.style.display = '';
-                            connectButton.disabled = false;
+                            showFailure(result.body.error);
                             return;
                         }
-                        const link = document.getElementById('device-auth-link');
-                        link.href = result.body.verificationUriComplete;
-                        link.textContent = result.body.verificationUriComplete;
-                        document.getElementById('device-auth-code').textContent = result.body.userCode;
+                        linkEl.href = result.body.verificationUriComplete;
+                        linkEl.textContent = result.body.verificationUriComplete;
+                        codeEl.textContent = result.body.userCode;
                         statusEl.textContent = messages.waiting;
-                        progress.style.display = '';
                         const deadline = Date.now() + result.body.expiresIn * 1000;
                         poll(providerName, result.body.deviceCode, result.body.interval || 5, deadline);
                     })
                     .catch(function () {
-                        statusEl.textContent = messages.failed;
-                        connectButton.disabled = false;
+                        showFailure('');
                     });
-            });
-
-            if (providerSelect) {
-                providerSelect.addEventListener('change', updateVisibility);
             }
-            updateVisibility();
+
+            connectButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    startFlow(button.getAttribute('data-provider'));
+                });
+            });
         })();
     </script>
 

@@ -12,6 +12,7 @@ import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.provider.api.AuthConfig;
+import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
 import pl.commercelink.rest.client.OAuth2DeviceAuthorization;
 import pl.commercelink.rest.client.OAuth2DeviceAuthorizationService;
@@ -63,8 +64,14 @@ public class MarketplaceDeviceAuthController {
             return ResponseEntity.badRequest().body(
                     Map.of("error", "Save clientId and clientSecret before connecting"));
         }
-        OAuth2DeviceAuthorization authorization = deviceAuthorizationService.startDeviceAuthorization(
-                oauth2.deviceAuthUrl(), secrets.getClientId(), secrets.getClientSecret());
+        OAuth2DeviceAuthorization authorization;
+        try {
+            authorization = deviceAuthorizationService.startDeviceAuthorization(
+                    oauth2.deviceAuthUrl(), secrets.getClientId(), secrets.getClientSecret());
+        } catch (HttpClientException e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Authorization server rejected the request: " + e.getResponseBody()));
+        }
         return ResponseEntity.ok(Map.of(
                 "deviceCode", authorization.getDeviceCode(),
                 "userCode", authorization.getUserCode(),

@@ -167,6 +167,21 @@ class MarketplaceDeviceAuthControllerTest {
     }
 
     @Test
+    void startReturnsErrorWhenAuthorizationServerRejectsClient() {
+        // given: wrong clientId/clientSecret -> Allegro answers 401 invalid_client
+        stubDeviceFlowProvider();
+        when(deviceAuthorizationService.startDeviceAuthorization(anyString(), anyString(), anyString()))
+                .thenThrow(new pl.commercelink.rest.client.HttpClientException(401, "{\"error\":\"invalid_client\"}"));
+
+        // when
+        ResponseEntity<Map<String, Object>> response = controller.startDeviceAuthorization("Allegro");
+
+        // then
+        assertEquals(400, response.getStatusCode().value());
+        assertNotNull(response.getBody().get("error"));
+    }
+
+    @Test
     void pollSeedsTokenAndConnectsIntegrationOnAuthorized() {
         // given
         stubDeviceFlowProvider();
