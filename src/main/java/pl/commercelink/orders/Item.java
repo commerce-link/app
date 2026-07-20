@@ -368,6 +368,20 @@ public abstract class Item implements Delivered, Categorized {
         this.destroyedAt = destroyedAt;
     }
 
+    public void appendComment(String other) {
+        if (StringUtils.isBlank(other)) {
+            return;
+        }
+        if (StringUtils.isBlank(comment)) {
+            comment = other;
+            return;
+        }
+        if (comment.contains(other)) {
+            return;
+        }
+        comment = comment + "; " + other;
+    }
+
     public String getComment() {
         return comment;
     }

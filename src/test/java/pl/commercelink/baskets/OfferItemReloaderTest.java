@@ -17,7 +17,6 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -57,7 +56,7 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(item);
         AvailabilityAndPrice freshPriceData = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
-                ProductCategory.Laptops.name(), 250L, 5L, 3, 0L);
+                "Laptops", 250L, 5L, 3, 0L);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);

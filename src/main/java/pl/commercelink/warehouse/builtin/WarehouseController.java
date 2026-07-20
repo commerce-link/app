@@ -327,6 +327,7 @@ class WarehouseController {
     }
 
     @PostMapping("/dashboard/warehouse/fulfilment/commit")
+    @PreAuthorize("hasRole('ADMIN')")
     String handleFulfilment(@ModelAttribute FulfilmentForm form) {
         manualWarehouseFulfilment.accept(getStoreId(), form);
         return form.getRedirectUrl();

@@ -2,7 +2,6 @@ package pl.commercelink.baskets;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.List;
 import java.util.Map;

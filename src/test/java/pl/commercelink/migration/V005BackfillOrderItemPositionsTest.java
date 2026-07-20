@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Arrays;
 import java.util.List;
@@ -49,9 +48,9 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("assigns order item positions following the category ordinal display order within each order")
     void assignsOrderItemPositionsFollowingCategoryOrdinalDisplayOrder() {
         // given
-        OrderItem laptopItem = orderItem(ORDER_ID, "item-l", ProductCategory.Laptops.name());
-        OrderItem cpuItem = orderItem(ORDER_ID, "item-c", ProductCategory.CPU.name());
-        OrderItem serviceItem = orderItem(ORDER_ID, "item-s", ProductCategory.Services.name());
+        OrderItem laptopItem = orderItem(ORDER_ID, "item-l", "Laptops");
+        OrderItem cpuItem = orderItem(ORDER_ID, "item-c", "CPU");
+        OrderItem serviceItem = orderItem(ORDER_ID, "item-s", "Services");
         stubScanReturning(ORDER_ID);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(laptopItem, cpuItem, serviceItem));
 
@@ -69,7 +68,7 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("writes positions through if_not_exists update on the item key without touching the version")
     void writesPositionsThroughIfNotExistsUpdateOnItemKey() {
         // given
-        OrderItem cpuItem = orderItem(ORDER_ID, "item-c", ProductCategory.CPU.name());
+        OrderItem cpuItem = orderItem(ORDER_ID, "item-c", "CPU");
         stubScanReturning(ORDER_ID);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(cpuItem));
 
@@ -92,8 +91,8 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("positions items independently per order")
     void positionsItemsIndependentlyPerOrder() {
         // given
-        OrderItem firstOrderItem = orderItem("order-1", "item-a", ProductCategory.Laptops.name());
-        OrderItem secondOrderItem = orderItem("order-2", "item-b", ProductCategory.CPU.name());
+        OrderItem firstOrderItem = orderItem("order-1", "item-a", "Laptops");
+        OrderItem secondOrderItem = orderItem("order-2", "item-b", "CPU");
         stubScanReturning("order-1", "order-2");
         when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of(firstOrderItem));
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of(secondOrderItem));
@@ -111,7 +110,7 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("treats missing and unknown categories as last without failing")
     void treatsMissingAndUnknownCategoriesAsLastWithoutFailing() {
         // given
-        OrderItem cpuItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
+        OrderItem cpuItem = orderItem(ORDER_ID, "item-a", "CPU");
         OrderItem missingCategoryItem = orderItem(ORDER_ID, "item-b", null);
         OrderItem unknownCategoryItem = orderItem(ORDER_ID, "item-c", "NotACategory");
         stubScanReturning(ORDER_ID);
@@ -132,8 +131,8 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("breaks category ties by itemId so re-runs assign the same positions")
     void breaksCategoryTiesByItemIdSoRerunsAssignSamePositions() {
         // given
-        OrderItem laterItem = orderItem(ORDER_ID, "item-b", ProductCategory.CPU.name());
-        OrderItem earlierItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
+        OrderItem laterItem = orderItem(ORDER_ID, "item-b", "CPU");
+        OrderItem earlierItem = orderItem(ORDER_ID, "item-a", "CPU");
         stubScanReturning(ORDER_ID);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(laterItem, earlierItem));
 
@@ -150,8 +149,8 @@ class V005BackfillOrderItemPositionsTest {
     @DisplayName("issues an if_not_exists update for every item so existing positions are preserved by DynamoDB")
     void issuesIfNotExistsUpdateForEveryItemPreservingExistingPositions() {
         // given
-        OrderItem firstItem = orderItem(ORDER_ID, "item-a", ProductCategory.CPU.name());
-        OrderItem secondItem = orderItem(ORDER_ID, "item-b", ProductCategory.CPU.name());
+        OrderItem firstItem = orderItem(ORDER_ID, "item-a", "CPU");
+        OrderItem secondItem = orderItem(ORDER_ID, "item-b", "CPU");
         stubScanReturning(ORDER_ID);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(firstItem, secondItem));
 

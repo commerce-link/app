@@ -158,6 +158,7 @@ public class OrdersManager {
                         );
 
                 orderItem.removeFulfilment();
+                orderItem.setComment(null);
                 orderItemsRepository.save(orderItem);
             }
         });
@@ -175,6 +176,7 @@ public class OrdersManager {
                         );
 
                 orderItem.removeFulfilment();
+                orderItem.setComment(null);
                 orderItemsRepository.save(orderItem);
             }
         });

@@ -46,8 +46,6 @@ class ManualOrderFulfilmentRoutingTest {
     private InventoryView inventoryView;
     @Mock
     private OrderItem orderItem;
-    @Mock
-    private FulfilmentPathSelector pathSelector;
 
     @Test
     void initCallsInventoryWithFulfilmentScope() {
@@ -60,7 +58,7 @@ class ManualOrderFulfilmentRoutingTest {
                 warehouseFulfilmentService, supplierRegistry);
 
         // when
-        service.init(STORE_ID, List.of(ORDER_ID), pathSelector, false, false, false);
+        service.init(STORE_ID, List.of(ORDER_ID), "default", false, false, false);
 
         // then
         verify(inventory).withEnabledSuppliersAndWarehouseData(eq(STORE_ID), eq(SupplierScope.FULFILMENT));

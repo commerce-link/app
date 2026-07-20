@@ -72,9 +72,10 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "pathSelector", defaultValue = "false") String pathSelector,
             @RequestParam(value = "onlyWithProfit", defaultValue = "false") boolean onlyWithProfit,
             @RequestParam(value = "onlyMultiOrder", defaultValue = "false") boolean onlyMultiOrder,
+            @RequestParam(value = "onlyLocalSuppliers", defaultValue = "false") boolean onlyLocalSuppliers,
             @RequestParam(value = "orderByOrder", defaultValue = "false") boolean orderByOrder,
             Model model) {
-        return renderManualFulfilmentPage(getStoreId(), selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, orderByOrder, model);
+        return renderManualFulfilmentPage(getStoreId(), selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers, orderByOrder, model);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment")
@@ -85,23 +86,25 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "pathSelector", defaultValue = "false") String pathSelector,
             @RequestParam(value = "onlyWithProfit", defaultValue = "false") boolean onlyWithProfit,
             @RequestParam(value = "onlyMultiOrder", defaultValue = "false") boolean onlyMultiOrder,
+            @RequestParam(value = "onlyLocalSuppliers", defaultValue = "false") boolean onlyLocalSuppliers,
             @RequestParam(value = "orderByOrder", defaultValue = "false") boolean orderByOrder,
             Model model) {
-        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, orderByOrder, model);
+        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers, orderByOrder, model);
     }
 
-    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean orderByOrder, Model model) {
-        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, orderByOrder, Map.of(), model);
+    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers, boolean orderByOrder, Model model) {
+        return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers, orderByOrder, Map.of(), model);
     }
 
-    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean orderByOrder, Map<String, Double> committedSuppliers, Model model) {
+    private String renderManualFulfilmentPage(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers, boolean orderByOrder, Map<String, Double> committedSuppliers, Model model) {
         List<String> orders = orderByOrder ? sortByItemsToOrder(selectedOrders) : selectedOrders;
         List<String> ordersToFulfil = orderByOrder && !orders.isEmpty() ? List.of(orders.get(0)) : orders;
-        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, createPathSelector(pathSelector), isSuperAdmin(), onlyWithProfit, onlyMultiOrder);
+        FulfilmentForm fulfilmentForm = manualOrderFulfilment.init(storeId, ordersToFulfil, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers);
         fulfilmentForm.setSelectedOrders(orders);
         fulfilmentForm.setPathSelector(pathSelector);
         fulfilmentForm.setOnlyWithProfit(onlyWithProfit);
         fulfilmentForm.setOnlyMultiOrder(onlyMultiOrder);
+        fulfilmentForm.setOnlyLocalSuppliers(onlyLocalSuppliers);
         fulfilmentForm.setOrderByOrder(orderByOrder);
         fulfilmentForm.setCommittedSuppliers(committedSuppliers);
 
@@ -113,21 +116,6 @@ class FulfilmentController extends BaseController {
         }
 
         return "fulfilment";
-    }
-
-    private FulfilmentPathSelector createPathSelector(String pathSelector) {
-        switch (pathSelector) {
-            case "cheapest":
-                return new CheapestFulfilmentPathSelector();
-            case "cheapest-min":
-                return new ShortestAndCheapestPathSelector();
-            case "cheapest-local-min":
-                return new ShortestAndCheapestLocalPathSelector();
-            case "cheapest-local-avg":
-                return new SecondShortestAndCheapestLocalPathSelector();
-            default:
-                return new DefaultPathSelector();
-        }
     }
 
     @PostMapping("/dashboard/orders/fulfilment/commit")
@@ -147,7 +135,7 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(getStoreId(), form);
-        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), "default", false, false, false, model);
+        return renderManualFulfilmentPage(getStoreId(), form.getSelectedOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), form.isOnlyLocalSuppliers(), form.isOrderByOrder(), model);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commit")
@@ -167,7 +155,7 @@ class FulfilmentController extends BaseController {
         if (form.isOrderByOrder() && form.hasRemainingOrders()) {
             Map<String, Double> committedSuppliers = new LinkedHashMap<>(form.getCommittedSuppliers());
             form.getAcceptedValueByProvider().forEach((provider, value) -> committedSuppliers.merge(provider, value, Double::sum));
-            return renderManualFulfilmentPage(storeId, form.getRemainingOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), true, committedSuppliers, model);
+            return renderManualFulfilmentPage(storeId, form.getRemainingOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), form.isOnlyLocalSuppliers(), true, committedSuppliers, model);
         }
         return form.getRedirectUrl();
     }
@@ -184,6 +172,6 @@ class FulfilmentController extends BaseController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String commitAndContinueFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute FulfilmentForm form, Model model) {
         manualOrderFulfilment.commit(storeId, form);
-        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), "default", false, false, false, model);
+        return renderManualFulfilmentPage(storeId, form.getSelectedOrders(), form.getPathSelector(), form.isOnlyWithProfit(), form.isOnlyMultiOrder(), form.isOnlyLocalSuppliers(), form.isOrderByOrder(), model);
     }
 }

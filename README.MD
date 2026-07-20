@@ -59,6 +59,14 @@ aws dynamodb list-tables --endpoint-url http://localhost:8000
 curl http://localhost:4566/_localstack/health
 ```
 
+## AWS Infrastructure
+
+The AWS infrastructure for real environments (Elastic Beanstalk, DynamoDB, SQS,
+S3, Cognito, API Gateway, SES, ElastiCache, and more) is provisioned with
+Terraform and lives in the separate
+[terraform](https://github.com/commerce-link/terraform) repository. See its
+README for the full deployment runbook.
+
 ## Maven Profiles
 
 | Profile | Activation                  | Description                                            |

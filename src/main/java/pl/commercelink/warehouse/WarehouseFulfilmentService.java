@@ -67,6 +67,7 @@ public class WarehouseFulfilmentService {
                         orderItem.isConsolidated(),
                         orderItem.getPosition()
                 );
+                remainingItem.setComment(orderItem.getComment());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -94,6 +95,7 @@ public class WarehouseFulfilmentService {
                 orderItem.isConsolidated(),
                 orderItem.getPosition()
         );
+        newItem.setComment(orderItem.getComment());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

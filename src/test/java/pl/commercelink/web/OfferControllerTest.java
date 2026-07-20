@@ -37,7 +37,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.ProductCategory;
 
 import java.util.Collections;
 import java.util.List;
@@ -218,14 +217,14 @@ class OfferControllerTest {
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
+                "Laptops", 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
         offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                ProductCategory.Laptops.name(), "GroupLabel", "Test Product");
+                "Laptops", "GroupLabel", "Test Product");
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -264,14 +263,14 @@ class OfferControllerTest {
         basket.setBasketItems(List.of(existing));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
-                ProductCategory.Laptops.name(), 199L, 1L, 3, 0L);
+                "Laptops", 199L, 1L, 3, 0L);
         Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
         when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
         offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                ProductCategory.Laptops.name(), "GroupLabel", "Test Product");
+                "Laptops", "GroupLabel", "Test Product");
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);

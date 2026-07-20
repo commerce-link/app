@@ -70,7 +70,12 @@
                                 <span th:text="#{deliveries.create.removeUnselected}">Remove unselected</span>
                             </label>
                         </div>
-                        <div class="column has-text-right">
+                        <div class="column is-flex is-align-items-center is-justify-content-flex-end">
+                            <span class="mr-4">
+                                <span th:text="#{deliveries.create.netValue}">Products net value</span>:
+                                <strong id="deliveryNetValue">0.00</strong>
+                                <strong id="deliveryNetCurrency">PLN</strong>
+                            </span>
                             <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
                         </div>
                     </div>
@@ -261,6 +266,27 @@
     </section>
 
     <script>
+        function updateDeliveryNetValue() {
+            let total = 0;
+            document.querySelectorAll('input[name$=".requestedQty"]').forEach(qtyInput => {
+                const qty = parseInt(qtyInput.value) || 0;
+                if (qty <= 0) return;
+                const costInput = document.querySelector('input[name="' + qtyInput.name.replace('.requestedQty', '.unitCost') + '"]');
+                total += qty * (costInput ? parseFloat(costInput.value) || 0 : 0);
+            });
+            document.getElementById('deliveryNetValue').textContent = total.toFixed(2);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('deliveryCreateForm').addEventListener('input', updateDeliveryNetValue);
+            const currencySelect = document.querySelector('select[name="sourceCurrency"]');
+            const currencyLabel = document.getElementById('deliveryNetCurrency');
+            const syncCurrency = function () { currencyLabel.textContent = currencySelect.value; };
+            currencySelect.addEventListener('change', syncCurrency);
+            syncCurrency();
+            updateDeliveryNetValue();
+        });
+
         function updateSuggestionStock(input) {
             const mfn = input.dataset.mfn;
             const qty = parseInt(input.value) || 0;
@@ -284,6 +310,7 @@
                 input.value = min;
             }
             updateExtraStock(input.dataset.mfn);
+            updateDeliveryNetValue();
         }
 
         function updateMinQty(checkbox) {
@@ -335,6 +362,7 @@
             }
 
             updateExtraStock(mfn);
+            updateDeliveryNetValue();
         }
 
         function updateExtraStock(mfn) {

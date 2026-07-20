@@ -104,9 +104,9 @@ class CategoryStringPersistenceTest {
     }
 
     @Test
-    void productCategoryPersistsAsStringAttributeAfterConverterRemoval() {
+    void productPersistsFilterCategoryButNoTopLevelCategoryAttribute() {
         // given
-        Product product = new Product("cat-def-1", "CPU");
+        Product product = new Product("cat-def-1");
         ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
         filter.setCategory("CPU");
         product.setCustomAttributesFilters(List.of(filter));
@@ -118,10 +118,9 @@ class CategoryStringPersistenceTest {
         Product restored = model.unconvert(attributes);
 
         // then
-        assertThat(attributes.get("category").getS()).isEqualTo("CPU");
-        assertThat(attributes.get("category").getN()).isNull();
+        assertThat(attributes).doesNotContainKey("category");
         assertThat(attributes.get("customAttributesFilters").getL().get(0).getM().get("category").getS()).isEqualTo("CPU");
-        assertThat(restored.getCategory()).isEqualTo("CPU");
+        assertThat(restored.getCustomAttributesFilters().get(0).getCategory()).isEqualTo("CPU");
     }
 
     @Test
