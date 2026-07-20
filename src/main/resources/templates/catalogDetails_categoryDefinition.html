@@ -21,7 +21,7 @@
                 <div th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
             </div>
             <div class="control">
-                <div th:replace="~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, false)}"></div>
+                <div th:replace="~{fragments/category-picker :: picker('category', *{category}, ${edit}, false)}"></div>
             </div>
             <p class="help" th:text="#{catalog.category.mapping.hint}"></p>
         </div>

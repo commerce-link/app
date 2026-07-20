@@ -11,7 +11,7 @@
     <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
 </div>
 
-<div th:fragment="picker(fieldName, selected, disabled, includeServices, required)" class="category-picker">
+<div th:fragment="picker(fieldName, selected, disabled, required)" class="category-picker">
     <input type="hidden" th:name="${fieldName}" th:value="${selected}" data-picker-value>
 
     <div th:if="${disabled}" class="control">
@@ -19,8 +19,7 @@
     </div>
 
     <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-picker
-         th:attr="data-picker-services=${includeServices} ? #{catalog.category.services} : null,
-                  data-picker-required=${required} ? 'true' : null">
+         th:attr="data-picker-required=${required} ? 'true' : null">
         <div class="dropdown-trigger">
             <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
                 <span data-picker-label th:text="${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected}"></span>

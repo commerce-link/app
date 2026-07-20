@@ -33,14 +33,9 @@ class CategoryPickerFragmentTest {
 
     private static final String PICKER = "<div th:replace=\"~{fragments/category-picker :: picker(%s)}\"></div>";
 
-    private String render(String fieldName, String selected, boolean disabled, boolean includeServices) {
-        return render(fieldName, selected, disabled, includeServices, includeServices);
-    }
-
-    private String render(String fieldName, String selected, boolean disabled, boolean includeServices,
-                          boolean required) {
-        String arguments = "'%s', %s, %s, %s, %s".formatted(
-                fieldName, selected == null ? "null" : "'" + selected + "'", disabled, includeServices, required);
+    private String render(String fieldName, String selected, boolean disabled, boolean required) {
+        String arguments = "'%s', %s, %s, %s".formatted(
+                fieldName, selected == null ? "null" : "'" + selected + "'", disabled, required);
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
@@ -182,8 +177,8 @@ class CategoryPickerFragmentTest {
     @Test
     void catalogDefinitionBlocksSavingWithoutACategoryButCompatibilityFiltersDoNot() {
         // when
-        String definition = render("category", null, false, true, true);
-        String compatibilityFilter = render("customAttributesFilters[0].category", "Procesory", false, false, false);
+        String definition = render("category", null, false, true);
+        String compatibilityFilter = render("customAttributesFilters[0].category", "Procesory", false, false);
 
         // then
         assertThat(definition).contains("data-picker-required");
@@ -231,7 +226,7 @@ class CategoryPickerFragmentTest {
         context.setVariable("filters", List.of(new ProductFilter("Procesory"), new ProductFilter("Kołdry")));
         String rows = "<table><tr th:each=\"filter, iterStat : ${filters}\"><td>"
                 + "<div th:replace=\"~{fragments/category-picker :: picker("
-                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, false)}\"></div>"
+                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false)}\"></div>"
                 + "</td></tr></table>";
 
         // when
@@ -252,7 +247,7 @@ class CategoryPickerFragmentTest {
         context.setVariable("categoryDefinition", new ProductFilter("CPU"));
         context.setVariable("edit", true);
         String form = "<form th:object=\"${categoryDefinition}\">"
-                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, true)}\"></div>"
+                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true)}\"></div>"
                 + "</form>";
 
         // when
@@ -295,16 +290,5 @@ class CategoryPickerFragmentTest {
         // then
         assertThat(html).containsOnlyOnce("Procesory");
         assertThat(html).contains("data-category-picker");
-    }
-
-    @Test
-    void servicesOptionIsOfferedOnlyWhenRequested() {
-        // when
-        String withServices = render("category", "Procesory", false, true);
-        String withoutServices = render("customAttributesFilters[0].category", "Procesory", false, false);
-
-        // then
-        assertThat(withServices).contains("data-picker-services");
-        assertThat(withoutServices).doesNotContain("data-picker-services");
     }
 }
