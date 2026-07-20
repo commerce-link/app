@@ -31,7 +31,7 @@
                         </form>
                     </td>
                     <td>
-                        <button type="button" th:if="${integration.deviceAuth}"
+                        <button type="button" th:if="${integration.deviceAuth && !integration.connected}"
                                 class="button is-small is-link is-outlined device-auth-row-connect mr-2"
                                 th:attr="data-provider=${integration.name}"
                                 th:text="#{store.integrations.deviceauth.connect}"></button>
