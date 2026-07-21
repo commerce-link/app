@@ -99,7 +99,7 @@ class BasketOrderImporterTest {
         assertThat(savedItems).extracting(OrderItem::getPosition).containsExactly(0, 1, PositionGroup.DELIVERY_POSITION);
 
         OrderItem deliveryLine = savedItems.get(savedItems.size() - 1);
-        assertThat(deliveryLine.getCategory()).isNull();
+        assertThat(deliveryLine.getCategory()).isEqualTo("Dostawa");
         assertThat(deliveryLine.isService()).isTrue();
         assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
         assertThat(deliveryLine.getStatus()).isEqualTo(FulfilmentStatus.Delivered);

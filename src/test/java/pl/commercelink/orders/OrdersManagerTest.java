@@ -22,6 +22,7 @@ import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationService;
 import pl.commercelink.warehouse.api.Warehouse;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -349,6 +350,40 @@ class OrdersManagerTest {
         // then
         verify(ordersRepository).delete(order);
         verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("a Delivered service item can be removed from the order")
+    void serviceItemCanBeRemovedEvenWhenDelivered() {
+        // given
+        Order order = orderWithTotalPrice(50.0);
+        OrderItem service = deliveredWarehouseService("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(new ArrayList<>(List.of(service)));
+
+        // when
+        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(service.getItemId()));
+
+        // then
+        verify(orderItemsRepository).delete(service);
+        assertThat(order.getTotalPrice()).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("a Delivered product item is NOT removable")
+    void deliveredProductItemIsNotRemovable() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        OrderItem product = allocatedProduct("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product));
+
+        // when
+        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(product.getItemId()));
+
+        // then
+        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+        assertThat(order.getTotalPrice()).isEqualTo(100.0);
     }
 
     @Test

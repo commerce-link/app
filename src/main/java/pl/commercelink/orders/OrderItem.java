@@ -12,6 +12,7 @@ import java.util.UUID;
 public class OrderItem extends Item {
 
     public static final String GENERIC_WAREHOUSE_ORDER_NO = "Warehouse";
+    public static final String DELIVERY_CATEGORY = "Dostawa";
 
     @DynamoDBHashKey(attributeName = "orderId")
     private String orderId;
@@ -286,7 +287,7 @@ public class OrderItem extends Item {
     public static OrderItem fromDeliveryOption(String orderId, DeliveryOption opt) {
         OrderItem orderItem = new OrderItem(
                 orderId,
-                null,
+                DELIVERY_CATEGORY,
                 opt.getName(),
                 1,
                 opt.getPrice(),

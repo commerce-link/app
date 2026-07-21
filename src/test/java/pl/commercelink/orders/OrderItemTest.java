@@ -26,8 +26,8 @@ class OrderItemTest {
     }
 
     @Test
-    @DisplayName("fromDeliveryOption creates a service item without any category string")
-    void fromDeliveryOptionCreatesServiceItemWithoutCategory() {
+    @DisplayName("fromDeliveryOption creates a service item with the delivery category label")
+    void fromDeliveryOptionCreatesServiceItemWithDeliveryCategoryLabel() {
         // given
         DeliveryOption option = new DeliveryOption();
         option.setName("Kurier DPD");
@@ -38,7 +38,7 @@ class OrderItemTest {
 
         // then
         assertThat(deliveryItem.isService()).isTrue();
-        assertThat(deliveryItem.getCategory()).isNull();
+        assertThat(deliveryItem.getCategory()).isEqualTo("Dostawa");
         assertThat(deliveryItem.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
         assertThat(deliveryItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(deliveryItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
