@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.stores.CreateStoreRequest;
@@ -15,6 +16,7 @@ import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -238,5 +240,64 @@ class SuperAdminControllerTest {
         assertEquals("redirect:/dashboard/store/create", view);
         assertEquals("Błąd tworzenia", redirectAttributes.getFlashAttributes().get("errorMessage"));
         assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+    }
+
+    private static Store storeWithCreatedAt(String storeId, String createdAt) {
+        Store store = new Store();
+        store.setStoreId(storeId);
+        store.setCreatedAt(createdAt);
+        return store;
+    }
+
+    @Test
+    void sortsStoresNewestFirstByDefaultWithNullsLast() {
+        // given
+        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
+        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
+        Store legacy = storeWithCreatedAt("legacy-st-1", null);
+        when(storesRepository.findAll()).thenReturn(List.of(oldest, legacy, newest));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.store("desc", model);
+
+        // then
+        assertEquals("stores", view);
+        assertEquals(List.of(newest, oldest, legacy), model.getAttribute("stores"));
+        assertEquals("desc", model.getAttribute("dir"));
+    }
+
+    @Test
+    void sortsStoresOldestFirstWhenAscendingRequested() {
+        // given
+        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
+        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
+        Store legacy = storeWithCreatedAt("legacy-st-1", null);
+        when(storesRepository.findAll()).thenReturn(List.of(newest, legacy, oldest));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.store("asc", model);
+
+        // then
+        assertEquals("stores", view);
+        assertEquals(List.of(oldest, newest, legacy), model.getAttribute("stores"));
+        assertEquals("asc", model.getAttribute("dir"));
+    }
+
+    @Test
+    void normalizesUnknownSortDirectionToDescending() {
+        // given
+        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
+        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
+        when(storesRepository.findAll()).thenReturn(List.of(oldest, newest));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.store("bogus", model);
+
+        // then
+        assertEquals(List.of(newest, oldest), model.getAttribute("stores"));
+        assertEquals("desc", model.getAttribute("dir"));
     }
 }

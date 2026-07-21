@@ -45,9 +45,14 @@ public class SuperAdminController {
     boolean demoEnvironment;
 
     @GetMapping("/dashboard/stores")
-    public String store(Model model) {
-        List<Store> stores = storesRepository.findAll();
+    public String store(@RequestParam(defaultValue = "desc") String dir, Model model) {
+        boolean ascending = "asc".equalsIgnoreCase(dir);
+        Comparator<String> order = ascending ? Comparator.naturalOrder() : Comparator.reverseOrder();
+        List<Store> stores = storesRepository.findAll().stream()
+                .sorted(Comparator.comparing(Store::getCreatedAt, Comparator.nullsLast(order)))
+                .toList();
         model.addAttribute("stores", stores);
+        model.addAttribute("dir", ascending ? "asc" : "desc");
         return "stores";
     }
 
