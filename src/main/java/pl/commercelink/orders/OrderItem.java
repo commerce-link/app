@@ -273,6 +273,7 @@ public class OrderItem extends Item {
                 basketItem.isConsolidated()
         );
         orderItem.setService(basketItem.isService());
+        orderItem.markAsWarehouseFulfilled();
         orderItem.setPosition(basketItem.getPosition());
         return orderItem;
     }
@@ -289,6 +290,7 @@ public class OrderItem extends Item {
                 PositionGroup.DELIVERY_POSITION
         );
         orderItem.setService(true);
+        orderItem.markAsWarehouseFulfilled();
         return orderItem;
     }
 

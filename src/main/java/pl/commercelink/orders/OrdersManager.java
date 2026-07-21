@@ -276,6 +276,7 @@ public class OrdersManager {
                     source.getPosition()
             );
             newItem.setService(source.isService());
+            newItem.markAsWarehouseFulfilled();
             newItem.setComment(source.getComment());
             orderItemsRepository.save(newItem);
         }

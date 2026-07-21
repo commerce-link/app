@@ -16,6 +16,7 @@ import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
@@ -101,6 +102,8 @@ class BasketOrderImporterTest {
         assertThat(deliveryLine.getCategory()).isNull();
         assertThat(deliveryLine.isService()).isTrue();
         assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
+        assertThat(deliveryLine.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(deliveryLine.getDeliveryId()).isEqualTo("Warehouse");
     }
 
     private Store storeWithDeliveryOption(DeliveryOption deliveryOption) {
