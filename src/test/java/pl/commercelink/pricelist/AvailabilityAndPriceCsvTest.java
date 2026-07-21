@@ -17,6 +17,6 @@ class AvailabilityAndPriceCsvTest {
 
         // then — service is the last column
         assertThat(csv[csv.length - 1]).isEqualTo("true");
-        assertThat(AvailabilityAndPrice.HEADERS[AvailabilityAndPrice.HEADERS.length - 1]).isEqualTo("service");
+        assertThat(AvailabilityAndPrice.HEADERS[AvailabilityAndPrice.HEADERS.length - 1]).isEqualTo("Service");
     }
 }
