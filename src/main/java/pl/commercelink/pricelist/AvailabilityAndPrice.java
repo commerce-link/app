@@ -5,7 +5,7 @@ import pl.commercelink.starter.csv.CSVReady;
 
 public class AvailabilityAndPrice  implements CSVReady {
 
-    public static final String[] HEADERS = { "PimId","EAN", "Mfn", "Brand", "Label", "Name", "Category", "Price", "Qty", "Estimated Delivery Days", "Lowest 30 Days Price", "service"};
+    public static final String[] HEADERS = { "PimId","EAN", "Mfn", "Brand", "Label", "Name", "Category", "Price", "Qty", "Estimated Delivery Days", "Lowest 30 Days Price", "Service"};
 
     @JsonProperty("pimId")
     private String pimId;
