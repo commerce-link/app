@@ -16,6 +16,104 @@
         </div>
     </section>
 
+    <script th:inline="javascript">
+        (function () {
+            const messages = {
+                failed: /*[[#{store.integrations.deviceauth.failed}]]*/ '',
+                expired: /*[[#{store.integrations.deviceauth.expired}]]*/ ''
+            };
+            const connectButtons = document.querySelectorAll('.device-auth-row-connect');
+            let pollTimer = null;
+            let activeButton = null;
+
+            function setInProgress(button, inProgress) {
+                connectButtons.forEach(function (b) { b.disabled = inProgress; });
+                button.classList.toggle('is-loading', inProgress);
+                activeButton = inProgress ? button : null;
+            }
+
+            function stopPolling() {
+                if (pollTimer) {
+                    clearTimeout(pollTimer);
+                    pollTimer = null;
+                }
+            }
+
+            function post(url, params) {
+                return fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams(params)
+                }).then(response => response.json().then(body => ({ok: response.ok, body: body})));
+            }
+
+            function fail(message) {
+                stopPolling();
+                if (activeButton) {
+                    setInProgress(activeButton, false);
+                }
+                alert(message);
+            }
+
+            function poll(providerName, deviceCode, intervalSeconds, deadline) {
+                if (Date.now() > deadline) {
+                    fail(messages.expired);
+                    return;
+                }
+                pollTimer = setTimeout(function () {
+                    post('/dashboard/store/integrations/device-auth/poll',
+                            {providerName: providerName, deviceCode: deviceCode})
+                        .then(function (result) {
+                            const status = result.body.status;
+                            if (status === 'AUTHORIZED') {
+                                window.location.reload();
+                            } else if (status === 'FAILED' || !result.ok) {
+                                fail(messages.failed + ' ' + (result.body.error || ''));
+                            } else {
+                                const nextInterval = status === 'SLOW_DOWN' ? intervalSeconds + 5 : intervalSeconds;
+                                poll(providerName, deviceCode, nextInterval, deadline);
+                            }
+                        })
+                        .catch(function () {
+                            poll(providerName, deviceCode, intervalSeconds, deadline);
+                        });
+                }, intervalSeconds * 1000);
+            }
+
+            connectButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    const providerName = button.getAttribute('data-provider');
+                    const authWindow = window.open('about:blank', '_blank');
+                    stopPolling();
+                    setInProgress(button, true);
+                    post('/dashboard/store/integrations/device-auth/start', {providerName: providerName})
+                        .then(function (result) {
+                            if (!result.ok) {
+                                if (authWindow) {
+                                    authWindow.close();
+                                }
+                                fail(messages.failed + ' ' + (result.body.error || ''));
+                                return;
+                            }
+                            if (authWindow) {
+                                authWindow.location = result.body.verificationUriComplete;
+                            } else {
+                                window.open(result.body.verificationUriComplete, '_blank');
+                            }
+                            const deadline = Date.now() + result.body.expiresIn * 1000;
+                            poll(providerName, result.body.deviceCode, result.body.interval || 5, deadline);
+                        })
+                        .catch(function () {
+                            if (authWindow) {
+                                authWindow.close();
+                            }
+                            fail(messages.failed);
+                        });
+                });
+            });
+        })();
+    </script>
+
 </div>
 
 </body>

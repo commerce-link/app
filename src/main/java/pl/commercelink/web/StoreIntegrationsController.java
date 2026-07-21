@@ -69,9 +69,12 @@ public class StoreIntegrationsController {
             case "payments" -> store.addPaymentIntegration(providerName);
             case "marketplace" -> {
                 MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
+                boolean requiresDeviceAuth = marketplaceProviderFactory.deviceAuthProviders().contains(providerName);
                 if (integration == null) {
-                    store.getMarketplaces().add(new MarketplaceIntegration(providerName));
-                } else {
+                    MarketplaceIntegration created = new MarketplaceIntegration(providerName);
+                    created.setLoggedIn(!requiresDeviceAuth);
+                    store.getMarketplaces().add(created);
+                } else if (!requiresDeviceAuth) {
                     store.markConnectionAsRestored(providerName);
                 }
             }

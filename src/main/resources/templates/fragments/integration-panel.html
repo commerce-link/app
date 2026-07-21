@@ -19,7 +19,8 @@
                     <td th:text="${integration.name}"></td>
                     <td>
                         <span class="tag is-success" th:if="${integration.connected}" th:text="#{store.marketplaces.connected}"></span>
-                        <span class="tag is-danger" th:unless="${integration.connected}" th:text="#{store.marketplaces.disconnected}"></span>
+                        <span class="tag is-warning" th:if="${!integration.connected && integration.deviceAuth}" th:text="#{store.integrations.deviceauth.pending}"></span>
+                        <span class="tag is-danger" th:if="${!integration.connected && !integration.deviceAuth}" th:text="#{store.marketplaces.disconnected}"></span>
                     </td>
                     <td th:if="${showDefault}">
                         <span class="tag is-info" th:if="${integration.isDefault}" th:text="#{store.integrations.default}"></span>
@@ -30,7 +31,11 @@
                         </form>
                     </td>
                     <td>
-                        <form th:action="@{/dashboard/store/integrations/disconnect}" method="post">
+                        <button type="button" th:if="${integration.deviceAuth && !integration.connected}"
+                                class="button is-small is-link is-outlined device-auth-row-connect mr-2"
+                                th:attr="data-provider=${integration.name}"
+                                th:text="#{store.integrations.deviceauth.connect}"></button>
+                        <form th:action="@{/dashboard/store/integrations/disconnect}" method="post" style="display:inline;">
                             <input type="hidden" name="storeId" th:value="${storeId}"/>
                             <input type="hidden" name="providerType" th:value="${providerType}"/>
                             <input type="hidden" name="providerName" th:value="${integration.name}"/>
