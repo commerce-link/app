@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
@@ -29,7 +30,7 @@ public class PimCatalogRegistry {
 
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
-                       SecretsManager secretsManager, TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
+                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
         Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
 
