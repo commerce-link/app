@@ -18,6 +18,8 @@ import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
+import pl.commercelink.warehouse.api.Reservation;
+import pl.commercelink.warehouse.api.ReservationService;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +59,8 @@ class OrdersManagerTest {
     private Store store;
     @Mock
     private MatchedInventory matchedInventory;
+    @Mock
+    private ReservationService reservationService;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -388,6 +393,56 @@ class OrdersManagerTest {
         });
     }
 
+    @Test
+    @DisplayName("moveOrderItemsToTheWarehouse skips service items entirely")
+    void moveToWarehouseSkipsServiceItems() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem product = allocatedProduct("item-1");
+        OrderItem service = deliveredWarehouseService("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product, service));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+
+        // when
+        ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID, List.of(product.getItemId(), service.getItemId()));
+
+        // then
+        verify(reservationService, times(1)).remove(any(Reservation.class));
+        verify(orderItemsRepository).save(product);
+        verify(orderItemsRepository, never()).save(service);
+        assertThat(product.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(product.getEan()).isNull();
+        assertThat(product.getDeliveryId()).isNull();
+        assertThat(service.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(service.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+    }
+
+    @Test
+    @DisplayName("moveOrderItemsToTheWarehouseForRMA skips service items entirely")
+    void moveToWarehouseForRmaSkipsServiceItems() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem product = allocatedProduct("item-1");
+        OrderItem service = deliveredWarehouseService("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product, service));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+
+        // when
+        ordersManager.moveOrderItemsToTheWarehouseForRMA(STORE_ID, ORDER_ID, List.of(product.getItemId(), service.getItemId()));
+
+        // then
+        verify(reservationService, times(1)).remove(any(Reservation.class));
+        verify(orderItemsRepository).save(product);
+        verify(orderItemsRepository, never()).save(service);
+        assertThat(product.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(product.getEan()).isNull();
+        assertThat(product.getDeliveryId()).isNull();
+        assertThat(service.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(service.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+    }
+
     private Order orderWithTotalPrice(double totalPrice) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -418,6 +473,21 @@ class OrdersManagerTest {
         OrderItem item = new OrderItem(ORDER_ID, "Usługi dodatkowe", "service", 1, price, null, false);
         item.setService(true);
         item.setItemId(itemId);
+        return item;
+    }
+
+    private OrderItem allocatedProduct(String itemId) {
+        OrderItem item = orderItem(itemId, 100.0);
+        item.setEan("1111111111111");
+        item.setManufacturerCode("MFN-" + itemId);
+        item.setDeliveryId("Supplier-1");
+        item.setStatus(FulfilmentStatus.Delivered);
+        return item;
+    }
+
+    private OrderItem deliveredWarehouseService(String itemId) {
+        OrderItem item = serviceItem(itemId, 50.0);
+        item.markAsWarehouseFulfilled();
         return item;
     }
 }

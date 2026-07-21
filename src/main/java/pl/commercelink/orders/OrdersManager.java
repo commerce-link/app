@@ -145,7 +145,7 @@ public class OrdersManager {
 
     public Result moveOrderItemsToTheWarehouseForRMA(String storeId, String orderId, List<String> orderItemIds) {
         return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isDelivered()) {
+            if (orderItem.isProduct() && orderItem.isDelivered()) {
                 warehouse.reservationService(storeId)
                         .remove(
                                 Reservation.orderFulfilmentToRMA(
@@ -163,7 +163,7 @@ public class OrdersManager {
 
     public Result moveOrderItemsToTheWarehouse(String storeId, String orderId, List<String> orderItemIds) {
         return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isAllocated()) {
+            if (orderItem.isProduct() && orderItem.isAllocated()) {
                 warehouse.reservationService(storeId)
                         .remove(
                                 Reservation.orderFulfilmentToStock(
