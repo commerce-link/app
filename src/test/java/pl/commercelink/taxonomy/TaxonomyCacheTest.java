@@ -7,6 +7,8 @@ import org.mockito.Mockito;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -269,13 +271,33 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void updateCategoryIgnoresUnknownCategoryKey() {
+    void updateCategoryIgnoresBlankMfnAndNullCategory() {
         // given
         cache.add(uncategorized("MFN-1", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("MFN-1", "NotARealCategory"));
+        assertFalse(cache.updateCategory("", "CPU"));
+        assertFalse(cache.updateCategory("   ", "CPU"));
+        assertFalse(cache.updateCategory("MFN-1", null));
         assertEquals("Other", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void updateCategoryIgnoresUnknownCategoryKey() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(captured));
+
+        try {
+            // when / then
+            assertFalse(cache.updateCategory("MFN-1", "NotARealCategory"));
+        } finally {
+            System.setOut(originalOut);
+        }
+        assertEquals("Other", cache.findByMfn("MFN-1").category());
+        assertTrue(captured.toString().contains("unknown category key: NotARealCategory"));
     }
 
     @Test
