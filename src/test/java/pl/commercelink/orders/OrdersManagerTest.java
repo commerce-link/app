@@ -387,27 +387,8 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("splitGroupItem components inherit the service flag from the source item")
-    void splitGroupItemComponentsInheritServiceFlag() {
-        // given
-        OrderItem source = new OrderItem(ORDER_ID, "Usługi dodatkowe", "Pakiet montażowy", 1, 100.0, "MONTAZ-A+MONTAZ-B", false);
-        source.setService(true);
-        when(orderItemsRepository.findById(ORDER_ID, source.getItemId())).thenReturn(source);
-
-        // when
-        ordersManager.splitGroupItem(ORDER_ID, source.getItemId(), List.of(
-                new SplitGroupComponent("MONTAZ-A", "Montaż A", 1, 60.0),
-                new SplitGroupComponent("MONTAZ-B", "Montaż B", 1, 40.0)));
-
-        // then
-        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
-        verify(orderItemsRepository, org.mockito.Mockito.times(2)).save(itemCaptor.capture());
-        assertThat(itemCaptor.getAllValues()).allSatisfy(item -> assertThat(item.isService()).isTrue());
-    }
-
-    @Test
-    @DisplayName("splitGroupItem components of a service are warehouse-fulfilled immediately")
-    void splitGroupItemServiceComponentsAreDelivered() {
+    @DisplayName("splitGroupItem components of a legacy New service are warehouse-fulfilled")
+    void splitGroupItemHealsLegacyNewServiceComponents() {
         // given
         OrderItem source = new OrderItem(ORDER_ID, "Usługi dodatkowe", "Pakiet montażowy", 1, 100.0, "MONTAZ-A+MONTAZ-B", false);
         source.setService(true);

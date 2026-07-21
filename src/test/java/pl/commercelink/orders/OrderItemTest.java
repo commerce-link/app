@@ -184,6 +184,20 @@ class OrderItemTest {
         assertThat(orderItem.hasSupplierAllocation()).isTrue();
     }
 
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a product in external service with real allocation details")
+    void hasSupplierAllocationIsTrueForProductInExternalServiceWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.setStatus(FulfilmentStatus.InExternalService);
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);
