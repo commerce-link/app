@@ -60,9 +60,13 @@ class BasketItemTest {
     }
 
     @Test
-    void shippingItemHasNoCategoryString() {
+    void shippingItemHasDeliveryCategoryLabel() {
+        // given
+        BasketItem shipping = BasketItem.shipping(10.0);
+
         // when / then
-        assertThat(BasketItem.shipping(10.0).getCategory()).isNull();
+        assertThat(shipping.getCategory()).isEqualTo("Dostawa");
+        assertThat(shipping.isService()).isTrue();
     }
 
     @Test

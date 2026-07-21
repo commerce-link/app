@@ -145,7 +145,7 @@ public class OrdersManager {
 
     public Result moveOrderItemsToTheWarehouseForRMA(String storeId, String orderId, List<String> orderItemIds) {
         return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isDelivered()) {
+            if (orderItem.isProduct() && orderItem.isDelivered()) {
                 warehouse.reservationService(storeId)
                         .remove(
                                 Reservation.orderFulfilmentToRMA(
@@ -163,7 +163,7 @@ public class OrdersManager {
 
     public Result moveOrderItemsToTheWarehouse(String storeId, String orderId, List<String> orderItemIds) {
         return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isAllocated()) {
+            if (orderItem.isProduct() && orderItem.isAllocated()) {
                 warehouse.reservationService(storeId)
                         .remove(
                                 Reservation.orderFulfilmentToStock(
@@ -249,7 +249,7 @@ public class OrdersManager {
     public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components) {
         OrderItem source = orderItemsRepository.findById(orderId, itemId);
 
-        if (source == null || !source.isNew()) {
+        if (source == null || !source.isNew() || source.isService()) {
             throw new IllegalStateException("split.group.invalid.state");
         }
         if (components == null || components.size() < 2) {

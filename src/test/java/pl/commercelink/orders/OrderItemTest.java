@@ -26,8 +26,8 @@ class OrderItemTest {
     }
 
     @Test
-    @DisplayName("fromDeliveryOption creates a service item without any category string")
-    void fromDeliveryOptionCreatesServiceItemWithoutCategory() {
+    @DisplayName("fromDeliveryOption creates a service item with the delivery category label")
+    void fromDeliveryOptionCreatesServiceItemWithDeliveryCategoryLabel() {
         // given
         DeliveryOption option = new DeliveryOption();
         option.setName("Kurier DPD");
@@ -38,8 +38,41 @@ class OrderItemTest {
 
         // then
         assertThat(deliveryItem.isService()).isTrue();
-        assertThat(deliveryItem.getCategory()).isNull();
+        assertThat(deliveryItem.getCategory()).isEqualTo("Dostawa");
         assertThat(deliveryItem.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
+        assertThat(deliveryItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(deliveryItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+    }
+
+    @Test
+    @DisplayName("fromBasketItem marks a service item as warehouse-fulfilled on entry")
+    void fromBasketItemMarksServiceItemAsDelivered() {
+        // given
+        BasketItem basketItem = new BasketItem("pim-1", "Montaż PC", "MONTAZ-1", "Usługi dodatkowe", 150, 100, 1, "cat-1", 801, false);
+        basketItem.setService(true);
+
+        // when
+        OrderItem orderItem = OrderItem.fromBasketItem(ORDER_ID, basketItem);
+
+        // then
+        assertThat(orderItem.isService()).isTrue();
+        assertThat(orderItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(orderItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+    }
+
+    @Test
+    @DisplayName("fromBasketItem leaves a product item untouched by the service invariant")
+    void fromBasketItemLeavesProductItemNew() {
+        // given
+        BasketItem basketItem = basketItem("MFN-1");
+
+        // when
+        OrderItem orderItem = OrderItem.fromBasketItem(ORDER_ID, basketItem);
+
+        // then
+        assertThat(orderItem.isService()).isFalse();
+        assertThat(orderItem.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(orderItem.getDeliveryId()).isNull();
     }
 
     @Test
@@ -93,6 +126,76 @@ class OrderItemTest {
 
         // then
         assertThat(copy.isService()).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is false for a warehouse-fulfilled service item")
+    void hasSupplierAllocationIsFalseForWarehouseFulfilledService() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setService(true);
+
+        // when
+        orderItem.markAsWarehouseFulfilled();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isFalse();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for an ordered product with real allocation details")
+    void hasSupplierAllocationIsTrueForOrderedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.setStatus(FulfilmentStatus.Ordered);
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a returned product with real allocation details")
+    void hasSupplierAllocationIsTrueForReturnedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.markAsReturned();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a replaced product with real allocation details")
+    void hasSupplierAllocationIsTrueForReplacedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.markAsReplaced();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a product in external service with real allocation details")
+    void hasSupplierAllocationIsTrueForProductInExternalServiceWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.setStatus(FulfilmentStatus.InExternalService);
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
     }
 
     private BasketItem basketItem(String mfn) {

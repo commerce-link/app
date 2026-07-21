@@ -418,12 +418,12 @@
                                            th:text="#{order.item.clear.assign}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
-                                        <a th:if="${item.isNew() and item.group}" class="dropdown-item"
+                                        <a th:if="${item.isNew() and item.group and item.product}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="openSplitGroupModal(this); return false;"
                                            th:text="#{order.item.split.group}"></a>
-                                        <span th:unless="${item.isNew() and item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isNew() and item.group and item.product}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.split.group}"></span>
                                         <a class="dropdown-item"
                                            href="#"

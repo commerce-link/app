@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
@@ -174,7 +175,7 @@ public class BasketItem {
         BasketItem item = new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
                 SHIPPING_MFN_CODE,
-                null,
+                OrderItem.DELIVERY_CATEGORY,
                 shippingPrice,
                 0,
                 1,

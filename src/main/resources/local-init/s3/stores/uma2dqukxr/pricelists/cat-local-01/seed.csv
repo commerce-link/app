@@ -1,4 +1,4 @@
-PimId;EAN;Mfn;Brand;Label;Name;Category;Price;Qty;Estimated Delivery Days;Lowest 30 Days Price;service
+PimId;EAN;Mfn;Brand;Label;Name;Category;Price;Qty;Estimated Delivery Days;Lowest 30 Days Price;Service
 local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;AMD ClearEdge;AMD ClearEdge Pro X3D;CPU;1299;20;1;1299;false
 local-seed-0002;5900000000002;MZ-V8V1T0BW;Samsung;Samsung 980;Samsung 980 NVMe 1TB;Storage;299;50;1;319;false
 local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch DDR5;G.Skill TwinMatch 32GB DDR5 Kit;Memory;459;50;1;479;false
