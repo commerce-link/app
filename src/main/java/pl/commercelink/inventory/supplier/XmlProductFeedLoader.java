@@ -8,8 +8,6 @@ import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.XmlItem;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
@@ -32,9 +30,8 @@ public class XmlProductFeedLoader {
 
     private final InventoryRepository inventoryRepository;
     private final StoreFeedRepository storeFeedRepository;
-    private final DataCorrection dataCorrection;
     private final DataCleanup dataCleanup;
-    private final TaxonomyCache taxonomyCache;
+    private final FeedRowProcessor feedRowProcessor;
 
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
@@ -77,6 +74,7 @@ public class XmlProductFeedLoader {
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
 
         List<InventoryItem> res = new LinkedList<>();
+        FeedParseStats stats = new FeedParseStats(supplierInfo.name());
 
         try {
             while (xsr.hasNext()) {
@@ -84,13 +82,8 @@ public class XmlProductFeedLoader {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
 
                     ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                    InventoryItem inventoryItem = dataCorrection.run(parsed.item());
-                    Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
-
-                    if (taxonomy.isProcessable() && inventoryItem.isSellable()) {
-                        taxonomyCache.add(StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty));
-                        res.add(inventoryItem);
-                    }
+                    feedRowProcessor.process(parsed, supplierInfo.name(), taxonomyPenalty, stats)
+                            .ifPresent(res::add);
                 } else {
                     xsr.next();
                 }
@@ -99,6 +92,7 @@ public class XmlProductFeedLoader {
             xsr.close();
         }
 
+        stats.log();
         return dataCleanup.run(res);
     }
 
