@@ -4,10 +4,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -15,6 +17,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaxonomyCacheTest {
@@ -139,6 +142,105 @@ class TaxonomyCacheTest {
         assertThat(result.grossWeightInGrams()).isEqualTo(250);
     }
 
+    @Test
+    void categorizedEntryIsNotClobberedByBetterScoreUncategorized() {
+        // given
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // when
+        cache.add(uncategorized("MFN-1", 1));
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals("CPU", result.category());
+        assertEquals(10, result.dataAccuracyScore());
+    }
+
+    @Test
+    void incomingCategorizedEntryReplacesUncategorizedDespiteWorseScore() {
+        // given
+        cache.add(uncategorized("MFN-1", 1));
+
+        // when
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // then
+        assertEquals("CPU", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void blankCategoryIsTreatedLikeOther() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "", 1, null, null));
+
+        // when
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // then
+        assertEquals("CPU", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void twoCategorizedEntriesStillMergeByScore() {
+        // given
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // when
+        cache.add(categorized("MFN-1", "GPU", 1));
+
+        // then
+        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void categorizedWinnerStillAdoptsWeightFromUncategorizedEntry() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 1, 777, null));
+
+        // when
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals("CPU", result.category());
+        assertEquals(777, result.netWeightInGrams());
+    }
+
+    @Test
+    void findPrefersCategorizedEntryOverPendingWithBetterScore() {
+        // given
+        cache.add(uncategorized("MFN-PENDING", 1));
+        cache.add(categorized("MFN-CAT", "CPU", 10));
+        InventoryKey key = new InventoryKey(Set.of(), Set.of("MFN-PENDING", "MFN-CAT"));
+
+        // when
+        Taxonomy result = cache.find(key);
+
+        // then
+        assertEquals("CPU", result.category());
+    }
+
+    @Test
+    void findReturnsPendingEntryWhenNoCategorizedCandidateExists() {
+        // given
+        cache.add(uncategorized("MFN-PENDING", 1));
+        InventoryKey key = new InventoryKey(Set.of(), Set.of("MFN-PENDING"));
+
+        // when
+        Taxonomy result = cache.find(key);
+
+        // then
+        assertEquals("MFN-PENDING", result.mfn());
+    }
+
+    @Test
+    void hasCategoryRejectsNullBlankAndOther() {
+        assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", null, 1, null, null)));
+        assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", " ", 1, null, null)));
+        assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "Other", 1, null, null)));
+        assertTrue(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "CPU", 1, null, null)));
+    }
+
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
         return taxonomyNamed(mfn, score, weight, "Name");
     }
@@ -146,5 +248,13 @@ class TaxonomyCacheTest {
     private static Taxonomy taxonomyNamed(String mfn, int score, Integer weight, String name) {
         return new Taxonomy("1234567890123", mfn, "Brand", name,
                 "Laptops", score, weight, null);
+    }
+
+    private static Taxonomy categorized(String mfn, String category, int score) {
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", category, score, null, null);
+    }
+
+    private static Taxonomy uncategorized(String mfn, int score) {
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", "Other", score, null, null);
     }
 }

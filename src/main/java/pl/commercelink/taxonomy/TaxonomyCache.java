@@ -44,14 +44,28 @@ public class TaxonomyCache {
         taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> mergeOf(current, taxonomy));
     }
 
+    public static boolean hasCategory(Taxonomy taxonomy) {
+        return taxonomy != null
+                && taxonomy.category() != null
+                && !taxonomy.category().isBlank()
+                && !Taxonomy.OTHER.equals(taxonomy.category());
+    }
+
     private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
         if (current == null) return incoming;
 
-        Taxonomy winner = bestByScore(current, incoming);
+        Taxonomy winner = bestByCategoryThenScore(current, incoming);
         Integer net = bestWeightOf(current, incoming, Taxonomy::netWeightInGrams);
         Integer gross = bestWeightOf(current, incoming, Taxonomy::grossWeightInGrams);
 
         return needsRebuild(winner, net, gross) ? withWeights(winner, net, gross) : winner;
+    }
+
+    private static Taxonomy bestByCategoryThenScore(Taxonomy current, Taxonomy incoming) {
+        if (hasCategory(current) != hasCategory(incoming)) {
+            return hasCategory(current) ? current : incoming;
+        }
+        return bestByScore(current, incoming);
     }
 
     private static Taxonomy bestByScore(Taxonomy a, Taxonomy b) {
@@ -81,12 +95,19 @@ public class TaxonomyCache {
 
         for (String productCode : inventoryKey.getProductCodes()) {
             Taxonomy t = taxonomyByMfn.get(productCode);
-            if (t != null && t.dataAccuracyScore() < taxonomy.dataAccuracyScore()) {
+            if (t != null && preferredOver(t, taxonomy)) {
                 taxonomy = t;
             }
         }
 
         return taxonomy;
+    }
+
+    private static boolean preferredOver(Taxonomy candidate, Taxonomy current) {
+        if (hasCategory(candidate) != hasCategory(current)) {
+            return hasCategory(candidate);
+        }
+        return candidate.dataAccuracyScore() < current.dataAccuracyScore();
     }
 
     public Taxonomy findByMfn(String mfn) {
