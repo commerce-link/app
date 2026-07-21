@@ -156,6 +156,34 @@ class OrderItemTest {
         assertThat(orderItem.hasSupplierAllocation()).isTrue();
     }
 
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a returned product with real allocation details")
+    void hasSupplierAllocationIsTrueForReturnedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.markAsReturned();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for a replaced product with real allocation details")
+    void hasSupplierAllocationIsTrueForReplacedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.markAsReplaced();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);
