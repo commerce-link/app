@@ -3,7 +3,10 @@ package pl.commercelink.taxonomy;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 
@@ -13,16 +16,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MockitoExtension.class)
 class TaxonomyCategoryEnrichmentTest {
 
     private TaxonomyCache cache;
     private TaxonomyCategoryEnrichment enrichment;
 
+    @Mock
+    private TaxonomyRepository taxonomyRepository;
+
     @BeforeEach
     void setUp() {
-        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
-        cache = new TaxonomyCache(repo);
+        Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
+        cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
         enrichment = new TaxonomyCategoryEnrichment(cache,
                 new TaxonomyCategoryMatchProperties("Acme, Elko", 100, 2));

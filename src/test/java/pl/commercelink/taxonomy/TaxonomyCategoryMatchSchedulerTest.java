@@ -3,8 +3,11 @@ package pl.commercelink.taxonomy;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
@@ -22,18 +25,22 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+@ExtendWith(MockitoExtension.class)
 class TaxonomyCategoryMatchSchedulerTest {
 
     private TaxonomyCache cache;
+
+    @Mock
+    private TaxonomyRepository taxonomyRepository;
+
+    @Mock
     private PimCatalog pimCatalog;
 
     @BeforeEach
     void setUp() {
-        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
-        cache = new TaxonomyCache(repo);
+        Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
+        cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
-        pimCatalog = Mockito.mock(PimCatalog.class);
     }
 
     @Test
@@ -103,7 +110,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
                 cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
 
-        // when / then (brak wyjątku)
+        // when / then
         scheduler.sweep();
     }
 
