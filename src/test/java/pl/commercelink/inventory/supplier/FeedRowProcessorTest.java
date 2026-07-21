@@ -17,8 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +49,7 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
@@ -55,6 +57,7 @@ class FeedRowProcessorTest {
         // then
         assertEquals(Optional.of(sellableItem), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
+        verifyNoInteractions(stats);
     }
 
     @Test
@@ -65,7 +68,7 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible("Acme", pendingTaxonomy)).thenReturn(true);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
@@ -74,6 +77,9 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(enrichment).addPending(pendingTaxonomy);
         verify(taxonomyCache, never()).add(any());
+        verify(stats).markPendingAdded();
+        verify(stats, never()).markDropped();
+        verify(stats, never()).markAdopted();
     }
 
     @Test
@@ -84,7 +90,7 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible("Acme", pendingTaxonomy)).thenReturn(false);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
@@ -93,6 +99,8 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(enrichment, never()).addPending(any());
         verify(taxonomyCache, never()).add(any());
+        verify(stats).markDropped();
+        verify(stats, never()).markPendingAdded();
     }
 
     @Test
@@ -102,7 +110,7 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
@@ -110,6 +118,7 @@ class FeedRowProcessorTest {
         // then
         assertEquals(Optional.of(sellableItem), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
+        verify(stats).markAdopted();
     }
 
     @Test
@@ -119,7 +128,7 @@ class FeedRowProcessorTest {
         ParsedRow parsed = new ParsedRow(noQty, categorizedTaxonomy);
         when(dataCorrection.run(noQty)).thenReturn(noQty);
         when(dataCorrection.run(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
@@ -128,6 +137,7 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(taxonomyCache, never()).add(any());
         verify(enrichment, never()).addPending(any());
+        verifyNoInteractions(stats);
     }
 
     @Test
@@ -137,7 +147,7 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = new FeedParseStats("Acme");
+        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
         processor.process(parsed, "Acme", 1000, stats);
