@@ -115,7 +115,7 @@ public class RegistrationService {
     private RegistrationResult registerProduction(String email, String storeName) {
         Store store;
         try {
-            store = storeCreationService.createStore(CreateStoreRequest.bare(storeName, null));
+            store = storeCreationService.createStore(CreateStoreRequest.registered(storeName, email));
         } catch (RuntimeException e) {
             System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
