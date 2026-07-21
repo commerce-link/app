@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -49,6 +50,28 @@ public class TaxonomyCache {
                 && taxonomy.category() != null
                 && !taxonomy.category().isBlank()
                 && !Taxonomy.OTHER.equals(taxonomy.category());
+    }
+
+    public boolean updateCategory(String mfn, String category) {
+        if (StringUtils.isBlank(mfn) || category == null || Taxonomy.OTHER.equals(category)) {
+            return false;
+        }
+        Optional<String> known = ProductCategories.tryParse(category);
+        if (known.isEmpty()) {
+            System.out.println("Ignoring category match with unknown category key: " + category);
+            return false;
+        }
+        boolean[] updated = {false};
+        taxonomyByMfn.computeIfPresent(mfn, (key, current) -> {
+            if (hasCategory(current)) {
+                return current;
+            }
+            updated[0] = true;
+            return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
+                    known.get(), current.dataAccuracyScore(),
+                    current.netWeightInGrams(), current.grossWeightInGrams());
+        });
+        return updated[0];
     }
 
     private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {

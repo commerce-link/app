@@ -241,6 +241,59 @@ class TaxonomyCacheTest {
         assertTrue(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "CPU", 1, null, null)));
     }
 
+    @Test
+    void updateCategorySetsCategoryOnPendingEntryKeepingScoreAndWeights() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 7, 100, 200));
+
+        // when
+        boolean updated = cache.updateCategory("MFN-1", "CPU");
+
+        // then
+        assertTrue(updated);
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals("CPU", result.category());
+        assertEquals(7, result.dataAccuracyScore());
+        assertEquals(100, result.netWeightInGrams());
+        assertEquals(200, result.grossWeightInGrams());
+    }
+
+    @Test
+    void updateCategoryIgnoresOtherCategory() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+
+        // when / then
+        assertFalse(cache.updateCategory("MFN-1", "Other"));
+        assertEquals("Other", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void updateCategoryIgnoresUnknownCategoryKey() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+
+        // when / then
+        assertFalse(cache.updateCategory("MFN-1", "NotARealCategory"));
+        assertEquals("Other", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void updateCategoryIgnoresMissingEntry() {
+        // when / then
+        assertFalse(cache.updateCategory("MFN-GONE", "CPU"));
+    }
+
+    @Test
+    void updateCategoryDoesNotOverwriteAlreadyCategorizedEntry() {
+        // given
+        cache.add(categorized("MFN-1", "GPU", 7));
+
+        // when / then
+        assertFalse(cache.updateCategory("MFN-1", "CPU"));
+        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+    }
+
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
         return taxonomyNamed(mfn, score, weight, "Name");
     }
