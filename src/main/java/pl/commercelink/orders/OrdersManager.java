@@ -249,7 +249,7 @@ public class OrdersManager {
     public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components) {
         OrderItem source = orderItemsRepository.findById(orderId, itemId);
 
-        if (source == null || !source.isNew()) {
+        if (source == null || !source.isNew() || source.isService()) {
             throw new IllegalStateException("split.group.invalid.state");
         }
         if (components == null || components.size() < 2) {
@@ -276,7 +276,6 @@ public class OrdersManager {
                     source.getPosition()
             );
             newItem.setService(source.isService());
-            newItem.markAsWarehouseFulfilled();
             newItem.setComment(source.getComment());
             orderItemsRepository.save(newItem);
         }
