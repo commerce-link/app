@@ -15,6 +15,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
@@ -25,6 +26,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -361,6 +363,66 @@ class OrdersControllerTest {
         // then
         assertThat(item.getCategory()).isNull();
         assertThat(item.isService()).isTrue();
+    }
+
+    @Test
+    void turningServiceFlagOnMarksItemDeliveredAndMovesItToServiceBand() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        item.setPosition(2);
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isTrue();
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(item.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        assertThat(item.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 2);
+    }
+
+    @Test
+    void turningServiceFlagOffResetsWarehouseFulfilledItemToNewProduct() {
+        // given
+        OrderItem item = existingOrderItem("Usługi", true);
+        item.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        item.setStatus(FulfilmentStatus.Delivered);
+        item.setPosition(PositionGroup.SERVICE_GROUP_START + 2);
+        OrderItem posted = postedOrderItem("Usługi");
+        posted.setService(false);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isFalse();
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(item.getDeliveryId()).isNull();
+        assertThat(item.getPosition()).isEqualTo(2);
+    }
+
+    @Test
+    void postedServiceFlagIsIgnoredWhenItemHasSupplierAllocation() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("delivery-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        item.setPosition(2);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setService(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isFalse();
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getPosition()).isEqualTo(2);
     }
 
     private OrderItem existingOrderItem(String category, boolean service) {

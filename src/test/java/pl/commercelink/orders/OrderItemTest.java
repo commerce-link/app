@@ -128,6 +128,34 @@ class OrderItemTest {
         assertThat(copy.isService()).isTrue();
     }
 
+    @Test
+    @DisplayName("hasSupplierAllocation is false for a warehouse-fulfilled service item")
+    void hasSupplierAllocationIsFalseForWarehouseFulfilledService() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setService(true);
+
+        // when
+        orderItem.markAsWarehouseFulfilled();
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isFalse();
+    }
+
+    @Test
+    @DisplayName("hasSupplierAllocation is true for an ordered product with real allocation details")
+    void hasSupplierAllocationIsTrueForOrderedProductWithAllocationDetails() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.setStatus(FulfilmentStatus.Ordered);
+
+        // then
+        assertThat(orderItem.hasSupplierAllocation()).isTrue();
+    }
+
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);

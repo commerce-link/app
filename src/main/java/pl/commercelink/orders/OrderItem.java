@@ -81,6 +81,11 @@ public class OrderItem extends Item {
         }
     }
 
+    @DynamoDBIgnore
+    public boolean hasSupplierAllocation() {
+        return isInAllocation() || (hasAllocationDetails() && hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
+    }
+
     public void update(OrderItem other) {
         if (isNew()) {
             updateAllFields(other);

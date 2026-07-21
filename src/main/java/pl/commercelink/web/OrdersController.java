@@ -509,10 +509,32 @@ public class OrdersController extends BaseController {
         if (op.isPresent()) {
             OrderItem orderItem = op.get();
 
+            boolean wasService = orderItem.isService();
+            boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
+
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);
             }
+            if (serviceFlagLocked) {
+                updatedItem.setService(orderItem.isService());
+            }
             orderItem.update(updatedItem);
+
+            if (!wasService && orderItem.isService()) {
+                orderItem.markAsWarehouseFulfilled();
+                if (orderItem.getPosition() < PositionGroup.SERVICE_GROUP_START) {
+                    orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + orderItem.getPosition());
+                }
+            } else if (wasService && !orderItem.isService()) {
+                if (OrderItem.GENERIC_WAREHOUSE_ORDER_NO.equals(orderItem.getDeliveryId())) {
+                    orderItem.setDeliveryId(null);
+                    orderItem.setStatus(FulfilmentStatus.New);
+                }
+                if (orderItem.getPosition() >= PositionGroup.SERVICE_GROUP_START && orderItem.getPosition() < PositionGroup.DELIVERY_POSITION) {
+                    orderItem.setPosition(orderItem.getPosition() - PositionGroup.SERVICE_GROUP_START);
+                }
+            }
+
             orderItemsRepository.save(orderItem);
 
             order.setTotalPrice(new OrderFinancials(order, orderItems).getTotalPrice());
@@ -615,6 +637,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("categoryGroups", storeCategories.groupsFor(order.getStoreId()));
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
+        model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
 
         return "orderItem";
     }

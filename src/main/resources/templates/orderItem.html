@@ -34,7 +34,7 @@
 
                     <div class="field">
                         <label class="checkbox">
-                            <input type="checkbox" th:field="*{service}" th:disabled="${isCompletedOrder}" />
+                            <input type="checkbox" th:field="*{service}" th:disabled="${isCompletedOrder or serviceFlagLocked}" />
                             <span th:text="#{product.service}"></span>
                         </label>
                     </div>
