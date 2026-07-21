@@ -31,6 +31,8 @@ awslocal sqs create-queue --queue-name order-goods-out-queue.fifo \
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
 awslocal sqs create-queue --queue-name pim-fetch-queue
+awslocal sqs create-queue --queue-name pim-category-match-queue
+awslocal sqs create-queue --queue-name pim-category-matched-queue
 
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,

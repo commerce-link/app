@@ -74,7 +74,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>pim-api</artifactId>
-            <version>0.1.5</version>
+            <version>0.1.6</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -338,7 +338,7 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
-                    <version>0.1.5</version>
+                    <version>0.1.6</version>
                 </dependency>
             </dependencies>
         </profile>
