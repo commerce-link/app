@@ -153,4 +153,43 @@ class StoreCreationServiceTest {
         assertTrue(store.getNotifications().stream()
                 .noneMatch(n -> n.getType() == StoreNotificationType.WELCOME));
     }
+
+    @Test
+    void setsRegistrationEmailAsBillingEmail() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.registered("Sklep X", "owner@example.com"));
+
+        // then
+        assertNotNull(store.getBillingDetails());
+        assertEquals("owner@example.com", store.getBillingDetails().getEmail());
+    }
+
+    @Test
+    void copiesDemoOwnerEmailToBillingEmail() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+        DemoStoreMetadata demo = new DemoStoreMetadata("a@b.pl", "2026-07-13T10:00:00Z", "2026-07-16T10:00:00Z");
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.seeded("Sklep demo", demo, seeder));
+
+        // then
+        assertNotNull(store.getBillingDetails());
+        assertEquals("a@b.pl", store.getBillingDetails().getEmail());
+    }
+
+    @Test
+    void leavesBillingDetailsEmptyWithoutOwnerEmail() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", null));
+
+        // then
+        assertNull(store.getBillingDetails());
+    }
 }

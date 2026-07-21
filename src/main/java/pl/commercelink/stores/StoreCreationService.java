@@ -1,7 +1,9 @@
 package pl.commercelink.stores;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 
 import java.time.Instant;
@@ -20,6 +22,11 @@ public class StoreCreationService {
         store.setName(request.name());
         store.setApiKey(request.apiKey());
         store.setCreatedAt(Instant.now().toString());
+        if (StringUtils.isNotBlank(request.ownerEmail())) {
+            BillingDetails billingDetails = new BillingDetails();
+            billingDetails.setEmail(request.ownerEmail());
+            store.setBillingDetails(billingDetails);
+        }
         if (request.demoMetadata() != null) {
             store.setDemo(request.demoMetadata());
         }
