@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategories;
 import pl.commercelink.pim.api.PimCategory;
-import pl.commercelink.taxonomy.Categorized;
 
 import java.text.Collator;
 import java.util.ArrayList;
@@ -45,7 +44,6 @@ public class PimCategoryOptions {
         List<String> options = new ArrayList<>(leafNamesUnder(topLevelNames));
         currentValues.stream()
                 .filter(value -> value != null && !value.isBlank())
-                .filter(value -> !Categorized.SERVICES.equals(value))
                 .filter(value -> !options.contains(value))
                 .distinct()
                 .forEach(options::add);

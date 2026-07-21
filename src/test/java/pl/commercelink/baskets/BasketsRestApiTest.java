@@ -24,6 +24,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 

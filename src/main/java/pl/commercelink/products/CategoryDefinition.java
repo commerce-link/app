@@ -107,7 +107,7 @@ public class CategoryDefinition implements DeletionProtection {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return StringUtils.isNotBlank(name) && StringUtils.isNotBlank(category) && type != null && stockDefinition != null && stockDefinition.isComplete()
+        return StringUtils.isNotBlank(name) && type != null && stockDefinition != null && stockDefinition.isComplete()
                 && availabilityDefinition != null && availabilityDefinition.isComplete()
                 && !priceDefinitions.isEmpty() && priceDefinitions.stream().anyMatch(PriceDefinition::isComplete);
     }

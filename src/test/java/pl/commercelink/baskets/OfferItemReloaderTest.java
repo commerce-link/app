@@ -56,7 +56,7 @@ class OfferItemReloaderTest {
         Basket basket = basketWith(item);
         AvailabilityAndPrice freshPriceData = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
-                "Laptops", 250L, 5L, 3, 0L);
+                "Laptops", 250L, 5L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(pricelist);

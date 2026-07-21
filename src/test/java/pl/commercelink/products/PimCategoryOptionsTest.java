@@ -8,6 +8,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -198,7 +199,7 @@ class PimCategoryOptionsTest {
     }
 
     @Test
-    void categoryOptionsSkipServicesBecauseThePickerAlwaysOffersItSeparately() {
+    void categoryOptionsTreatLegacyServicesValueLikeAnyOtherUnknownCurrentValue() {
         // given
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("1", null, "Dom", "pl"),
@@ -207,6 +208,21 @@ class PimCategoryOptionsTest {
 
         // when
         List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), List.of("Services"));
+
+        // then
+        assertThat(options).containsExactly("Services", "Stoły");
+    }
+
+    @Test
+    void categoryOptionsIgnoreNullCurrentValueOfServiceDefinitions() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when
+        List<String> options = pimCategoryOptions().categoryOptions(List.of("Dom"), Collections.singletonList(null));
 
         // then
         assertThat(options).containsExactly("Stoły");

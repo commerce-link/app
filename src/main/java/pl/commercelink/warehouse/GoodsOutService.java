@@ -78,7 +78,7 @@ class GoodsOutService {
 
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId())
                 .stream()
-                .filter(i -> i.isProduct())
+                .filter(OrderItem::isProduct)
                 .toList();
 
         List<GoodsOutItem> items = orderItems.stream()

@@ -17,7 +17,7 @@ public class InvoicePositionName {
     public static String fromOrderItems(String prefix, List<OrderItem> orderItems) {
         return prefix + " " +
                 orderItems.stream()
-                        .filter(i -> i.isProduct())
+                        .filter(OrderItem::isProduct)
                         .map(i -> formatName(i.getName(), i.getQty()))
                         .collect(Collectors.joining(", "))
                         .trim();

@@ -156,6 +156,7 @@ public class StoreCopyService {
                 target.setLabel(source.getLabel());
                 target.setName(source.getName());
                 target.setEnabled(source.isEnabled());
+                target.setService(source.isService());
                 target.setCustomAttributesFilters(copyList(source.getCustomAttributesFilters()));
                 target.setCustomAttributes(copyList(source.getCustomAttributes()));
                 target.setRecommendation(source.getRecommendation());

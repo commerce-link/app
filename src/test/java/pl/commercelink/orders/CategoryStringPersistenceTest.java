@@ -56,8 +56,8 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes.get("service").getN()).isEqualTo("1");
-        assertThat(restored.isService()).isTrue();
+        assertThat(attributes.get("service").getN()).isEqualTo("0");
+        assertThat(restored.isService()).isFalse();
         assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "product", "serviceGroup");
     }
 
@@ -77,7 +77,7 @@ class CategoryStringPersistenceTest {
         // then
         assertThat(attributes.get("category").getS()).isEqualTo("Services");
         assertThat(attributes.get("category").getN()).isNull();
-        assertThat(attributes.get("service").getN()).isEqualTo("1");
+        assertThat(attributes.get("service").getN()).isEqualTo("0");
         assertThat(attributes).doesNotContainKeys("sequenceNumber", "categoryKey", "product", "serviceGroup");
     }
 
@@ -142,7 +142,25 @@ class CategoryStringPersistenceTest {
         Map<String, AttributeValue> nested = attributes.get("categories").getL().get(0).getM();
         assertThat(nested.get("category").getS()).isEqualTo("CPU");
         assertThat(nested.get("category").getN()).isNull();
+        assertThat(nested).doesNotContainKey("service");
         assertThat(restored.getCategories().get(0).getCategory()).isEqualTo("CPU");
+    }
+
+    @Test
+    void productServiceFlagPersistsAndRestores() {
+        // given
+        Product product = new Product("cat-def-1");
+        product.setService(true);
+
+        // when
+        DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
+        DynamoDBMapperTableModel<Product> model = mapper.getTableModel(Product.class, DynamoDBMapperConfig.DEFAULT);
+        Map<String, AttributeValue> attributes = model.convert(product);
+        Product restored = model.unconvert(attributes);
+
+        // then
+        assertThat(attributes.get("service").getN()).isEqualTo("1");
+        assertThat(restored.isService()).isTrue();
     }
 
     private DynamoDBMapperTableModel<OrderItem> orderItemModel() {

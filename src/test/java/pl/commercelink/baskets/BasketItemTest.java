@@ -20,6 +20,19 @@ class BasketItemTest {
     }
 
     @Test
+    void ofCopiesServiceFlagFromPricelistRow() {
+        // given
+        AvailabilityAndPrice serviceRow = new AvailabilityAndPrice("pim-1", "EAN", "MFN", "Brand",
+                "Label", "Montaż PC", "Usługi dodatkowe", 100, 1, 1, 100, true);
+
+        // when
+        BasketItem item = BasketItem.of(serviceRow, 1, "cat-1", false);
+
+        // then
+        assertThat(item.isService()).isTrue();
+    }
+
+    @Test
     void serviceFlagSetExplicitlyMakesItemAService() {
         // given
         BasketItem item = BasketItem.of(pricelistRow("Usługi dodatkowe"), 1, "catalog-1", false);
@@ -32,12 +45,12 @@ class BasketItemTest {
     }
 
     @Test
-    void legacyItemWithServicesCategoryIsStillService() {
+    void legacyServicesCategoryStringAloneDoesNotMakeItemAService() {
         // given
         BasketItem item = new BasketItem("id", "name", "mfn", "Services", 100, 80, 1, null, 1, false);
 
         // when / then
-        assertThat(item.isService()).isTrue();
+        assertThat(item.isService()).isFalse();
     }
 
     @Test
@@ -46,7 +59,32 @@ class BasketItemTest {
         assertThat(BasketItem.shipping(10.0).isService()).isTrue();
     }
 
+    @Test
+    void shippingItemHasNoCategoryString() {
+        // when / then
+        assertThat(BasketItem.shipping(10.0).getCategory()).isNull();
+    }
+
+    @Test
+    void serviceItemWithoutCategoryIsComplete() {
+        // given
+        BasketItem item = new BasketItem("id", "Montaż PC", "MONTAZ-1", null, 100, 80, 1, null, 1, false);
+        item.setService(true);
+
+        // when / then
+        assertThat(item.isComplete()).isTrue();
+    }
+
+    @Test
+    void productItemWithoutCategoryIsNotComplete() {
+        // given
+        BasketItem item = new BasketItem("id", "name", "mfn", null, 100, 80, 1, null, 1, false);
+
+        // when / then
+        assertThat(item.isComplete()).isFalse();
+    }
+
     private AvailabilityAndPrice pricelistRow(String category) {
-        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name", category, 100, 1, 1, 100);
+        return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", "label", "name", category, 100, 1, 1, 100, false);
     }
 }

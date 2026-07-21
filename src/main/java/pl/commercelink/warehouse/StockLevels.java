@@ -124,9 +124,11 @@ public class StockLevels {
             return recommendationEngine.getRecommendations(category, enabledInventory).stream()
                     .filter(ProductRecommendation::hasPimId)
                     .map(ProductRecommendation::toProduct)
+                    .filter(p -> !p.isService())
                     .collect(Collectors.toList());
         }
         return productRepository.findAll(category.getCategoryId()).stream()
+                .filter(p -> !p.isService())
                 .filter(p -> scope == RestockScope.WholeCatalog || p.getStockExpectedQty() > 0)
                 .collect(Collectors.toList());
     }

@@ -111,7 +111,7 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(i -> i.isProduct()).collect(Collectors.toList());
+        return basketItems.stream().filter(BasketItem::isProduct).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
@@ -175,7 +175,7 @@ public class Basket {
 
     private int lastIndexOfCategory(String category) {
         for (int i = basketItems.size() - 1; i >= 0; i--) {
-            if (basketItems.get(i).hasCategory(category)) {
+            if (category != null && category.equals(basketItems.get(i).getCategory())) {
                 return i;
             }
         }

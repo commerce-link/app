@@ -20,6 +20,8 @@
                         <div class="control">
                             <div class="select">
                                 <select th:field="*{category}" th:disabled="${isCompletedOrder}">
+                                    <option th:if="${#strings.isEmpty(orderItem.category)}"
+                                            value="" th:text="#{catalog.category.unset}"></option>
                                     <option th:if="${!#strings.isEmpty(orderItem.category) && !categories.contains(orderItem.category)}"
                                             th:value="${orderItem.category}" th:text="${orderItem.category}"></option>
                                     <optgroup th:each="group : ${categoryGroups}" th:label="${group.catalog}">
@@ -28,6 +30,13 @@
                                 </select>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{service}" th:disabled="${isCompletedOrder}" />
+                            <span th:text="#{product.service}"></span>
+                        </label>
                     </div>
 
                     <div class="field">

@@ -57,7 +57,7 @@ abstract class OrderFulfilment {
         List<OrderItem> acceptedProducts = orderItems.stream()
                 .filter(i -> !i.isInAllocation())
                 .filter(i -> !i.isAllocated())
-                .filter(i -> i.isProduct())
+                .filter(OrderItem::isProduct)
                 .collect(Collectors.toList());
 
         List<OrderItem> acceptedServices = orderItems.stream()

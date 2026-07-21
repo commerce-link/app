@@ -29,6 +29,10 @@ public class ProductRecommendationEngine {
      * recommendations for products that are not currently available via PimIndex.
      */
     public List<ProductRecommendation> getRecommendations(CategoryDefinition categoryDefinition, InventoryView inventory) {
+        if (categoryDefinition.getCategory() == null) {
+            return List.of();
+        }
+
         List<InventoryKey> alreadyMappedInventoryKeys = productRepository.findAll(categoryDefinition.getCategoryId())
                 .stream()
                 .map(InventoryKey::fromProduct)

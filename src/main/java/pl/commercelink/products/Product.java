@@ -36,6 +36,8 @@ public class Product {
     private String name;
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled = true;
+    @DynamoDBAttribute(attributeName = "service")
+    private boolean service;
 
     @DynamoDBAttribute(attributeName = "customAttributesFilters")
     private List<ProductCustomAttributeFilter> customAttributesFilters = new LinkedList<>();
@@ -278,6 +280,14 @@ public class Product {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isService() {
+        return service;
+    }
+
+    public void setService(boolean service) {
+        this.service = service;
     }
 
     public List<String> getMarketplaces() {

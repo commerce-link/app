@@ -3,11 +3,10 @@ package pl.commercelink.orders.fulfilment;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.OrderItem;
-import pl.commercelink.taxonomy.Categorized;
 
 import java.util.Objects;
 
-public class FulfilmentSource implements Categorized {
+public class FulfilmentSource {
 
     private String name;
     private String category;
@@ -89,9 +88,8 @@ public class FulfilmentSource implements Categorized {
         this.category = category;
     }
 
-    @Override
     public boolean isService() {
-        return service || hasCategory(SERVICES);
+        return service;
     }
 
     public void setService(boolean service) {

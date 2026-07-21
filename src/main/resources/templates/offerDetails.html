@@ -147,6 +147,7 @@
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
                         <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
+                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].service}" />
                         <td><span class="drag-handle" style="cursor:grab; padding:0 .4rem; color:#7a8290;" th:title="#{offers.item.drag.hint}"><i class="fas fa-arrows-alt"></i></span></td>
                         <td>
                             <div class="select">

@@ -17,7 +17,6 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.products.StoreCategories;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.Warehouse;
 
@@ -55,8 +54,6 @@ class OrdersManagerTest {
     private OrderLifecycle orderLifecycle;
     @Mock
     private Store store;
-    @Mock
-    private StoreCategories storeCategories;
     @Mock
     private MatchedInventory matchedInventory;
 
@@ -117,8 +114,8 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem from matched inventory shifts a service item into the service band and marks it warehouse-fulfilled")
-    void addOrderItemFromMatchedInventoryShiftsServiceItemIntoServiceBand() {
+    @DisplayName("addOrderItem from matched inventory treats a legacy Services category string as a regular product")
+    void addOrderItemFromMatchedInventoryTreatsLegacyServicesCategoryAsRegularProduct() {
         // given
         Order order = orderWithTotalPrice(0.0);
         Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", "Services", 1, null, null);
@@ -136,9 +133,10 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
-        assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
-        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(savedItem.isService()).isFalse();
+        assertThat(savedItem.getPosition()).isEqualTo(3);
+        assertThat(savedItem.getDeliveryId()).isNull();
+        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.New);
     }
 
     @Test
@@ -148,7 +146,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(50.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                "Laptops", 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -169,36 +167,13 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem from availability and price marks Services category item as warehouse-fulfilled")
-    void addOrderItemFromAvailabilityAndPriceMarksServiceItemAsWarehouseFulfilled() {
+    @DisplayName("addOrderItem from availability and price puts a service-flagged row into the service band")
+    void addOrderItemFromServiceFlaggedRowGoesToServiceBand() {
         // given
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
-                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                "Services", 30L, 1L, 1, 0L);
-        when(store.isPositionConsolidationEnabled()).thenReturn(false);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-
-        // when
-        ordersManager.addOrderItem(store, order, availability, 0);
-
-        // then
-        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
-        verify(orderItemsRepository).save(itemCaptor.capture());
-        OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getCategory()).isEqualTo("Services");
-        assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
-        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
-    }
-
-    @Test
-    @DisplayName("addOrderItem from availability and price shifts a service item into the service band")
-    void addOrderItemFromAvailabilityAndPriceShiftsServiceItemIntoServiceBand() {
-        // given
-        Order order = orderWithTotalPrice(0.0);
-        AvailabilityAndPrice availability = new AvailabilityAndPrice(
-                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
-                "Services", 30L, 1L, 1, 0L);
+                "pim-montaz", "", "MONTAZ-1", "", "", "Montaż PC",
+                "Usługi dodatkowe", 30L, 1L, 1, 0L, true);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -208,33 +183,35 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
-    }
-
-    @Test
-    @DisplayName("addOrderItem from availability and price treats row from a service catalog definition as a service")
-    void addOrderItemFromAvailabilityAndPriceTreatsRowFromServiceDefinitionAsService() {
-        // given
-        Order order = orderWithTotalPrice(0.0);
-        AvailabilityAndPrice availability = new AvailabilityAndPrice(
-                "pim-1", "", "MFN-S", "", "", "Montaż komputera",
-                "Usługi dodatkowe", 30L, 1L, 1, 0L);
-        when(store.getStoreId()).thenReturn(STORE_ID);
-        when(store.isPositionConsolidationEnabled()).thenReturn(false);
-        when(storeCategories.isService(STORE_ID, "Usługi dodatkowe")).thenReturn(true);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-
-        // when
-        ordersManager.addOrderItem(store, order, availability, 3);
-
-        // then
-        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
-        verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
-        assertThat(savedItem.getCategory()).isEqualTo("Usługi dodatkowe");
+        assertThat(savedItem.isService()).isTrue();
         assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+    }
+
+    @Test
+    @DisplayName("addOrderItem from availability and price treats a row without the service flag as a regular product")
+    void addOrderItemFromUnflaggedRowIsARegularProductEvenWithServiceLikeCategory() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-shipping", "", "Shipping", "", "", "Delivery courier",
+                "Services", 30L, 1L, 1, 0L, false);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, availability, 3);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        OrderItem savedItem = itemCaptor.getValue();
+        assertThat(savedItem.isService()).isFalse();
+        assertThat(savedItem.getPosition()).isEqualTo(3);
+        assertThat(savedItem.getDeliveryId()).isNull();
+        assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.New);
     }
 
     @Test
@@ -244,7 +221,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
                 "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
-                "Laptops", 200L, 10L, 5, 0L);
+                "Laptops", 200L, 10L, 5, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -369,6 +346,25 @@ class OrdersManagerTest {
         verify(orderLifecycleEventPublisher, never()).publish(any(), any());
     }
 
+    @Test
+    @DisplayName("splitGroupItem components inherit the service flag from the source item")
+    void splitGroupItemComponentsInheritServiceFlag() {
+        // given
+        OrderItem source = new OrderItem(ORDER_ID, "Usługi dodatkowe", "Pakiet montażowy", 1, 100.0, "MONTAZ-A+MONTAZ-B", false);
+        source.setService(true);
+        when(orderItemsRepository.findById(ORDER_ID, source.getItemId())).thenReturn(source);
+
+        // when
+        ordersManager.splitGroupItem(ORDER_ID, source.getItemId(), List.of(
+                new SplitGroupComponent("MONTAZ-A", "Montaż A", 1, 60.0),
+                new SplitGroupComponent("MONTAZ-B", "Montaż B", 1, 40.0)));
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository, org.mockito.Mockito.times(2)).save(itemCaptor.capture());
+        assertThat(itemCaptor.getAllValues()).allSatisfy(item -> assertThat(item.isService()).isTrue());
+    }
+
     private Order orderWithTotalPrice(double totalPrice) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -396,7 +392,8 @@ class OrdersManagerTest {
     }
 
     private OrderItem serviceItem(String itemId, double price) {
-        OrderItem item = new OrderItem(ORDER_ID, "Services", "service", 1, price, null, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Usługi dodatkowe", "service", 1, price, null, false);
+        item.setService(true);
         item.setItemId(itemId);
         return item;
     }

@@ -189,6 +189,9 @@ public class ProductCatalogController {
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category")
     public String saveCategoryDefinition(@PathVariable String catalogId, @ModelAttribute CategoryDefinition categoryDefinition, Model model, RedirectAttributes redirectAttributes) {
+        if (StringUtils.isBlank(categoryDefinition.getCategory())) {
+            categoryDefinition.setCategory(null);
+        }
         if (categoryDefinition.isComplete()) {
             // Save the category definition
             ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
@@ -203,7 +206,7 @@ public class ProductCatalogController {
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (categoryDefinition.getCategory() == null || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
             return;
         }
 
@@ -548,6 +551,7 @@ public class ProductCatalogController {
         existingProduct.setName(product.getName());
         existingProduct.setRecommendation(product.getRecommendation());
         existingProduct.setEnabled(product.isEnabled());
+        existingProduct.setService(product.isService());
 
         existingProduct.setCustomAttributesFilters(product.getCustomAttributesFilters()
                 .stream()

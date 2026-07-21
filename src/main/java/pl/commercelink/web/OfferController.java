@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -214,7 +215,7 @@ public class OfferController {
         Basket existingBasket = basketsRepository.findById(getStoreId(), offerId).get();
         existingBasket.setName(basket.getName());
         existingBasket.setFulfilmentType(basket.getFulfilmentType());
-        existingBasket.setBasketItems(withResolvedServiceFlags(basket.getBasketItems().stream()
+        existingBasket.setBasketItems(normalizeBlankCategories(basket.getBasketItems().stream()
                 .filter(BasketItem::isComplete)
                 .collect(Collectors.toList())));
         existingBasket.setComment(basket.getComment());
@@ -234,7 +235,7 @@ public class OfferController {
                 .withType(BasketType.OfferTemplate)
                 .withName("Template based on: " + basket.getName())
                 .withFulfilmentType(basket.getFulfilmentType())
-                .withBasketItems(withResolvedServiceFlags(basket.getBasketItems())).build();
+                .withBasketItems(normalizeBlankCategories(basket.getBasketItems())).build();
         save(templateBasket);
 
         return "redirect:/dashboard/offer/" + templateBasket.getBasketId();
@@ -320,7 +321,6 @@ public class OfferController {
                 .findFirst().get();
 
         BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
-        withResolvedServiceFlags(List.of(basketItem));
         basket.addBasketItemInCategoryOrder(basketItem, catalogCategorySequenceNumbers(catalogId));
         save(basket);
 
@@ -403,7 +403,7 @@ public class OfferController {
         try {
             dto.setStoreId(getStoreId());
             OfferImporter importer = getImporter(dto.getType());
-            List<BasketItem> basketItems = withResolvedServiceFlags(importer.importOffer(dto));
+            List<BasketItem> basketItems = importer.importOffer(dto);
 
             if (basketItems.isEmpty()) {
                 redirectAttributes.addFlashAttribute("errorMessage",
@@ -447,9 +447,12 @@ public class OfferController {
         return basket;
     }
 
-    private List<BasketItem> withResolvedServiceFlags(List<BasketItem> items) {
-        Set<String> serviceNames = storeCategories.serviceNamesFor(getStoreId());
-        items.forEach(item -> item.setService(serviceNames.contains(item.getCategory()) || item.isService()));
+    private List<BasketItem> normalizeBlankCategories(List<BasketItem> items) {
+        items.forEach(item -> {
+            if (StringUtils.isBlank(item.getCategory())) {
+                item.setCategory(null);
+            }
+        });
         return items;
     }
 

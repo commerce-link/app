@@ -10,7 +10,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,21 +50,6 @@ class StoreCategoriesTest {
     }
 
     @Test
-    void isServiceRecognizesDefinitionMappedToServicesCategory() {
-        // given
-        CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
-        CategoryDefinition regular = definition("Obudowa", 2);
-        regular.setCategory("Case");
-        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog("A", services, regular)));
-
-        // when / then
-        assertThat(storeCategories.isService("store-1", "Usługi dodatkowe")).isTrue();
-        assertThat(storeCategories.isService("store-1", "Obudowa")).isFalse();
-        assertThat(storeCategories.isService("store-1", "Nieznana kategoria")).isFalse();
-    }
-
-    @Test
     void groupsForReturnsCatalogsWithTheirDefinitionNamesInCatalogAndSequenceOrder() {
         // given
         ProductCatalog furniture = catalog("Meble biurowe", definition("Biurko", 2), definition("Krzesło", 1));
@@ -96,48 +80,6 @@ class StoreCategoriesTest {
         // then
         assertThat(groups).extracting(StoreCategories.Group::catalog).containsExactly("Meble biurowe");
         assertThat(groups.get(0).names()).containsExactly("Krzesło", "Other");
-    }
-
-    @Test
-    void serviceNamesForReturnsNamesOfServiceDefinitionsOnly() {
-        // given
-        CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
-        CategoryDefinition regular = definition("Obudowa", 2);
-        regular.setCategory("Case");
-        CategoryDefinition blankService = definition(" ", 3);
-        blankService.setCategory("Services");
-        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog("A", services, regular, blankService)));
-
-        // when / then
-        assertThat(storeCategories.serviceNamesFor("store-1")).containsExactly("Usługi dodatkowe");
-    }
-
-    @Test
-    void serviceNamesIgnoreDefinitionsMappedToIcecatLeaves() {
-        // given
-        CategoryDefinition service = definition("Montaż", 1);
-        service.setCategory("Services");
-        CategoryDefinition regular = definition("Obudowa", 2);
-        regular.setCategory("Zabezpieczenia & uchwyty komputerów");
-
-        // when / then
-        assertThat(storeCategories.serviceNames(List.of(catalog("A", service, regular))))
-                .containsExactly("Montaż");
-    }
-
-    @Test
-    void serviceNamesReadsGivenCatalogsWithoutTouchingTheRepository() {
-        // given
-        CategoryDefinition services = definition("Usługi dodatkowe", 1);
-        services.setCategory("Services");
-        CategoryDefinition regular = definition("Obudowa", 2);
-        regular.setCategory("Case");
-
-        // when / then
-        assertThat(storeCategories.serviceNames(List.of(catalog("A", services, regular))))
-                .containsExactly("Usługi dodatkowe");
-        verifyNoInteractions(productCatalogRepository);
     }
 
     private ProductCatalog catalog(String name, CategoryDefinition... definitions) {

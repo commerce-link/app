@@ -20,6 +20,9 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrderStatus;
+import org.springframework.ui.ExtendedModelMap;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
@@ -49,6 +52,8 @@ class OrdersControllerTest {
 
     @Mock
     private OrdersRepository ordersRepository;
+    @Mock
+    private OrderItemsRepository orderItemsRepository;
     @Mock
     private MessageSource messageSource;
     @Mock
@@ -312,6 +317,66 @@ class OrdersControllerTest {
 
         // then
         verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    void savingItemAppliesThePostedServiceFlag() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isTrue();
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void savingItemCanClearTheServiceFlag() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", true);
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(false);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isService()).isFalse();
+    }
+
+    @Test
+    void savingItemWithBlankCategoryNormalizesItToNull() {
+        // given
+        OrderItem item = existingOrderItem(null, true);
+        OrderItem posted = postedOrderItem("");
+        posted.setService(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getCategory()).isNull();
+        assertThat(item.isService()).isTrue();
+    }
+
+    private OrderItem existingOrderItem(String category, boolean service) {
+        OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
+        item.setService(service);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        return item;
+    }
+
+    private OrderItem postedOrderItem(String category) {
+        OrderItem posted = new OrderItem();
+        posted.setCategory(category);
+        posted.setName("pozycja");
+        posted.setQty(1);
+        return posted;
     }
 
     private Order orderBase() {

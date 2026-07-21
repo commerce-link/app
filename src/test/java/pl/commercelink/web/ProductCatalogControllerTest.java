@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,10 +19,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PriceDefinition;
+import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
@@ -31,6 +34,7 @@ import pl.commercelink.starter.security.model.CustomUser;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,6 +70,9 @@ class ProductCatalogControllerTest {
 
     @Mock
     private MatchedInventory matchedInventory;
+
+    @Mock
+    private PimCatalog pimCatalog;
 
     @InjectMocks
     private ProductCatalogController controller;
@@ -150,6 +157,100 @@ class ProductCatalogControllerTest {
 
         // then
         assertThat(redirectAttributes.getFlashAttributes()).containsKey("warningMessage");
+    }
+
+    @Test
+    void savingDefinitionWithBlankCategoryNormalizesItToNull() {
+        // given
+        CategoryDefinition blankCategoryDefinition = definition(CategoryDefinitionType.Managed, "");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, blankCategoryDefinition, new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        verify(catalog).addOrUpdateCategoryDefinition(blankCategoryDefinition);
+        assertThat(blankCategoryDefinition.getCategory()).isNull();
+    }
+
+    @Test
+    void savingDynamicDefinitionWithoutMappingDoesNotQueryInventoryForAWarning() {
+        // given
+        CategoryDefinition unmappedDefinition = definition(CategoryDefinitionType.Dynamic, "");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, unmappedDefinition, new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        verify(inventoryView, never()).findAllByProductCategory(any());
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+    }
+
+    @Test
+    void savingProductWithServiceCheckboxMarksItAsService() {
+        // given
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, null);
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(null);
+        when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
+        Product product = new Product(definition.getCategoryId());
+        product.setProductId("prod-1");
+        product.setName("Montaż PC");
+        product.setService(true);
+
+        // when
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+
+        // then
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(productCaptor.capture());
+        assertThat(productCaptor.getValue().isService()).isTrue();
+    }
+
+    @Test
+    void savingProductWithoutServiceCheckboxLeavesItAsProduct() {
+        // given
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, "Karty graficzne");
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(null);
+        when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
+        Product product = new Product(definition.getCategoryId());
+        product.setProductId("prod-1");
+        product.setName("Karta graficzna");
+        product.setService(false);
+
+        // when
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+
+        // then
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(productCaptor.capture());
+        assertThat(productCaptor.getValue().isService()).isFalse();
+    }
+
+    @Test
+    void editingProductCanClearTheServiceFlag() {
+        // given
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, "Karty graficzne");
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        Product existingProduct = new Product(definition.getCategoryId());
+        existingProduct.setProductId("prod-1");
+        existingProduct.setName("Montaż PC");
+        existingProduct.setService(true);
+        when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(existingProduct);
+        Product product = new Product(definition.getCategoryId());
+        product.setProductId("prod-1");
+        product.setName("Montaż PC");
+        product.setService(false);
+
+        // when
+        controller.saveProduct(CATALOG_ID, definition.getCategoryId(), "prod-1", product, new ExtendedModelMap());
+
+        // then
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(productCaptor.capture());
+        assertThat(productCaptor.getValue().isService()).isFalse();
     }
 
     private CategoryDefinition definition(CategoryDefinitionType type, String category) {

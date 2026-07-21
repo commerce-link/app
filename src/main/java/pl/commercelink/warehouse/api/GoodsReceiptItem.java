@@ -1,7 +1,7 @@
 package pl.commercelink.warehouse.api;
 
 import pl.commercelink.orders.rma.RMAItem;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 
 public class GoodsReceiptItem {
 
@@ -33,7 +33,7 @@ public class GoodsReceiptItem {
                 rmaItem.getEan(),
                 rmaItem.getMfn(),
                 rmaItem.getName(),
-                Categorized.OTHER,
+                ProductCategories.OTHER,
                 rmaItem.getQty(),
                 rmaItem.getCost(),
                 rmaItem.getTax(),

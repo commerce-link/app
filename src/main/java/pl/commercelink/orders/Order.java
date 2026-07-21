@@ -298,7 +298,7 @@ public class Order {
             return false;
         }
         return orderItems.stream()
-                .filter(i -> i.isProduct())
+                .filter(OrderItem::isProduct)
                 .allMatch(OrderItem::isReturned);
     }
 

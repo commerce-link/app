@@ -1,8 +1,10 @@
 package pl.commercelink.orders;
 
-import pl.commercelink.taxonomy.Categorized;
+public interface Positioned {
 
-public interface Positioned extends Categorized {
+    String getCategory();
+
+    boolean isService();
 
     int getPosition();
 

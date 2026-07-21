@@ -60,7 +60,7 @@ public class ItemPositioner {
 
     private static int lastIndexOfCategory(List<? extends Positioned> items, String category) {
         for (int i = items.size() - 1; i >= 0; i--) {
-            if (items.get(i).hasCategory(category)) {
+            if (category != null && category.equals(items.get(i).getCategory())) {
                 return i;
             }
         }

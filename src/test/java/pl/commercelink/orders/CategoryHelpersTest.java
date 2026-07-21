@@ -2,109 +2,132 @@ package pl.commercelink.orders;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.orders.fulfilment.FulfilmentSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryHelpersTest {
 
     @Test
-    void hasCategoryMatchesExactKey() {
+    void serviceFlagAloneMarksOrderItemAsService() {
         // given
-        OrderItem service = orderItemWithCategory(Categorized.SERVICES);
-        OrderItem laptop = orderItemWithCategory("Laptops");
+        OrderItem item = orderItemWithCategory("Laptops");
+        item.setService(true);
 
         // when / then
-        assertThat(service.hasCategory("Services")).isTrue();
-        assertThat(laptop.hasCategory("Services")).isFalse();
+        assertThat(item.isService()).isTrue();
     }
 
     @Test
-    void servicePredicatesAreFalseForCategoryOutsideTheLegacyEnum() {
+    void legacyServicesCategoryStringAloneDoesNotMarkOrderItemAsService() {
         // given
-        OrderItem unknown = new OrderItem("order-1", "Smartwatches", "Watch 5", 1, 900.0, "SKU-1", false);
+        OrderItem item = orderItemWithCategory("Services");
 
         // when / then
-        assertThat(unknown.isServiceGroup()).isFalse();
-        assertThat(unknown.isService()).isFalse();
-        assertThat(unknown.isProduct()).isTrue();
+        assertThat(item.isService()).isFalse();
     }
 
     @Test
-    void copiedOrderItemKeepsCategoryOutsideTheLegacyEnum() {
+    void serviceFlagAloneMarksBasketItemAsService() {
         // given
-        OrderItem source = new OrderItem("order-1", "Smartwatches", "Watch 5", 2, 900.0, "SKU-1", false);
+        BasketItem item = basketItemWithCategory("Laptops");
+        item.setService(true);
 
-        // when
-        OrderItem copy = new OrderItem("order-2", source, 1);
-
-        // then
-        assertThat(copy.getCategory()).isEqualTo("Smartwatches");
+        // when / then
+        assertThat(item.isService()).isTrue();
     }
 
     @Test
-    void updatedOrderItemKeepsCategoryOutsideTheLegacyEnum() {
+    void legacyServicesCategoryStringAloneDoesNotMarkBasketItemAsService() {
         // given
-        OrderItem item = new OrderItem("order-1", "Laptops", "Old", 1, 100.0, "SKU-1", false);
-        OrderItem other = new OrderItem("order-1", "Smartwatches", "Watch 5", 1, 900.0, "SKU-2", false);
+        BasketItem item = basketItemWithCategory("Services");
 
-        // when
-        item.updateAllFields(other);
-
-        // then
-        assertThat(item.getCategory()).isEqualTo("Smartwatches");
+        // when / then
+        assertThat(item.isService()).isFalse();
     }
 
     @Test
-    void itemWithNullCategoryIsProductWithoutException() {
+    void serviceFlagAloneMarksFulfilmentSourceAsService() {
+        // given
+        FulfilmentSource source = new FulfilmentSource();
+        source.setCategory("Laptops");
+        source.setService(true);
+
+        // when / then
+        assertThat(source.isService()).isTrue();
+    }
+
+    @Test
+    void legacyServicesCategoryStringAloneDoesNotMarkFulfilmentSourceAsService() {
+        // given
+        FulfilmentSource source = new FulfilmentSource();
+        source.setCategory("Services");
+
+        // when / then
+        assertThat(source.isService()).isFalse();
+    }
+
+    @Test
+    void isProductIsTheExactInverseOfTheServiceFlag() {
+        // given
+        OrderItem product = orderItemWithCategory("Laptops");
+        OrderItem service = orderItemWithCategory("Usługi dodatkowe");
+        service.setService(true);
+
+        // when / then
+        assertThat(product.isProduct()).isTrue();
+        assertThat(service.isProduct()).isFalse();
+    }
+
+    @Test
+    void isProductIsTheExactInverseOfTheServiceFlagForBasketItem() {
+        // given
+        BasketItem product = basketItemWithCategory("Laptops");
+        BasketItem service = basketItemWithCategory("Usługi dodatkowe");
+        service.setService(true);
+
+        // when / then
+        assertThat(product.isProduct()).isTrue();
+        assertThat(service.isProduct()).isFalse();
+    }
+
+    @Test
+    void itemWithNullCategoryIsNotServiceWithoutException() {
         // given
         BasketItem item = new BasketItem();
 
         // when / then
         assertThat(item.getCategory()).isNull();
-        assertThat(item.isProduct()).isTrue();
         assertThat(item.isService()).isFalse();
-        assertThat(item.hasCategory("Services")).isFalse();
     }
 
     @Test
-    void isProductIsExactInverseOfIsService() {
+    void copiedOrderItemKeepsServiceFlagAndCategory() {
         // given
-        OrderItem service = orderItemWithCategory(Categorized.SERVICES);
-        OrderItem laptop = orderItemWithCategory("Laptops");
+        OrderItem source = new OrderItem("order-1", "Montaż", "Montaż PC", 2, 900.0, "SKU-1", false);
+        source.setService(true);
 
-        // when / then
-        assertThat(service.isService()).isTrue();
-        assertThat(service.isProduct()).isFalse();
-        assertThat(laptop.isService()).isFalse();
-        assertThat(laptop.isProduct()).isTrue();
+        // when
+        OrderItem copy = new OrderItem("order-2", source, 1);
+
+        // then
+        assertThat(copy.isService()).isTrue();
+        assertThat(copy.getCategory()).isEqualTo("Montaż");
     }
 
     @Test
-    void serviceCategoryAndServiceGroupStayDistinctPredicates() {
+    void updatedOrderItemTakesServiceFlagAndCategoryFromTheOtherItem() {
         // given
-        OrderItem laptop = orderItemWithCategory("Laptops");
-        OrderItem service = orderItemWithCategory(Categorized.SERVICES);
+        OrderItem item = new OrderItem("order-1", "Laptops", "Old", 1, 100.0, "SKU-1", false);
+        OrderItem other = new OrderItem("order-1", "Montaż", "Montaż PC", 1, 900.0, "SKU-2", false);
+        other.setService(true);
 
-        // when / then
-        assertThat(laptop.isService()).isFalse();
-        assertThat(laptop.isServiceGroup()).isFalse();
-        assertThat(service.isService()).isTrue();
-        assertThat(service.isServiceGroup()).isTrue();
-    }
+        // when
+        item.updateAllFields(other);
 
-    @Test
-    void basketItemServicePredicatesMatchOrderItemBehaviour() {
-        // given
-        BasketItem service = basketItemWithCategory(Categorized.SERVICES);
-        BasketItem laptop = basketItemWithCategory("Laptops");
-
-        // when / then
-        assertThat(service.hasCategory("Services")).isTrue();
-        assertThat(service.isService()).isTrue();
-        assertThat(service.isProduct()).isFalse();
-        assertThat(laptop.isService()).isFalse();
-        assertThat(laptop.isProduct()).isTrue();
+        // then
+        assertThat(item.isService()).isTrue();
+        assertThat(item.getCategory()).isEqualTo("Montaż");
     }
 
     private OrderItem orderItemWithCategory(String category) {

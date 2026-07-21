@@ -10,7 +10,9 @@ import pl.commercelink.pim.api.PimCatalog;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,5 +58,18 @@ class ProductRecommendationEngineTest {
 
         // then
         verify(inventory).findAllByProductCategory("Case");
+    }
+
+    @Test
+    void definitionWithoutCategoryMappingGetsNoRecommendationsAndNeverQueriesInventory() {
+        // given
+        CategoryDefinition unmappedDefinition = new CategoryDefinition().withGeneratedId();
+
+        // when
+        List<ProductRecommendation> recommendations = engine.getRecommendations(unmappedDefinition, inventory);
+
+        // then
+        assertThat(recommendations).isEmpty();
+        verifyNoInteractions(inventory);
     }
 }

@@ -6,7 +6,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.inventory.deliveries.Delivered;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.taxonomy.Categorized;
+import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -23,10 +23,10 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.*;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @DynamoDBDocument
-public abstract class Item implements Delivered, Categorized {
+public abstract class Item implements Delivered {
 
     // general information
-    private String category = Categorized.OTHER;
+    private String category = ProductCategories.OTHER;
     private boolean service;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
@@ -176,7 +176,7 @@ public abstract class Item implements Delivered, Categorized {
 
     @DynamoDBIgnore
     public boolean isAllocated() {
-        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
+        if (isService() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
         return hasAllocationDetails() && hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered);
@@ -184,7 +184,7 @@ public abstract class Item implements Delivered, Categorized {
 
     @DynamoDBIgnore
     public boolean isOrdered() {
-        if (isServiceGroup() && this.status == FulfilmentStatus.Delivered) {
+        if (isService() && this.status == FulfilmentStatus.Delivered) {
             return true;
         }
 
@@ -256,14 +256,18 @@ public abstract class Item implements Delivered, Categorized {
         this.category = category;
     }
 
-    @Override
     @DynamoDBAttribute(attributeName = "service")
     public boolean isService() {
-        return service || hasCategory(Categorized.SERVICES);
+        return service;
     }
 
     public void setService(boolean service) {
         this.service = service;
+    }
+
+    @DynamoDBIgnore
+    public boolean isProduct() {
+        return !isService();
     }
 
     public String getName() {

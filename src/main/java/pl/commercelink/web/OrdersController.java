@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -321,7 +322,7 @@ public class OrdersController extends BaseController {
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
-                .filter(i -> i.isProduct())
+                .filter(OrderItem::isProduct)
                 .collect(Collectors.toList());
 
         Map<String, SplitGroupPreviewDto> splitGroupPreviews = orderItems.stream()
@@ -508,7 +509,9 @@ public class OrdersController extends BaseController {
         if (op.isPresent()) {
             OrderItem orderItem = op.get();
 
-            updatedItem.setService(storeCategories.isService(getStoreId(), updatedItem.getCategory()));
+            if (StringUtils.isBlank(updatedItem.getCategory())) {
+                updatedItem.setCategory(null);
+            }
             orderItem.update(updatedItem);
             orderItemsRepository.save(orderItem);
 

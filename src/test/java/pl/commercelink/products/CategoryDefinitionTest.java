@@ -17,19 +17,19 @@ class CategoryDefinitionTest {
     }
 
     @Test
-    void definitionWithoutCategoryIsNotComplete() {
-        // when / then
-        assertThat(completeDefinitionWithoutCategory().isComplete()).isFalse();
-    }
-
-    @Test
-    void serviceDefinitionWithLegacyServicesCategoryIsComplete() {
+    void definitionWithLegacyServicesCategoryStringIsComplete() {
         // given
         CategoryDefinition definition = completeDefinitionWithoutCategory();
         definition.setCategory("Services");
 
         // when / then
         assertThat(definition.isComplete()).isTrue();
+    }
+
+    @Test
+    void definitionWithoutCategoryIsComplete() {
+        // when / then
+        assertThat(completeDefinitionWithoutCategory().isComplete()).isTrue();
     }
 
     private CategoryDefinition completeDefinitionWithoutCategory() {

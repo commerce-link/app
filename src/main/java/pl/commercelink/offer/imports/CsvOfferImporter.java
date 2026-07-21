@@ -25,7 +25,7 @@ public class CsvOfferImporter implements OfferImporter {
     }
 
     private BasketItem mapToBasketItem(String[] row) {
-        return new BasketItem(
+        BasketItem item = new BasketItem(
                 "", // pimId - empty for CSV imports
                 asString(row[1]), // name
                 asStringOrDefault(row, 5, ""), // manufacturer code
@@ -37,6 +37,8 @@ public class CsvOfferImporter implements OfferImporter {
                 1,
                 false
         );
+        item.setService(row.length > 6 && Boolean.parseBoolean(asString(row[6])));
+        return item;
     }
 
     @Override
