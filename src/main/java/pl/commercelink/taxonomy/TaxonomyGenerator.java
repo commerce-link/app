@@ -4,6 +4,9 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.supplier.api.Taxonomy;
+
+import java.util.List;
 
 @Service
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -22,6 +25,9 @@ public class TaxonomyGenerator {
             pollTimeoutSeconds = "20"
     )
     public void handleMessage(String message) {
-        taxonomyRepository.save(taxonomyCache.getTaxonomies());
+        List<Taxonomy> categorized = taxonomyCache.getTaxonomies().stream()
+                .filter(TaxonomyCache::hasCategory)
+                .toList();
+        taxonomyRepository.save(categorized);
     }
 }
