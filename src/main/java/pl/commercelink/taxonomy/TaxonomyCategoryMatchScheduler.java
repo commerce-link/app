@@ -41,7 +41,7 @@ class TaxonomyCategoryMatchScheduler {
             }
             try {
                 pimCatalog.submitCategoryMatch(new CategoryMatchRequest(
-                        null, taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(), null));
+                        null, taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(), taxonomy.rawCategory()));
                 submitted++;
             } catch (IllegalStateException e) {
                 System.out.println("Category match sweep aborted: " + e.getMessage());

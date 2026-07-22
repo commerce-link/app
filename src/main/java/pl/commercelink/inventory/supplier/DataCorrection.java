@@ -48,7 +48,7 @@ class DataCorrection {
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight);
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight, taxonomy.rawCategory());
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {

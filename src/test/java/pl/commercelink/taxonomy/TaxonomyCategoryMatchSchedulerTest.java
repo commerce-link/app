@@ -103,6 +103,22 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     @Test
+    void sweepPassesRawCategoryIntoRequest() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 5, null, null, "Karty graficzne"));
+        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
+
+        // when
+        scheduler.sweep();
+
+        // then
+        ArgumentCaptor<CategoryMatchRequest> captor = ArgumentCaptor.forClass(CategoryMatchRequest.class);
+        verify(pimCatalog).submitCategoryMatch(captor.capture());
+        assertThat(captor.getValue().rawCategory()).isEqualTo("Karty graficzne");
+    }
+
+    @Test
     void sweepAbortsQuietlyWhenSqsIsNotConfigured() {
         // given
         cache.add(pending("MFN-1"));

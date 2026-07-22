@@ -209,6 +209,21 @@ class TaxonomyCacheTest {
     }
 
     @Test
+    void mergePreservesRawCategoryOfWinningPendingEntry() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 10, null, 500, "First"));
+
+        // when
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 1, 300, null, "Second"));
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals(300, result.netWeightInGrams());
+        assertEquals(500, result.grossWeightInGrams());
+        assertEquals("Second", result.rawCategory());
+    }
+
+    @Test
     void findPrefersCategorizedEntryOverPendingWithBetterScore() {
         // given
         cache.add(uncategorized("MFN-PENDING", 1));
