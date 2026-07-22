@@ -123,6 +123,19 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
+    void pendingCountDropsWhenAnotherSupplierDeliversCategorizedEntry() {
+        // given
+        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
+        assertEquals(1, enrichment.pendingCount());
+
+        // when
+        cache.add(taxonomy("MFN-1", "CPU", 5));
+
+        // then
+        assertEquals(0, enrichment.pendingCount());
+    }
+
+    @Test
     void applyMatchIgnoresOtherUnknownAndMissingEntries() {
         // given
         enrichment.addPending(taxonomy("MFN-1", "Other", 10));

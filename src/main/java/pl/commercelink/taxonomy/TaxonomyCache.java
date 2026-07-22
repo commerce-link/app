@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -23,6 +24,7 @@ public class TaxonomyCache {
 
     private String fileName = "N/A";
     private ConcurrentHashMap<String, Taxonomy> taxonomyByMfn = new ConcurrentHashMap<>();
+    private final AtomicInteger pendingCount = new AtomicInteger();
 
     public TaxonomyCache(TaxonomyRepository taxonomyRepository) {
         this.taxonomyRepository = taxonomyRepository;
@@ -36,13 +38,28 @@ public class TaxonomyCache {
         result.getRight().forEach(cachedTaxonomy -> {
             taxonomyByMfn.put(cachedTaxonomy.mfn(), cachedTaxonomy);
         });
+        pendingCount.set((int) taxonomyByMfn.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
 
         System.out.println("Loaded " + taxonomyByMfn.size() + " taxonomies by mfn into cache from file: " + fileName);
     }
 
     public void add(Taxonomy taxonomy) {
         if (StringUtils.isBlank(taxonomy.mfn())) return;
-        taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> mergeOf(current, taxonomy));
+        taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> {
+            Taxonomy merged = mergeOf(current, taxonomy);
+            pendingCount.addAndGet(pendingDelta(current, merged));
+            return merged;
+        });
+    }
+
+    private static int pendingDelta(Taxonomy current, Taxonomy merged) {
+        int before = current != null && !hasCategory(current) ? 1 : 0;
+        int after = hasCategory(merged) ? 0 : 1;
+        return after - before;
+    }
+
+    public int pendingCount() {
+        return pendingCount.get();
     }
 
     public static boolean hasCategory(Taxonomy taxonomy) {
@@ -67,6 +84,7 @@ public class TaxonomyCache {
                 return current;
             }
             updated[0] = true;
+            pendingCount.decrementAndGet();
             return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
                     known.get(), current.dataAccuracyScore(),
                     current.netWeightInGrams(), current.grossWeightInGrams());

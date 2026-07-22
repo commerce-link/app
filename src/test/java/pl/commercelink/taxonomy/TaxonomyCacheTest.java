@@ -316,6 +316,58 @@ class TaxonomyCacheTest {
         assertEquals("GPU", cache.findByMfn("MFN-1").category());
     }
 
+    @Test
+    void pendingCountTracksEntriesWithoutCategory() {
+        // when
+        cache.add(uncategorized("MFN-1", 5));
+        cache.add(uncategorized("MFN-1", 3));
+        cache.add(categorized("MFN-2", "CPU", 5));
+
+        // then
+        assertEquals(1, cache.pendingCount());
+    }
+
+    @Test
+    void pendingCountDropsWhenCategorizedAddOvertakesPendingEntry() {
+        // given
+        cache.add(uncategorized("MFN-1", 1));
+        assertEquals(1, cache.pendingCount());
+
+        // when
+        cache.add(categorized("MFN-1", "CPU", 10));
+
+        // then
+        assertEquals(0, cache.pendingCount());
+    }
+
+    @Test
+    void pendingCountDropsOnceForRepeatedUpdateCategory() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+
+        // when
+        cache.updateCategory("MFN-1", "CPU");
+        cache.updateCategory("MFN-1", "GPU");
+
+        // then
+        assertEquals(0, cache.pendingCount());
+    }
+
+    @Test
+    void pendingCountIncludesSnapshotRowsLoadedWithoutCategory() {
+        // given
+        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
+        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv",
+                List.of(uncategorized("MFN-1", 5), categorized("MFN-2", "CPU", 5))));
+        TaxonomyCache loaded = new TaxonomyCache(repo);
+
+        // when
+        loaded.onStartUp();
+
+        // then
+        assertEquals(1, loaded.pendingCount());
+    }
+
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
         return taxonomyNamed(mfn, score, weight, "Name");
     }
