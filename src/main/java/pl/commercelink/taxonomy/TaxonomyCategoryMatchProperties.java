@@ -18,6 +18,9 @@ public class TaxonomyCategoryMatchProperties {
             @Value("${taxonomy.category-match.suppliers:}") String suppliers,
             @Value("${taxonomy.category-match.buckets:100}") int buckets,
             @Value("${taxonomy.category-match.pending-cap:300000}") int pendingCap) {
+        if (buckets < 1) {
+            throw new IllegalArgumentException("taxonomy.category-match.buckets must be at least 1, got: " + buckets);
+        }
         this.suppliers = Arrays.stream(suppliers.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
