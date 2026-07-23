@@ -128,7 +128,6 @@
     <div id="navbarBasicExample" class="navbar-menu ml-5 mr-5">
         <div class="navbar-start">
             <div class="is-flex" sec:authorize="hasRole('USER')">
-                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
                 <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
                 <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
                 <a class="navbar-item" href="/dashboard/rma" th:text="#{nav.rma}"></a>
@@ -140,7 +139,6 @@
             </div>
 
             <div class="is-flex" sec:authorize="hasRole('ADMIN')">
-                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
                 <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
                 <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
                 <a class="navbar-item" href="/dashboard/rma" th:text="#{nav.rma}"></a>
@@ -157,7 +155,6 @@
             </div>
 
             <div class="is-flex" sec:authorize="hasRole('SUPER_ADMIN')">
-                <a class="navbar-item" href="/dashboard" th:text="#{nav.home}"></a>
                 <a class="navbar-item" href="/dashboard/fulfilment/queue" th:text="#{nav.fulfilment.queue}"></a>
                 <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries.queue}"></a>
                 <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
