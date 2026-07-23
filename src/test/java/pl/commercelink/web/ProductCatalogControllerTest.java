@@ -94,7 +94,7 @@ class ProductCatalogControllerTest {
     void keepsProductsWhenAnotherDefinitionResolvesToTheSameInventoryCategory() {
         // given
         CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, "Karty graficzne");
-        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, "GPU");
+        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, "Karty graficzne");
         when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
         when(catalog.getCategories()).thenReturn(List.of(remaining));
 
@@ -122,7 +122,7 @@ class ProductCatalogControllerTest {
     void doesNotWarnWhenDynamicDefinitionCategoryResolvesToInventoryWithOffers() {
         // given
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategory("GPU")).thenReturn(List.of(matchedInventory));
+        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -149,7 +149,7 @@ class ProductCatalogControllerTest {
     void warnsWhenDynamicDefinitionCategoryHasInventoryEntriesButNoneOfThemHasOffers() {
         // given
         when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(inventoryView.findAllByProductCategory("GPU")).thenReturn(List.of(matchedInventory));
+        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when

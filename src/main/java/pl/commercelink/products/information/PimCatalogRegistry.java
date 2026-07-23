@@ -5,12 +5,14 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
+import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.ArrayList;
@@ -28,7 +30,7 @@ public class PimCatalogRegistry {
 
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
-                       SecretsManager secretsManager) {
+                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
         Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
 
@@ -56,6 +58,8 @@ public class PimCatalogRegistry {
 
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
+
+        catalog.onCategoryMatched(taxonomyCategoryEnrichment::applyMatch);
 
         EventBindingRegistrar.forDescriptors(List.of(descriptor))
                 .withQueues(sqsAsyncClient, containers, catalog::dispatch)

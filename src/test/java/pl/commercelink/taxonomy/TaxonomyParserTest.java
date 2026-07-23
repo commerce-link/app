@@ -43,12 +43,12 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void blankCategoryCellFallsBackToOther() {
+    void blankCategoryCellYieldsNullCategory() {
         String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "1"};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
-        assertEquals("Other", parsed.category());
+        assertNull(parsed.category());
     }
 
     @Test
@@ -147,5 +147,53 @@ class TaxonomyParserTest {
 
         assertThat(parsed.netWeightInGrams()).isNull();
         assertThat(parsed.grossWeightInGrams()).isNull();
+    }
+
+    @Test
+    void nineColumnRowReadsCategoryAndCategoryId() {
+        // given
+        String[] row = {"5901234123457", "MFN-1", "BrandX", "Mysz", "Myszki", "195", "5", "100", "120"};
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("Myszki", parsed.category());
+        assertEquals("195", parsed.categoryId());
+        assertEquals(5, parsed.dataAccuracyScore());
+        assertEquals(100, parsed.netWeightInGrams());
+        assertEquals(120, parsed.grossWeightInGrams());
+    }
+
+    @Test
+    void categoryIdSurvivesCsvRoundTrip() {
+        // given
+        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand", "Router",
+                "Routery", 10, null, null, null, "537");
+
+        // when
+        byte[] csv = TaxonomyParser.toCsv(List.of(original));
+        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
+        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
+
+        // then
+        assertEquals("Routery", parsed.category());
+        assertEquals("537", parsed.categoryId());
+    }
+
+    @Test
+    void legacyEightColumnRowLeavesCategoryIdNull() {
+        // given
+        String[] legacyRow = {"5901234123457", "MFN-1", "BrandX", "Mysz", "Myszki", "5", "100", "120"};
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
+
+        // then
+        assertEquals("Myszki", parsed.category());
+        assertNull(parsed.categoryId());
+        assertEquals(5, parsed.dataAccuracyScore());
+        assertEquals(100, parsed.netWeightInGrams());
     }
 }

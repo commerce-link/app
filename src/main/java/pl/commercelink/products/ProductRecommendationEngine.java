@@ -38,7 +38,7 @@ public class ProductRecommendationEngine {
                 .map(InventoryKey::fromProduct)
                 .collect(Collectors.toList());
 
-        return inventory.findAllByProductCategory(InventoryCategoryBridge.toInventoryCategory(categoryDefinition.getCategory()))
+        return inventory.findAllByProductCategory(categoryDefinition.getCategory())
                 .stream()
                 .filter(MatchedInventory::hasAnyOffers)
                 .filter(i -> isNotMapped(i.getInventoryKey(), alreadyMappedInventoryKeys))

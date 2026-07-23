@@ -17,7 +17,7 @@ class LocalizedOrderItemTest {
     private CategoryLocalizer categoryLocalizer;
 
     @Test
-    void keepsTheCategoryDefinitionNameVerbatimEvenWhenItCollidesWithAnIcecatLeaf() {
+    void keepsTheCategoryDefinitionNameVerbatimEvenWhenItCollidesWithAPimCategoryLeaf() {
         // given
         OrderItem orderItem = new OrderItem("order-1", "Karty graficzne", "RTX 5090", 1, 9000.0, "SKU-1", false);
         when(categoryLocalizer.localize("Karty graficzne", "singular")).thenReturn("Karty graficzne");

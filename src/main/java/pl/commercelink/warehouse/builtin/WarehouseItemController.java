@@ -13,7 +13,7 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
-import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -107,7 +107,7 @@ class WarehouseItemController {
         String ean = taxonomy != null ? taxonomy.ean() : null;
         String category = taxonomy != null && Strings.isNotBlank(taxonomy.category())
                 ? taxonomy.category()
-                : ProductCategories.OTHER;
+                : Categories.UNCATEGORIZED;
 
         WarehouseItem item = new WarehouseItem(getStoreId(), supplier, category, name, ean, mfn, cost, qty);
         item.setStatus(status);

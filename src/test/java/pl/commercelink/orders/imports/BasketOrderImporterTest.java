@@ -29,7 +29,7 @@ import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.util.List;
@@ -129,7 +129,7 @@ class BasketOrderImporterTest {
 
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-" + mfn, "Product " + mfn, mfn,
-                ProductCategories.OTHER, 100.0, 0, 1, null, 3, false);
+                Categories.UNCATEGORIZED, 100.0, 0, 1, null, 3, false);
     }
 
     private DeliveryOption deliveryOption(String name, double price) {

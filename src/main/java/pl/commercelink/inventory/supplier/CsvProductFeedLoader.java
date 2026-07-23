@@ -7,8 +7,6 @@ import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -22,9 +20,8 @@ public class CsvProductFeedLoader {
 
     private final InventoryRepository inventoryRepository;
     private final StoreFeedRepository storeFeedRepository;
-    private final DataCorrection dataCorrection;
     private final DataCleanup dataCleanup;
-    private final TaxonomyCache taxonomyCache;
+    private final FeedRowProcessor feedRowProcessor;
 
     public List<InventoryItem> fetch(CsvRowParser parser, Character separator, String supplierName) {
         if (!inventoryRepository.canRead(supplierName)) {
@@ -32,7 +29,7 @@ public class CsvProductFeedLoader {
             return new LinkedList<>();
         }
         try (Reader reader = inventoryRepository.read(supplierName)) {
-            return parseRows(parser, separator, reader, 0);
+            return parseRows(parser, separator, reader, supplierName, 0);
         } catch (IOException e) {
             System.out.println("Error reading feed file for " + supplierName + ": " + e.getMessage());
             return new LinkedList<>();
@@ -45,25 +42,21 @@ public class CsvProductFeedLoader {
             return new LinkedList<>();
         }
         try (Reader reader = storeFeedRepository.read(storeId, supplierName, "csv")) {
-            return parseRows(parser, separator, reader, taxonomyPenalty);
+            return parseRows(parser, separator, reader, supplierName, taxonomyPenalty);
         } catch (IOException e) {
             System.out.println("Error reading store feed file for " + storeId + "/" + supplierName + ": " + e.getMessage());
             return new LinkedList<>();
         }
     }
 
-    private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, int taxonomyPenalty) {
+    private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, String supplierName, int taxonomyPenalty) {
         List<InventoryItem> res = new ArrayList<>();
-        new CSVLoader(reader).readRows(separator, row -> {
-            parser.tryParse(row).ifPresent(parsed -> {
-                InventoryItem item = dataCorrection.run(parsed.item());
-                Taxonomy taxonomy = dataCorrection.run(parsed.taxonomy());
-                if (item != null && taxonomy != null && taxonomy.isProcessable() && item.isSellable()) {
-                    taxonomyCache.add(StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty));
-                    res.add(item);
-                }
-            });
-        });
+        FeedParseStats stats = new FeedParseStats(supplierName);
+        new CSVLoader(reader).readRows(separator, row ->
+                parser.tryParse(row)
+                        .flatMap(parsed -> feedRowProcessor.process(parsed, supplierName, taxonomyPenalty, stats))
+                        .ifPresent(res::add));
+        stats.log();
         return dataCleanup.run(res);
     }
 

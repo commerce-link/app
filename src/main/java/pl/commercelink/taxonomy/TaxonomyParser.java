@@ -11,8 +11,8 @@ import java.util.List;
 class TaxonomyParser {
 
     static final String[] COLUMNS = {
-            "ean", "mfn", "brand", "name", "category", "data_accuracy_score",
-            "net_weight_g", "gross_weight_g"
+            "ean", "mfn", "brand", "name", "category", "category_id",
+            "data_accuracy_score", "net_weight_g", "gross_weight_g"
     };
 
     static Taxonomy fromCsvRow(String[] row) {
@@ -20,11 +20,17 @@ class TaxonomyParser {
         String mfn = row[1];
         String brand = row[2];
         String name = row[3];
-        String category = row[4] == null || row[4].isBlank() ? ProductCategories.OTHER : row[4];
-        int dataAccuracyScore = parseScore(row[5]);
-        Integer netWeight = row.length > 6 ? parseWeight(row[6]) : null;
-        Integer grossWeight = row.length > 7 ? parseWeight(row[7]) : null;
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, netWeight, grossWeight);
+        String category = row[4] == null || row[4].isBlank() ? null : row[4];
+        boolean newFormat = row.length > 8;
+        String categoryId = newFormat && row[5] != null && !row[5].isBlank() ? row[5] : null;
+        int scoreIndex = newFormat ? 6 : 5;
+        int netIndex = newFormat ? 7 : 6;
+        int grossIndex = newFormat ? 8 : 7;
+        int dataAccuracyScore = parseScore(row[scoreIndex]);
+        Integer netWeight = row.length > netIndex ? parseWeight(row[netIndex]) : null;
+        Integer grossWeight = row.length > grossIndex ? parseWeight(row[grossIndex]) : null;
+        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore,
+                netWeight, grossWeight, null, categoryId);
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {
@@ -63,6 +69,7 @@ class TaxonomyParser {
                 t.brand() != null ? t.brand() : "",
                 t.name() != null ? t.name() : "",
                 t.category() != null ? t.category() : "",
+                t.categoryId() != null ? t.categoryId() : "",
                 String.valueOf(t.dataAccuracyScore()),
                 t.netWeightInGrams() != null ? t.netWeightInGrams().toString() : "",
                 t.grossWeightInGrams() != null ? t.grossWeightInGrams().toString() : ""

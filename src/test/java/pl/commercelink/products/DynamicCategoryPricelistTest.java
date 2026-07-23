@@ -76,27 +76,23 @@ class DynamicCategoryPricelistTest {
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
-        when(inventory.findAllByProductCategory("GPU")).thenReturn(List.of(matchedInventory));
+        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
 
         mockInventoryWithSingleGraphicsCard();
     }
 
     @Test
-    void dynamicDefinitionWithIcecatLeafCategoryGeneratesTheSamePricelistAsLegacyEnumCategory() {
+    void dynamicDefinitionWithMatchingCategoryNameGeneratesPricelist() {
         // given / when
-        List<AvailabilityAndPrice> fromIcecatLeaf = generatePricelistFor("Karty graficzne");
-        List<AvailabilityAndPrice> fromLegacyEnum = generatePricelistFor("GPU");
+        List<AvailabilityAndPrice> pricelist = generatePricelistFor("Karty graficzne");
 
         // then
-        assertThat(fromLegacyEnum).hasSize(1);
-        assertThat(fromIcecatLeaf)
-                .usingRecursiveFieldByFieldElementComparator()
-                .isEqualTo(fromLegacyEnum);
+        assertThat(pricelist).hasSize(1);
     }
 
     @Test
-    void dynamicDefinitionWithCategoryOutsideTheBridgeGeneratesEmptyPricelist() {
+    void dynamicDefinitionWithNonMatchingCategoryNameGeneratesEmptyPricelist() {
         // given / when
         List<AvailabilityAndPrice> pricelist = generatePricelistFor("Kołdry");
 

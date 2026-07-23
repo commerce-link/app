@@ -5,7 +5,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.products.brand.BrandMapper;
-import pl.commercelink.taxonomy.ProductCategories;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
@@ -41,14 +40,14 @@ class DataCorrection {
             PimEntry entry = pim.get();
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
-            if (entry.category() != null && !ProductCategories.OTHER.equals(entry.category()))
-                category = ProductCategories.tryParse(entry.category()).orElse(category);
+            if (isNotBlank(entry.category())) category = entry.category();
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;
         }
 
-        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight);
+        return new Taxonomy(ean, taxonomy.mfn(), brand, name, category, score, netWeight, grossWeight,
+                taxonomy.rawCategory(), taxonomy.categoryId());
     }
 
     Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {

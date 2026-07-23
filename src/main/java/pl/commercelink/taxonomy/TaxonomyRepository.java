@@ -44,7 +44,8 @@ public class TaxonomyRepository {
                     Taxonomy unified = new Taxonomy(parsed.ean(), parsed.mfn(),
                             brandMapper.unifyBrand(parsed.brand()),
                             parsed.name(), parsed.category(), parsed.dataAccuracyScore(),
-                            parsed.netWeightInGrams(), parsed.grossWeightInGrams());
+                            parsed.netWeightInGrams(), parsed.grossWeightInGrams(),
+                            parsed.rawCategory(), parsed.categoryId());
                     taxonomies.add(unified);
                 } catch (Exception e) {
                     System.err.println("Failed to load taxonomy row: " + e.getMessage());
