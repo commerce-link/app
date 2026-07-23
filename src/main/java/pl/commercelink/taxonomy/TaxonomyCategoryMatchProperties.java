@@ -34,7 +34,11 @@ public class TaxonomyCategoryMatchProperties {
     }
 
     public boolean allows(String supplierName) {
-        return suppliers.contains(supplierName);
+        if (supplierName == null) {
+            return false;
+        }
+        return suppliers.contains(supplierName)
+                || (supplierName.startsWith("manual:") && suppliers.contains("Manual"));
     }
 
     public int buckets() {
