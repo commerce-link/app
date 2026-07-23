@@ -27,7 +27,8 @@ public class TaxonomyCategoryEnrichment {
         }
         return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
                 cached.category(), taxonomy.dataAccuracyScore(),
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams());
+                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
+                taxonomy.rawCategory(), cached.categoryId());
     }
 
     public boolean isPendingEligible(String supplierName, Taxonomy taxonomy) {
@@ -42,11 +43,11 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public void applyMatch(CategoryMatchedEvent event) {
-        if (event == null || event.mfn() == null || event.category() == null
-                || Taxonomy.OTHER.equals(event.category())) {
+        if (event == null || event.mfn() == null
+                || event.category() == null || event.category().isBlank()) {
             return;
         }
-        if (taxonomyCache.updateCategory(event.mfn(), event.category())) {
+        if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
         }

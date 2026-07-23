@@ -7,8 +7,6 @@ import org.mockito.Mockito;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -20,6 +18,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaxonomyCacheTest {
@@ -107,8 +106,8 @@ class TaxonomyCacheTest {
 
     @Test
     void mergesNetFromOneAndGrossFromOtherIndependently() {
-        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 100, null);
-        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", "Other", 10, null, 200);
+        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", null, 5, 100, null);
+        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", null, 10, null, 200);
 
         cache.add(a);
         cache.add(b);
@@ -120,8 +119,8 @@ class TaxonomyCacheTest {
 
     @Test
     void prefersWeightFromLowestScorePerDimension() {
-        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", "Other", 2, 999, null);
-        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", "Other", 9, 100, 200);
+        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", null, 2, 999, null);
+        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", null, 9, 100, 200);
 
         cache.add(highScoreBoth);
         cache.add(lowScoreNet);
@@ -133,8 +132,8 @@ class TaxonomyCacheTest {
 
     @Test
     void incomingWinsTieBreakForBothDimensions() {
-        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 100, 200);
-        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", "Other", 5, 150, 250);
+        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", null, 5, 100, 200);
+        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", null, 5, 150, 250);
 
         cache.add(first);
         cache.add(second);
@@ -171,7 +170,7 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void blankCategoryIsTreatedLikeOther() {
+    void blankCategoryIsTreatedAsUncategorized() {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "", 1, null, null));
 
@@ -197,7 +196,7 @@ class TaxonomyCacheTest {
     @Test
     void categorizedWinnerStillAdoptsWeightFromUncategorizedEntry() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 1, 777, null));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 1, 777, null));
 
         // when
         cache.add(categorized("MFN-1", "CPU", 10));
@@ -211,16 +210,31 @@ class TaxonomyCacheTest {
     @Test
     void mergePreservesRawCategoryOfWinningPendingEntry() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 10, null, 500, "First"));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 10, null, 500, "First"));
 
         // when
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 1, 300, null, "Second"));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 1, 300, null, "Second"));
 
         // then
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("Second", result.rawCategory());
+    }
+
+    @Test
+    void mergePreservesCategoryIdOfWinningEntry() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, 500, "Raw", "111"));
+
+        // when
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 1, 300, null, "Raw", "999"));
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals(300, result.netWeightInGrams());
+        assertEquals(500, result.grossWeightInGrams());
+        assertEquals("999", result.categoryId());
     }
 
     @Test
@@ -251,38 +265,39 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void hasCategoryRejectsNullBlankAndOther() {
+    void hasCategoryRejectsNullAndBlank() {
         assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", null, 1, null, null)));
         assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", " ", 1, null, null)));
-        assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "Other", 1, null, null)));
+        assertTrue(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "Other", 1, null, null)));
         assertTrue(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", "CPU", 1, null, null)));
     }
 
     @Test
     void updateCategorySetsCategoryOnPendingEntryKeepingScoreAndWeights() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 7, 100, 200));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 7, 100, 200));
 
         // when
-        boolean updated = cache.updateCategory("MFN-1", "CPU");
+        boolean updated = cache.updateCategory("MFN-1", "CPU", "301");
 
         // then
         assertTrue(updated);
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals("CPU", result.category());
+        assertEquals("301", result.categoryId());
         assertEquals(7, result.dataAccuracyScore());
         assertEquals(100, result.netWeightInGrams());
         assertEquals(200, result.grossWeightInGrams());
     }
 
     @Test
-    void updateCategoryIgnoresOtherCategory() {
+    void updateCategoryAcceptsArbitraryCategory() {
         // given
         cache.add(uncategorized("MFN-1", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("MFN-1", "Other"));
-        assertEquals("Other", cache.findByMfn("MFN-1").category());
+        assertTrue(cache.updateCategory("MFN-1", "Cokolwiek", "999"));
+        assertEquals("Cokolwiek", cache.findByMfn("MFN-1").category());
     }
 
     @Test
@@ -291,34 +306,17 @@ class TaxonomyCacheTest {
         cache.add(uncategorized("MFN-1", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("", "CPU"));
-        assertFalse(cache.updateCategory("   ", "CPU"));
-        assertFalse(cache.updateCategory("MFN-1", null));
-        assertEquals("Other", cache.findByMfn("MFN-1").category());
-    }
-
-    @Test
-    void updateCategoryIgnoresUnknownCategoryKey() {
-        // given
-        cache.add(uncategorized("MFN-1", 7));
-        PrintStream originalOut = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(captured));
-
-        try {
-            // when / then
-            assertFalse(cache.updateCategory("MFN-1", "NotARealCategory"));
-        } finally {
-            System.setOut(originalOut);
-        }
-        assertEquals("Other", cache.findByMfn("MFN-1").category());
-        assertTrue(captured.toString().contains("unknown category key: NotARealCategory"));
+        assertFalse(cache.updateCategory("", "CPU", null));
+        assertFalse(cache.updateCategory("   ", "CPU", null));
+        assertFalse(cache.updateCategory("MFN-1", null, null));
+        assertFalse(cache.updateCategory("MFN-1", "", null));
+        assertNull(cache.findByMfn("MFN-1").category());
     }
 
     @Test
     void updateCategoryIgnoresMissingEntry() {
         // when / then
-        assertFalse(cache.updateCategory("MFN-GONE", "CPU"));
+        assertFalse(cache.updateCategory("MFN-GONE", "CPU", null));
     }
 
     @Test
@@ -327,7 +325,7 @@ class TaxonomyCacheTest {
         cache.add(categorized("MFN-1", "GPU", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("MFN-1", "CPU"));
+        assertFalse(cache.updateCategory("MFN-1", "CPU", null));
         assertEquals("GPU", cache.findByMfn("MFN-1").category());
     }
 
@@ -361,8 +359,8 @@ class TaxonomyCacheTest {
         cache.add(uncategorized("MFN-1", 7));
 
         // when
-        cache.updateCategory("MFN-1", "CPU");
-        cache.updateCategory("MFN-1", "GPU");
+        cache.updateCategory("MFN-1", "CPU", null);
+        cache.updateCategory("MFN-1", "GPU", null);
 
         // then
         assertEquals(0, cache.pendingCount());
@@ -397,6 +395,6 @@ class TaxonomyCacheTest {
     }
 
     private static Taxonomy uncategorized(String mfn, int score) {
-        return new Taxonomy("1234567890123", mfn, "Brand", "Name", "Other", score, null, null);
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, score, null, null);
     }
 }

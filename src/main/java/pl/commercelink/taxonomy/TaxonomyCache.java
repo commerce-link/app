@@ -11,7 +11,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -65,17 +64,11 @@ public class TaxonomyCache {
     public static boolean hasCategory(Taxonomy taxonomy) {
         return taxonomy != null
                 && taxonomy.category() != null
-                && !taxonomy.category().isBlank()
-                && !Taxonomy.OTHER.equals(taxonomy.category());
+                && !taxonomy.category().isBlank();
     }
 
-    public boolean updateCategory(String mfn, String category) {
-        if (StringUtils.isBlank(mfn) || category == null || Taxonomy.OTHER.equals(category)) {
-            return false;
-        }
-        Optional<String> known = ProductCategories.tryParse(category);
-        if (known.isEmpty()) {
-            System.out.println("Ignoring category match with unknown category key: " + category);
+    public boolean updateCategory(String mfn, String category, String categoryId) {
+        if (StringUtils.isBlank(mfn) || category == null || category.isBlank()) {
             return false;
         }
         boolean[] updated = {false};
@@ -86,8 +79,9 @@ public class TaxonomyCache {
             updated[0] = true;
             pendingCount.decrementAndGet();
             return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
-                    known.get(), current.dataAccuracyScore(),
-                    current.netWeightInGrams(), current.grossWeightInGrams());
+                    category, current.dataAccuracyScore(),
+                    current.netWeightInGrams(), current.grossWeightInGrams(),
+                    current.rawCategory(), categoryId);
         });
         return updated[0];
     }
@@ -128,7 +122,7 @@ public class TaxonomyCache {
 
     private static Taxonomy withWeights(Taxonomy t, Integer net, Integer gross) {
         return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
-                            t.category(), t.dataAccuracyScore(), net, gross, t.rawCategory());
+                            t.category(), t.dataAccuracyScore(), net, gross, t.rawCategory(), t.categoryId());
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {

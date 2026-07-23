@@ -83,7 +83,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     @Test
     void requestCarriesIdentifiersFromCacheRow() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 5, null, null));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
                 cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
 
@@ -105,7 +105,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     @Test
     void sweepPassesRawCategoryIntoRequest() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 5, null, null, "Karty graficzne"));
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null, "Karty graficzne"));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
                 cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
 
@@ -131,6 +131,6 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     private static Taxonomy pending(String mfn) {
-        return new Taxonomy("1234567890123", mfn, "Brand", "Name", "Other", 5, null, null);
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null);
     }
 }

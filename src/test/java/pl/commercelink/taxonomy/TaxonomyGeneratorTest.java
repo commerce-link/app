@@ -26,7 +26,7 @@ class TaxonomyGeneratorTest {
     void savesOnlyCategorizedTaxonomies() {
         // given
         Taxonomy categorized = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 5, null, null);
-        Taxonomy pending = new Taxonomy("1234567890124", "MFN-2", "Brand", "Name", "Other", 5, null, null);
+        Taxonomy pending = new Taxonomy("1234567890124", "MFN-2", "Brand", "Name", null, 5, null, null);
         when(taxonomyCache.getTaxonomies()).thenReturn(List.of(categorized, pending));
 
         // when

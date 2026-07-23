@@ -38,7 +38,7 @@ class FeedRowProcessorTest {
     private final InventoryItem sellableItem =
             new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true);
     private final Taxonomy pendingTaxonomy =
-            new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Other", 5, null, null);
+            new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null);
     private final Taxonomy categorizedTaxonomy =
             new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 5, null, null);
 

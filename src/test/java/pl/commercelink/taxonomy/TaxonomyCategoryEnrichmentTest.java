@@ -14,6 +14,7 @@ import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,14 +47,15 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void enrichAdoptsCategoryFromCacheKeepingOwnScoreAndWeights() {
         // given
-        cache.add(taxonomy("MFN-1", "CPU", 3));
-        Taxonomy incoming = new Taxonomy("1234567890123", "MFN-1", "OtherBrand", "OtherName", "Other", 10, 555, null);
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null, null, "301"));
+        Taxonomy incoming = new Taxonomy("1234567890123", "MFN-1", "OtherBrand", "OtherName", null, 10, 555, null);
 
         // when
         Taxonomy result = enrichment.enrich(incoming);
 
         // then
         assertEquals("CPU", result.category());
+        assertEquals("301", result.categoryId());
         assertEquals(10, result.dataAccuracyScore());
         assertEquals("OtherBrand", result.brand());
         assertEquals(555, result.netWeightInGrams());
@@ -62,17 +64,17 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void enrichLeavesTaxonomyPendingWhenCacheHasNoCategorizedEntry() {
         // given
-        cache.add(taxonomy("MFN-1", "Other", 3));
-        Taxonomy incoming = taxonomy("MFN-1", "Other", 10);
+        cache.add(taxonomy("MFN-1", null, 3));
+        Taxonomy incoming = taxonomy("MFN-1", null, 10);
 
         // when / then
-        assertEquals("Other", enrichment.enrich(incoming).category());
+        assertNull(enrichment.enrich(incoming).category());
     }
 
     @Test
     void pendingEligibleOnlyForAllowlistedSupplier() {
         // given
-        Taxonomy taxonomy = taxonomy("MFN-1", "Other", 10);
+        Taxonomy taxonomy = taxonomy("MFN-1", null, 10);
 
         // when / then
         assertTrue(enrichment.isPendingEligible("Acme", taxonomy));
@@ -82,7 +84,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void pendingNotEligibleWhenIdentifiersIncomplete() {
         // given
-        Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", "", "Name", "Other", 10, null, null);
+        Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", "", "Name", null, 10, null, null);
 
         // when / then
         assertFalse(enrichment.isPendingEligible("Acme", noBrand));
@@ -91,18 +93,18 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void pendingNotEligibleAboveCap() {
         // given (cap = 2)
-        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
-        enrichment.addPending(taxonomy("MFN-2", "Other", 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-2", null, 10));
 
         // when / then
-        assertFalse(enrichment.isPendingEligible("Acme", taxonomy("MFN-3", "Other", 10)));
+        assertFalse(enrichment.isPendingEligible("Acme", taxonomy("MFN-3", null, 10)));
     }
 
     @Test
     void addPendingCountsEachMfnOnce() {
         // when
-        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
-        enrichment.addPending(taxonomy("MFN-1", "Other", 5));
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 5));
 
         // then
         assertEquals(1, enrichment.pendingCount());
@@ -112,20 +114,34 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchUpdatesCacheAndDecrementsCounter() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
 
         // when
-        enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", "Procesory", 0.9, "mock"));
+        enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.9, "mock"));
 
         // then
         assertEquals("CPU", cache.findByMfn("MFN-1").category());
+        assertEquals("301", cache.findByMfn("MFN-1").categoryId());
         assertEquals(0, enrichment.pendingCount());
+    }
+
+    @Test
+    void applyMatchAcceptsArbitraryCategoryName() {
+        // given
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "Dowolna Kategoria", "999", null, "mock"));
+
+        // then
+        assertEquals("Dowolna Kategoria", cache.findByMfn("MFN-1").category());
+        assertEquals("999", cache.findByMfn("MFN-1").categoryId());
     }
 
     @Test
     void pendingCountDropsWhenAnotherSupplierDeliversCategorizedEntry() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
         assertEquals(1, enrichment.pendingCount());
 
         // when
@@ -136,18 +152,17 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
-    void applyMatchIgnoresOtherUnknownAndMissingEntries() {
+    void applyMatchIgnoresBlankCategoryMissingEntryAndNull() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", "Other", 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10));
 
         // when
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "Other", null, null, null, "mock"));
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "NotARealCategory", null, null, null, "mock"));
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-GONE", "CPU", null, null, null, "mock"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "", null, null, "mock"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-GONE", "CPU", "301", null, "mock"));
         enrichment.applyMatch(null);
 
         // then
-        assertEquals("Other", cache.findByMfn("MFN-1").category());
+        assertNull(cache.findByMfn("MFN-1").category());
         assertEquals(1, enrichment.pendingCount());
     }
 
