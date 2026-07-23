@@ -7,7 +7,12 @@
 <div layout:fragment="content">
     <section class="section">
         <div class="container">
-            <h1 th:text="#{warehouse.documents.title}"></h1>
+            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
+                <h1 class="mb-0" th:text="#{warehouse.documents.title}"></h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+            </div>
+
+            <div th:replace="~{fragments/screen-intro :: panel('warehouse-documents', 'fas fa-file-alt')}"></div>
 
             <div class="box" th:if="${documentsDisabled}">
                 <div class="notification is-warning">

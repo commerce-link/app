@@ -16,6 +16,9 @@
                             th:text="${isSuperAdmin} ? ${#messages.msg('store.title.settings', form.store.name)} : #{store.title}">
                         </h1>
                     </div>
+                    <div class="level-item">
+                        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                    </div>
                 </div>
                 <div class="level-right" th:if="${isSuperAdmin}">
                     <div class="level-item">
@@ -26,6 +29,8 @@
                     </div>
                 </div>
             </div>
+
+            <div th:replace="~{fragments/screen-intro :: panel('store', 'fas fa-cog')}"></div>
 
             <!-- Notifications Section -->
             <div class="box" th:if="${form.store.notifications != null and !form.store.notifications.isEmpty()}">

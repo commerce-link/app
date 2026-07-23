@@ -7,7 +7,12 @@
 
     <section class="section">
         <div class="container">
-            <h2 th:text="#{financial.report.title} + ' ' + ${dateFrom} + ' - ' + ${dateTo}"></h2>
+            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
+                <h2 class="mb-0" th:text="#{financial.report.title} + ' ' + ${dateFrom} + ' - ' + ${dateTo}"></h2>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+            </div>
+
+            <div th:replace="~{fragments/screen-intro :: panel('reports', 'fas fa-chart-bar')}"></div>
 
             <form method="get" th:action="@{/dashboard/reports}" class="box mb-4">
                 <div class="field is-grouped is-flex-wrap-wrap">
