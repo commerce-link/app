@@ -106,11 +106,11 @@ class DataCorrectionTest {
     }
 
     @Test
-    void keepsFeedCategoryWhenPimCategoryIsUnknown() {
+    void keepsFeedCategoryWhenPimCategoryIsBlank() {
         // given
         Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
                 "CPU", 5, 100, 200);
-        PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
+        PimEntry pim = pimEntry(null, true, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
@@ -121,18 +121,18 @@ class DataCorrectionTest {
     }
 
     @Test
-    void overridesFeedCategoryWhenPimCategoryIsKnown() {
+    void overridesFeedCategoryWithPimCategoryName() {
         // given
         Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
                 "CPU", 5, 100, 200);
-        PimEntry pim = pimEntry("GPU", true, 7000, 9000);
+        PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
         Taxonomy result = dataCorrection.run(fromFeed);
 
         // then
-        assertThat(result.category()).isEqualTo("GPU");
+        assertThat(result.category()).isEqualTo("Smartwatches");
     }
 
     private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {

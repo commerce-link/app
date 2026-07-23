@@ -31,18 +31,18 @@ class ProductRecommendationEngineTest {
     private ProductRecommendationEngine engine;
 
     @Test
-    void queriesInventoryWithBridgedCategoryForIcecatLeafName() {
+    void queriesInventoryWithCategoryNameUnchanged() {
         // given
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
         definition.setCategory("Karty graficzne");
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
-        when(inventory.findAllByProductCategory("GPU")).thenReturn(List.of());
+        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of());
 
         // when
         engine.getRecommendations(definition, inventory);
 
         // then
-        verify(inventory).findAllByProductCategory("GPU");
+        verify(inventory).findAllByProductCategory("Karty graficzne");
     }
 
     @Test

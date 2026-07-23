@@ -96,8 +96,8 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem from matched inventory with no offers falls back to Other category and uses MFN from inventory key")
-    void addOrderItemFromMatchedInventoryWithoutOffersFallsBackToOtherCategory() {
+    @DisplayName("addOrderItem from matched inventory with no offers falls back to Inne category and uses MFN from inventory key")
+    void addOrderItemFromMatchedInventoryWithoutOffersFallsBackToUncategorized() {
         // given
         Order order = orderWithTotalPrice(0.0);
         InventoryKey key = new InventoryKey("EAN-Z", "MFN-MISSING");
@@ -113,7 +113,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Other");
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Inne");
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");

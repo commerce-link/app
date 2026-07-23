@@ -210,7 +210,7 @@ public class ProductCatalogController {
             return;
         }
 
-        String inventoryCategory = InventoryCategoryBridge.toInventoryCategory(categoryDefinition.getCategory());
+        String inventoryCategory = categoryDefinition.getCategory();
         boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findAllByProductCategory(inventoryCategory)
                 .stream()
@@ -231,8 +231,8 @@ public class ProductCatalogController {
 
         // if no other CategoryDefinition is associated with the same category, then delete all products associated with this category
         if (productCatalog.getCategories().stream().noneMatch(c -> Objects.equals(
-                InventoryCategoryBridge.toInventoryCategory(c.getCategory()),
-                InventoryCategoryBridge.toInventoryCategory(removedCategoryDefinition.getCategory())))) {
+                c.getCategory(),
+                removedCategoryDefinition.getCategory()))) {
             List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
             productRepository.delete(products);
         }
