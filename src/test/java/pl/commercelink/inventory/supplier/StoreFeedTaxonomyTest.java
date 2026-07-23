@@ -29,6 +29,20 @@ class StoreFeedTaxonomyTest {
     }
 
     @Test
+    void preservesCategoryIdWhenApplyingPenalty() {
+        // given
+        Taxonomy withCategoryId = new Taxonomy("5900000000001", "MFN1", "Brand", "Name",
+                "CPU", 5, 100, 120, "raw-category", "cat-123");
+
+        // when
+        Taxonomy result = StoreFeedTaxonomy.deprioritized(withCategoryId, 1000);
+
+        // then
+        assertEquals("cat-123", result.categoryId());
+        assertEquals(1005, result.dataAccuracyScore());
+    }
+
+    @Test
     void returnsSameInstanceWhenPenaltyZeroOrNegative() {
         // given
         Taxonomy base = taxonomy(5);

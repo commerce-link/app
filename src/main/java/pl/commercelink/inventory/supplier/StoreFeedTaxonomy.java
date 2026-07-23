@@ -13,6 +13,7 @@ final class StoreFeedTaxonomy {
         }
         return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
                 taxonomy.category(), taxonomy.dataAccuracyScore() + penalty,
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(), taxonomy.rawCategory());
+                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
+                taxonomy.rawCategory(), taxonomy.categoryId());
     }
 }
