@@ -30,10 +30,6 @@ public class StoreCreationService {
         if (request.demoMetadata() != null) {
             store.setDemo(request.demoMetadata());
         }
-        if (request.welcomeNotification()) {
-            store.getNotifications().add(new StoreNotification(
-                    StoreNotificationSeverity.INFO, StoreNotificationType.WELCOME, null, null));
-        }
         storesRepository.save(store);
         if (request.seeder() != null) {
             try {

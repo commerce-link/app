@@ -1,8 +1,6 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -10,7 +8,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.util.PaginationUtil;
 import pl.commercelink.web.dtos.InventoryItemView;
 import pl.commercelink.inventory.Inventory;
@@ -31,7 +28,6 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -58,9 +54,6 @@ public class WebController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private MessageSource messageSource;
-
-    @Autowired
     private DeliveriesRepository deliveriesRepository;
 
     @Autowired
@@ -75,35 +68,14 @@ public class WebController {
     @Autowired
     private ManualSupplierService manualSupplierService;
 
-    @Value("${app.registration.demo:false}")
-    boolean demoEnvironment;
-
     private static final int CLIENTS_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard")
-    public String index(RedirectAttributes redirectAttributes, Locale locale) {
+    public String index() {
         if (CustomSecurityContext.hasRole("SUPER_ADMIN")) {
             return "redirect:/dashboard/stores";
         }
-        String storeId = getStoreId();
-        if (storeId != null) {
-            Store store = storesRepository.findById(storeId);
-            if (store != null && consumeWelcome(store)) {
-                redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("welcome.message", null, locale));
-            }
-        }
         return "redirect:/dashboard/orders";
-    }
-
-    private boolean consumeWelcome(Store store) {
-        if (demoEnvironment || store.getNotifications() == null) {
-            return false;
-        }
-        boolean removed = store.getNotifications().removeIf(n -> n.getType() == StoreNotificationType.WELCOME);
-        if (removed) {
-            storesRepository.save(store);
-        }
-        return removed;
     }
 
     @GetMapping("/dashboard/clients")
