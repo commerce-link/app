@@ -135,6 +135,36 @@ class DataCorrectionTest {
         assertThat(result.category()).isEqualTo("Smartwatches");
     }
 
+    @Test
+    void keepsCategoryIdWhenNoPimCorrection() {
+        // given
+        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
+                "CPU", 5, 100, 200, "rawCPU", "195");
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.categoryId()).isEqualTo("195");
+    }
+
+    @Test
+    void keepsCategoryIdWhenPimOverridesCategoryName() {
+        // given
+        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
+                "CPU", 5, 100, 200, "rawCPU", "195");
+        PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isEqualTo("Smartwatches");
+        assertThat(result.categoryId()).isEqualTo("195");
+    }
+
     private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {
         return pimEntry("Other", approved, net, gross);
     }
