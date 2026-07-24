@@ -130,3 +130,20 @@ false misses. If that normalization logic changes in Java, update `unify_ean` /
 - AWS credentials with `s3:ListBucket`/`GetObject`/`PutObject` on the datalake
   bucket and `dynamodb:Scan` on the PIM table (via the normal boto3 credential
   chain — no credentials are hardcoded in the script).
+
+## Tests
+
+`test_migrate_taxonomy.py` covers the transform logic and the full `main()` flow
+(dry-run, apply-with-backup-before-overwrite ordering, already-migrated guard,
+paginated PIM scan, fail-closed backup). It stubs `boto3`/`botocore` and uses
+in-memory S3/DynamoDB fakes, so it needs **no external dependencies** and does not
+touch AWS:
+
+```bash
+cd tools/taxonomy-icecat-migration
+python3 -m unittest
+```
+
+The tests do **not** replace confirming the real `productIdentifiers` attribute
+shape against the production PIM table on deployment day — always do the first run
+in the default `--dry-run` mode.

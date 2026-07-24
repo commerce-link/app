@@ -9,7 +9,7 @@ import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.Store;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 import pl.commercelink.warehouse.api.Warehouse;

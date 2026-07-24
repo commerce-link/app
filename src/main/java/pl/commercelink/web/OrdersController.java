@@ -16,7 +16,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;

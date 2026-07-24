@@ -1,6 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 final class StoreFeedTaxonomy {
 

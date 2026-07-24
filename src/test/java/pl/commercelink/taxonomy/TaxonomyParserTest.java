@@ -1,7 +1,6 @@
 package pl.commercelink.taxonomy;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.starter.csv.CSVLoader;
 
 import java.io.InputStreamReader;

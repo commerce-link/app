@@ -2,7 +2,6 @@ package pl.commercelink.taxonomy;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
 

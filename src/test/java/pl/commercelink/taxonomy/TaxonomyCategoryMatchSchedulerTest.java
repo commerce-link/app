@@ -8,7 +8,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
 

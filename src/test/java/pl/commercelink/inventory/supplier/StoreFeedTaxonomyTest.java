@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;

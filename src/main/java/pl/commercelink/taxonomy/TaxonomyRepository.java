@@ -4,7 +4,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;

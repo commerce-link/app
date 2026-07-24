@@ -17,7 +17,7 @@ import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -124,8 +124,8 @@ class StoreScopedFeedLoaderTest {
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
+        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
+        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -186,8 +186,8 @@ class StoreScopedFeedLoaderTest {
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
+        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
+        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when

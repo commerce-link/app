@@ -1,7 +1,6 @@
 package pl.commercelink.taxonomy;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 @Component
 public class TaxonomyResolver {

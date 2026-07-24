@@ -5,7 +5,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import pl.commercelink.inventory.InventoryKey;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -235,6 +234,20 @@ class TaxonomyCacheTest {
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("999", result.categoryId());
+    }
+
+    @Test
+    void pimCorrectionWithoutIdReplacesPreviouslyResolvedCategoryId() {
+        // given
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Karty graficzne", 3, null, null, "Raw", "1613"));
+
+        // when
+        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Karty graficzne", 0, null, null, "Raw", null));
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-1");
+        assertEquals("Karty graficzne", result.category());
+        assertNull(result.categoryId());
     }
 
     @Test

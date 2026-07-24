@@ -31,7 +31,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.security.CustomSecurityContext;
 

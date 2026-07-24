@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 
@@ -21,7 +21,7 @@ class FeedRowProcessor {
 
     Optional<InventoryItem> process(ParsedRow parsed, String supplierName, int taxonomyPenalty, FeedParseStats stats) {
         InventoryItem item = dataCorrection.run(parsed.item());
-        Taxonomy corrected = dataCorrection.run(parsed.taxonomy());
+        Taxonomy corrected = dataCorrection.run(parsed.product());
         if (item == null || corrected == null || !item.isSellable()) {
             return Optional.empty();
         }

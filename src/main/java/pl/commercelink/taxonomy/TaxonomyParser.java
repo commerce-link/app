@@ -1,6 +1,5 @@
 package pl.commercelink.taxonomy;
 
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
 

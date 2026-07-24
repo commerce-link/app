@@ -1,7 +1,6 @@
 package pl.commercelink.taxonomy;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;

@@ -5,7 +5,6 @@ import jakarta.annotation.PostConstruct;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 
 import java.util.Collection;
 import java.util.Comparator;

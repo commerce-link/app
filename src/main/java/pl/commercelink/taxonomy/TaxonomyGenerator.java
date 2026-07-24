@@ -4,7 +4,6 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 

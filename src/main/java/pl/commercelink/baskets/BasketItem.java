@@ -8,7 +8,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
