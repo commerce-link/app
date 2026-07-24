@@ -438,6 +438,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
                                 help="Perform the real migration: back up the source file, then "
                                      "upload the new taxonomy/<today>.csv. Required to write anything.")
 
+    parser.add_argument("--force", dest="force", action="store_true", default=False,
+                         help="Bypass the empty-PIM-scan safety abort. Normally a real "
+                              "(--no-dry-run) apply refuses to upload when the PIM scan mapped "
+                              "ZERO rows while there are non-Services data rows (a sign the PIM "
+                              "scan was empty or the schema drifted, which would wipe every "
+                              "category). Pass --force only for the rare legitimate case where an "
+                              "all-blank category column is genuinely intended.")
+
     parser.add_argument("--local-output", default=None,
                          help="In dry-run mode, write the would-be output CSV to this local path "
                               "for inspection. Defaults to "
@@ -530,6 +538,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"[dry-run] would upload new file to s3://{args.datalake_bucket}/{target_key}")
         print(f"[dry-run] preview written locally to {local_output}")
     else:
+        non_services_rows = stats.total_rows - stats.services_rows
+        if stats.mapped_total() == 0 and non_services_rows > 0 and not args.force:
+            raise RuntimeError(
+                f"Safety abort: the PIM scan mapped ZERO of {non_services_rows} non-Services "
+                f"data rows, so a real apply would upload a taxonomy file with EVERY non-Services "
+                f"category wiped blank, silently destroying taxonomy data. This usually means the "
+                f"PIM scan came back empty (V007 backfill did not run) or the PIM schema drifted "
+                f"so categories were not read (check the --pim-* flags against the real table). "
+                f"Inspect a --dry-run first; if an all-blank category column is genuinely intended, "
+                f"re-run with --force."
+            )
         if target_key == source_key:
             print(f"WARNING: target key {target_key} is the same as the source key "
                   f"(migration already run today?). Overwriting anyway - backup was taken above.")

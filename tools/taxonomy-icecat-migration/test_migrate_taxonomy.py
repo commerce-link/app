@@ -358,6 +358,32 @@ class TestMainFlow(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             migrate.main(["--pim-table", "PIM", "--no-dry-run"])
 
+    def _use_all_non_services_source_with_empty_pim(self):
+        source = (OLD_HEADER + "\n"
+                  "5901234567890;RTX4090;NVIDIA;GeForce;GPU;5;100;200\n"
+                  "9999999999999;UNKNOWN;Acme;Widget;Misc;3;;\n")
+        self.s3.store[self.source_key] = source.encode("utf-8")
+        # PIM scan yields nothing -> both maps empty (V007 didn't run / schema drift).
+        self.ddb = FakeDynamoDbClient([{"Items": []}])
+
+    def test_apply_aborts_when_pim_scan_empty_and_uploads_nothing(self):
+        self._use_all_non_services_source_with_empty_pim()
+        with self.assertRaises(RuntimeError):
+            migrate.main(["--pim-table", "PIM", "--no-dry-run"])
+        target_key = self._target_key()
+        self.assertNotIn(target_key, self.s3.put_calls)
+
+    def test_apply_with_force_proceeds_when_pim_scan_empty(self):
+        self._use_all_non_services_source_with_empty_pim()
+        rc = migrate.main(["--pim-table", "PIM", "--no-dry-run", "--force"])
+        self.assertEqual(rc, 0)
+        target_key = self._target_key()
+        self.assertIn(target_key, self.s3.put_calls)
+        header, rows = migrate.parse_csv(self.s3.store[target_key].decode("utf-8"))
+        self.assertEqual(header, migrate.NEW_COLUMNS)
+        self.assertEqual(rows[0][4], "")
+        self.assertEqual(rows[0][5], "")
+
 
 if __name__ == "__main__":
     unittest.main()
