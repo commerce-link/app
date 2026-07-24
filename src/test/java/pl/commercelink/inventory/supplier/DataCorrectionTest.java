@@ -165,6 +165,23 @@ class DataCorrectionTest {
         assertThat(result.categoryId()).isEqualTo("195");
     }
 
+    @Test
+    void carriesCategoryIdFromPimWhenPresent() {
+        // given
+        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
+                "CPU", 5, 100, 200, "rawCPU", "195");
+        PimEntry pim = new PimEntry("pim-id", List.of(), "PimBrand", "PimName",
+                "Karty graficzne", "subcategory", true, 7000, 9000, "170");
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isEqualTo("Karty graficzne");
+        assertThat(result.categoryId()).isEqualTo("170");
+    }
+
     private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {
         return pimEntry("Other", approved, net, gross);
     }
