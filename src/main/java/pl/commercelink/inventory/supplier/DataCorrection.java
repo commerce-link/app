@@ -43,7 +43,7 @@ class DataCorrection {
             if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
             if (isNotBlank(entry.name())) name = entry.name();
             if (isNotBlank(entry.category())) category = entry.category();
-            if (entry.categoryId() != null) categoryId = entry.categoryId();
+            if (isNotBlank(entry.categoryId())) categoryId = entry.categoryId();
             if (entry.netWeightInGrams() != null) netWeight = entry.netWeightInGrams();
             if (entry.grossWeightInGrams() != null) grossWeight = entry.grossWeightInGrams();
             score = 0;

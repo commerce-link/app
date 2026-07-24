@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
@@ -93,6 +94,30 @@ class OrdersManagerTest {
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getTotalPrice()).isEqualTo(150.0);
+    }
+
+    @Test
+    @DisplayName("addOrderItem from matched inventory with offers but a null taxonomy category falls back to Inne")
+    void addOrderItemFromMatchedInventoryWithNullTaxonomyCategoryFallsBackToUncategorized() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        Taxonomy taxonomy = new Taxonomy("EAN-N", "MFN-N", "TestBrand", "no-category-product", null, 1, null, null);
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(80.0));
+        when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(2);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, matchedInventory, 0);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo(Categories.UNCATEGORIZED);
+        assertThat(itemCaptor.getValue().getName()).isEqualTo("no-category-product");
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-N");
     }
 
     @Test

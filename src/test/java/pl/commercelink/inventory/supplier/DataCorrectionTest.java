@@ -145,6 +145,21 @@ class DataCorrectionTest {
     }
 
     @Test
+    void categoryIdStaysNullWhenPimCategoryIdIsBlank() {
+        // given
+        SupplierProduct fromFeed = feed("rawCPU", 100, 200);
+        PimEntry pim = new PimEntry("pim-id", List.of(), "PimBrand", "PimName",
+                "Karty graficzne", "subcategory", true, 7000, 9000, "");
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.categoryId()).isNull();
+    }
+
+    @Test
     void resolvesServicesCategoryFromRawCategoryWithoutPim() {
         // given
         SupplierProduct fromFeed = feed("Services", 100, 200);

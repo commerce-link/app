@@ -49,7 +49,7 @@ public class OrdersManager {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
-                    taxonomy.category(),
+                    StringUtils.isNotBlank(taxonomy.category()) ? taxonomy.category() : Categories.UNCATEGORIZED,
                     taxonomy.name(),
                     1,
                     matchedInventory.getMedianPrice().grossValue(),
