@@ -6,6 +6,12 @@
 
 <div layout:fragment="content">
 
+    <div class="is-flex is-justify-content-flex-end mb-2">
+        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+    </div>
+
+    <div th:replace="~{fragments/screen-intro :: panel('warehouse', 'fas fa-archive')}"></div>
+
     <div th:if="${hasExternalWarehouse}" class="notification is-info is-light">
         <span th:text="#{warehouse.external.wms.info}"></span>
     </div>

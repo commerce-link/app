@@ -6,6 +6,12 @@
 
 <div layout:fragment="content">
 
+    <div class="is-flex is-justify-content-flex-end mb-2">
+        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+    </div>
+
+    <div th:replace="~{fragments/screen-intro :: panel('orders', 'fas fa-shopping-cart')}"></div>
+
     <div class="box">
         <h4 class="title is-5">Filter by Order Status</h4>
         <div class="field is-grouped is-grouped-multiline" id="filterTags">

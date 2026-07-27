@@ -12,6 +12,12 @@
                 <tr>
                     <th th:text="#{store.id}"></th>
                     <th th:text="#{store.name}"></th>
+                    <th>
+                        <a th:href="@{/dashboard/stores(dir=${dir == 'asc'} ? 'desc' : 'asc')}">
+                            <span th:text="#{store.createdAt}"></span>
+                            <span th:text="${dir == 'asc'} ? '▲' : '▼'"></span>
+                        </a>
+                    </th>
                     <th></th>
                 </tr>
                 </thead>
@@ -21,6 +27,7 @@
                         <a th:href="@{'/dashboard/store/' + ${store.storeId}}" th:text="${store.storeId}"></a>
                     </td>
                     <td th:text="${store.name}"></td>
+                    <td th:text="${store.createdAt != null and #strings.length(store.createdAt) >= 10} ? ${#strings.substring(store.createdAt, 0, 10)} : ''"></td>
                     <td th:with="deleteConfirm=${store.demo != null} ? #{store.delete.confirm} : #{store.delete.confirm.regular}">
                         <div th:if="${store.demo != null}" style="display:inline-block">
                             <span class="tag is-warning" th:text="#{store.demo.badge}"></span>

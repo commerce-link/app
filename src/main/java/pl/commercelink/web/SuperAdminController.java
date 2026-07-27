@@ -1,7 +1,6 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -41,13 +40,15 @@ public class SuperAdminController {
     @Autowired
     private StoreCreationService storeCreationService;
 
-    @Value("${app.registration.demo:false}")
-    boolean demoEnvironment;
-
     @GetMapping("/dashboard/stores")
-    public String store(Model model) {
-        List<Store> stores = storesRepository.findAll();
+    public String store(@RequestParam(defaultValue = "desc") String dir, Model model) {
+        boolean ascending = "asc".equalsIgnoreCase(dir);
+        Comparator<String> order = ascending ? Comparator.naturalOrder() : Comparator.reverseOrder();
+        List<Store> stores = storesRepository.findAll().stream()
+                .sorted(Comparator.comparing(Store::getCreatedAt, Comparator.nullsLast(order)))
+                .toList();
         model.addAttribute("stores", stores);
+        model.addAttribute("dir", ascending ? "asc" : "desc");
         return "stores";
     }
 
@@ -78,7 +79,7 @@ public class SuperAdminController {
                               Locale locale,
                               RedirectAttributes redirectAttributes) {
         try {
-            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey, !demoEnvironment));
+            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey));
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
             return String.format("redirect:/dashboard/store/%s", store.getStoreId());
         } catch (Exception e) {

@@ -1,7 +1,6 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -29,7 +28,6 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -70,32 +68,14 @@ public class WebController {
     @Autowired
     private ManualSupplierService manualSupplierService;
 
-    @Value("${app.registration.demo:false}")
-    boolean demoEnvironment;
-
     private static final int CLIENTS_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard")
-    public String index(Model model) {
-        String storeId = getStoreId();
-        if (storeId != null) {
-            Store store = storesRepository.findById(storeId);
-            if (store != null) {
-                model.addAttribute("welcomeMessage", consumeWelcome(store));
-            }
+    public String index() {
+        if (CustomSecurityContext.hasRole("SUPER_ADMIN")) {
+            return "redirect:/dashboard/stores";
         }
-        return "dashboard";
-    }
-
-    private boolean consumeWelcome(Store store) {
-        if (demoEnvironment || store.getNotifications() == null) {
-            return false;
-        }
-        boolean removed = store.getNotifications().removeIf(n -> n.getType() == StoreNotificationType.WELCOME);
-        if (removed) {
-            storesRepository.save(store);
-        }
-        return removed;
+        return "redirect:/dashboard/orders";
     }
 
     @GetMapping("/dashboard/clients")

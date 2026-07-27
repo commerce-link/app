@@ -9,11 +9,16 @@
     <section class="section">
         <div class="container">
             <div class="is-flex is-align-items-center is-justify-content-space-between mb-4">
-                <h2 class="title mb-0" th:text="#{payments.unpaid.deliveries}"></h2>
+                <div class="is-flex is-align-items-center" style="gap: 0.6rem">
+                    <h2 class="title mb-0" th:text="#{payments.unpaid.deliveries}"></h2>
+                    <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                </div>
                 <form th:action="@{/dashboard/deliveries/syncPaymentStatuses}" method="post" onsubmit="event.preventDefault();">
                     <button type="submit" class="button is-info" onclick="confirmSave(this)" th:text="#{payments.sync.statuses}"></button>
                 </form>
             </div>
+
+            <div th:replace="~{fragments/screen-intro :: panel('payments', 'fas fa-money-bill-alt')}"></div>
             <p>
                 <span th:text="#{payments.total.unpaid.net} + ': ' + ${#numbers.formatDecimal(unpaidDeliveriesAmountNet, 1, 2)} + ' PLN'"></span>
                 <span class="mx-3">|</span>

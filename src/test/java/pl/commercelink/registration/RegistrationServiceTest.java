@@ -63,6 +63,7 @@ class RegistrationServiceTest {
         verify(storeCreationService).createStore(requestCaptor.capture());
         assertEquals("Sklep Testowy", requestCaptor.getValue().name());
         assertSame(storeSeeder, requestCaptor.getValue().seeder());
+        assertEquals("user@example.com", requestCaptor.getValue().ownerEmail());
         assertEquals("user@example.com", requestCaptor.getValue().demoMetadata().getOwnerEmail());
         assertEquals(NOW.toString(), requestCaptor.getValue().demoMetadata().getCreatedAt());
         assertEquals(NOW.plusSeconds(14 * 24 * 3600).toString(), requestCaptor.getValue().demoMetadata().getExpiresAt());
@@ -221,7 +222,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"))).thenReturn(store("prod-store-1"));
 
         // when
         RegistrationResult result = service(false, false).register("user@firma.pl", "Moja Firma", "10.0.0.1");
@@ -229,7 +230,7 @@ class RegistrationServiceTest {
         // then
         assertEquals("prod-store-1", result.storeId());
         assertNull(result.revealedPassword());
-        verify(storeCreationService).createStore(CreateStoreRequest.bare("Moja Firma", null));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"));
         verify(cognitoUserService).createStoreAdmin("user@firma.pl", "prod-store-1");
         verifyNoInteractions(storeSeeder);
     }
@@ -239,13 +240,13 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"))).thenReturn(store("prod-store-1"));
 
         // when
         service(false, false).register("user@firma.pl", "  Moja Firma  ", "10.0.0.1");
 
         // then
-        verify(storeCreationService).createStore(CreateStoreRequest.bare("Moja Firma", null));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"));
     }
 
     @Test
@@ -291,16 +292,16 @@ class RegistrationServiceTest {
         String maxName = "x".repeat(60);
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare(minName, null))).thenReturn(store("prod-store-1"));
-        when(storeCreationService.createStore(CreateStoreRequest.bare(maxName, null))).thenReturn(store("prod-store-2"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered(minName, "user@firma.pl"))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered(maxName, "user@firma.pl"))).thenReturn(store("prod-store-2"));
 
         // when
         service(false, false).register("user@firma.pl", minName, "10.0.0.1");
         service(false, false).register("user@firma.pl", maxName, "10.0.0.1");
 
         // then
-        verify(storeCreationService).createStore(CreateStoreRequest.bare(minName, null));
-        verify(storeCreationService).createStore(CreateStoreRequest.bare(maxName, null));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered(minName, "user@firma.pl"));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered(maxName, "user@firma.pl"));
     }
 
     @Test
@@ -310,7 +311,7 @@ class RegistrationServiceTest {
                 storeDeletionService, new RegistrationRateLimiter(Clock.fixed(NOW, ZoneOffset.UTC), 3, 100),
                 Clock.fixed(NOW, ZoneOffset.UTC), 14, false, false);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"))).thenReturn(store("prod-store-1"));
 
         // when
         for (int i = 0; i < 3; i++) {
@@ -329,7 +330,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"))).thenReturn(store("prod-store-1"));
 
         // when
         RegistrationResult result = service(false, true).register("user@firma.pl", "Moja Firma", "10.0.0.1");
@@ -344,7 +345,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null)))
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl")))
                 .thenThrow(new RuntimeException("dynamo down"));
 
         // when / then
@@ -361,7 +362,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Moja Firma", null))).thenReturn(store("prod-store-1"));
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"))).thenReturn(store("prod-store-1"));
         doThrow(new RuntimeException("cognito down")).when(cognitoUserService).createStoreAdmin(anyString(), anyString());
 
         // when / then
