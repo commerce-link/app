@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,27 +42,13 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     @Test
-    void sweepIsNoopWhenDisabled() {
-        // given
-        cache.add(pending("MFN-1"));
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties(false, 4, 300000));
-
-        // when
-        scheduler.sweep();
-
-        // then
-        verify(pimCatalog, never()).submitCategoryMatch(any());
-    }
-
-    @Test
     void everyPendingRowIsSubmittedExactlyOnceAcrossFullBucketCycle() {
         // given
         List<String> pendingMfns = IntStream.range(0, 20).mapToObj(i -> "MFN-P-" + i).toList();
         pendingMfns.forEach(mfn -> cache.add(pending(mfn)));
         cache.add(new Taxonomy("1234567890123", "MFN-CAT", "Brand", "Name", "CPU", 5, null, null));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 4, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(4, 300000));
 
         // when
         for (int i = 0; i < 4; i++) {
@@ -84,7 +69,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
         scheduler.sweep();
@@ -106,7 +91,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null, "Karty graficzne"));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
         scheduler.sweep();
@@ -123,7 +108,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         cache.add(pending("MFN-1"));
         doThrow(new IllegalStateException("no sqs")).when(pimCatalog).submitCategoryMatch(any());
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when / then
         scheduler.sweep();

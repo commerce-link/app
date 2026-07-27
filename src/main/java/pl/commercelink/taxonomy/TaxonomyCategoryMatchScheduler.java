@@ -24,9 +24,6 @@ class TaxonomyCategoryMatchScheduler {
 
     @Scheduled(cron = "${taxonomy.category-match.sweep-cron:0 2-57/5 * * * ?}")
     void sweep() {
-        if (!properties.enabled()) {
-            return;
-        }
         int bucket = Math.floorMod(sweepCounter.getAndIncrement(), properties.buckets());
         int pendingTotal = 0;
         int submitted = 0;

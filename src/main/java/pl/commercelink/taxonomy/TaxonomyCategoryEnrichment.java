@@ -31,8 +31,7 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
-        return properties.enabled()
-                && isNotBlank(taxonomy.mfn()) && isNotBlank(taxonomy.ean())
+        return isNotBlank(taxonomy.mfn()) && isNotBlank(taxonomy.ean())
                 && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name())
                 && taxonomyCache.pendingCount() < properties.pendingCap();
     }

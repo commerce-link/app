@@ -31,7 +31,7 @@ class TaxonomyCategoryEnrichmentTest {
         cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
         enrichment = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties(true, 100, 2));
+                new TaxonomyCategoryMatchProperties(100, 2));
     }
 
     @Test
@@ -71,22 +71,12 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
-    void pendingEligibleForEverySupplierWhenEnabled() {
+    void pendingEligibleForEverySupplier() {
         // given
         Taxonomy taxonomy = taxonomy("MFN-1", null, 10);
 
         // when / then
         assertTrue(enrichment.isPendingEligible(taxonomy));
-    }
-
-    @Test
-    void pendingNotEligibleWhenDisabled() {
-        // given
-        TaxonomyCategoryEnrichment disabled = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties(false, 100, 2));
-
-        // when / then
-        assertFalse(disabled.isPendingEligible(taxonomy("MFN-1", null, 10)));
     }
 
     @Test
