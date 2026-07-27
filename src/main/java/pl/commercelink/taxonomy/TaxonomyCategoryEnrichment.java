@@ -30,8 +30,8 @@ public class TaxonomyCategoryEnrichment {
                 taxonomy.rawCategory(), cached.categoryId());
     }
 
-    public boolean isPendingEligible(String supplierName, Taxonomy taxonomy) {
-        return properties.allows(supplierName)
+    public boolean isPendingEligible(Taxonomy taxonomy) {
+        return properties.enabled()
                 && isNotBlank(taxonomy.mfn()) && isNotBlank(taxonomy.ean())
                 && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name())
                 && taxonomyCache.pendingCount() < properties.pendingCap();

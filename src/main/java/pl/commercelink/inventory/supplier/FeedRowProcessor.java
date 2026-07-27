@@ -19,7 +19,7 @@ class FeedRowProcessor {
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryEnrichment enrichment;
 
-    Optional<InventoryItem> process(ParsedRow parsed, String supplierName, int taxonomyPenalty, FeedParseStats stats) {
+    Optional<InventoryItem> process(ParsedRow parsed, int taxonomyPenalty, FeedParseStats stats) {
         InventoryItem item = dataCorrection.run(parsed.item());
         Taxonomy corrected = dataCorrection.run(parsed.product());
         if (item == null || corrected == null || !item.isSellable()) {
@@ -37,7 +37,7 @@ class FeedRowProcessor {
             return Optional.of(item);
         }
 
-        if (enrichment.isPendingEligible(supplierName, taxonomy)) {
+        if (enrichment.isPendingEligible(taxonomy)) {
             enrichment.addPending(deprioritized);
             stats.markPendingAdded();
         } else {

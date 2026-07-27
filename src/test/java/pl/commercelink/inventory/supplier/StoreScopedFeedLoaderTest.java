@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -133,7 +132,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), eq("Action"), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
         assertEquals(1000, captor.getValue());
     }
 
@@ -174,7 +173,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), eq("Action"), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
         assertEquals(1000, captor.getValue());
     }
 
@@ -195,7 +194,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), eq("Action"), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
         assertEquals(0, captor.getValue());
     }
 
@@ -210,7 +209,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), eq("Action"), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
         assertEquals(0, captor.getValue());
     }
 }

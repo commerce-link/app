@@ -54,7 +54,7 @@ public class CsvProductFeedLoader {
         FeedParseStats stats = new FeedParseStats(supplierName);
         new CSVLoader(reader).readRows(separator, row ->
                 parser.tryParse(row)
-                        .flatMap(parsed -> feedRowProcessor.process(parsed, supplierName, taxonomyPenalty, stats))
+                        .flatMap(parsed -> feedRowProcessor.process(parsed, taxonomyPenalty, stats))
                         .ifPresent(res::add));
         stats.log();
         return dataCleanup.run(res);

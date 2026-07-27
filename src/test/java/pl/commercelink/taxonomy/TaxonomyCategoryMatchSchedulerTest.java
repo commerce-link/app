@@ -43,11 +43,11 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     @Test
-    void sweepIsNoopWhenNoSuppliersConfigured() {
+    void sweepIsNoopWhenDisabled() {
         // given
         cache.add(pending("MFN-1"));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties("", 4, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(false, 4, 300000));
 
         // when
         scheduler.sweep();
@@ -63,7 +63,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         pendingMfns.forEach(mfn -> cache.add(pending(mfn)));
         cache.add(new Taxonomy("1234567890123", "MFN-CAT", "Brand", "Name", "CPU", 5, null, null));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 4, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 4, 300000));
 
         // when
         for (int i = 0; i < 4; i++) {
@@ -84,7 +84,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
 
         // when
         scheduler.sweep();
@@ -106,7 +106,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null, "Karty graficzne"));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
 
         // when
         scheduler.sweep();
@@ -123,7 +123,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         cache.add(pending("MFN-1"));
         doThrow(new IllegalStateException("no sqs")).when(pimCatalog).submitCategoryMatch(any());
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, new TaxonomyCategoryMatchProperties("Acme", 1, 300000));
+                cache, pimCatalog, new TaxonomyCategoryMatchProperties(true, 1, 300000));
 
         // when / then
         scheduler.sweep();

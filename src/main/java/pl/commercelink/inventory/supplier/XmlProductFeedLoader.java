@@ -82,7 +82,7 @@ public class XmlProductFeedLoader {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
 
                     ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                    feedRowProcessor.process(parsed, supplierInfo.name(), taxonomyPenalty, stats)
+                    feedRowProcessor.process(parsed, taxonomyPenalty, stats)
                             .ifPresent(res::add);
                 } else {
                     xsr.next();

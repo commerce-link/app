@@ -55,7 +55,7 @@ class FeedRowProcessorTest {
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertEquals(Optional.of(sellableItem), result);
@@ -70,11 +70,11 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
-        when(enrichment.isPendingEligible("Acme", pendingTaxonomy)).thenReturn(true);
+        when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertTrue(result.isEmpty());
@@ -92,11 +92,11 @@ class FeedRowProcessorTest {
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
-        when(enrichment.isPendingEligible("Acme", pendingTaxonomy)).thenReturn(false);
+        when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertTrue(result.isEmpty());
@@ -116,7 +116,7 @@ class FeedRowProcessorTest {
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertEquals(Optional.of(sellableItem), result);
@@ -134,7 +134,7 @@ class FeedRowProcessorTest {
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, "Acme", 0, stats);
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertTrue(result.isEmpty());
@@ -153,7 +153,7 @@ class FeedRowProcessorTest {
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        processor.process(parsed, "Acme", 1000, stats);
+        processor.process(parsed, 1000, stats);
 
         // then
         verify(taxonomyCache).add(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));

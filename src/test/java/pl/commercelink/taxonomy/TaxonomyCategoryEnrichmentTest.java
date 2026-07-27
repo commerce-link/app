@@ -31,7 +31,7 @@ class TaxonomyCategoryEnrichmentTest {
         cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
         enrichment = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties("Acme, Elko", 100, 2));
+                new TaxonomyCategoryMatchProperties(true, 100, 2));
     }
 
     @Test
@@ -71,13 +71,22 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
-    void pendingEligibleOnlyForAllowlistedSupplier() {
+    void pendingEligibleForEverySupplierWhenEnabled() {
         // given
         Taxonomy taxonomy = taxonomy("MFN-1", null, 10);
 
         // when / then
-        assertTrue(enrichment.isPendingEligible("Acme", taxonomy));
-        assertFalse(enrichment.isPendingEligible("Morele", taxonomy));
+        assertTrue(enrichment.isPendingEligible(taxonomy));
+    }
+
+    @Test
+    void pendingNotEligibleWhenDisabled() {
+        // given
+        TaxonomyCategoryEnrichment disabled = new TaxonomyCategoryEnrichment(cache,
+                new TaxonomyCategoryMatchProperties(false, 100, 2));
+
+        // when / then
+        assertFalse(disabled.isPendingEligible(taxonomy("MFN-1", null, 10)));
     }
 
     @Test
@@ -86,7 +95,7 @@ class TaxonomyCategoryEnrichmentTest {
         Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", "", "Name", null, 10, null, null);
 
         // when / then
-        assertFalse(enrichment.isPendingEligible("Acme", noBrand));
+        assertFalse(enrichment.isPendingEligible(noBrand));
     }
 
     @Test
@@ -96,7 +105,7 @@ class TaxonomyCategoryEnrichmentTest {
         enrichment.addPending(taxonomy("MFN-2", null, 10));
 
         // when / then
-        assertFalse(enrichment.isPendingEligible("Acme", taxonomy("MFN-3", null, 10)));
+        assertFalse(enrichment.isPendingEligible(taxonomy("MFN-3", null, 10)));
     }
 
     @Test
