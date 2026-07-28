@@ -138,7 +138,7 @@ class OrdersManagerTest {
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Inne");
+        assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Uncategorized");
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");
