@@ -3,6 +3,8 @@ package pl.commercelink.taxonomy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
@@ -10,6 +12,7 @@ public class TaxonomyCategoryEnrichment {
 
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryMatchProperties properties;
+    private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
 
     TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties) {
         this.taxonomyCache = taxonomyCache;
@@ -36,8 +39,15 @@ public class TaxonomyCategoryEnrichment {
                 && taxonomyCache.pendingCount() < properties.pendingCap();
     }
 
-    public void addPending(Taxonomy taxonomy) {
+    public void addPending(Taxonomy taxonomy, String supplier) {
+        if (isNotBlank(supplier) && isNotBlank(taxonomy.mfn())) {
+            supplierByMfn.put(taxonomy.mfn(), supplier);
+        }
         taxonomyCache.add(taxonomy);
+    }
+
+    public String supplierOf(String mfn) {
+        return supplierByMfn.get(mfn);
     }
 
     public void applyMatch(CategoryMatchedEvent event) {

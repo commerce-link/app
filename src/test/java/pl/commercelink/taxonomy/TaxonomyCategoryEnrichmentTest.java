@@ -91,8 +91,8 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void pendingNotEligibleAboveCap() {
         // given (cap = 2)
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
-        enrichment.addPending(taxonomy("MFN-2", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        enrichment.addPending(taxonomy("MFN-2", null, 10), "Acme");
 
         // when / then
         assertFalse(enrichment.isPendingEligible(taxonomy("MFN-3", null, 10)));
@@ -101,8 +101,8 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void addPendingCountsEachMfnOnce() {
         // when
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
-        enrichment.addPending(taxonomy("MFN-1", null, 5));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        enrichment.addPending(taxonomy("MFN-1", null, 5), "Acme");
 
         // then
         assertEquals(1, enrichment.pendingCount());
@@ -110,9 +110,20 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
+    void addPendingRecordsSupplierForMfn() {
+        // when
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        enrichment.addPending(taxonomy("MFN-2", null, 10), null);
+
+        // then
+        assertEquals("Acme", enrichment.supplierOf("MFN-1"));
+        assertNull(enrichment.supplierOf("MFN-2"));
+    }
+
+    @Test
     void applyMatchUpdatesCacheAndDecrementsCounter() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.9, "mock"));
@@ -126,7 +137,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchAcceptsArbitraryCategoryName() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "Dowolna Kategoria", "999", null, "mock"));
@@ -139,7 +150,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void pendingCountDropsWhenAnotherSupplierDeliversCategorizedEntry() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
         assertEquals(1, enrichment.pendingCount());
 
         // when
@@ -152,7 +163,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchIgnoresBlankCategoryMissingEntryAndNull() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10));
+        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "", null, null, "mock"));

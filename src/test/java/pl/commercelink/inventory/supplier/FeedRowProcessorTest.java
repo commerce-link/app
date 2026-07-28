@@ -72,13 +72,14 @@ class FeedRowProcessorTest {
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
+        when(stats.supplierName()).thenReturn("Acme");
 
         // when
         Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
         assertTrue(result.isEmpty());
-        verify(enrichment).addPending(pendingTaxonomy);
+        verify(enrichment).addPending(pendingTaxonomy, "Acme");
         verify(taxonomyCache, never()).add(any());
         verify(stats).markPendingAdded();
         verify(stats, never()).markDropped();
@@ -100,7 +101,7 @@ class FeedRowProcessorTest {
 
         // then
         assertTrue(result.isEmpty());
-        verify(enrichment, never()).addPending(any());
+        verify(enrichment, never()).addPending(any(), any());
         verify(taxonomyCache, never()).add(any());
         verify(stats).markDropped();
         verify(stats, never()).markPendingAdded();
@@ -139,7 +140,7 @@ class FeedRowProcessorTest {
         // then
         assertTrue(result.isEmpty());
         verify(taxonomyCache, never()).add(any());
-        verify(enrichment, never()).addPending(any());
+        verify(enrichment, never()).addPending(any(), any());
         verifyNoInteractions(stats);
     }
 

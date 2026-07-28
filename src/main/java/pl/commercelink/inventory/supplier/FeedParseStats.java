@@ -11,6 +11,10 @@ final class FeedParseStats {
         this.supplierName = supplierName;
     }
 
+    String supplierName() {
+        return supplierName;
+    }
+
     void markAdopted() {
         adopted++;
     }

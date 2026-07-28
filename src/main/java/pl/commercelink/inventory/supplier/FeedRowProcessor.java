@@ -38,7 +38,7 @@ class FeedRowProcessor {
         }
 
         if (enrichment.isPendingEligible(taxonomy)) {
-            enrichment.addPending(deprioritized);
+            enrichment.addPending(deprioritized, stats.supplierName());
             stats.markPendingAdded();
         } else {
             stats.markDropped();
