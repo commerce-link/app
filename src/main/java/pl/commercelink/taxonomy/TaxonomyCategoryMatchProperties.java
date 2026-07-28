@@ -14,7 +14,7 @@ public class TaxonomyCategoryMatchProperties {
     private final double mappingMinConfidence;
     private final int mappingTrickleEvery;
 
-    TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
+    public TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
         this(buckets, pendingCap, 5, 0.9, 0.9, 20);
     }
 
