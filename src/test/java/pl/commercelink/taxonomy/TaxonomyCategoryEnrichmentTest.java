@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
+import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
 import java.util.ArrayList;
 
@@ -15,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class TaxonomyCategoryEnrichmentTest {
@@ -25,13 +29,16 @@ class TaxonomyCategoryEnrichmentTest {
     @Mock
     private TaxonomyRepository taxonomyRepository;
 
+    @Mock
+    private CategoryMappingCache mappingCache;
+
     @BeforeEach
     void setUp() {
         Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
         cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
         enrichment = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties(100, 2));
+                new TaxonomyCategoryMatchProperties(100, 2), mappingCache);
     }
 
     @Test
@@ -175,7 +182,78 @@ class TaxonomyCategoryEnrichmentTest {
         assertEquals(1, enrichment.pendingCount());
     }
 
+    @Test
+    void applyMatchLearnsMappingSampleFromConfidentAnswer() {
+        // given
+        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini"));
+
+        // then
+        verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
+    }
+
+    @Test
+    void applyMatchLearnsFromPimIndexAnswerWithoutConfidence() {
+        // given
+        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", null, "pim-index"));
+
+        // then
+        verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
+    }
+
+    @Test
+    void applyMatchSkipsLearningBelowConfidenceThreshold() {
+        // given
+        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.85, "gemini"));
+
+        // then
+        verify(mappingCache, never()).recordSample(any(), any(), any(), any());
+        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+    }
+
+    @Test
+    void applyMatchSkipsLearningWithoutSupplierRawCategoryOrCategoryId() {
+        // given
+        enrichment.addPending(pendingWithRawCategory("MFN-NO-SUPPLIER", "Karty graficzne"), null);
+        enrichment.addPending(taxonomy("MFN-NO-RAW", null, 10), "Acme");
+        enrichment.addPending(pendingWithRawCategory("MFN-NO-CAT-ID", "Karty graficzne"), "Acme");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-SUPPLIER", "GPU", "301", 0.95, "gemini"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-RAW", "GPU", "301", 0.95, "gemini"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-CAT-ID", "GPU", null, 0.95, "gemini"));
+
+        // then
+        verify(mappingCache, never()).recordSample(any(), any(), any(), any());
+    }
+
+    @Test
+    void applyMatchLearnsOnlyOnceForDuplicateEvent() {
+        // given
+        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+        CategoryMatchedEvent event = new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini");
+
+        // when
+        enrichment.applyMatch(event);
+        enrichment.applyMatch(event);
+
+        // then
+        verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
+    }
+
     private static Taxonomy taxonomy(String mfn, String category, int score) {
         return new Taxonomy("1234567890123", mfn, "Brand", "Name", category, score, null, null);
+    }
+
+    private static Taxonomy pendingWithRawCategory(String mfn, String rawCategory) {
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 10, null, null, rawCategory);
     }
 }

@@ -2,9 +2,11 @@ package pl.commercelink.taxonomy;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
+import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
@@ -12,11 +14,14 @@ public class TaxonomyCategoryEnrichment {
 
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryMatchProperties properties;
+    private final CategoryMappingCache mappingCache;
     private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
 
-    TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties) {
+    TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties,
+                               CategoryMappingCache mappingCache) {
         this.taxonomyCache = taxonomyCache;
         this.properties = properties;
+        this.mappingCache = mappingCache;
     }
 
     public Taxonomy enrich(Taxonomy taxonomy) {
@@ -58,7 +63,23 @@ public class TaxonomyCategoryEnrichment {
         if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
+            learnMapping(event);
         }
+    }
+
+    private void learnMapping(CategoryMatchedEvent event) {
+        String supplier = supplierByMfn.remove(event.mfn());
+        if (supplier == null || isBlank(event.categoryId())) {
+            return;
+        }
+        if (event.confidence() != null && event.confidence() < properties.mappingMinConfidence()) {
+            return;
+        }
+        Taxonomy taxonomy = taxonomyCache.findByMfn(event.mfn());
+        if (taxonomy == null || isBlank(taxonomy.rawCategory())) {
+            return;
+        }
+        mappingCache.recordSample(supplier, taxonomy.rawCategory(), event.categoryId(), event.category());
     }
 
     public int pendingCount() {
