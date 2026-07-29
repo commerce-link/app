@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.taxonomy.TaxonomyCategoryMatchProperties;
 
 import java.util.HashMap;
@@ -29,6 +31,9 @@ class CategoryMappingCacheTest {
     @Mock
     private CategoryMappingRepository repository;
 
+    @Mock
+    private PimCatalog pimCatalog;
+
     private CategoryMappingCache mappingCache;
     private final Map<String, CategoryMapping> store = new HashMap<>();
 
@@ -41,7 +46,17 @@ class CategoryMappingCacheTest {
             store.put(mapping.getSupplier() + "|" + mapping.getRawCategory(), mapping);
             return null;
         }).when(repository).save(any(CategoryMapping.class));
-        mappingCache = new CategoryMappingCache(repository, new TaxonomyCategoryMatchProperties(100, 300000));
+        lenient().when(pimCatalog.allCategories()).thenReturn(categoryTree());
+        mappingCache = new CategoryMappingCache(repository, new TaxonomyCategoryMatchProperties(100, 300000), pimCatalog);
+    }
+
+    private static List<PimCategory> categoryTree() {
+        return List.of(
+                new PimCategory("2833", null, "Komputery i urządzenia peryferyjne", "pl"),
+                new PimCategory("206", "2833", "Przechowywanie danych", "pl"),
+                new PimCategory("301", "206", "GPU", "pl"),
+                new PimCategory("999", "206", "Inna", "pl"),
+                new PimCategory("777", "206", "Cokolwiek", "pl"));
     }
 
     @Test
@@ -90,6 +105,62 @@ class CategoryMappingCacheTest {
 
         // then
         assertThat(mappingCache.findActive("Acme", "Karty graficzne")).isEmpty();
+    }
+
+    @Test
+    void nonLeafSampleIsIgnored() {
+        // when
+        for (int i = 0; i < 5; i++) {
+            mappingCache.recordSample("Acme", "Dyski", "206", "Przechowywanie danych");
+        }
+
+        // then
+        verify(repository, never()).save(any(CategoryMapping.class));
+        assertThat(mappingCache.findActive("Acme", "Dyski")).isEmpty();
+    }
+
+    @Test
+    void rootCategorySampleIsIgnored() {
+        // when
+        mappingCache.recordSample("Acme", "Komputery", "2833", "Komputery i urządzenia peryferyjne");
+
+        // then
+        verify(repository, never()).save(any(CategoryMapping.class));
+    }
+
+    @Test
+    void unknownCategorySampleIsIgnored() {
+        // when
+        mappingCache.recordSample("Acme", "Dyski", "555", "Nieznana");
+
+        // then
+        verify(repository, never()).save(any(CategoryMapping.class));
+    }
+
+    @Test
+    void samplesAreIgnoredWhenCategoryTreeUnavailable() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of());
+
+        // when
+        mappingCache.recordSample("Acme", "Karty graficzne", "301", "GPU");
+
+        // then
+        verify(repository, never()).save(any(CategoryMapping.class));
+    }
+
+    @Test
+    void leafIndexRebuildsOnceTreeBecomesAvailable() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of()).thenReturn(categoryTree());
+        mappingCache.recordSample("Acme", "Karty graficzne", "301", "GPU");
+        verify(repository, never()).save(any(CategoryMapping.class));
+
+        // when
+        mappingCache.recordSample("Acme", "Karty graficzne", "301", "GPU");
+
+        // then
+        verify(repository, atLeastOnce()).save(any(CategoryMapping.class));
     }
 
     @Test

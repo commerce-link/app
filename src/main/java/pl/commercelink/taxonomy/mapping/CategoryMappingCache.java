@@ -3,11 +3,17 @@ package pl.commercelink.taxonomy.mapping;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.taxonomy.TaxonomyCategoryMatchProperties;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -18,11 +24,15 @@ public class CategoryMappingCache {
 
     private final CategoryMappingRepository repository;
     private final TaxonomyCategoryMatchProperties properties;
+    private final PimCatalog pimCatalog;
     private final ConcurrentHashMap<String, ActiveMapping> activeByKey = new ConcurrentHashMap<>();
+    private LeafIndex leafIndex = LeafIndex.EMPTY;
 
-    CategoryMappingCache(CategoryMappingRepository repository, TaxonomyCategoryMatchProperties properties) {
+    CategoryMappingCache(CategoryMappingRepository repository, TaxonomyCategoryMatchProperties properties,
+                         PimCatalog pimCatalog) {
         this.repository = repository;
         this.properties = properties;
+        this.pimCatalog = pimCatalog;
     }
 
     @PostConstruct
@@ -49,6 +59,11 @@ public class CategoryMappingCache {
         if (isBlank(supplier) || isBlank(rawCategory) || isBlank(categoryId)) {
             return;
         }
+        if (!isLeaf(categoryId)) {
+            System.out.println("Category mapping sample skipped (non-leaf category): supplier=" + supplier
+                    + " rawCategory=" + rawCategory + " categoryId=" + categoryId);
+            return;
+        }
         String rawKey = normalize(rawCategory);
         try {
             CategoryMapping mapping = repository.find(supplier, rawKey);
@@ -68,6 +83,35 @@ public class CategoryMappingCache {
             }
         } catch (Exception e) {
             System.out.println("Category mapping sample skipped: " + e.getMessage());
+        }
+    }
+
+    private boolean isLeaf(String categoryId) {
+        if (leafIndex.isEmpty()) {
+            leafIndex = LeafIndex.from(pimCatalog.allCategories());
+        }
+        return leafIndex.isLeaf(categoryId);
+    }
+
+    private record LeafIndex(Set<String> ids, Set<String> parentIds) {
+
+        private static final LeafIndex EMPTY = new LeafIndex(Set.of(), Set.of());
+
+        private static LeafIndex from(List<PimCategory> categories) {
+            if (categories == null) {
+                return EMPTY;
+            }
+            return new LeafIndex(
+                    categories.stream().map(PimCategory::id).filter(Objects::nonNull).collect(Collectors.toSet()),
+                    categories.stream().map(PimCategory::parentId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        }
+
+        private boolean isEmpty() {
+            return ids.isEmpty();
+        }
+
+        private boolean isLeaf(String categoryId) {
+            return ids.contains(categoryId) && !parentIds.contains(categoryId);
         }
     }
 
