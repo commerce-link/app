@@ -13,7 +13,7 @@ import java.util.List;
 
 
 @Component
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
 public class MarketplaceOrdersImportEventListener {
 
     @Autowired
