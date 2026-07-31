@@ -302,4 +302,29 @@ class V010_MigrateCategoryDefinitionCategoriesTest {
         assertThat(categoriesOf(writtenDefinition)).isEmpty();
         assertThat(writtenDefinition.getM().get("category").getS()).isEqualTo("Services");
     }
+
+    @Test
+    void resolvesCollidingNameToTheLeafWhenBuildingTheMapFromTheRealTree() {
+        // given
+        PimCategory root = new PimCategory("1", null, "Elektronika", "pl");
+        PimCategory internalNode = new PimCategory("8760", "1", "Telewizory", "pl");
+        PimCategory internalChild = new PimCategory("8761", "8760", "Telewizory plazmowe", "pl");
+        PimCategory leaf = new PimCategory("1584", "1", "Telewizory", "pl");
+        when(pimCatalog.allCategories()).thenReturn(List.of(root, internalNode, internalChild, leaf));
+        Map<String, AttributeValue> item = Map.of(
+                "storeId", new AttributeValue().withS("store-1"),
+                "catalogId", new AttributeValue().withS("catalog-1"),
+                "categories", list(definition("Telewizory", null)));
+        when(dynamoDB.scan(any(ScanRequest.class))).thenReturn(new ScanResult().withItems(List.of(item)));
+
+        // when
+        migration.migrateCategories();
+
+        // then
+        ArgumentCaptor<UpdateItemRequest> captor = ArgumentCaptor.forClass(UpdateItemRequest.class);
+        verify(dynamoDB).updateItem(captor.capture());
+        AttributeValue writtenDefinition = captor.getValue().getExpressionAttributeValues()
+                .get(":categories").getL().get(0);
+        assertThat(categoriesOf(writtenDefinition)).containsExactly("1584").doesNotContain("8760");
+    }
 }
