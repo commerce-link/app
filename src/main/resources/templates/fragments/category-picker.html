@@ -52,6 +52,8 @@
 </div>
 
 <div th:fragment="multiPicker(fieldName, options, selectedIds, disabled)" class="category-multi-picker">
+    <input type="hidden" name="categories" th:each="id : ${selectedIds}" th:value="${id}" data-multi-initial>
+
     <div th:if="${disabled}" class="control">
         <input class="input" type="text" disabled
                th:value="${#strings.listJoin(selectedIds, ', ')}">
@@ -358,6 +360,7 @@
                 let query = '';
 
                 const syncInputs = () => {
+                    picker.parentElement.querySelectorAll('[data-multi-initial]').forEach(node => node.remove());
                     inputs.innerHTML = '';
                     selected.forEach(id => {
                         const input = document.createElement('input');
