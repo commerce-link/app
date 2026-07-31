@@ -227,4 +227,196 @@ class PimCategoryOptionsTest {
         // then
         assertThat(options).containsExactly("Stoły");
     }
+
+    @Test
+    void leafOptionsUnderReturnsIdAndNameForLeavesOnly() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble do domu", "pl"),
+                new PimCategory("3", "2", "Stoły", "pl"),
+                new PimCategory("4", "2", "Krzesła", "pl")
+        ));
+
+        // when
+        List<CategoryOption> options = pimCategoryOptions().leafOptionsUnder(List.of("Dom"));
+
+        // then
+        assertThat(options).containsExactly(
+                new CategoryOption("4", "Krzesła"),
+                new CategoryOption("3", "Stoły"));
+    }
+
+    @Test
+    void leafOptionsUnderIgnoresOtherLanguages() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl"),
+                new PimCategory("3", null, "Home", "en"),
+                new PimCategory("4", "3", "Tables", "en")
+        ));
+
+        // when
+        List<CategoryOption> options = pimCategoryOptions().leafOptionsUnder(List.of("Dom"));
+
+        // then
+        assertThat(options).containsExactly(new CategoryOption("2", "Stoły"));
+    }
+
+    @Test
+    void categoryOptionsByIdAppendCurrentIdsOutsideEnabledTopLevels() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl"),
+                new PimCategory("9", null, "Biuro", "pl"),
+                new PimCategory("10", "9", "Ławki", "pl")
+        ));
+
+        // when
+        List<CategoryOption> options = pimCategoryOptions().categoryOptionsById(List.of("Dom"), List.of("10"));
+
+        // then
+        assertThat(options).containsExactly(
+                new CategoryOption("10", "Ławki"),
+                new CategoryOption("2", "Stoły"));
+    }
+
+    @Test
+    void categoryOptionsByIdDoNotDuplicateCurrentIdsAlreadyAvailable() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when
+        List<CategoryOption> options = pimCategoryOptions().categoryOptionsById(List.of("Dom"), List.of("2", "2"));
+
+        // then
+        assertThat(options).containsExactly(new CategoryOption("2", "Stoły"));
+    }
+
+    @Test
+    void categoryOptionsByIdIgnoreUnresolvableCurrentIds() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when
+        List<CategoryOption> options = pimCategoryOptions().categoryOptionsById(List.of("Dom"), List.of("nope"));
+
+        // then
+        assertThat(options).containsExactly(new CategoryOption("2", "Stoły"));
+    }
+
+    @Test
+    void namesOfResolvesIdsInPolishCollationOrder() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "1", "Łóżka", "pl")
+        ));
+
+        // when
+        List<String> names = pimCategoryOptions().namesOf(List.of("2", "3"));
+
+        // then
+        assertThat(names).containsExactly("Łóżka", "Meble");
+    }
+
+    @Test
+    void namesOfSkipsUnresolvableIds() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl")
+        ));
+
+        // when
+        List<String> names = pimCategoryOptions().namesOf(List.of("2", "missing"));
+
+        // then
+        assertThat(names).containsExactly("Meble");
+    }
+
+    @Test
+    void namesOfResolvesInternalNodesToo() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "2", "Stoły", "pl")
+        ));
+
+        // when
+        List<String> names = pimCategoryOptions().namesOf(List.of("2"));
+
+        // then
+        assertThat(names).containsExactly("Meble");
+    }
+
+    @Test
+    void joinedNamesOfJoinsWithCommaSpace() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "1", "Łóżka", "pl")
+        ));
+
+        // when
+        String joined = pimCategoryOptions().joinedNamesOf(List.of("2", "3"));
+
+        // then
+        assertThat(joined).isEqualTo("Łóżka, Meble");
+    }
+
+    @Test
+    void joinedNamesOfIsEmptyStringForNoIds() {
+        // when / then
+        assertThat(pimCategoryOptions().joinedNamesOf(List.of())).isEmpty();
+    }
+
+    @Test
+    void selectionOfCarriesIdsAndResolvedNames() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "1", "Łóżka", "pl")
+        ));
+
+        // when
+        CategorySelection selection = pimCategoryOptions().selectionOf(List.of("2", "3"));
+
+        // then
+        assertThat(selection.categoryIds()).containsExactlyInAnyOrder("2", "3");
+        assertThat(selection.categoryNames()).containsExactlyInAnyOrder("Meble", "Łóżka");
+    }
+
+    @Test
+    void selectionOfIsEmptyForNoIds() {
+        // when / then
+        assertThat(pimCategoryOptions().selectionOf(List.of()).isEmpty()).isTrue();
+    }
+
+    @Test
+    void selectionOfKeepsIdsThatCannotBeResolvedToNames() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl")
+        ));
+
+        // when
+        CategorySelection selection = pimCategoryOptions().selectionOf(List.of("gone"));
+
+        // then
+        assertThat(selection.categoryIds()).containsExactly("gone");
+        assertThat(selection.categoryNames()).isEmpty();
+    }
 }
