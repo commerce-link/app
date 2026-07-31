@@ -2,10 +2,11 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.brand.BrandMapper;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,8 +32,7 @@ class DataCorrectionTest {
 
     @Test
     void usesPimNetAndGrossWhenBothPresentAndApproved() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, 999, 1999);
+        SupplierProduct fromFeed = feed(999, 1999);
         PimEntry pim = pimEntry(true, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
@@ -44,8 +44,7 @@ class DataCorrectionTest {
 
     @Test
     void usesPimNetAndFeedGrossWhenPimHasOnlyNet() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, null, 1999);
+        SupplierProduct fromFeed = feed(null, 1999);
         PimEntry pim = pimEntry(true, 7000, null);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
@@ -57,8 +56,7 @@ class DataCorrectionTest {
 
     @Test
     void usesFeedWeightsWhenPimHasNoneOfTheTwo() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, 100, 200);
+        SupplierProduct fromFeed = feed(100, 200);
         PimEntry pim = pimEntry(true, null, null);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
@@ -70,8 +68,7 @@ class DataCorrectionTest {
 
     @Test
     void usesFeedWeightsWhenPimEntryIsNotApproved() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, 100, 200);
+        SupplierProduct fromFeed = feed(100, 200);
         PimEntry unapproved = pimEntry(false, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(unapproved));
 
@@ -83,8 +80,7 @@ class DataCorrectionTest {
 
     @Test
     void usesFeedWeightsWhenNoPimEntryFound() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, 100, 200);
+        SupplierProduct fromFeed = feed(100, 200);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.empty());
 
         Taxonomy result = dataCorrection.run(fromFeed);
@@ -95,8 +91,7 @@ class DataCorrectionTest {
 
     @Test
     void scoreIsZeroedWhenPimMatchesApproved() {
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "Other", 5, 100, 200);
+        SupplierProduct fromFeed = feed(100, 200);
         PimEntry pim = pimEntry(true, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
@@ -106,10 +101,23 @@ class DataCorrectionTest {
     }
 
     @Test
-    void keepsFeedCategoryWhenPimCategoryIsUnknown() {
+    void categoryStaysNullWhenPimCategoryIsBlank() {
         // given
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "CPU", 5, 100, 200);
+        SupplierProduct fromFeed = feed("CPU", 100, 200);
+        PimEntry pim = pimEntry(null, true, 7000, 9000);
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isNull();
+    }
+
+    @Test
+    void usesPimCategoryName() {
+        // given
+        SupplierProduct fromFeed = feed("CPU", 100, 200);
         PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
@@ -117,22 +125,60 @@ class DataCorrectionTest {
         Taxonomy result = dataCorrection.run(fromFeed);
 
         // then
-        assertThat(result.category()).isEqualTo("CPU");
+        assertThat(result.category()).isEqualTo("Smartwatches");
     }
 
     @Test
-    void overridesFeedCategoryWhenPimCategoryIsKnown() {
+    void carriesCategoryAndCategoryIdFromPimWhenPresent() {
         // given
-        Taxonomy fromFeed = new Taxonomy("1234567890123", "MFN", "FeedBrand", "FeedName",
-                "CPU", 5, 100, 200);
-        PimEntry pim = pimEntry("GPU", true, 7000, 9000);
+        SupplierProduct fromFeed = feed("rawCPU", 100, 200);
+        PimEntry pim = new PimEntry("pim-id", List.of(), "PimBrand", "PimName",
+                "Karty graficzne", "subcategory", true, 7000, 9000, "170");
         when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
         Taxonomy result = dataCorrection.run(fromFeed);
 
         // then
-        assertThat(result.category()).isEqualTo("GPU");
+        assertThat(result.category()).isEqualTo("Karty graficzne");
+        assertThat(result.categoryId()).isEqualTo("170");
+    }
+
+    @Test
+    void categoryIdStaysNullWhenPimCategoryIdIsBlank() {
+        // given
+        SupplierProduct fromFeed = feed("rawCPU", 100, 200);
+        PimEntry pim = new PimEntry("pim-id", List.of(), "PimBrand", "PimName",
+                "Karty graficzne", "subcategory", true, 7000, 9000, "");
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.categoryId()).isNull();
+    }
+
+    @Test
+    void resolvesServicesCategoryFromRawCategoryWithoutPim() {
+        // given
+        SupplierProduct fromFeed = feed("Services", 100, 200);
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.category()).isEqualTo("Services");
+        assertThat(result.rawCategory()).isEqualTo("Services");
+    }
+
+    private SupplierProduct feed(Integer net, Integer gross) {
+        return new SupplierProduct("1234567890123", "MFN", "FeedBrand", "FeedName", 5, net, gross);
+    }
+
+    private SupplierProduct feed(String rawCategory, Integer net, Integer gross) {
+        return new SupplierProduct("1234567890123", "MFN", "FeedBrand", "FeedName", 5, net, gross, rawCategory);
     }
 
     private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {

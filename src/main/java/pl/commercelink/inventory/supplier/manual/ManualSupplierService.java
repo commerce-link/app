@@ -156,7 +156,7 @@ public class ManualSupplierService {
         AtomicInteger loadable = new AtomicInteger();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(csvBytes), StandardCharsets.UTF_8)) {
             new CSVLoader(reader).readRows(';', row -> parser.tryParse(row).ifPresent(parsed -> {
-                if (parsed.taxonomy().isProcessable() && parsed.item().isSellable()) {
+                if (parsed.item().isSellable()) {
                     loadable.incrementAndGet();
                 }
             }));

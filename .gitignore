@@ -52,3 +52,7 @@ update.env
 /.dynamodb-data/
 /.ministack-data/
 
+### Python (tools/)
+__pycache__/
+*.pyc
+

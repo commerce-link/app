@@ -285,6 +285,7 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
+        // qty=0 is not sellable (isSellable() requires qty>0), so no row is loadable
         String csv = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
                 + "5901234123457;MFN-1;BrandX;Mysz;Mice;12,50;PLN;0;2\n";
         byte[] csvBytes = csv.getBytes(StandardCharsets.UTF_8);

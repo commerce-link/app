@@ -6,7 +6,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.inventory.deliveries.Delivered;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
@@ -26,7 +26,7 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 public abstract class Item implements Delivered {
 
     // general information
-    private String category = ProductCategories.OTHER;
+    private String category = Categories.UNCATEGORIZED;
     private boolean service;
     @DynamoDBAttribute(attributeName = "name")
     private String name;

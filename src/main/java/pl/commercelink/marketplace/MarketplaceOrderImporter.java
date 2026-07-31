@@ -8,7 +8,7 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.orders.*;
-import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.CountryCodeConverter;
@@ -134,7 +134,7 @@ public class MarketplaceOrderImporter {
     private String resolveProductCategory(String mfn) {
         return pimCatalog.findByMpn(mfn)
                 .map(PimEntry::category)
-                .orElse(ProductCategories.OTHER);
+                .orElse(Categories.UNCATEGORIZED);
     }
 
     private PaymentSource resolvePaymentSource(String paymentType) {

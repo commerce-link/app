@@ -4,7 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.Collection;
 import java.util.List;

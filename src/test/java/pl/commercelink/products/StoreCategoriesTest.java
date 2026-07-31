@@ -32,7 +32,7 @@ class StoreCategoriesTest {
         List<String> names = storeCategories.namesFor("store-1");
 
         // then
-        assertThat(names).containsExactly("Krzesło", "Biurko", "Obudowa", "Procesor", "Other");
+        assertThat(names).containsExactly("Krzesło", "Biurko", "Obudowa", "Procesor", "Uncategorized");
     }
 
     @Test
@@ -46,7 +46,7 @@ class StoreCategoriesTest {
         List<String> names = storeCategories.namesFor("store-1");
 
         // then
-        assertThat(names).containsExactly("Obudowa", "Procesor", "Other");
+        assertThat(names).containsExactly("Obudowa", "Procesor", "Uncategorized");
     }
 
     @Test
@@ -62,16 +62,16 @@ class StoreCategoriesTest {
 
         // then
         assertThat(groups).extracting(StoreCategories.Group::catalog)
-                .containsExactly("Meble biurowe", "Podzespoły komputerowe", "Other");
+                .containsExactly("Meble biurowe", "Podzespoły komputerowe", "Uncategorized");
         assertThat(groups.get(0).names()).containsExactly("Krzesło", "Biurko");
         assertThat(groups.get(1).names()).containsExactly("Obudowa");
-        assertThat(groups.get(2).names()).containsExactly("Other");
+        assertThat(groups.get(2).names()).containsExactly("Uncategorized");
     }
 
     @Test
     void groupsForSkipsSyntheticOtherGroupWhenCatalogAlreadyDefinesIt() {
         // given
-        ProductCatalog catalog = catalog("Meble biurowe", definition("Krzesło", 1), definition("Other", 2));
+        ProductCatalog catalog = catalog("Meble biurowe", definition("Krzesło", 1), definition("Uncategorized", 2));
         when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
 
         // when
@@ -79,7 +79,7 @@ class StoreCategoriesTest {
 
         // then
         assertThat(groups).extracting(StoreCategories.Group::catalog).containsExactly("Meble biurowe");
-        assertThat(groups.get(0).names()).containsExactly("Krzesło", "Other");
+        assertThat(groups.get(0).names()).containsExactly("Krzesło", "Uncategorized");
     }
 
     private ProductCatalog catalog(String name, CategoryDefinition... definitions) {

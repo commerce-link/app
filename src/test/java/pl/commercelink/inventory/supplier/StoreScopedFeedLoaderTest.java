@@ -17,7 +17,7 @@ import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -46,11 +46,9 @@ class StoreScopedFeedLoaderTest {
     @Mock
     private StoreFeedRepository storeFeedRepository;
     @Mock
-    private DataCorrection dataCorrection;
-    @Mock
     private DataCleanup dataCleanup;
     @Mock
-    private pl.commercelink.taxonomy.TaxonomyCache taxonomyCache;
+    private FeedRowProcessor feedRowProcessor;
 
     @InjectMocks
     private CsvProductFeedLoader loader;
@@ -118,26 +116,24 @@ class StoreScopedFeedLoaderTest {
     }
 
     @Test
-    void csvStoreOverloadBumpsTaxonomyScoreByPenalty() throws Exception {
+    void csvStoreOverloadPassesTaxonomyPenaltyToProcessor() throws Exception {
         // given
         when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
         when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
-        when(dataCorrection.run(item)).thenReturn(item);
-        when(dataCorrection.run(taxonomy)).thenReturn(taxonomy);
+        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
+        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         loader.fetch(parser, ';', "store-1", "Action", 1000);
 
         // then
-        ArgumentCaptor<Taxonomy> captor = ArgumentCaptor.forClass(Taxonomy.class);
-        verify(taxonomyCache).add(captor.capture());
-        assertEquals(1005, captor.getValue().dataAccuracyScore());
+        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        assertEquals(1000, captor.getValue());
     }
 
     @Test
@@ -167,59 +163,53 @@ class StoreScopedFeedLoaderTest {
     }
 
     @Test
-    void xmlStoreOverloadBumpsTaxonomyScoreByPenalty() throws Exception {
+    void xmlStoreOverloadPassesTaxonomyPenaltyToProcessor() throws Exception {
         // given
         when(storeFeedRepository.read("store-1", "Action", "xml")).thenReturn(new StringReader(XML_FEED));
-        when(dataCorrection.run(any(InventoryItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(dataCorrection.run(any(Taxonomy.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 1000);
 
         // then
-        ArgumentCaptor<Taxonomy> captor = ArgumentCaptor.forClass(Taxonomy.class);
-        verify(taxonomyCache).add(captor.capture());
-        assertEquals(1005, captor.getValue().dataAccuracyScore());
+        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        assertEquals(1000, captor.getValue());
     }
 
     @Test
-    void csvGlobalOverloadDoesNotPenaliseTaxonomy() throws Exception {
+    void csvGlobalOverloadPassesZeroTaxonomyPenaltyToProcessor() throws Exception {
         // given
         when(inventoryRepository.canRead("Action")).thenReturn(true);
         when(inventoryRepository.read("Action")).thenReturn(new StringReader("header\nrow"));
 
         CsvRowParser parser = mock(CsvRowParser.class);
         InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        Taxonomy taxonomy = new Taxonomy("5900000000001", "MFN1", "Brand", "Name", "CPU", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, taxonomy)));
-        when(dataCorrection.run(item)).thenReturn(item);
-        when(dataCorrection.run(taxonomy)).thenReturn(taxonomy);
+        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
+        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         loader.fetch(parser, ';', "Action");
 
         // then
-        ArgumentCaptor<Taxonomy> captor = ArgumentCaptor.forClass(Taxonomy.class);
-        verify(taxonomyCache).add(captor.capture());
-        assertEquals(5, captor.getValue().dataAccuracyScore());
+        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        assertEquals(0, captor.getValue());
     }
 
     @Test
-    void xmlGlobalOverloadDoesNotPenaliseTaxonomy() throws Exception {
+    void xmlGlobalOverloadPassesZeroTaxonomyPenaltyToProcessor() throws Exception {
         // given
         when(inventoryRepository.read("Action", "xml")).thenReturn(new StringReader(XML_FEED));
-        when(dataCorrection.run(any(InventoryItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(dataCorrection.run(any(Taxonomy.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"));
 
         // then
-        ArgumentCaptor<Taxonomy> captor = ArgumentCaptor.forClass(Taxonomy.class);
-        verify(taxonomyCache).add(captor.capture());
-        assertEquals(5, captor.getValue().dataAccuracyScore());
+        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
+        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        assertEquals(0, captor.getValue());
     }
 }

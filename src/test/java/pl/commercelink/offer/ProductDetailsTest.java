@@ -8,7 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;

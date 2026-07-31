@@ -7,9 +7,9 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.taxonomy.ProductCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.Store;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -44,12 +44,12 @@ public class OrdersManager {
         OrderItem orderItem;
         if (!matchedInventory.hasAnyOffers()) {
             String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            orderItem = new OrderItem(order.getOrderId(), ProductCategories.OTHER, "", 1, 0, mfn, store.isPositionConsolidationEnabled(), position);
+            orderItem = new OrderItem(order.getOrderId(), Categories.UNCATEGORIZED, "", 1, 0, mfn, store.isPositionConsolidationEnabled(), position);
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
-                    taxonomy.category(),
+                    StringUtils.isNotBlank(taxonomy.category()) ? taxonomy.category() : Categories.UNCATEGORIZED,
                     taxonomy.name(),
                     1,
                     matchedInventory.getMedianPrice().grossValue(),

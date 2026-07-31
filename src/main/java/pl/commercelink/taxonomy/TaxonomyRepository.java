@@ -4,7 +4,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
@@ -44,7 +43,8 @@ public class TaxonomyRepository {
                     Taxonomy unified = new Taxonomy(parsed.ean(), parsed.mfn(),
                             brandMapper.unifyBrand(parsed.brand()),
                             parsed.name(), parsed.category(), parsed.dataAccuracyScore(),
-                            parsed.netWeightInGrams(), parsed.grossWeightInGrams());
+                            parsed.netWeightInGrams(), parsed.grossWeightInGrams(),
+                            parsed.rawCategory(), parsed.categoryId());
                     taxonomies.add(unified);
                 } catch (Exception e) {
                     System.err.println("Failed to load taxonomy row: " + e.getMessage());

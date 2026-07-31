@@ -3,7 +3,7 @@ package pl.commercelink.products.filters;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.dynamodb.MetadataField;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.Collection;
 import java.util.LinkedList;

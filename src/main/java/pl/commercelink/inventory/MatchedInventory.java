@@ -5,7 +5,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;

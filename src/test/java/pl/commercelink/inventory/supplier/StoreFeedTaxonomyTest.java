@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.Taxonomy;
+import pl.commercelink.taxonomy.Taxonomy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -26,6 +26,20 @@ class StoreFeedTaxonomyTest {
         assertEquals("CPU", result.category());
         assertEquals(100, result.netWeightInGrams());
         assertEquals(120, result.grossWeightInGrams());
+    }
+
+    @Test
+    void preservesCategoryIdWhenApplyingPenalty() {
+        // given
+        Taxonomy withCategoryId = new Taxonomy("5900000000001", "MFN1", "Brand", "Name",
+                "CPU", 5, 100, 120, "raw-category", "cat-123");
+
+        // when
+        Taxonomy result = StoreFeedTaxonomy.deprioritized(withCategoryId, 1000);
+
+        // then
+        assertEquals("cat-123", result.categoryId());
+        assertEquals(1005, result.dataAccuracyScore());
     }
 
     @Test
