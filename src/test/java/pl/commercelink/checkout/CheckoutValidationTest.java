@@ -44,6 +44,17 @@ class CheckoutValidationTest {
     }
 
     @Test
+    @DisplayName("required category is no longer satisfied by an item carrying the legacy PIM category")
+    void legacyPimCategoryNoLongerSatisfiesRequiredDefinition() {
+        // given
+        ProductCatalog catalog = catalogWithRequiredLegacyCategory("Obudowa", "Case");
+
+        // when / then
+        assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     @DisplayName("required category throws when no item matches the definition")
     void throwsWhenRequiredCategoryIsMissing() {
         // given
@@ -75,6 +86,16 @@ class CheckoutValidationTest {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setName(name);
         definition.setCategories(List.of(category));
+        definition.setRequiredDuringOrder(true);
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(definition));
+        return catalog;
+    }
+
+    private ProductCatalog catalogWithRequiredLegacyCategory(String name, String legacyCategory) {
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setName(name);
+        definition.setCategory(legacyCategory);
         definition.setRequiredDuringOrder(true);
         ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
         catalog.setCategories(List.of(definition));
