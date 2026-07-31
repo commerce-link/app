@@ -34,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +45,8 @@ class InventoryViewStoreListingsTest {
     private static final String STORE_ID = "store-1";
     private static final String EAN = "5901234567890";
     private static final String MFN = "MFN-1";
+    private static final String EAN_GPU = "5901234567891";
+    private static final String MFN_GPU = "MFN-2";
 
     @Mock
     private Warehouse warehouse;
@@ -69,6 +73,8 @@ class InventoryViewStoreListingsTest {
     private Inventory inventory;
 
     private static final CategorySelection CPU_SELECTION = CategorySelection.of(List.of("989"), List.of("CPU"));
+    private static final CategorySelection CPU_AND_GRAPHICS_CARDS_SELECTION =
+            CategorySelection.of(List.of(), List.of("CPU", "Karty graficzne"));
 
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
@@ -128,8 +134,27 @@ class InventoryViewStoreListingsTest {
                 .findFirst().orElse(-1);
     }
 
+    private void stubTwoDistinctCategoryGroups() {
+        MatchedInventory cpuGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
+                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry);
+        MatchedInventory graphicsCardGroup = new MatchedInventory(new InventoryKey(EAN_GPU, MFN_GPU),
+                List.of(new InventoryItem(EAN_GPU, MFN_GPU, 2000.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                taxonomyCache, supplierRegistry);
+        stubGlobalIndex(List.of(cpuGroup, graphicsCardGroup));
+        when(taxonomyCache.find(argThat(key -> key != null && key.getProductCodes().contains(MFN))))
+                .thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(argThat(key -> key != null && key.getProductCodes().contains(MFN_GPU))))
+                .thenReturn(new Taxonomy(EAN_GPU, MFN_GPU, "Gigabyte", "RTX 5070", "Karty graficzne", 1, null, null));
+    }
+
+    private long taxonomyFindInvocationCount() {
+        return mockingDetails(taxonomyCache).getInvocations().stream()
+                .filter(invocation -> invocation.getMethod().getName().equals("find"))
+                .count();
+    }
+
     @Test
-    void findAllByProductCategoryReachesStoreOwnInventory() {
+    void findAllByProductCategoriesReachesStoreOwnInventory() {
         // given
         storeWithGlobalAbGroupAndOwnAction();
 
@@ -141,6 +166,37 @@ class InventoryViewStoreListingsTest {
         MatchedInventory matched = result.iterator().next();
         assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action");
         assertThat(priceOf(matched, "Action")).isEqualTo(1380.0);
+    }
+
+    @Test
+    void findAllByProductCategoriesReturnsTheUnionOfDistinctMatchingCategories() {
+        // given
+        stubTwoDistinctCategoryGroups();
+
+        // when
+        Collection<MatchedInventory> union = inventory.withGlobalData().findAllByProductCategories(CPU_AND_GRAPHICS_CARDS_SELECTION);
+        Collection<MatchedInventory> cpuOnly = inventory.withGlobalData().findAllByProductCategories(CPU_SELECTION);
+
+        // then
+        assertThat(union).hasSize(2);
+        assertThat(cpuOnly).hasSize(1);
+        assertThat(cpuOnly.iterator().next().getMfnCodes()).containsExactly(MFN);
+    }
+
+    @Test
+    void findAllByProductCategoriesWalksTaxonomyCacheOncePerKeyRegardlessOfSelectionSize() {
+        // given
+        stubTwoDistinctCategoryGroups();
+
+        // when
+        inventory.withGlobalData().findAllByProductCategories(CPU_SELECTION);
+        long invocationsForOneCategory = taxonomyFindInvocationCount();
+        clearInvocations(taxonomyCache);
+        inventory.withGlobalData().findAllByProductCategories(CPU_AND_GRAPHICS_CARDS_SELECTION);
+        long invocationsForTwoCategories = taxonomyFindInvocationCount();
+
+        // then
+        assertThat(invocationsForTwoCategories).isEqualTo(invocationsForOneCategory);
     }
 
     @Test
@@ -235,7 +291,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findAllByProductCategorySurfacesOwnOnlyProductThroughFullWarehouseChain() {
+    void findAllByProductCategoriesSurfacesOwnOnlyProductThroughFullWarehouseChain() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
@@ -341,7 +397,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findAllByProductCategoryAppendsWarehouseStock() {
+    void findAllByProductCategoriesAppendsWarehouseStock() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
