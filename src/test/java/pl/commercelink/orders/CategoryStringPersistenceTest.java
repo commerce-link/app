@@ -147,6 +147,28 @@ class CategoryStringPersistenceTest {
     }
 
     @Test
+    void categoryDefinitionCategoriesSurviveDynamoDbRoundTrip() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-1");
+        definition.setCategories(List.of("1234", "5678"));
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(definition));
+
+        // when
+        DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
+        DynamoDBMapperTableModel<ProductCatalog> model = mapper.getTableModel(ProductCatalog.class, DynamoDBMapperConfig.DEFAULT);
+        Map<String, AttributeValue> attributes = model.convert(catalog);
+        ProductCatalog restored = model.unconvert(attributes);
+
+        // then
+        Map<String, AttributeValue> nested = attributes.get("categories").getL().get(0).getM();
+        assertThat(nested.get("categories").getL()).extracting(AttributeValue::getS)
+                .containsExactly("1234", "5678");
+        assertThat(restored.getCategories().get(0).getCategories()).containsExactly("1234", "5678");
+    }
+
+    @Test
     void productServiceFlagPersistsAndRestores() {
         // given
         Product product = new Product("cat-def-1");

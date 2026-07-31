@@ -32,6 +32,33 @@ class CategoryDefinitionTest {
         assertThat(completeDefinitionWithoutCategory().isComplete()).isTrue();
     }
 
+    @Test
+    void categoriesDefaultToEmptyList() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition();
+
+        // when / then
+        assertThat(definition.getCategories()).isEmpty();
+    }
+
+    @Test
+    void withCategoriesSetsIds() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition().withCategories("1234", "5678");
+
+        // when / then
+        assertThat(definition.getCategories()).containsExactly("1234", "5678");
+    }
+
+    @Test
+    void completenessIgnoresCategories() {
+        // given
+        CategoryDefinition withoutCategories = completeDefinition();
+
+        // when / then
+        assertThat(withoutCategories.isComplete()).isTrue();
+    }
+
     private CategoryDefinition completeDefinitionWithoutCategory() {
         StockDefinition stock = new StockDefinition();
         stock.setCriticalStockThreshold(1);
@@ -51,5 +78,14 @@ class CategoryDefinitionTest {
                 .withStockDefinition(stock)
                 .withAvailabilityDefinition(availability)
                 .withPriceDefinition(price);
+    }
+
+    private static CategoryDefinition completeDefinition() {
+        return new CategoryDefinition()
+                .withGeneratedId()
+                .withName("Karty graficzne")
+                .withStockDefinition(new StockDefinition(1, 10, 30))
+                .withAvailabilityDefinition(new AvailabilityDefinition(3, 1))
+                .withPriceDefinition(new PriceDefinition(1.00, 0, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP));
     }
 }

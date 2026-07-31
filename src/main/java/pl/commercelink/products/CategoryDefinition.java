@@ -16,8 +16,11 @@ public class CategoryDefinition implements DeletionProtection {
     private String categoryId;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
+    @Deprecated
     @DynamoDBAttribute(attributeName = "category")
     private String category;
+    @DynamoDBAttribute(attributeName = "categories")
+    private List<String> categories = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private CategoryDefinitionType type = CategoryDefinitionType.Managed;
@@ -95,6 +98,11 @@ public class CategoryDefinition implements DeletionProtection {
         return this;
     }
 
+    public CategoryDefinition withCategories(String... categoryIds) {
+        this.categories = new LinkedList<>(Arrays.asList(categoryIds));
+        return this;
+    }
+
     public PriceDefinition findPriceDefinition(String pricingGroup) {
         return priceDefinitions.stream().filter(p -> p.hasPricingGroup(pricingGroup)).findFirst()
                 .orElseThrow(() -> new RuntimeException("No price definition found for pricing group " + pricingGroup));
@@ -152,12 +160,22 @@ public class CategoryDefinition implements DeletionProtection {
         this.name = name;
     }
 
+    @Deprecated
     public String getCategory() {
         return category;
     }
 
+    @Deprecated
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public List<String> getCategories() {
+        return categories;
+    }
+
+    public void setCategories(List<String> categories) {
+        this.categories = categories == null ? new LinkedList<>() : new LinkedList<>(categories);
     }
 
     public boolean isRequiredDuringOrder() {

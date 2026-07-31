@@ -40,6 +40,33 @@ class ProductCatalogTest {
         assertThat(sequenceNumbers).containsExactlyInAnyOrderEntriesOf(Map.of("Pamięć", 2));
     }
 
+    @Test
+    void addOrUpdateTrimsBlankAndDuplicateCategories() {
+        // given
+        ProductCatalog catalog = new ProductCatalog("store-1", "Catalog");
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
+        definition.setCategories(java.util.Arrays.asList(" 1234 ", "", null, "1234", "5678", "  "));
+
+        // when
+        catalog.addOrUpdateCategoryDefinition(definition);
+
+        // then
+        assertThat(catalog.getCategories().get(0).getCategories()).containsExactly("1234", "5678");
+    }
+
+    @Test
+    void addOrUpdateKeepsCategoriesEmptyWhenNoneSelected() {
+        // given
+        ProductCatalog catalog = new ProductCatalog("store-1", "Catalog");
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
+
+        // when
+        catalog.addOrUpdateCategoryDefinition(definition);
+
+        // then
+        assertThat(catalog.getCategories().get(0).getCategories()).isEmpty();
+    }
+
     private CategoryDefinition definition(String name, String category, int sequenceNumber) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setName(name);

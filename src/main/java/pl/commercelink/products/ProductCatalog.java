@@ -67,6 +67,14 @@ public class ProductCatalog implements DeletionProtection {
                 .collect(Collectors.toList());
         categoryDefinition.setGroupingOrder(completeGroupingOrder);
 
+        List<String> sanitisedCategories = categoryDefinition.getCategories()
+                .stream()
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        categoryDefinition.setCategories(sanitisedCategories);
+
         List<InventoryDefinition> completeInventoryDefinitions = categoryDefinition.getInventoryDefinitions()
                 .stream()
                 .filter(InventoryDefinition::isComplete)
