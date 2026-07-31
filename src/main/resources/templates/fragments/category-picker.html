@@ -353,6 +353,7 @@
                 const inputs = picker.querySelector('[data-multi-inputs]');
                 const clear = picker.querySelector('[data-multi-clear]');
 
+                const locked = new Set(initial);
                 const selected = new Set(initial);
                 const nameById = new Map(options.map(option => [option.id, option.name]));
                 let matches = [];
@@ -377,14 +378,16 @@
                         const tag = document.createElement('span');
                         tag.className = 'tag is-info is-light';
                         tag.textContent = nameById.get(id) || id;
-                        const remove = document.createElement('button');
-                        remove.type = 'button';
-                        remove.className = 'delete is-small';
-                        remove.addEventListener('click', () => {
-                            selected.delete(id);
-                            refresh();
-                        });
-                        tag.appendChild(remove);
+                        if (!locked.has(id)) {
+                            const remove = document.createElement('button');
+                            remove.type = 'button';
+                            remove.className = 'delete is-small';
+                            remove.addEventListener('click', () => {
+                                selected.delete(id);
+                                refresh();
+                            });
+                            tag.appendChild(remove);
+                        }
                         chips.appendChild(tag);
                     });
                 };
@@ -396,6 +399,7 @@
                         const box = document.createElement('input');
                         box.type = 'checkbox';
                         box.checked = selected.has(option.id);
+                        box.disabled = locked.has(option.id);
                         box.addEventListener('change', () => {
                             box.checked ? selected.add(option.id) : selected.delete(option.id);
                             renderChips();
@@ -446,7 +450,7 @@
 
                 clear.addEventListener('click', event => {
                     event.preventDefault();
-                    selected.clear();
+                    Array.from(selected).filter(id => !locked.has(id)).forEach(id => selected.delete(id));
                     refresh();
                 });
 

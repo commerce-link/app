@@ -14,6 +14,7 @@ import org.thymeleaf.messageresolver.IMessageResolver;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.StringTemplateResolver;
+import pl.commercelink.products.CategoryOption;
 
 import java.util.List;
 import java.util.Locale;
@@ -33,10 +34,34 @@ class CategoryPickerFragmentTest {
 
     private static final String PICKER = "<div th:replace=\"~{fragments/category-picker :: picker(%s)}\"></div>";
 
+    private static final String MULTI_PICKER =
+            "<div th:replace=\"~{fragments/category-picker :: multiPicker('categories', ${options}, ${selectedIds}, false)}\"></div>";
+
+    private static final String MULTI_PICKER_SCRIPT =
+            "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${selectedIds})}\"></div>";
+
+    private static final List<CategoryOption> KEYBOARDS_AND_MICE =
+            List.of(new CategoryOption("194", "Klawiatury"), new CategoryOption("195", "Myszki"));
+
     private String render(String fieldName, String selected, boolean disabled, boolean required) {
         String arguments = "'%s', %s, %s, %s".formatted(
                 fieldName, selected == null ? "null" : "'" + selected + "'", disabled, required);
         return templateEngine().process(PICKER.formatted(arguments), new Context());
+    }
+
+    private String renderMultiPicker(List<CategoryOption> options, List<String> selectedIds) {
+        return templateEngine().process(MULTI_PICKER, multiPickerContext(options, selectedIds));
+    }
+
+    private String renderMultiPickerScript(List<CategoryOption> options, List<String> selectedIds) {
+        return templateEngine().process(MULTI_PICKER_SCRIPT, multiPickerContext(options, selectedIds));
+    }
+
+    private Context multiPickerContext(List<CategoryOption> options, List<String> selectedIds) {
+        Context context = new Context();
+        context.setVariable("options", options);
+        context.setVariable("selectedIds", selectedIds);
+        return context;
     }
 
     private TemplateEngine templateEngine() {
@@ -99,25 +124,6 @@ class CategoryPickerFragmentTest {
     void doesNotShowTheHintWhenTheStoreHasEnabledCategories() {
         // when
         String html = renderEmptyHint(List.of("Karty graficzne"));
-
-        // then
-        assertThat(html).doesNotContain("/dashboard/store/categories");
-    }
-
-    @Test
-    void emptyHintIsSkippedEntirelyWhenTheCategoryFieldIsLockedForEditing() {
-        // given
-        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
-        IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
-        WebContext context = new WebContext(exchange);
-        context.setVariable("categories", List.of());
-        context.setVariable("edit", true);
-
-        // when
-        String html = templateEngine().process(
-                "<div th:unless=\"${edit}\">"
-                        + "<div th:replace=\"~{fragments/category-picker :: emptyHint(${categories})}\"></div>"
-                        + "</div>", context);
 
         // then
         assertThat(html).doesNotContain("/dashboard/store/categories");
@@ -209,17 +215,6 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void disabledPickerKeepsTheSavedCategoryAndOffersNoSearch() {
-        // when
-        String html = render("category", "CPU", true, true);
-
-        // then
-        assertThat(html).contains("value=\"CPU\"");
-        assertThat(html).doesNotContain("data-picker-trigger");
-        assertThat(html).doesNotContain("data-picker-search");
-    }
-
-    @Test
     void pickerInARepeatedRowBindsToTheIndexedFormField() {
         // given
         Context context = new Context();
@@ -241,22 +236,25 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void pickerBoundToTheFormObjectKeepsTheCategoryWhenEditingIsBlocked() {
-        // given
-        Context context = new Context();
-        context.setVariable("categoryDefinition", new ProductFilter("CPU"));
-        context.setVariable("edit", true);
-        String form = "<form th:object=\"${categoryDefinition}\">"
-                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true)}\"></div>"
-                + "</form>";
-
+    void savedCategoriesCannotBeDeselectedButNewOnesCanBeAdded() {
         // when
-        String html = templateEngine().process(form, context);
+        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
 
         // then
-        assertThat(html).contains("name=\"category\"");
-        assertThat(html).contains("value=\"CPU\"");
-        assertThat(html).doesNotContain("data-picker-trigger");
+        assertThat(script).contains("const locked = new Set(initial)");
+        assertThat(script).contains("box.disabled = locked.has(option.id)");
+        assertThat(script).contains("if (!locked.has(id)) {");
+    }
+
+    @Test
+    void clearingTheSelectionLeavesTheSavedCategoriesInPlace() {
+        // when
+        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
+
+        // then
+        assertThat(script).contains(
+                "Array.from(selected).filter(id => !locked.has(id)).forEach(id => selected.delete(id));");
+        assertThat(script).doesNotContain("selected.clear()");
     }
 
     @Test

@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -307,7 +308,7 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void savingDynamicDefinitionWithoutMappingDoesNotQueryInventoryForAWarning() {
+    void savingDynamicDefinitionWithoutMappingWarnsWithoutQueryingInventory() {
         // given
         CategoryDefinition unmappedDefinition = definition(CategoryDefinitionType.Dynamic, "");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
@@ -317,7 +318,8 @@ class ProductCatalogControllerTest {
 
         // then
         verify(inventoryView, never()).findAllByProductCategories(any());
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+        verify(messageSource).getMessage(eq("catalog.category.noMapping"), isNull(), any(Locale.class));
+        assertThat(redirectAttributes.getFlashAttributes()).containsKey("warningMessage");
     }
 
     @Test

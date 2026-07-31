@@ -205,7 +205,13 @@ public class ProductCatalogController {
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (categoryDefinition.getCategories().isEmpty() || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+            return;
+        }
+
+        if (categoryDefinition.getCategories().isEmpty()) {
+            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
+                    "catalog.category.noMapping", null, LocaleContextHolder.getLocale()));
             return;
         }
 
