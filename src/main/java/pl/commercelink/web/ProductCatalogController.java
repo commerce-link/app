@@ -210,9 +210,8 @@ public class ProductCatalogController {
             return;
         }
 
-        String inventoryCategory = categoryDefinition.getCategory();
         boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findAllByProductCategory(inventoryCategory)
+                .findAllByProductCategories(pimCategoryOptions.selectionOf(categoryDefinition.getCategories()))
                 .stream()
                 .anyMatch(MatchedInventory::hasAnyOffers);
 

@@ -23,6 +23,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -74,6 +75,9 @@ class ProductCatalogControllerTest {
     @Mock
     private PimCatalog pimCatalog;
 
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
+
     @InjectMocks
     private ProductCatalogController controller;
 
@@ -108,7 +112,7 @@ class ProductCatalogControllerTest {
     @Test
     void warnsWhenDynamicDefinitionIsSavedWithCategoryThatHasNoInventory() {
         // given
-        when(inventoryView.findAllByProductCategory("Kołdry")).thenReturn(List.of());
+        when(inventoryView.findAllByProductCategories(any())).thenReturn(List.of());
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -122,7 +126,7 @@ class ProductCatalogControllerTest {
     void doesNotWarnWhenDynamicDefinitionCategoryResolvesToInventoryWithOffers() {
         // given
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
+        when(inventoryView.findAllByProductCategories(any())).thenReturn(List.of(matchedInventory));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -135,7 +139,7 @@ class ProductCatalogControllerTest {
     @Test
     void doesNotWarnForManagedDefinitionBecauseItsProductsDoNotComeFromTheCategory() {
         // given
-        when(inventoryView.findAllByProductCategory(any())).thenReturn(List.of());
+        when(inventoryView.findAllByProductCategories(any())).thenReturn(List.of());
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -149,7 +153,7 @@ class ProductCatalogControllerTest {
     void warnsWhenDynamicDefinitionCategoryHasInventoryEntriesButNoneOfThemHasOffers() {
         // given
         when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
+        when(inventoryView.findAllByProductCategories(any())).thenReturn(List.of(matchedInventory));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -183,7 +187,7 @@ class ProductCatalogControllerTest {
         controller.saveCategoryDefinition(CATALOG_ID, unmappedDefinition, new ExtendedModelMap(), redirectAttributes);
 
         // then
-        verify(inventoryView, never()).findAllByProductCategory(any());
+        verify(inventoryView, never()).findAllByProductCategories(any());
         assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
     }
 

@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.products.CategorySelection;
 import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
@@ -49,12 +50,12 @@ public class InventoryView {
                 .collect(Collectors.toList());
     }
 
-    public Collection<MatchedInventory> findAllByProductCategory(String productCategory) {
+    public Collection<MatchedInventory> findAllByProductCategories(CategorySelection selection) {
+        if (selection == null || selection.isEmpty()) {
+            return List.of();
+        }
         return listedKeys()
-                .filter(key -> {
-                    String category = taxonomyCache.find(key).category();
-                    return category == null ? productCategory == null : category.equals(productCategory);
-                })
+                .filter(key -> selection.matches(taxonomyCache.find(key)))
                 .map(this::assemble)
                 .collect(Collectors.toList());
     }

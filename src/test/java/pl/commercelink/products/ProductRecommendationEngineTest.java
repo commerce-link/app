@@ -11,6 +11,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -27,46 +28,66 @@ class ProductRecommendationEngineTest {
     @Mock
     private InventoryView inventory;
 
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
+
     @InjectMocks
     private ProductRecommendationEngine engine;
 
     @Test
-    void queriesInventoryWithCategoryNameUnchanged() {
+    void queriesInventoryWithTheResolvedSelection() {
         // given
-        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
-        definition.setCategory("Karty graficzne");
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId().withCategories("1234");
+        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Karty graficzne"));
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
-        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of());
+        when(pimCategoryOptions.selectionOf(List.of("1234"))).thenReturn(selection);
+        when(inventory.findAllByProductCategories(selection)).thenReturn(List.of());
 
         // when
         engine.getRecommendations(definition, inventory);
 
         // then
-        verify(inventory).findAllByProductCategory("Karty graficzne");
+        verify(inventory).findAllByProductCategories(selection);
     }
 
     @Test
-    void queriesInventoryWithLegacyCategoryUnchanged() {
+    void queriesInventoryOnceForSeveralCategories() {
         // given
-        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
-        definition.setCategory("Case");
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId().withCategories("1234", "5678");
+        CategorySelection selection = CategorySelection.of(
+                List.of("1234", "5678"), List.of("Karty graficzne", "Procesory"));
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
-        when(inventory.findAllByProductCategory("Case")).thenReturn(List.of());
+        when(pimCategoryOptions.selectionOf(List.of("1234", "5678"))).thenReturn(selection);
+        when(inventory.findAllByProductCategories(selection)).thenReturn(List.of());
 
         // when
         engine.getRecommendations(definition, inventory);
 
         // then
-        verify(inventory).findAllByProductCategory("Case");
+        verify(inventory, times(1)).findAllByProductCategories(selection);
     }
 
     @Test
-    void definitionWithoutCategoryMappingGetsNoRecommendationsAndNeverQueriesInventory() {
+    void definitionWithoutCategoriesGetsNoRecommendationsAndNeverQueriesInventory() {
         // given
         CategoryDefinition unmappedDefinition = new CategoryDefinition().withGeneratedId();
 
         // when
         List<ProductRecommendation> recommendations = engine.getRecommendations(unmappedDefinition, inventory);
+
+        // then
+        assertThat(recommendations).isEmpty();
+        verifyNoInteractions(inventory);
+    }
+
+    @Test
+    void definitionWhoseSelectionResolvesToNothingNeverQueriesInventory() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId().withCategories("gone");
+        when(pimCategoryOptions.selectionOf(List.of("gone"))).thenReturn(CategorySelection.EMPTY);
+
+        // when
+        List<ProductRecommendation> recommendations = engine.getRecommendations(definition, inventory);
 
         // then
         assertThat(recommendations).isEmpty();

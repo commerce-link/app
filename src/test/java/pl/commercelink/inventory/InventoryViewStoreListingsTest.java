@@ -13,6 +13,8 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategorySelection;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
@@ -60,22 +62,31 @@ class InventoryViewStoreListingsTest {
     private PimCatalog pimCatalog;
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
 
     @InjectMocks
     private Inventory inventory;
 
+    private static final CategorySelection CPU_SELECTION = CategorySelection.of(List.of("989"), List.of("CPU"));
+
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
-                ProductRecommendationEngine.class.getDeclaredConstructor(PimCatalog.class, ProductRepository.class);
+                ProductRecommendationEngine.class.getDeclaredConstructor(
+                        PimCatalog.class, ProductRepository.class, PimCategoryOptions.class);
         ctor.setAccessible(true);
-        return ctor.newInstance(pimCatalog, productRepository);
+        return ctor.newInstance(pimCatalog, productRepository, pimCategoryOptions);
     }
 
     private CategoryDefinition cpuCategory() {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-1");
-        definition.setCategory("CPU");
+        definition.setCategories(List.of("989"));
         return definition;
+    }
+
+    private void stubCpuSelection() {
+        when(pimCategoryOptions.selectionOf(List.of("989"))).thenReturn(CPU_SELECTION);
     }
 
     private InventoryItem item(String supplier, double price) {
@@ -123,7 +134,7 @@ class InventoryViewStoreListingsTest {
         storeWithGlobalAbGroupAndOwnAction();
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategories(CPU_SELECTION);
 
         // then
         assertThat(result).hasSize(1);
@@ -160,6 +171,7 @@ class InventoryViewStoreListingsTest {
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        stubCpuSelection();
 
         // when
         List<ProductRecommendation> recommendations =
@@ -184,6 +196,7 @@ class InventoryViewStoreListingsTest {
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        stubCpuSelection();
 
         // when
         List<ProductRecommendation> recommendations =
@@ -214,7 +227,7 @@ class InventoryViewStoreListingsTest {
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategories(CPU_SELECTION);
 
         // then
         assertThat(result).hasSize(1);
@@ -236,7 +249,7 @@ class InventoryViewStoreListingsTest {
         when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategories(CPU_SELECTION);
 
         // then
         assertThat(result).hasSize(1);
@@ -345,7 +358,7 @@ class InventoryViewStoreListingsTest {
         when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategories(CPU_SELECTION);
 
         // then
         assertThat(result).hasSize(1);

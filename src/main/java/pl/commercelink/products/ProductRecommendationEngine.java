@@ -18,10 +18,13 @@ public class ProductRecommendationEngine {
 
     private final PimCatalog pimCatalog;
     private final ProductRepository productRepository;
+    private final PimCategoryOptions pimCategoryOptions;
 
-    ProductRecommendationEngine(PimCatalog pimCatalog, ProductRepository productRepository) {
+    ProductRecommendationEngine(PimCatalog pimCatalog, ProductRepository productRepository,
+                                PimCategoryOptions pimCategoryOptions) {
         this.pimCatalog = pimCatalog;
         this.productRepository = productRepository;
+        this.pimCategoryOptions = pimCategoryOptions;
     }
 
     /**
@@ -29,7 +32,12 @@ public class ProductRecommendationEngine {
      * recommendations for products that are not currently available via PimIndex.
      */
     public List<ProductRecommendation> getRecommendations(CategoryDefinition categoryDefinition, InventoryView inventory) {
-        if (categoryDefinition.getCategory() == null) {
+        if (categoryDefinition.getCategories().isEmpty()) {
+            return List.of();
+        }
+
+        CategorySelection selection = pimCategoryOptions.selectionOf(categoryDefinition.getCategories());
+        if (selection.isEmpty()) {
             return List.of();
         }
 
@@ -38,7 +46,7 @@ public class ProductRecommendationEngine {
                 .map(InventoryKey::fromProduct)
                 .collect(Collectors.toList());
 
-        return inventory.findAllByProductCategory(categoryDefinition.getCategory())
+        return inventory.findAllByProductCategories(selection)
                 .stream()
                 .filter(MatchedInventory::hasAnyOffers)
                 .filter(i -> isNotMapped(i.getInventoryKey(), alreadyMappedInventoryKeys))

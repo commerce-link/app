@@ -65,18 +65,25 @@ class DynamicCategoryPricelistTest {
     @Mock
     private MatchedInventory matchedInventory;
 
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
+
     private ProductRecommendationEngine recommendationEngine;
 
     @BeforeEach
     void setUp() {
-        recommendationEngine = new ProductRecommendationEngine(pimCatalog, productRepository);
+        recommendationEngine = new ProductRecommendationEngine(pimCatalog, productRepository, pimCategoryOptions);
 
         when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
-        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
+        CategorySelection graphicsCardsSelection = CategorySelection.of(List.of("Karty graficzne"), List.of("Karty graficzne"));
+        when(pimCategoryOptions.selectionOf(List.of("Karty graficzne"))).thenReturn(graphicsCardsSelection);
+        when(pimCategoryOptions.selectionOf(List.of("Kołdry")))
+                .thenReturn(CategorySelection.of(List.of("Kołdry"), List.of("Kołdry")));
+        when(inventory.findAllByProductCategories(graphicsCardsSelection)).thenReturn(List.of(matchedInventory));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
 
         mockInventoryWithSingleGraphicsCard();
@@ -123,6 +130,7 @@ class DynamicCategoryPricelistTest {
         definition.setName("Karta graficzna");
         definition.setType(CategoryDefinitionType.Dynamic);
         definition.setCategory(category);
+        definition.setCategories(List.of(category));
         definition.setStockDefinition(new StockDefinition(2, 5, 20));
         definition.setPriceDefinitions(List.of(new PriceDefinition(1.2, 100, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP)));
         definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 2));
