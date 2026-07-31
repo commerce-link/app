@@ -28,6 +28,7 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -181,6 +182,57 @@ class InventoryViewStoreListingsTest {
         assertThat(union).hasSize(2);
         assertThat(cpuOnly).hasSize(1);
         assertThat(cpuOnly.iterator().next().getMfnCodes()).containsExactly(MFN);
+    }
+
+    @Test
+    void findAllByProductCategoriesGroupedPartitionsOneInventoryPassPerSelection() {
+        // given
+        stubTwoDistinctCategoryGroups();
+        CategorySelection graphicsCards = CategorySelection.of(List.of(), List.of("Karty graficzne"));
+
+        // when
+        Map<String, Collection<MatchedInventory>> grouped = inventory.withGlobalData()
+                .findAllByProductCategoriesGrouped(Map.of("989", CPU_SELECTION, "1234", graphicsCards));
+
+        // then
+        assertThat(grouped).containsOnlyKeys("989", "1234");
+        assertThat(grouped.get("989")).hasSize(1);
+        assertThat(grouped.get("989").iterator().next().getMfnCodes()).containsExactly(MFN);
+        assertThat(grouped.get("1234")).hasSize(1);
+        assertThat(grouped.get("1234").iterator().next().getMfnCodes()).containsExactly(MFN_GPU);
+    }
+
+    @Test
+    void findAllByProductCategoriesGroupedWalksTaxonomyCacheOncePerKeyRegardlessOfSelectionCount() {
+        // given
+        stubTwoDistinctCategoryGroups();
+        CategorySelection graphicsCards = CategorySelection.of(List.of(), List.of("Karty graficzne"));
+
+        // when
+        inventory.withGlobalData().findAllByProductCategoriesGrouped(Map.of("989", CPU_SELECTION));
+        long invocationsForOneSelection = taxonomyFindInvocationCount();
+        clearInvocations(taxonomyCache);
+        inventory.withGlobalData()
+                .findAllByProductCategoriesGrouped(Map.of("989", CPU_SELECTION, "1234", graphicsCards));
+        long invocationsForTwoSelections = taxonomyFindInvocationCount();
+
+        // then
+        assertThat(invocationsForTwoSelections).isEqualTo(invocationsForOneSelection);
+    }
+
+    @Test
+    void findAllByProductCategoriesGroupedKeepsEveryRequestedKeyEvenWithoutMatches() {
+        // given
+        stubTwoDistinctCategoryGroups();
+
+        // when
+        Map<String, Collection<MatchedInventory>> grouped = inventory.withGlobalData()
+                .findAllByProductCategoriesGrouped(
+                        Map.of("unknown", CategorySelection.of(List.of("nope"), List.of("Nieznane"))));
+
+        // then
+        assertThat(grouped).containsOnlyKeys("unknown");
+        assertThat(grouped.get("unknown")).isEmpty();
     }
 
     @Test

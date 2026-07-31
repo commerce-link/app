@@ -19,7 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PimCategoryOptions {
 
-    private static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
+    static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
 
     private static final String LANG = "pl";
 
@@ -78,27 +78,20 @@ public class PimCategoryOptions {
         return sortedByName(byIdMap.values());
     }
 
+    public CategoryNames categoryNames() {
+        return new CategoryNames(namesById());
+    }
+
     public List<String> namesOf(Collection<String> categoryIds) {
-        if (categoryIds == null || categoryIds.isEmpty()) {
-            return List.of();
-        }
-        Map<String, String> namesById = namesById();
-        return categoryIds.stream()
-                .filter(id -> id != null && !id.isBlank())
-                .map(String::trim)
-                .map(namesById::get)
-                .filter(name -> name != null && !name.isBlank())
-                .distinct()
-                .sorted(POLISH_COLLATOR)
-                .toList();
+        return categoryNames().namesOf(categoryIds);
     }
 
     public String joinedNamesOf(Collection<String> categoryIds) {
-        return String.join(", ", namesOf(categoryIds));
+        return categoryNames().joinedNamesOf(categoryIds);
     }
 
     public CategorySelection selectionOf(Collection<String> categoryIds) {
-        return CategorySelection.of(categoryIds, namesOf(categoryIds));
+        return categoryNames().selectionOf(categoryIds);
     }
 
     private List<CategoryOption> sortedByName(Collection<CategoryOption> options) {

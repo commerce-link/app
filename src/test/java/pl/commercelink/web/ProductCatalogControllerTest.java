@@ -23,6 +23,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CategoryNames;
 import pl.commercelink.products.CategoryOption;
 import pl.commercelink.products.CategorySelection;
 import pl.commercelink.products.PimCategoryOptions;
@@ -36,6 +37,8 @@ import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -99,6 +102,8 @@ class ProductCatalogControllerTest {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("brak produktow");
+        when(pimCategoryOptions.categoryNames()).thenReturn(new CategoryNames(
+                Map.of("194", "Klawiatury", "195", "Myszki", "989", "Procesory")));
     }
 
     @AfterEach
@@ -157,9 +162,7 @@ class ProductCatalogControllerTest {
     void warnsWhenDynamicDefinitionIsSavedWithCategoryThatHasNoInventory() {
         // given
         CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "195");
-        CategorySelection myszki = CategorySelection.of(List.of("195"), List.of("Myszki"));
-        when(pimCategoryOptions.selectionOf(List.of("195"))).thenReturn(myszki);
-        when(inventoryView.findAllByProductCategories(myszki)).thenReturn(List.of());
+        stubGroupedInventory(Map.of("195", List.of()));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -173,10 +176,8 @@ class ProductCatalogControllerTest {
     void doesNotWarnWhenDynamicDefinitionCategoryResolvesToInventoryWithOffers() {
         // given
         CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "194");
-        CategorySelection klawiatury = CategorySelection.of(List.of("194"), List.of("Klawiatury"));
-        when(pimCategoryOptions.selectionOf(List.of("194"))).thenReturn(klawiatury);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategories(klawiatury)).thenReturn(List.of(matchedInventory));
+        stubGroupedInventory(Map.of("194", List.of(matchedInventory)));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -196,7 +197,7 @@ class ProductCatalogControllerTest {
         controller.saveCategoryDefinition(CATALOG_ID, definition, new ExtendedModelMap(), redirectAttributes);
 
         // then
-        verify(inventoryView, never()).findAllByProductCategories(any());
+        verify(inventoryView, never()).findAllByProductCategoriesGrouped(any());
         assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
     }
 
@@ -204,10 +205,8 @@ class ProductCatalogControllerTest {
     void warnsWhenDynamicDefinitionCategoryHasInventoryEntriesButNoneOfThemHasOffers() {
         // given
         CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "989");
-        CategorySelection procesory = CategorySelection.of(List.of("989"), List.of("Procesory"));
-        when(pimCategoryOptions.selectionOf(List.of("989"))).thenReturn(procesory);
         when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(inventoryView.findAllByProductCategories(procesory)).thenReturn(List.of(matchedInventory));
+        stubGroupedInventory(Map.of("989", List.of(matchedInventory)));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -221,14 +220,8 @@ class ProductCatalogControllerTest {
     void warnsListingOnlyTheSelectedCategoriesWithoutOffers() {
         // given
         CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "194", "195");
-        CategorySelection klawiatury = CategorySelection.of(List.of("194"), List.of("Klawiatury"));
-        CategorySelection myszki = CategorySelection.of(List.of("195"), List.of("Myszki"));
-        when(pimCategoryOptions.selectionOf(List.of("194"))).thenReturn(klawiatury);
-        when(pimCategoryOptions.selectionOf(List.of("195"))).thenReturn(myszki);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategories(klawiatury)).thenReturn(List.of(matchedInventory));
-        when(inventoryView.findAllByProductCategories(myszki)).thenReturn(List.of());
-        when(pimCategoryOptions.joinedNamesOf(List.of("195"))).thenReturn("Myszki");
+        stubGroupedInventory(Map.of("194", List.of(matchedInventory), "195", List.of()));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -244,13 +237,8 @@ class ProductCatalogControllerTest {
     void doesNotWarnWhenEverySelectedCategoryHasOffers() {
         // given
         CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "194", "195");
-        CategorySelection klawiatury = CategorySelection.of(List.of("194"), List.of("Klawiatury"));
-        CategorySelection myszki = CategorySelection.of(List.of("195"), List.of("Myszki"));
-        when(pimCategoryOptions.selectionOf(List.of("194"))).thenReturn(klawiatury);
-        when(pimCategoryOptions.selectionOf(List.of("195"))).thenReturn(myszki);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategories(klawiatury)).thenReturn(List.of(matchedInventory));
-        when(inventoryView.findAllByProductCategories(myszki)).thenReturn(List.of(matchedInventory));
+        stubGroupedInventory(Map.of("194", List.of(matchedInventory), "195", List.of(matchedInventory)));
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -258,6 +246,25 @@ class ProductCatalogControllerTest {
 
         // then
         assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+    }
+
+    @Test
+    void everySelectedCategoryIsResolvedAndQueriedInASinglePassOverTheInventory() {
+        // given
+        CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "194", "195");
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        stubGroupedInventory(Map.of("194", List.of(matchedInventory), "195", List.of(matchedInventory)));
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, definition, new ExtendedModelMap(), new RedirectAttributesModelMap());
+
+        // then
+        verify(pimCategoryOptions).categoryNames();
+        ArgumentCaptor<Map<String, CategorySelection>> selections = ArgumentCaptor.forClass(Map.class);
+        verify(inventoryView).findAllByProductCategoriesGrouped(selections.capture());
+        assertThat(selections.getValue()).containsOnlyKeys("194", "195");
+        assertThat(selections.getValue().get("194"))
+                .isEqualTo(CategorySelection.of(List.of("194"), List.of("Klawiatury")));
     }
 
     @Test
@@ -388,6 +395,11 @@ class ProductCatalogControllerTest {
         ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(productCaptor.capture());
         assertThat(productCaptor.getValue().isService()).isFalse();
+    }
+
+    private void stubGroupedInventory(Map<String, List<MatchedInventory>> matchesByCategory) {
+        Map<String, Collection<MatchedInventory>> grouped = new LinkedHashMap<>(matchesByCategory);
+        when(inventoryView.findAllByProductCategoriesGrouped(any())).thenReturn(grouped);
     }
 
     private CategoryDefinition definition(CategoryDefinitionType type, String category) {

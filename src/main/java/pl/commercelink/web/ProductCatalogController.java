@@ -93,10 +93,11 @@ public class ProductCatalogController {
     }
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
+        CategoryNames categoryNames = pimCategoryOptions.categoryNames();
         model.addAttribute("productCatalog", productCatalog);
         model.addAttribute("categoryNamesByDefinitionId", productCatalog.getCategories().stream()
                 .collect(Collectors.toMap(CategoryDefinition::getCategoryId,
-                        definition -> pimCategoryOptions.joinedNamesOf(definition.getCategories()))));
+                        definition -> categoryNames.joinedNamesOf(definition.getCategories()))));
         return "catalogDetails";
     }
 
@@ -216,18 +217,23 @@ public class ProductCatalogController {
             return;
         }
 
+        CategoryNames categoryNames = pimCategoryOptions.categoryNames();
+        Map<String, CategorySelection> selectionsByCategory = new LinkedHashMap<>();
+        categoryDefinition.getCategories()
+                .forEach(categoryId -> selectionsByCategory.put(categoryId, categoryNames.selectionOf(List.of(categoryId))));
+
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
-        List<String> withoutOffers = categoryDefinition.getCategories().stream()
-                .filter(categoryId -> enabledInventory
-                        .findAllByProductCategories(pimCategoryOptions.selectionOf(List.of(categoryId)))
-                        .stream()
-                        .noneMatch(MatchedInventory::hasAnyOffers))
+        List<String> withoutOffers = enabledInventory.findAllByProductCategoriesGrouped(selectionsByCategory)
+                .entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().stream().noneMatch(MatchedInventory::hasAnyOffers))
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
         if (!withoutOffers.isEmpty()) {
             redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
                     "catalog.category.emptyInventory",
-                    new Object[]{pimCategoryOptions.joinedNamesOf(withoutOffers)},
+                    new Object[]{categoryNames.joinedNamesOf(withoutOffers)},
                     LocaleContextHolder.getLocale()));
         }
     }

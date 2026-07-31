@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,6 +12,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryNames;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -25,6 +27,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +59,12 @@ class StockLevelsRoutingTest {
 
     @InjectMocks
     private StockLevels stockLevels;
+
+    @BeforeEach
+    void resolveCategoryNames() {
+        when(pimCategoryOptions.categoryNames()).thenReturn(
+                new CategoryNames(Map.of("194", "Klawiatury", "195", "Myszki")));
+    }
 
     @Test
     void serviceProductsAreSkippedEvenThoughBothDefinitionsAreMapped() {
@@ -124,7 +133,6 @@ class StockLevelsRoutingTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-1")).thenReturn(List.of(product));
         when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
-        when(pimCategoryOptions.joinedNamesOf(definition.getCategories())).thenReturn("Klawiatury, Myszki");
 
         // when
         List<StockProductLevel> levels = stockLevels.calculate(
@@ -132,5 +140,36 @@ class StockLevelsRoutingTest {
 
         // then
         assertThat(levels).hasSize(1).allMatch(level -> "Klawiatury, Myszki".equals(level.getCategory()));
+    }
+
+    @Test
+    void categoryNamesAreResolvedOncePerReportInsteadOfOncePerProduct() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-1");
+        definition.setName("Elektronika");
+        definition.setCategories(List.of("194", "195"));
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(definition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-1")).thenReturn(List.of(
+                product("MFN-1", "Klawiatura X1"), product("MFN-2", "Mysz M1"), product("MFN-3", "Mysz M2")));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels = stockLevels.calculate(
+                STORE_ID, CATALOG_ID, definition.getCategoryId(), RestockScope.WholeCatalog, false);
+
+        // then
+        assertThat(levels).hasSize(3);
+        verify(pimCategoryOptions, times(1)).categoryNames();
+    }
+
+    private Product product(String manufacturerCode, String name) {
+        Product product = new Product("cat-1");
+        product.setName(name);
+        product.setManufacturerCode(manufacturerCode);
+        return product;
     }
 }

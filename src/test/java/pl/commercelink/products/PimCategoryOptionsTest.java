@@ -12,6 +12,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -311,6 +313,26 @@ class PimCategoryOptionsTest {
 
         // then
         assertThat(options).containsExactly(new CategoryOption("2", "Stoły"));
+    }
+
+    @Test
+    void categoryNamesIsAReusableResolverBuiltFromOnePimScan() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "1", "Łóżka", "pl")
+        ));
+        PimCategoryOptions options = pimCategoryOptions();
+
+        // when
+        CategoryNames categoryNames = options.categoryNames();
+
+        // then
+        assertThat(categoryNames.namesOf(List.of("2"))).containsExactly("Meble");
+        assertThat(categoryNames.joinedNamesOf(List.of("2", "3"))).isEqualTo("Łóżka, Meble");
+        assertThat(categoryNames.selectionOf(List.of("3")).categoryNames()).containsExactly("Łóżka");
+        verify(pimCatalog, times(1)).allCategories();
     }
 
     @Test
