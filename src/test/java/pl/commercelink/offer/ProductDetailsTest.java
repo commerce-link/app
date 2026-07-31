@@ -74,7 +74,7 @@ class ProductDetailsTest {
     @Test
     void dynamicDefinitionBuildsDetailsFromRecommendation() {
         // given
-        dynamicDefinition("Karty graficzne");
+        dynamicDefinition("170");
         when(pimCatalog.findByPimId(PIM_ID)).thenReturn(Optional.of(pimEntry()));
         when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
@@ -94,17 +94,17 @@ class ProductDetailsTest {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId(CATEGORY_ID);
         definition.setType(CategoryDefinitionType.Managed);
-        definition.setCategory("Karty graficzne");
+        definition.setCategories(List.of("170"));
 
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(catalog.findCategoryDefinition(CATEGORY_ID)).thenReturn(definition);
     }
 
-    private void dynamicDefinition(String category) {
+    private void dynamicDefinition(String categoryId) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId(CATEGORY_ID);
         definition.setType(CategoryDefinitionType.Dynamic);
-        definition.setCategory(category);
+        definition.setCategories(List.of(categoryId));
 
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(catalog.findCategoryDefinition(CATEGORY_ID)).thenReturn(definition);

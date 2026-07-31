@@ -463,7 +463,7 @@ class OfferControllerTest {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-def-" + category);
         definition.setName(category);
-        definition.setCategory(category);
+        definition.setCategories(List.of("989"));
         definition.setSequenceNumber(sequenceNumber);
         return definition;
     }

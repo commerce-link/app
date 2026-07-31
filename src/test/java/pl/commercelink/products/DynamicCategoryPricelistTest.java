@@ -79,10 +79,10 @@ class DynamicCategoryPricelistTest {
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
-        CategorySelection graphicsCardsSelection = CategorySelection.of(List.of("Karty graficzne"), List.of("Karty graficzne"));
-        when(pimCategoryOptions.selectionOf(List.of("Karty graficzne"))).thenReturn(graphicsCardsSelection);
-        when(pimCategoryOptions.selectionOf(List.of("Kołdry")))
-                .thenReturn(CategorySelection.of(List.of("Kołdry"), List.of("Kołdry")));
+        CategorySelection graphicsCardsSelection = CategorySelection.of(List.of("170"), List.of("Karty graficzne"));
+        when(pimCategoryOptions.selectionOf(List.of("170"))).thenReturn(graphicsCardsSelection);
+        when(pimCategoryOptions.selectionOf(List.of("1584")))
+                .thenReturn(CategorySelection.of(List.of("1584"), List.of("Telewizory")));
         when(inventory.findAllByProductCategories(graphicsCardsSelection)).thenReturn(List.of(matchedInventory));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
 
@@ -90,26 +90,26 @@ class DynamicCategoryPricelistTest {
     }
 
     @Test
-    void dynamicDefinitionWithMatchingCategoryNameGeneratesPricelist() {
+    void dynamicDefinitionWithMatchingCategoryIdGeneratesPricelist() {
         // given / when
-        List<AvailabilityAndPrice> pricelist = generatePricelistFor("Karty graficzne");
+        List<AvailabilityAndPrice> pricelist = generatePricelistFor("170");
 
         // then
         assertThat(pricelist).hasSize(1);
     }
 
     @Test
-    void dynamicDefinitionWithNonMatchingCategoryNameGeneratesEmptyPricelist() {
+    void dynamicDefinitionWithNonMatchingCategoryIdGeneratesEmptyPricelist() {
         // given / when
-        List<AvailabilityAndPrice> pricelist = generatePricelistFor("Kołdry");
+        List<AvailabilityAndPrice> pricelist = generatePricelistFor("1584");
 
         // then
         assertThat(pricelist).isEmpty();
     }
 
-    private List<AvailabilityAndPrice> generatePricelistFor(String category) {
+    private List<AvailabilityAndPrice> generatePricelistFor(String categoryId) {
         ProductCatalog catalog = mock(ProductCatalog.class);
-        when(catalog.getCategories()).thenReturn(List.of(dynamicDefinition(category)));
+        when(catalog.getCategories()).thenReturn(List.of(dynamicDefinition(categoryId)));
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
 
         AvailabilityAndPriceList availabilityAndPriceList = new AvailabilityAndPriceList(
@@ -124,13 +124,12 @@ class DynamicCategoryPricelistTest {
         return availabilityAndPriceList.generate(STORE_ID, CATALOG_ID);
     }
 
-    private CategoryDefinition dynamicDefinition(String category) {
+    private CategoryDefinition dynamicDefinition(String categoryId) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId(CATEGORY_ID);
         definition.setName("Karta graficzna");
         definition.setType(CategoryDefinitionType.Dynamic);
-        definition.setCategory(category);
-        definition.setCategories(List.of(category));
+        definition.setCategories(List.of(categoryId));
         definition.setStockDefinition(new StockDefinition(2, 5, 20));
         definition.setPriceDefinitions(List.of(new PriceDefinition(1.2, 100, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP)));
         definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 2));

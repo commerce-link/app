@@ -59,8 +59,8 @@ class ProductCatalogRestApiTest {
     void categoryTreeBuildsPathFromCatalogAndDefinitionNames() {
         // given
         catalogWithDefinitions("Elektronika",
-                definition("category-1", "Karty RTX", "Karty graficzne"),
-                definition("category-2", "Procesory do gier", "Procesory"));
+                definition("category-1", "Karty RTX", "170"),
+                definition("category-2", "Procesory do gier", "989"));
 
         // when
         List<ProductCategoryTree> tree = categoriesTree();
@@ -78,11 +78,11 @@ class ProductCatalogRestApiTest {
         when(catalog.getCategories()).thenReturn(List.of(definitions));
     }
 
-    private CategoryDefinition definition(String categoryId, String name, String category) {
+    private CategoryDefinition definition(String categoryId, String name, String categoryLeafId) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId(categoryId);
         definition.setName(name);
-        definition.setCategory(category);
+        definition.setCategories(List.of(categoryLeafId));
         return definition;
     }
 

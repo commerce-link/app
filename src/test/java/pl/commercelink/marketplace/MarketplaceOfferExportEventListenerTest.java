@@ -149,7 +149,7 @@ class MarketplaceOfferExportEventListenerTest {
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName, String definitionName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
-        category.setCategory(categoryName);
+        category.setCategories(List.of(leafIdFor(categoryName)));
         category.setName(definitionName);
         category.setMarketplaceDefinitions(List.of(def));
 
@@ -158,6 +158,10 @@ class MarketplaceOfferExportEventListenerTest {
 
         MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(inventoryView.findByProduct(product)).thenReturn(matched);
+    }
+
+    private String leafIdFor(String categoryName) {
+        return "Karty graficzne".equals(categoryName) ? "170" : "989";
     }
 
     private MatchedInventory mockMatchedInventoryWithWarehouseQty(int warehouseQty) {

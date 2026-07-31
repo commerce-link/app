@@ -17,7 +17,7 @@ class ProductCategoryTreeTest {
     @DisplayName("builds path from catalog name and definition name")
     void buildsPathFromCatalogAndDefinitionName() {
         // given
-        CategoryDefinition definition = definition("Procesory", "Gaming CPUs");
+        CategoryDefinition definition = definition("989", "Gaming CPUs");
 
         // when
         ProductCategoryTree tree = new ProductCategoryTree(definition, "Elektronika");
@@ -36,7 +36,7 @@ class ProductCategoryTreeTest {
     @DisplayName("falls back to definition name when catalog has no name")
     void fallsBackToDefinitionNameWhenCatalogHasNoName() {
         // given
-        CategoryDefinition definition = definition("Procesory", "Gaming CPUs");
+        CategoryDefinition definition = definition("989", "Gaming CPUs");
 
         // when
         ProductCategoryTree tree = new ProductCategoryTree(definition, null);
@@ -49,7 +49,7 @@ class ProductCategoryTreeTest {
     @DisplayName("serializes exactly the agreed JSON field set")
     void serializesExactlyTheAgreedJsonFieldSet() throws Exception {
         // given
-        ProductCategoryTree tree = new ProductCategoryTree(definition("Procesory", "Gaming CPUs"), "Elektronika");
+        ProductCategoryTree tree = new ProductCategoryTree(definition("989", "Gaming CPUs"), "Elektronika");
 
         // when
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(tree));
@@ -62,11 +62,11 @@ class ProductCategoryTreeTest {
         assertThat(json.get("path").asText()).isEqualTo("Elektronika/Gaming CPUs");
     }
 
-    private CategoryDefinition definition(String categoryKey, String name) {
+    private CategoryDefinition definition(String categoryId, String name) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-1");
         definition.setName(name);
-        definition.setCategory(categoryKey);
+        definition.setCategories(List.of(categoryId));
         definition.setGroupingOrder(List.of("A", "B"));
         definition.setMaxQty(3);
         definition.setSequenceNumber(7);
