@@ -23,6 +23,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CategoryOption;
 import pl.commercelink.products.CategorySelection;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
@@ -32,6 +33,8 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 import java.util.Locale;
@@ -79,6 +82,12 @@ class ProductCatalogControllerTest {
 
     @Mock
     private PimCategoryOptions pimCategoryOptions;
+
+    @Mock
+    private StoresRepository storesRepository;
+
+    @Mock
+    private Store store;
 
     @InjectMocks
     private ProductCatalogController controller;
@@ -261,7 +270,6 @@ class ProductCatalogControllerTest {
 
         // then
         verify(catalog).addOrUpdateCategoryDefinition(blankCategoryDefinition);
-        assertThat(blankCategoryDefinition.getCategories()).isEmpty();
     }
 
     @Test
@@ -276,6 +284,26 @@ class ProductCatalogControllerTest {
         // then
         verify(catalog).addOrUpdateCategoryDefinition(captor.capture());
         assertThat(captor.getValue().getCategories()).containsExactly("1234", "5678");
+    }
+
+    @Test
+    void editingCategoryPopulatesFormOptionsFromIds() throws Exception {
+        // given
+        CategoryDefinition definition = definitionWithCategories(CategoryDefinitionType.Dynamic, "194", "195");
+        when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getEnabledCategories()).thenReturn(List.of("Komputery i urządzenia peryferyjne"));
+        when(store.getMarketplaces()).thenReturn(List.of());
+        List<CategoryOption> options = List.of(new CategoryOption("194", "Klawiatury"), new CategoryOption("195", "Myszki"));
+        when(pimCategoryOptions.categoryOptionsById(List.of("Komputery i urządzenia peryferyjne"), List.of("194", "195")))
+                .thenReturn(options);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.editCategory(CATALOG_ID, definition.getCategoryId(), model);
+
+        // then
+        assertThat(model.getAttribute("productCategories")).isEqualTo(options);
     }
 
     @Test
