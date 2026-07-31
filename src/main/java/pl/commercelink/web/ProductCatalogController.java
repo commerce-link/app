@@ -94,6 +94,9 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
+        model.addAttribute("categoryNamesByDefinitionId", productCatalog.getCategories().stream()
+                .collect(Collectors.toMap(CategoryDefinition::getCategoryId,
+                        definition -> pimCategoryOptions.joinedNamesOf(definition.getCategories()))));
         return "catalogDetails";
     }
 
@@ -396,6 +399,7 @@ public class ProductCatalogController {
 
         model.addAttribute("catalogId", catalogId);
         model.addAttribute("categoryDefinition", categoryDefinition);
+        model.addAttribute("categoryNames", pimCategoryOptions.namesOf(categoryDefinition.getCategories()));
 
         Map<String, Object> paginationParams = new HashMap<>();
         if (StringUtils.isNotBlank(status)) paginationParams.put("status", status);

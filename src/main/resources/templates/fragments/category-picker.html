@@ -5,6 +5,9 @@
 <span th:fragment="categoryName(value)"
       th:text="${value}"></span>
 
+<span th:fragment="categoryNames(values)"
+      th:text="${values == null or #lists.isEmpty(values)} ? '' : ${#strings.listJoin(values, ', ')}"></span>
+
 <div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}"
      class="notification is-warning is-light">
     <span th:text="#{catalog.category.noneEnabled}"></span>
@@ -47,6 +50,63 @@
         </div>
     </div>
 </div>
+
+<div th:fragment="multiPicker(fieldName, options, selectedIds, disabled)" class="category-multi-picker">
+    <div th:if="${disabled}" class="control">
+        <input class="input" type="text" disabled
+               th:value="${#strings.listJoin(selectedIds, ', ')}">
+    </div>
+
+    <div th:unless="${disabled}" data-category-multi-picker
+         th:attr="data-field-name=${fieldName}">
+        <div class="tags" data-multi-chips></div>
+        <div class="control has-icons-left">
+            <input class="input" type="search" autocomplete="off" data-multi-search
+                   th:placeholder="#{catalog.category.filter}">
+            <span class="icon is-small is-left"><i class="fas fa-search"></i></span>
+        </div>
+        <div data-multi-list class="multi-list"></div>
+        <p class="help">
+            <span data-multi-count></span>
+            <a href="#" data-multi-clear th:text="#{catalog.category.multi.clear}"></a>
+        </p>
+        <div data-multi-inputs></div>
+    </div>
+</div>
+
+<th:block th:fragment="pickerHelpersScript">
+    <script>
+        window.categoryPickerHelpers = (function () {
+            const format = (template, ...values) =>
+                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template);
+
+            const normalize = text => text.toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\u0142/g, 'l');
+
+            const escapeHtml = text => {
+                const holder = document.createElement('span');
+                holder.textContent = text;
+                return holder.innerHTML;
+            };
+
+            const highlight = (label, query) => {
+                if (!query) {
+                    return escapeHtml(label);
+                }
+                const start = normalize(label).indexOf(query);
+                if (start < 0) {
+                    return escapeHtml(label);
+                }
+                return escapeHtml(label.substring(0, start))
+                        + '<mark>' + escapeHtml(label.substring(start, start + query.length)) + '</mark>'
+                        + escapeHtml(label.substring(start + query.length));
+            };
+
+            return {format, normalize, escapeHtml, highlight};
+        })();
+    </script>
+</th:block>
 
 <th:block th:fragment="pickerScript(categories)">
     <style>
@@ -97,31 +157,7 @@
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
 
-            const format = (template, ...values) =>
-                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template);
-
-            const normalize = text => text.toLowerCase()
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\u0142/g, 'l');
-
-            const escapeHtml = text => {
-                const holder = document.createElement('span');
-                holder.textContent = text;
-                return holder.innerHTML;
-            };
-
-            const highlight = (label, query) => {
-                if (!query) {
-                    return escapeHtml(label);
-                }
-                const start = normalize(label).indexOf(query);
-                if (start < 0) {
-                    return escapeHtml(label);
-                }
-                return escapeHtml(label.substring(0, start))
-                        + '<mark>' + escapeHtml(label.substring(start, start + query.length)) + '</mark>'
-                        + escapeHtml(label.substring(start + query.length));
-            };
+            const {format, normalize, escapeHtml, highlight} = window.categoryPickerHelpers;
 
             const setUp = picker => {
                 const field = picker.parentElement.querySelector('[data-picker-value]');
@@ -264,6 +300,157 @@
             };
 
             document.querySelectorAll('[data-category-picker]').forEach(setUp);
+        })();
+    </script>
+</th:block>
+
+<th:block th:fragment="multiPickerScript(options, selectedIds)">
+    <style>
+        .category-multi-picker .multi-list {
+            max-height: 20rem;
+            overflow-y: auto;
+            border: 1px solid #dbdbdb;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        .category-multi-picker .multi-list label {
+            display: block;
+            padding: 0.4rem 0.75rem;
+            cursor: pointer;
+        }
+        .category-multi-picker .multi-list label:hover {
+            background-color: #eef3ff;
+        }
+        .category-multi-picker .tags:empty {
+            display: none;
+        }
+        .category-multi-picker mark {
+            background-color: #ffe9a8;
+            padding: 0;
+        }
+    </style>
+    <script th:inline="javascript">
+        (function () {
+            const CHUNK = 60;
+            const options = /*[[${options}]]*/ [];
+            const initial = /*[[${selectedIds}]]*/ [];
+            const messages = {
+                empty: /*[[#{catalog.category.empty}]]*/ '',
+                count: /*[[#{catalog.category.count}]]*/ '',
+                selected: /*[[#{catalog.category.multi.selected}]]*/ ''
+            };
+
+            const {format, normalize, escapeHtml, highlight} = window.categoryPickerHelpers;
+
+            const setUp = picker => {
+                const fieldName = picker.dataset.fieldName;
+                const search = picker.querySelector('[data-multi-search]');
+                const list = picker.querySelector('[data-multi-list]');
+                const chips = picker.querySelector('[data-multi-chips]');
+                const counter = picker.querySelector('[data-multi-count]');
+                const inputs = picker.querySelector('[data-multi-inputs]');
+                const clear = picker.querySelector('[data-multi-clear]');
+
+                const selected = new Set(initial);
+                const nameById = new Map(options.map(option => [option.id, option.name]));
+                let matches = [];
+                let shown = 0;
+                let query = '';
+
+                const syncInputs = () => {
+                    inputs.innerHTML = '';
+                    selected.forEach(id => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = fieldName;
+                        input.value = id;
+                        inputs.appendChild(input);
+                    });
+                };
+
+                const renderChips = () => {
+                    chips.innerHTML = '';
+                    selected.forEach(id => {
+                        const tag = document.createElement('span');
+                        tag.className = 'tag is-info is-light';
+                        tag.textContent = nameById.get(id) || id;
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'delete is-small';
+                        remove.addEventListener('click', () => {
+                            selected.delete(id);
+                            refresh();
+                        });
+                        tag.appendChild(remove);
+                        chips.appendChild(tag);
+                    });
+                };
+
+                const appendChunk = () => {
+                    matches.slice(shown, shown + CHUNK).forEach(option => {
+                        const label = document.createElement('label');
+                        label.className = 'checkbox';
+                        const box = document.createElement('input');
+                        box.type = 'checkbox';
+                        box.checked = selected.has(option.id);
+                        box.addEventListener('change', () => {
+                            box.checked ? selected.add(option.id) : selected.delete(option.id);
+                            renderChips();
+                            syncInputs();
+                            counter.textContent = format(messages.selected, selected.size);
+                        });
+                        const text = document.createElement('span');
+                        text.innerHTML = ' ' + highlight(option.name, query);
+                        label.appendChild(box);
+                        label.appendChild(text);
+                        list.appendChild(label);
+                    });
+                    shown = Math.min(shown + CHUNK, matches.length);
+                };
+
+                const renderList = () => {
+                    query = normalize(search.value.trim());
+                    matches = query
+                            ? options.filter(option => normalize(option.name).includes(query))
+                            : options;
+                    shown = 0;
+                    list.innerHTML = '';
+                    list.scrollTop = 0;
+                    if (!matches.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'has-text-grey';
+                        empty.style.padding = '0.4rem 0.75rem';
+                        empty.textContent = messages.empty;
+                        list.appendChild(empty);
+                    }
+                    appendChunk();
+                };
+
+                const refresh = () => {
+                    renderChips();
+                    syncInputs();
+                    renderList();
+                    counter.textContent = format(messages.selected, selected.size);
+                };
+
+                list.addEventListener('scroll', () => {
+                    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 48) {
+                        appendChunk();
+                    }
+                });
+
+                search.addEventListener('input', renderList);
+
+                clear.addEventListener('click', event => {
+                    event.preventDefault();
+                    selected.clear();
+                    refresh();
+                });
+
+                refresh();
+            };
+
+            document.querySelectorAll('[data-category-multi-picker]').forEach(setUp);
         })();
     </script>
 </th:block>
