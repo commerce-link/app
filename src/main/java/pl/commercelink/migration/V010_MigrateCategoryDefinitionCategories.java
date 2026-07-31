@@ -47,8 +47,9 @@ public class V010_MigrateCategoryDefinitionCategories {
         }
 
         scanAndProcess(dynamoDB, TABLE_NAME, List.of("storeId", "catalogId", "categories"), item -> {
-            List<AttributeValue> migrated = migratedDefinitions(item.get("categories"), idByLeafName);
-            if (migrated.isEmpty()) {
+            AttributeValue existing = item.get("categories");
+            List<AttributeValue> migrated = migratedDefinitions(existing, idByLeafName);
+            if (migrated.isEmpty() || migrated.equals(existing.getL())) {
                 return;
             }
             executeUpdate(dynamoDB, TABLE_NAME,
