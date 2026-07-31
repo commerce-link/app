@@ -9,6 +9,7 @@ import pl.commercelink.pricelist.RollingPriceAggregate;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -42,6 +43,9 @@ public class StockLevels {
 
     @Autowired
     private Inventory inventory;
+
+    @Autowired
+    private PimCategoryOptions pimCategoryOptions;
 
     public List<StockProductLevel> calculate(String storeId, String catalogId, String categoryId, RestockScope scope, boolean onlyMissingItems) {
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
@@ -85,7 +89,7 @@ public class StockLevels {
                     spl.setExpectedQuantity(Math.max(spl.getExpectedQuantity(), expectedQty));
                 } else {
                     StockProductLevel spl = new StockProductLevel(
-                            category.getCategory(),
+                            pimCategoryOptions.joinedNamesOf(category.getCategories()),
                             product.getManufacturerCode(),
                             product.getName(),
                             restockPricePromo,

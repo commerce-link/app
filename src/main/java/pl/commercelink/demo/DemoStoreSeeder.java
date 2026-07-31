@@ -152,6 +152,7 @@ public class DemoStoreSeeder implements StoreSeeder {
             definition.setCategoryId(CatalogSeed.categoryId(category, storeId));
             definition.setName(category);
             definition.setCategory(category);
+            definition.setCategories(List.of());
             definition.setType(CategoryDefinitionType.Managed);
             definition.setRequiredDuringOrder(false);
             definition.setSequenceNumber(++sequence);

@@ -11,6 +11,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -50,6 +51,8 @@ class StockLevelsRoutingTest {
     private InventoryView inventoryView;
     @Mock
     private ProductCatalog catalog;
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
 
     @InjectMocks
     private StockLevels stockLevels;
@@ -60,11 +63,11 @@ class StockLevelsRoutingTest {
         CategoryDefinition mixedDefinition = new CategoryDefinition();
         mixedDefinition.setCategoryId("cat-s");
         mixedDefinition.setName("Montaż");
-        mixedDefinition.setCategory("Assembly");
+        mixedDefinition.setCategories(List.of("assembly-id"));
         CategoryDefinition regularDefinition = new CategoryDefinition();
         regularDefinition.setCategoryId("cat-r");
         regularDefinition.setName("Obudowy");
-        regularDefinition.setCategory("Case");
+        regularDefinition.setCategories(List.of("case-id"));
 
         Product serviceProduct = new Product("cat-s");
         serviceProduct.setName("Montaż PC");
@@ -102,5 +105,32 @@ class StockLevelsRoutingTest {
 
         // then
         verify(inventory).withEnabledSuppliersOnly(eq(STORE_ID), eq(SupplierScope.FULFILMENT));
+    }
+
+    @Test
+    void stockProductLevelCarriesJoinedCategoryNames() {
+        // given
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-1");
+        definition.setName("Elektronika");
+        definition.setCategories(List.of("194", "195"));
+
+        Product product = new Product("cat-1");
+        product.setName("Klawiatura X1");
+        product.setManufacturerCode("MFN-KB");
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(definition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-1")).thenReturn(List.of(product));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(pimCategoryOptions.joinedNamesOf(definition.getCategories())).thenReturn("Klawiatury, Myszki");
+
+        // when
+        List<StockProductLevel> levels = stockLevels.calculate(
+                STORE_ID, CATALOG_ID, definition.getCategoryId(), RestockScope.WholeCatalog, false);
+
+        // then
+        assertThat(levels).hasSize(1).allMatch(level -> "Klawiatury, Myszki".equals(level.getCategory()));
     }
 }

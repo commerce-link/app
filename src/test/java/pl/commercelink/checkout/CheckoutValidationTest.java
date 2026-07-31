@@ -32,14 +32,15 @@ class CheckoutValidationTest {
     }
 
     @Test
-    @DisplayName("required category passes when the item still carries the legacy category key from an old pricelist")
-    void passesWhenItemCarriesLegacyCategoryKey() {
+    @DisplayName("required category throws when the item carries the PIM category id instead of the definition name")
+    void throwsWhenItemCarriesPimCategoryIdInsteadOfDefinitionName() {
         // given
         ProductCatalog catalog = catalogWithRequired("Obudowa", "Case");
 
         // when / then
-        assertThatCode(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Obudowa");
     }
 
     @Test
@@ -73,7 +74,7 @@ class CheckoutValidationTest {
     private ProductCatalog catalogWithRequired(String name, String category) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setName(name);
-        definition.setCategory(category);
+        definition.setCategories(List.of(category));
         definition.setRequiredDuringOrder(true);
         ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
         catalog.setCategories(List.of(definition));
