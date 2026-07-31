@@ -16,6 +16,9 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.StringTemplateResolver;
 import pl.commercelink.products.CategoryOption;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -288,5 +291,76 @@ class CategoryPickerFragmentTest {
         // then
         assertThat(html).containsOnlyOnce("Procesory");
         assertThat(html).contains("data-category-picker");
+    }
+
+    @Test
+    void everySavedCategoryIsCarriedByItsOwnHiddenInputSoASaveWithoutScriptsChangesNothing() {
+        // when
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of("194", "195"));
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"194\" data-multi-initial>");
+        assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"195\" data-multi-initial>");
+    }
+
+    @Test
+    void aBrandNewDefinitionShipsNoSavedCategoryInputs() {
+        // when
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of());
+
+        // then
+        assertThat(html).doesNotContain("data-multi-initial");
+        assertThat(html).contains("data-category-multi-picker");
+    }
+
+    @Test
+    void multiPickerScriptShipsCategoryOptionsAsUsableJson() {
+        // when
+        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
+
+        // then
+        assertThat(script).contains("[{\"id\":\"194\",\"name\":\"Klawiatury\"},{\"id\":\"195\",\"name\":\"Myszki\"}]");
+        assertThat(script).doesNotContain("[{}]");
+    }
+
+    @Test
+    void multiPickerScriptShipsTheSavedIdsThatSeedTheSelectionAndTheLock() {
+        // when
+        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
+
+        // then
+        assertThat(script).contains("const initial = [\"194\"]");
+    }
+
+    @Test
+    void aBrandNewDefinitionLocksNothing() {
+        // when
+        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of());
+
+        // then
+        assertThat(script).contains("const initial = []");
+    }
+
+    @Test
+    void pickerHelpersAreDefinedBeforeEveryScriptThatDestructuresThem() {
+        // given
+        String categoryDefinitionPage = template("catalogDetails_categoryDefinition.html");
+        String productDetailsPage = template("catalogDetails_categoryDefinition_productDetails.html");
+
+        // then
+        assertThat(categoryDefinitionPage.indexOf("pickerHelpersScript"))
+                .isGreaterThan(-1)
+                .isLessThan(categoryDefinitionPage.indexOf("multiPickerScript"));
+        assertThat(productDetailsPage.indexOf("pickerHelpersScript"))
+                .isGreaterThan(-1)
+                .isLessThan(productDetailsPage.indexOf("pickerScript("));
+    }
+
+    private String template(String name) {
+        try (InputStream stream = getClass().getClassLoader().getResourceAsStream("templates/" + name)) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot read template " + name, e);
+        }
     }
 }
