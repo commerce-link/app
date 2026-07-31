@@ -419,4 +419,21 @@ class PimCategoryOptionsTest {
         assertThat(selection.categoryIds()).containsExactly("gone");
         assertThat(selection.categoryNames()).isEmpty();
     }
+
+    @Test
+    void selectionOfSanitisesIdsThroughTheFactory() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl")
+        ));
+
+        // when
+        CategorySelection selection = pimCategoryOptions().selectionOf(
+                Arrays.asList(" 2 ", "", null, "  "));
+
+        // then
+        assertThat(selection.categoryIds()).containsExactly("2");
+        assertThat(selection.categoryNames()).containsExactly("Meble");
+    }
 }

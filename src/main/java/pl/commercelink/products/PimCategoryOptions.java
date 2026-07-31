@@ -85,6 +85,7 @@ public class PimCategoryOptions {
         Map<String, String> namesById = namesById();
         return categoryIds.stream()
                 .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
                 .map(namesById::get)
                 .filter(name -> name != null && !name.isBlank())
                 .distinct()
