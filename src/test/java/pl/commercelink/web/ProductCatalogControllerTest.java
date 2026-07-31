@@ -264,7 +264,7 @@ class ProductCatalogControllerTest {
         verify(inventoryView).findAllByProductCategoriesGrouped(selections.capture());
         assertThat(selections.getValue()).containsOnlyKeys("194", "195");
         assertThat(selections.getValue().get("194"))
-                .isEqualTo(CategorySelection.of(List.of("194"), List.of("Klawiatury")));
+                .isEqualTo(CategorySelection.of(List.of("194")));
     }
 
     @Test

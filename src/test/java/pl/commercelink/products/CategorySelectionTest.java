@@ -18,53 +18,43 @@ class CategorySelectionTest {
     @Test
     void matchesWhenCategoryIdIsSelected() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
         assertThat(selection.matches(taxonomy("Klawiatury", "1234"))).isTrue();
     }
 
     @Test
-    void doesNotFallBackToNameWhenCategoryIdIsPresentButNotSelected() {
+    void doesNotMatchWhenCategoryIdIsPresentButNotSelected() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
         assertThat(selection.matches(taxonomy("Klawiatury", "9999"))).isFalse();
     }
 
     @Test
-    void fallsBackToNameWhenCategoryIdIsNull() {
+    void rowWithSelectedCategoryNameButNoCategoryIdDoesNotMatch() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
-        assertThat(selection.matches(taxonomy("Klawiatury", null))).isTrue();
+        assertThat(selection.matches(taxonomy("Klawiatury", null))).isFalse();
     }
 
     @Test
-    void fallsBackToNameWhenCategoryIdIsBlank() {
+    void rowWithSelectedCategoryNameButBlankCategoryIdDoesNotMatch() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
-        assertThat(selection.matches(taxonomy("Klawiatury", "  "))).isTrue();
-    }
-
-    @Test
-    void doesNotMatchUnknownNameWhenCategoryIdIsNull() {
-        // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
-
-        // when / then
-        assertThat(selection.matches(taxonomy("Myszki", null))).isFalse();
+        assertThat(selection.matches(taxonomy("Klawiatury", "  "))).isFalse();
     }
 
     @Test
     void matchesAnyOfSeveralSelectedIds() {
         // given
-        CategorySelection selection = CategorySelection.of(
-                List.of("1234", "5678"), List.of("Klawiatury", "Myszki"));
+        CategorySelection selection = CategorySelection.of(List.of("1234", "5678"));
 
         // when / then
         assertThat(selection.matches(taxonomy("Myszki", "5678"))).isTrue();
@@ -73,7 +63,7 @@ class CategorySelectionTest {
     @Test
     void doesNotMatchTaxonomyWithoutCategoryOrId() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
         assertThat(selection.matches(taxonomy(null, null))).isFalse();
@@ -82,7 +72,7 @@ class CategorySelectionTest {
     @Test
     void doesNotMatchEmptyTaxonomySentinel() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
         assertThat(selection.matches(Taxonomy.EMPTY)).isFalse();
@@ -91,7 +81,7 @@ class CategorySelectionTest {
     @Test
     void doesNotMatchNullTaxonomy() {
         // given
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Klawiatury"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
 
         // when / then
         assertThat(selection.matches(null)).isFalse();
@@ -112,31 +102,23 @@ class CategorySelectionTest {
     @Test
     void selectionWithIdsIsNotEmpty() {
         // when / then
-        assertThat(CategorySelection.of(List.of("1234"), List.of()).isEmpty()).isFalse();
-    }
-
-    @Test
-    void selectionWithOnlyUnresolvableNamesIsNotEmpty() {
-        // when / then
-        assertThat(CategorySelection.of(List.of(), List.of("Services")).isEmpty()).isFalse();
+        assertThat(CategorySelection.of(List.of("1234")).isEmpty()).isFalse();
     }
 
     @Test
     void ofIgnoresNullAndBlankEntries() {
         // given
         CategorySelection selection = CategorySelection.of(
-                java.util.Arrays.asList("1234", null, "  ", ""),
-                java.util.Arrays.asList("Klawiatury", null, "  "));
+                java.util.Arrays.asList("1234", null, "  ", ""));
 
         // then
         assertThat(selection.categoryIds()).containsExactly("1234");
-        assertThat(selection.categoryNames()).containsExactly("Klawiatury");
     }
 
     @Test
-    void ofTreatsNullCollectionsAsEmpty() {
+    void ofTreatsNullCollectionAsEmpty() {
         // when
-        CategorySelection selection = CategorySelection.of(null, null);
+        CategorySelection selection = CategorySelection.of(null);
 
         // then
         assertThat(selection.isEmpty()).isTrue();
@@ -146,7 +128,7 @@ class CategorySelectionTest {
     void selectionIsImmutable() {
         // given
         Set<String> ids = new java.util.HashSet<>(List.of("1234"));
-        CategorySelection selection = CategorySelection.of(ids, List.of());
+        CategorySelection selection = CategorySelection.of(ids);
 
         // when
         ids.add("5678");

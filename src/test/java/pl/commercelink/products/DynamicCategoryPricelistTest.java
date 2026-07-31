@@ -79,10 +79,10 @@ class DynamicCategoryPricelistTest {
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
-        CategorySelection graphicsCardsSelection = CategorySelection.of(List.of("170"), List.of("Karty graficzne"));
+        CategorySelection graphicsCardsSelection = CategorySelection.of(List.of("170"));
         when(pimCategoryOptions.selectionOf(List.of("170"))).thenReturn(graphicsCardsSelection);
         when(pimCategoryOptions.selectionOf(List.of("1584")))
-                .thenReturn(CategorySelection.of(List.of("1584"), List.of("Telewizory")));
+                .thenReturn(CategorySelection.of(List.of("1584")));
         when(inventory.findAllByProductCategories(graphicsCardsSelection)).thenReturn(List.of(matchedInventory));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
 

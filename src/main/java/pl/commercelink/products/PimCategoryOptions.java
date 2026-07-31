@@ -91,7 +91,7 @@ public class PimCategoryOptions {
     }
 
     public CategorySelection selectionOf(Collection<String> categoryIds) {
-        return categoryNames().selectionOf(categoryIds);
+        return CategorySelection.of(categoryIds);
     }
 
     private List<CategoryOption> sortedByName(Collection<CategoryOption> options) {

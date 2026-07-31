@@ -73,9 +73,9 @@ class InventoryViewStoreListingsTest {
     @InjectMocks
     private Inventory inventory;
 
-    private static final CategorySelection CPU_SELECTION = CategorySelection.of(List.of("989"), List.of("CPU"));
+    private static final CategorySelection CPU_SELECTION = CategorySelection.of(List.of("989"));
     private static final CategorySelection CPU_AND_GRAPHICS_CARDS_SELECTION =
-            CategorySelection.of(List.of(), List.of("CPU", "Karty graficzne"));
+            CategorySelection.of(List.of("989", "170"));
 
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
@@ -121,7 +121,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
     }
 
     private void stubGlobalIndex(Collection<MatchedInventory> groups) {
@@ -143,9 +143,9 @@ class InventoryViewStoreListingsTest {
                 taxonomyCache, supplierRegistry);
         stubGlobalIndex(List.of(cpuGroup, graphicsCardGroup));
         when(taxonomyCache.find(argThat(key -> key != null && key.getProductCodes().contains(MFN))))
-                .thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+                .thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(taxonomyCache.find(argThat(key -> key != null && key.getProductCodes().contains(MFN_GPU))))
-                .thenReturn(new Taxonomy(EAN_GPU, MFN_GPU, "Gigabyte", "RTX 5070", "Karty graficzne", 1, null, null));
+                .thenReturn(new Taxonomy(EAN_GPU, MFN_GPU, "Gigabyte", "RTX 5070", "Karty graficzne", 1, null, null, null, "170"));
     }
 
     private long taxonomyFindInvocationCount() {
@@ -188,7 +188,7 @@ class InventoryViewStoreListingsTest {
     void findAllByProductCategoriesGroupedPartitionsOneInventoryPassPerSelection() {
         // given
         stubTwoDistinctCategoryGroups();
-        CategorySelection graphicsCards = CategorySelection.of(List.of(), List.of("Karty graficzne"));
+        CategorySelection graphicsCards = CategorySelection.of(List.of("170"));
 
         // when
         Map<String, Collection<MatchedInventory>> grouped = inventory.withGlobalData()
@@ -206,7 +206,7 @@ class InventoryViewStoreListingsTest {
     void findAllByProductCategoriesGroupedWalksTaxonomyCacheOncePerKeyRegardlessOfSelectionCount() {
         // given
         stubTwoDistinctCategoryGroups();
-        CategorySelection graphicsCards = CategorySelection.of(List.of(), List.of("Karty graficzne"));
+        CategorySelection graphicsCards = CategorySelection.of(List.of("170"));
 
         // when
         inventory.withGlobalData().findAllByProductCategoriesGrouped(Map.of("989", CPU_SELECTION));
@@ -228,7 +228,7 @@ class InventoryViewStoreListingsTest {
         // when
         Map<String, Collection<MatchedInventory>> grouped = inventory.withGlobalData()
                 .findAllByProductCategoriesGrouped(
-                        Map.of("unknown", CategorySelection.of(List.of("nope"), List.of("Nieznane"))));
+                        Map.of("unknown", CategorySelection.of(List.of("nope"))));
 
         // then
         assertThat(grouped).containsOnlyKeys("unknown");
@@ -276,7 +276,7 @@ class InventoryViewStoreListingsTest {
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
         stubCpuSelection();
@@ -301,7 +301,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
         stubCpuSelection();
@@ -332,7 +332,7 @@ class InventoryViewStoreListingsTest {
         globalKey.addManufacturerCode(MFN);
         stubGlobalIndex(List.of(new MatchedInventory(globalKey,
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
 
         // when
         Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategories(CPU_SELECTION);
@@ -351,7 +351,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
@@ -458,7 +458,7 @@ class InventoryViewStoreListingsTest {
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);

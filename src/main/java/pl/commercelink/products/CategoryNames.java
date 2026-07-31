@@ -29,6 +29,6 @@ public record CategoryNames(Map<String, String> namesById) {
     }
 
     public CategorySelection selectionOf(Collection<String> categoryIds) {
-        return CategorySelection.of(categoryIds, namesOf(categoryIds));
+        return CategorySelection.of(categoryIds);
     }
 }

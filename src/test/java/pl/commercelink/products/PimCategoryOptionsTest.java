@@ -331,7 +331,7 @@ class PimCategoryOptionsTest {
         // then
         assertThat(categoryNames.namesOf(List.of("2"))).containsExactly("Meble");
         assertThat(categoryNames.joinedNamesOf(List.of("2", "3"))).isEqualTo("Łóżka, Meble");
-        assertThat(categoryNames.selectionOf(List.of("3")).categoryNames()).containsExactly("Łóżka");
+        assertThat(categoryNames.selectionOf(List.of("3")).categoryIds()).containsExactly("3");
         verify(pimCatalog, times(1)).allCategories();
     }
 
@@ -405,20 +405,12 @@ class PimCategoryOptionsTest {
     }
 
     @Test
-    void selectionOfCarriesIdsAndResolvedNames() {
-        // given
-        when(pimCatalog.allCategories()).thenReturn(List.of(
-                new PimCategory("1", null, "Dom", "pl"),
-                new PimCategory("2", "1", "Meble", "pl"),
-                new PimCategory("3", "1", "Łóżka", "pl")
-        ));
-
+    void selectionOfCarriesTheGivenIds() {
         // when
         CategorySelection selection = pimCategoryOptions().selectionOf(List.of("2", "3"));
 
         // then
         assertThat(selection.categoryIds()).containsExactlyInAnyOrder("2", "3");
-        assertThat(selection.categoryNames()).containsExactlyInAnyOrder("Meble", "Łóżka");
     }
 
     @Test
@@ -428,34 +420,12 @@ class PimCategoryOptionsTest {
     }
 
     @Test
-    void selectionOfKeepsIdsThatCannotBeResolvedToNames() {
-        // given
-        when(pimCatalog.allCategories()).thenReturn(List.of(
-                new PimCategory("1", null, "Dom", "pl")
-        ));
-
-        // when
-        CategorySelection selection = pimCategoryOptions().selectionOf(List.of("gone"));
-
-        // then
-        assertThat(selection.categoryIds()).containsExactly("gone");
-        assertThat(selection.categoryNames()).isEmpty();
-    }
-
-    @Test
     void selectionOfSanitisesIdsThroughTheFactory() {
-        // given
-        when(pimCatalog.allCategories()).thenReturn(List.of(
-                new PimCategory("1", null, "Dom", "pl"),
-                new PimCategory("2", "1", "Meble", "pl")
-        ));
-
         // when
         CategorySelection selection = pimCategoryOptions().selectionOf(
                 Arrays.asList(" 2 ", "", null, "  "));
 
         // then
         assertThat(selection.categoryIds()).containsExactly("2");
-        assertThat(selection.categoryNames()).containsExactly("Meble");
     }
 }

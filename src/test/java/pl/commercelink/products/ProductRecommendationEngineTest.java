@@ -38,7 +38,7 @@ class ProductRecommendationEngineTest {
     void queriesInventoryWithTheResolvedSelection() {
         // given
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId().withCategories("1234");
-        CategorySelection selection = CategorySelection.of(List.of("1234"), List.of("Karty graficzne"));
+        CategorySelection selection = CategorySelection.of(List.of("1234"));
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(pimCategoryOptions.selectionOf(List.of("1234"))).thenReturn(selection);
         when(inventory.findAllByProductCategories(selection)).thenReturn(List.of());
@@ -54,8 +54,7 @@ class ProductRecommendationEngineTest {
     void queriesInventoryOnceForSeveralCategories() {
         // given
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId().withCategories("1234", "5678");
-        CategorySelection selection = CategorySelection.of(
-                List.of("1234", "5678"), List.of("Karty graficzne", "Procesory"));
+        CategorySelection selection = CategorySelection.of(List.of("1234", "5678"));
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(pimCategoryOptions.selectionOf(List.of("1234", "5678"))).thenReturn(selection);
         when(inventory.findAllByProductCategories(selection)).thenReturn(List.of());

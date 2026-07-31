@@ -6,17 +6,16 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public record CategorySelection(Set<String> categoryIds, Set<String> categoryNames) {
+public record CategorySelection(Set<String> categoryIds) {
 
-    public static final CategorySelection EMPTY = new CategorySelection(Set.of(), Set.of());
+    public static final CategorySelection EMPTY = new CategorySelection(Set.of());
 
     public CategorySelection {
         categoryIds = Set.copyOf(categoryIds);
-        categoryNames = Set.copyOf(categoryNames);
     }
 
-    public static CategorySelection of(Collection<String> ids, Collection<String> names) {
-        return new CategorySelection(sanitised(ids), sanitised(names));
+    public static CategorySelection of(Collection<String> ids) {
+        return new CategorySelection(sanitised(ids));
     }
 
     private static Set<String> sanitised(Collection<String> values) {
@@ -37,13 +36,10 @@ public record CategorySelection(Set<String> categoryIds, Set<String> categoryNam
             return false;
         }
         String id = taxonomy.categoryId();
-        if (id != null && !id.isBlank()) {
-            return categoryIds.contains(id);
-        }
-        return taxonomy.category() != null && categoryNames.contains(taxonomy.category());
+        return id != null && !id.isBlank() && categoryIds.contains(id);
     }
 
     public boolean isEmpty() {
-        return categoryIds.isEmpty() && categoryNames.isEmpty();
+        return categoryIds.isEmpty();
     }
 }
