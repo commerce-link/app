@@ -35,10 +35,18 @@ class CategoryPickerFragmentTest {
         }
     }
 
+    record Definition(List<String> categories) {
+
+        public List<String> getCategories() {
+            return categories;
+        }
+    }
+
     private static final String PICKER = "<div th:replace=\"~{fragments/category-picker :: picker(%s)}\"></div>";
 
     private static final String MULTI_PICKER =
-            "<div th:replace=\"~{fragments/category-picker :: multiPicker('categories', ${options}, ${selectedIds}, false)}\"></div>";
+            "<div th:replace=\"~{fragments/category-picker :: multiPicker('categories', ${options}, ${selectedIds},"
+                    + " ${selectedNames}, %s)}\"></div>";
 
     private static final String MULTI_PICKER_SCRIPT =
             "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${selectedIds})}\"></div>";
@@ -52,8 +60,8 @@ class CategoryPickerFragmentTest {
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
-    private String renderMultiPicker(List<CategoryOption> options, List<String> selectedIds) {
-        return templateEngine().process(MULTI_PICKER, multiPickerContext(options, selectedIds));
+    private String renderMultiPicker(List<CategoryOption> options, List<String> selectedIds, boolean disabled) {
+        return templateEngine().process(MULTI_PICKER.formatted(disabled), multiPickerContext(options, selectedIds));
     }
 
     private String renderMultiPickerScript(List<CategoryOption> options, List<String> selectedIds) {
@@ -64,6 +72,10 @@ class CategoryPickerFragmentTest {
         Context context = new Context();
         context.setVariable("options", options);
         context.setVariable("selectedIds", selectedIds);
+        context.setVariable("selectedNames", options.stream()
+                .filter(option -> selectedIds.contains(option.id()))
+                .map(CategoryOption::name)
+                .toList());
         return context;
     }
 
@@ -239,25 +251,69 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void savedCategoriesCannotBeDeselectedButNewOnesCanBeAdded() {
+    void lockedMultiPickerShowsResolvedNamesAndOffersNoSearch() {
         // when
-        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of("194", "195"), true);
 
         // then
-        assertThat(script).contains("const locked = new Set(initial)");
-        assertThat(script).contains("box.disabled = locked.has(option.id)");
-        assertThat(script).contains("if (!locked.has(id)) {");
+        assertThat(html).contains("Klawiatury, Myszki");
+        assertThat(html).doesNotContain("194, 195");
+        assertThat(html).doesNotContain("data-multi-search");
+        assertThat(html).doesNotContain("data-category-multi-picker");
     }
 
     @Test
-    void clearingTheSelectionLeavesTheSavedCategoriesInPlace() {
+    void lockedMultiPickerStillCarriesEverySavedIdSoASaveDoesNotWipeTheMapping() {
         // when
-        String script = renderMultiPickerScript(KEYBOARDS_AND_MICE, List.of("194"));
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of("194", "195"), true);
 
         // then
-        assertThat(script).contains(
-                "Array.from(selected).filter(id => !locked.has(id)).forEach(id => selected.delete(id));");
-        assertThat(script).doesNotContain("selected.clear()");
+        assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"194\" data-multi-initial>");
+        assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"195\" data-multi-initial>");
+    }
+
+    @Test
+    void multiPickerBoundToTheFormObjectIsLockedOnlyOnceAMappingExists() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", KEYBOARDS_AND_MICE);
+        context.setVariable("selectedCategoryNames", List.of("Klawiatury"));
+        context.setVariable("edit", true);
+        String form = "<form th:object=\"${categoryDefinition}\">"
+                + "<div th:replace=\"~{fragments/category-picker :: multiPicker('categories', ${options}, *{categories},"
+                + " ${selectedCategoryNames}, ${edit and !#lists.isEmpty(categoryDefinition.categories)})}\"></div>"
+                + "</form>";
+
+        // when
+        context.setVariable("categoryDefinition", new Definition(List.of("194")));
+        String mapped = templateEngine().process(form, context);
+        context.setVariable("categoryDefinition", new Definition(List.of()));
+        String unmapped = templateEngine().process(form, context);
+
+        // then
+        assertThat(mapped).contains("name=\"categories\"").contains("value=\"194\"");
+        assertThat(mapped).doesNotContain("data-category-multi-picker");
+        assertThat(unmapped).contains("data-category-multi-picker");
+    }
+
+    @Test
+    void emptyHintIsSkippedEntirelyWhenTheMappingIsLockedForEditing() {
+        // given
+        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
+        IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
+        WebContext context = new WebContext(exchange);
+        context.setVariable("categories", List.of());
+        context.setVariable("edit", true);
+        context.setVariable("categoryDefinition", new Definition(List.of("194")));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:unless=\"${edit and !#lists.isEmpty(categoryDefinition.categories)}\">"
+                        + "<div th:replace=\"~{fragments/category-picker :: emptyHint(${categories})}\"></div>"
+                        + "</div>", context);
+
+        // then
+        assertThat(html).doesNotContain("/dashboard/store/categories");
     }
 
     @Test
@@ -296,7 +352,7 @@ class CategoryPickerFragmentTest {
     @Test
     void everySavedCategoryIsCarriedByItsOwnHiddenInputSoASaveWithoutScriptsChangesNothing() {
         // when
-        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of("194", "195"));
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of("194", "195"), false);
 
         // then
         assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"194\" data-multi-initial>");
@@ -306,7 +362,7 @@ class CategoryPickerFragmentTest {
     @Test
     void aBrandNewDefinitionShipsNoSavedCategoryInputs() {
         // when
-        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of());
+        String html = renderMultiPicker(KEYBOARDS_AND_MICE, List.of(), false);
 
         // then
         assertThat(html).doesNotContain("data-multi-initial");

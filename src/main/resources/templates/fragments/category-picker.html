@@ -51,12 +51,11 @@
     </div>
 </div>
 
-<div th:fragment="multiPicker(fieldName, options, selectedIds, disabled)" class="category-multi-picker">
+<div th:fragment="multiPicker(fieldName, options, selectedIds, selectedNames, disabled)" class="category-multi-picker">
     <input type="hidden" th:name="${fieldName}" th:each="id : ${selectedIds}" th:value="${id}" data-multi-initial>
 
     <div th:if="${disabled}" class="control">
-        <input class="input" type="text" disabled
-               th:value="${#strings.listJoin(selectedIds, ', ')}">
+        <span th:replace="~{fragments/category-picker :: categoryNames(${selectedNames})}"></span>
     </div>
 
     <div th:unless="${disabled}" data-category-multi-picker
@@ -353,7 +352,6 @@
                 const inputs = picker.querySelector('[data-multi-inputs]');
                 const clear = picker.querySelector('[data-multi-clear]');
 
-                const locked = new Set(initial);
                 const selected = new Set(initial);
                 const nameById = new Map(options.map(option => [option.id, option.name]));
                 let matches = [];
@@ -378,16 +376,14 @@
                         const tag = document.createElement('span');
                         tag.className = 'tag is-info is-light';
                         tag.textContent = nameById.get(id) || id;
-                        if (!locked.has(id)) {
-                            const remove = document.createElement('button');
-                            remove.type = 'button';
-                            remove.className = 'delete is-small';
-                            remove.addEventListener('click', () => {
-                                selected.delete(id);
-                                refresh();
-                            });
-                            tag.appendChild(remove);
-                        }
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'delete is-small';
+                        remove.addEventListener('click', () => {
+                            selected.delete(id);
+                            refresh();
+                        });
+                        tag.appendChild(remove);
                         chips.appendChild(tag);
                     });
                 };
@@ -399,7 +395,6 @@
                         const box = document.createElement('input');
                         box.type = 'checkbox';
                         box.checked = selected.has(option.id);
-                        box.disabled = locked.has(option.id);
                         box.addEventListener('change', () => {
                             box.checked ? selected.add(option.id) : selected.delete(option.id);
                             renderChips();
@@ -450,7 +445,7 @@
 
                 clear.addEventListener('click', event => {
                     event.preventDefault();
-                    Array.from(selected).filter(id => !locked.has(id)).forEach(id => selected.delete(id));
+                    selected.clear();
                     refresh();
                 });
 

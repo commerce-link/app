@@ -17,8 +17,10 @@
 
         <div class="field" style="max-width: 30rem;">
             <label class="label" th:text="#{catalog.category}"></label>
-            <div th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
-            <div th:replace="~{fragments/category-picker :: multiPicker('categories', ${productCategories}, *{categories}, false)}"></div>
+            <div th:unless="${edit and !#lists.isEmpty(categoryDefinition.categories)}">
+                <div th:replace="~{fragments/category-picker :: emptyHint(${productCategories})}"></div>
+            </div>
+            <div th:replace="~{fragments/category-picker :: multiPicker('categories', ${productCategories}, *{categories}, ${selectedCategoryNames}, ${edit and !#lists.isEmpty(categoryDefinition.categories)})}"></div>
             <p class="help" th:text="#{catalog.category.mapping.hint}"></p>
         </div>
 
@@ -321,8 +323,10 @@
         </div>
     </form>
 
-    <div th:replace="~{fragments/category-picker :: pickerHelpersScript}"></div>
-    <div th:replace="~{fragments/category-picker :: multiPickerScript(${productCategories}, ${categoryDefinition.categories})}"></div>
+    <div th:unless="${edit and !#lists.isEmpty(categoryDefinition.categories)}">
+        <div th:replace="~{fragments/category-picker :: pickerHelpersScript}"></div>
+        <div th:replace="~{fragments/category-picker :: multiPickerScript(${productCategories}, ${categoryDefinition.categories})}"></div>
+    </div>
 </div>
 
 </body>

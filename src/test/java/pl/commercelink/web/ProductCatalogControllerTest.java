@@ -298,6 +298,7 @@ class ProductCatalogControllerTest {
         List<CategoryOption> options = List.of(new CategoryOption("194", "Klawiatury"), new CategoryOption("195", "Myszki"));
         when(pimCategoryOptions.categoryOptionsById(List.of("Komputery i urządzenia peryferyjne"), List.of("194", "195")))
                 .thenReturn(options);
+        when(pimCategoryOptions.namesOf(List.of("194", "195"))).thenReturn(List.of("Klawiatury", "Myszki"));
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -305,6 +306,7 @@ class ProductCatalogControllerTest {
 
         // then
         assertThat(model.getAttribute("productCategories")).isEqualTo(options);
+        assertThat(model.getAttribute("selectedCategoryNames")).isEqualTo(List.of("Klawiatury", "Myszki"));
     }
 
     @Test

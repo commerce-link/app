@@ -181,6 +181,7 @@ public class ProductCatalogController {
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
         model.addAttribute("productCategories", pimCategoryOptions.categoryOptionsById(
                 store.getEnabledCategories(), categoryDefinition.getCategories()));
+        model.addAttribute("selectedCategoryNames", pimCategoryOptions.namesOf(categoryDefinition.getCategories()));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
