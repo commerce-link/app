@@ -67,6 +67,28 @@ class ProductCatalogTest {
         assertThat(catalog.getCategories().get(0).getCategories()).isEmpty();
     }
 
+    @Test
+    void addOrUpdateKeepsTheLegacyCategoryOfAnExistingDefinitionWhenOnlyCategoriesArePosted() {
+        // given
+        ProductCatalog catalog = new ProductCatalog("store-1", "Catalog");
+        CategoryDefinition stored = new CategoryDefinition().withGeneratedId();
+        stored.setCategory("Klawiatury");
+        stored.setCategories(List.of("194"));
+        catalog.addOrUpdateCategoryDefinition(stored);
+
+        CategoryDefinition posted = new CategoryDefinition();
+        posted.setCategoryId(stored.getCategoryId());
+        posted.setCategories(List.of("195"));
+
+        // when
+        catalog.addOrUpdateCategoryDefinition(posted);
+
+        // then
+        CategoryDefinition saved = catalog.findCategoryDefinition(stored.getCategoryId());
+        assertThat(saved.getCategory()).isEqualTo("Klawiatury");
+        assertThat(saved.getCategories()).containsExactly("195");
+    }
+
     private CategoryDefinition definition(String name, String category, int sequenceNumber) {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setName(name);

@@ -50,6 +50,7 @@ public class ProductCatalog implements DeletionProtection {
                 }else{
                     categoryDefinition.setTypeChangedAt(existingCategory.get().getTypeChangedAt());
                 }
+                categoryDefinition.setCategory(existingCategory.get().getCategory());
         }
 
         categories.removeIf(c -> c.getCategoryId().equals(categoryDefinition.getCategoryId()));
