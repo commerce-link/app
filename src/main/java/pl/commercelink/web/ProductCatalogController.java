@@ -176,8 +176,8 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("productCategories", pimCategoryOptions.categoryOptions(
-                store.getEnabledCategories(), Collections.singletonList(categoryDefinition.getCategory())));
+        model.addAttribute("productCategories", pimCategoryOptions.categoryOptionsById(
+                store.getEnabledCategories(), categoryDefinition.getCategories()));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
@@ -189,11 +189,7 @@ public class ProductCatalogController {
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category")
     public String saveCategoryDefinition(@PathVariable String catalogId, @ModelAttribute CategoryDefinition categoryDefinition, Model model, RedirectAttributes redirectAttributes) {
-        if (StringUtils.isBlank(categoryDefinition.getCategory())) {
-            categoryDefinition.setCategory(null);
-        }
         if (categoryDefinition.isComplete()) {
-            // Save the category definition
             ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
             productCatalog.addOrUpdateCategoryDefinition(categoryDefinition);
             productCatalogRepository.save(productCatalog);
@@ -206,19 +202,22 @@ public class ProductCatalogController {
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (categoryDefinition.getCategory() == null || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (categoryDefinition.getCategories().isEmpty() || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
             return;
         }
 
-        boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findAllByProductCategories(pimCategoryOptions.selectionOf(categoryDefinition.getCategories()))
-                .stream()
-                .anyMatch(MatchedInventory::hasAnyOffers);
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
+        List<String> withoutOffers = categoryDefinition.getCategories().stream()
+                .filter(categoryId -> enabledInventory
+                        .findAllByProductCategories(pimCategoryOptions.selectionOf(List.of(categoryId)))
+                        .stream()
+                        .noneMatch(MatchedInventory::hasAnyOffers))
+                .collect(Collectors.toList());
 
-        if (!hasAnyOffers) {
+        if (!withoutOffers.isEmpty()) {
             redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
                     "catalog.category.emptyInventory",
-                    new Object[]{categoryDefinition.getCategory()},
+                    new Object[]{pimCategoryOptions.joinedNamesOf(withoutOffers)},
                     LocaleContextHolder.getLocale()));
         }
     }
@@ -228,10 +227,12 @@ public class ProductCatalogController {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
         CategoryDefinition removedCategoryDefinition = productCatalog.removeCategoryDefinition(categoryId);
 
-        // if no other CategoryDefinition is associated with the same category, then delete all products associated with this category
-        if (productCatalog.getCategories().stream().noneMatch(c -> Objects.equals(
-                c.getCategory(),
-                removedCategoryDefinition.getCategory()))) {
+        Set<String> removedCategories = new HashSet<>(removedCategoryDefinition.getCategories());
+        boolean sharedWithAnotherDefinition = !removedCategories.isEmpty()
+                && productCatalog.getCategories().stream()
+                        .anyMatch(c -> c.getCategories().stream().anyMatch(removedCategories::contains));
+
+        if (!sharedWithAnotherDefinition) {
             List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
             productRepository.delete(products);
         }
