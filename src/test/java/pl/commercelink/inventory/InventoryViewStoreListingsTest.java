@@ -10,6 +10,7 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
@@ -26,6 +27,7 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -385,6 +387,66 @@ class InventoryViewStoreListingsTest {
         assertThat(matched).isNotNull();
         assertThat(matched.isEmpty()).isTrue();
         assertThat(matched.getMfnCodes()).contains("UNKNOWN");
+    }
+
+    @Test
+    void rowWhoseCategoryNameMatchesButHasNoCategoryIdDoesNotMatch() {
+        // given
+        Store store = org.mockito.Mockito.mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
+        when(store.hasOwnSupplierConnections()).thenReturn(false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
+        stubGlobalIndex(List.of(globalGroupWithPimId()));
+        when(taxonomyCache.find(any())).thenReturn(
+                new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, null));
+
+        // when
+        Map<String, Collection<MatchedInventory>> result =
+                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
+
+        // then
+        assertThat(result.get("989")).isEmpty();
+    }
+
+    @Test
+    void taxonomyLookupCountIsIndependentOfSelectionSize() {
+        // given
+        storeWithGlobalAbGroupAndOwnAction();
+
+        // when
+        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
+        Collection<org.mockito.invocation.Invocation> afterSingle =
+                org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations();
+        long singleRunFinds = afterSingle.stream().filter(i -> i.getMethod().getName().equals("find")).count();
+        org.mockito.Mockito.clearInvocations(taxonomyCache);
+        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
+        long doubleRunFinds = org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("find")).count();
+
+        // then
+        assertThat(doubleRunFinds).isEqualTo(singleRunFinds);
+    }
+
+    @Test
+    void productReachableThroughTwoSelectedCategoriesAppearsExactlyOnce() {
+        // given — real TaxonomyCache: the key's two MFNs resolve to two different selected categories
+        TaxonomyRepository taxonomyRepository = org.mockito.Mockito.mock(TaxonomyRepository.class);
+        TaxonomyCache realCache = new TaxonomyCache(taxonomyRepository);
+        realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 1, null, null, null, "194"));
+        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 2, null, null, null, "195"));
+        InventoryKey key = new InventoryKey(EAN, "MFN-A");
+        key.addManufacturerCode("MFN-B");
+        MatchedInventory group = new MatchedInventory(key,
+                List.of(item("AB Group", 100.0)), realCache, supplierRegistry);
+        InventoryView view = new InventoryView(InventoryIndex.of(List.of(group)), InventoryIndex.of(List.of()),
+                realCache, supplierRegistry);
+
+        // when
+        Map<String, Collection<MatchedInventory>> result = view.findAllByProductCategoryIds(List.of("194", "195"));
+
+        // then
+        assertThat(result.get("194").size() + result.get("195").size()).isEqualTo(1);
     }
 
     @Test

@@ -5,7 +5,10 @@ import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -57,6 +60,19 @@ public class InventoryView {
                 })
                 .map(this::assemble)
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
+        Map<String, Collection<MatchedInventory>> matchesByCategoryId = new LinkedHashMap<>();
+        categoryIds.forEach(categoryId -> matchesByCategoryId.put(categoryId, new LinkedList<>()));
+        listedKeys().forEach(key -> {
+            String categoryId = taxonomyCache.find(key).categoryId();
+            Collection<MatchedInventory> matches = categoryId == null ? null : matchesByCategoryId.get(categoryId);
+            if (matches != null) {
+                matches.add(assemble(key));
+            }
+        });
+        return matchesByCategoryId;
     }
 
     private Stream<InventoryKey> listedKeys() {
