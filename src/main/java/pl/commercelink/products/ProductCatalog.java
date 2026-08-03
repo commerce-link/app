@@ -50,6 +50,10 @@ public class ProductCatalog implements DeletionProtection {
                 }else{
                     categoryDefinition.setTypeChangedAt(existingCategory.get().getTypeChangedAt());
                 }
+                categoryDefinition.setCategory(existingCategory.get().getCategory());
+                if (existingCategory.get().hasCategoryMapping()) {
+                    categoryDefinition.setPimCategoryIds(existingCategory.get().getPimCategoryIds());
+                }
         }
 
         categories.removeIf(c -> c.getCategoryId().equals(categoryDefinition.getCategoryId()));
@@ -66,6 +70,14 @@ public class ProductCatalog implements DeletionProtection {
                 .distinct()
                 .collect(Collectors.toList());
         categoryDefinition.setGroupingOrder(completeGroupingOrder);
+
+        List<String> completePimCategoryIds = categoryDefinition.getPimCategoryIds()
+                .stream()
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
+        categoryDefinition.setPimCategoryIds(completePimCategoryIds);
 
         List<InventoryDefinition> completeInventoryDefinitions = categoryDefinition.getInventoryDefinitions()
                 .stream()
