@@ -342,6 +342,16 @@
                 </dependency>
             </dependencies>
         </profile>
+        <profile>
+            <id>pim</id>
+            <dependencies>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>pim-commercelink</artifactId>
+                    <version>0.1.7</version>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 
 </project>
