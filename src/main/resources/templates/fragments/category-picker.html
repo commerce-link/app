@@ -48,7 +48,43 @@
     </div>
 </div>
 
-<th:block th:fragment="pickerScript(categories)">
+<div th:fragment="multiPicker(fieldName, selectedOptions, disabled, required)" class="category-picker">
+    <span data-picker-values>
+        <input type="hidden" th:each="option : ${selectedOptions}"
+               th:name="${fieldName}" th:value="${option.id}" th:attr="data-name=${option.name}">
+    </span>
+
+    <div th:if="${disabled}" class="control">
+        <input class="input" type="text" disabled
+               th:value="${#strings.listJoin(selectedOptions.![name], ', ')}">
+    </div>
+
+    <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-multi-picker
+         th:attr="data-picker-required=${required} ? 'true' : null, data-picker-field=${fieldName}">
+        <div class="dropdown-trigger">
+            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
+                <span data-picker-label
+                      th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : ${#strings.listJoin(selectedOptions.![name], ', ')}"></span>
+                <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
+            </button>
+        </div>
+        <div class="dropdown-menu" role="listbox">
+            <div class="dropdown-content">
+                <div class="dropdown-item">
+                    <div class="control has-icons-left">
+                        <input class="input" type="search" autocomplete="off" data-picker-search
+                               th:placeholder="#{catalog.category.filter}">
+                        <span class="icon is-small is-left"><i class="fas fa-search"></i></span>
+                    </div>
+                </div>
+                <div data-picker-list></div>
+                <div class="dropdown-item"><p class="help" data-picker-count></p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:fragment="pickerHelpers">
     <style>
         .category-picker .dropdown-trigger .button {
             justify-content: space-between;
@@ -77,6 +113,10 @@
             padding-right: 1rem;
         }
 
+        .category-picker .dropdown-item.is-selected {
+            font-weight: 600;
+        }
+
         .category-picker mark {
             background-color: #ffe9a8;
             padding: 0;
@@ -86,6 +126,36 @@
             margin-top: 0;
         }
     </style>
+    <script>
+        window.pickerHelpers = {
+            format: (template, ...values) =>
+                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
+            normalize: text => text.toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\u0142/g, 'l'),
+            escapeHtml: text => {
+                const holder = document.createElement('span');
+                holder.textContent = text;
+                return holder.innerHTML;
+            },
+            highlight: (label, query) => {
+                if (!query) {
+                    return window.pickerHelpers.escapeHtml(label);
+                }
+                const start = window.pickerHelpers.normalize(label).indexOf(query);
+                if (start < 0) {
+                    return window.pickerHelpers.escapeHtml(label);
+                }
+                return window.pickerHelpers.escapeHtml(label.substring(0, start))
+                        + '<mark>' + window.pickerHelpers.escapeHtml(label.substring(start, start + query.length)) + '</mark>'
+                        + window.pickerHelpers.escapeHtml(label.substring(start + query.length));
+            }
+        };
+    </script>
+</th:block>
+
+<th:block th:fragment="pickerScript(categories)">
+    <th:block th:insert="~{fragments/category-picker :: pickerHelpers}"></th:block>
 
     <script th:inline="javascript">
         (function () {
@@ -96,32 +166,7 @@
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-
-            const format = (template, ...values) =>
-                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template);
-
-            const normalize = text => text.toLowerCase()
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\u0142/g, 'l');
-
-            const escapeHtml = text => {
-                const holder = document.createElement('span');
-                holder.textContent = text;
-                return holder.innerHTML;
-            };
-
-            const highlight = (label, query) => {
-                if (!query) {
-                    return escapeHtml(label);
-                }
-                const start = normalize(label).indexOf(query);
-                if (start < 0) {
-                    return escapeHtml(label);
-                }
-                return escapeHtml(label.substring(0, start))
-                        + '<mark>' + escapeHtml(label.substring(start, start + query.length)) + '</mark>'
-                        + escapeHtml(label.substring(start + query.length));
-            };
+            const {format, normalize, escapeHtml, highlight} = window.pickerHelpers;
 
             const setUp = picker => {
                 const field = picker.parentElement.querySelector('[data-picker-value]');
@@ -264,6 +309,196 @@
             };
 
             document.querySelectorAll('[data-category-picker]').forEach(setUp);
+        })();
+    </script>
+</th:block>
+
+<th:block th:fragment="multiPickerScript(categoryOptions)">
+    <th:block th:insert="~{fragments/category-picker :: pickerHelpers}"></th:block>
+
+    <script th:inline="javascript">
+        (function () {
+            const CHUNK = 60;
+            const options = /*[[${categoryOptions}]]*/ [];
+            const messages = {
+                empty: /*[[#{catalog.category.empty}]]*/ '',
+                count: /*[[#{catalog.category.count}]]*/ '',
+                unset: /*[[#{catalog.category.unset}]]*/ ''
+            };
+            const {format, normalize, highlight} = window.pickerHelpers;
+
+            const setUp = picker => {
+                const root = picker.closest('.category-picker');
+                const values = root.querySelector('[data-picker-values]');
+                const fieldName = picker.dataset.pickerField;
+                const selected = new Map();
+                values.querySelectorAll('input').forEach(input =>
+                        selected.set(input.value, input.dataset.name || input.value));
+
+                const syncHiddenInputs = () => {
+                    values.innerHTML = '';
+                    selected.forEach((name, id) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = fieldName;
+                        input.value = id;
+                        values.appendChild(input);
+                    });
+                };
+
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const label = picker.querySelector('[data-picker-label]');
+                const search = picker.querySelector('[data-picker-search]');
+                const list = picker.querySelector('[data-picker-list]');
+                const counter = picker.querySelector('[data-picker-count]');
+
+                const entries = options.map(option => ({value: option.id, label: option.name}));
+
+                let matches = [];
+                let shown = [];
+                let active = -1;
+                let query = '';
+
+                const showSelection = () => {
+                    label.textContent = selected.size ? Array.from(selected.values()).join(', ') : messages.unset;
+                };
+
+                const renderSelectionState = () => {
+                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach(item => {
+                        item.classList.toggle('is-selected', selected.has(item.dataset.value));
+                    });
+                };
+
+                const toggle = option => {
+                    if (selected.has(option.value)) {
+                        selected.delete(option.value);
+                    } else {
+                        selected.set(option.value, option.label);
+                    }
+                    trigger.classList.remove('is-danger');
+                    syncHiddenInputs();
+                    showSelection();
+                    renderSelectionState();
+                };
+
+                const appendChunk = () => {
+                    matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
+                        const item = document.createElement('a');
+                        item.className = 'dropdown-item';
+                        item.href = '#';
+                        item.setAttribute('role', 'option');
+                        item.dataset.value = option.value;
+                        item.classList.toggle('is-selected', selected.has(option.value));
+                        item.innerHTML = highlight(option.label, query);
+                        item.addEventListener('click', event => {
+                            event.preventDefault();
+                            toggle(option);
+                        });
+                        list.appendChild(item);
+                        shown.push(option);
+                    });
+                };
+
+                const render = () => {
+                    query = normalize(search.value.trim());
+                    matches = query
+                            ? entries.filter(option => normalize(option.label).includes(query))
+                            : entries;
+                    shown = [];
+                    active = -1;
+                    list.innerHTML = '';
+                    list.scrollTop = 0;
+
+                    if (!matches.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'dropdown-item has-text-grey';
+                        empty.textContent = messages.empty;
+                        list.appendChild(empty);
+                    }
+
+                    appendChunk();
+                    counter.textContent = format(messages.count, matches.length, entries.length);
+                };
+
+                list.addEventListener('scroll', () => {
+                    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 48) {
+                        appendChunk();
+                    }
+                });
+
+                const highlightActive = () => {
+                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
+                        item.classList.toggle('is-active', index === active);
+                        if (index === active) {
+                            item.scrollIntoView({block: 'nearest'});
+                        }
+                    });
+                };
+
+                const move = step => {
+                    if (!shown.length) {
+                        return;
+                    }
+                    if (active + step >= shown.length - 1) {
+                        appendChunk();
+                    }
+                    active = Math.min(Math.max(active + step, 0), shown.length - 1);
+                    highlightActive();
+                };
+
+                const open = () => {
+                    picker.classList.add('is-active');
+                    search.value = '';
+                    render();
+                    search.focus();
+                };
+
+                const close = () => picker.classList.remove('is-active');
+
+                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                search.addEventListener('input', render);
+
+                search.addEventListener('keydown', event => {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        move(1);
+                    } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        move(-1);
+                    } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (active >= 0) {
+                            toggle(shown[active]);
+                        } else if (shown.length === 1) {
+                            toggle(shown[0]);
+                        }
+                    } else if (event.key === 'Escape') {
+                        close();
+                        trigger.focus();
+                    }
+                });
+
+                document.addEventListener('click', event => {
+                    if (!picker.contains(event.target)) {
+                        close();
+                    }
+                });
+
+                const form = picker.closest('form');
+                if (form && picker.dataset.pickerRequired) {
+                    form.addEventListener('submit', event => {
+                        if (selected.size === 0) {
+                            event.preventDefault();
+                            trigger.classList.add('is-danger');
+                            open();
+                        }
+                    });
+                }
+
+                showSelection();
+            };
+
+            document.querySelectorAll('[data-category-multi-picker]').forEach(setUp);
         })();
     </script>
 </th:block>
