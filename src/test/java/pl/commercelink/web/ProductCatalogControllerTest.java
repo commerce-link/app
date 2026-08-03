@@ -23,6 +23,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -30,7 +31,9 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.StoresRepository;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +42,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,6 +78,12 @@ class ProductCatalogControllerTest {
     @Mock
     private PimCatalog pimCatalog;
 
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
+
+    @Mock
+    private StoresRepository storesRepository;
+
     @InjectMocks
     private ProductCatalogController controller;
 
@@ -91,10 +101,57 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void keepsProductsWhenAnotherDefinitionResolvesToTheSameInventoryCategory() {
+    void warningListsOnlyTheSelectedCategoriesWithoutOffers() {
         // given
-        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, "Karty graficzne");
-        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, "Karty graficzne");
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(inventoryView.findAllByProductCategoryIds(List.of("194", "195"))).thenReturn(Map.of(
+                "194", List.of(matchedInventory),
+                "195", List.of()));
+        when(pimCategoryOptions.namesOf(List.of("195"))).thenReturn(List.of("Myszki"));
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, List.of("194", "195")), new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(messageSource).getMessage(eq("catalog.category.emptyInventory"), args.capture(), any(Locale.class));
+        assertThat(args.getValue()[0]).isEqualTo("Myszki");
+    }
+
+    @Test
+    void doesNotWarnWhenEverySelectedCategoryHasOffers() {
+        // given
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(inventoryView.findAllByProductCategoryIds(List.of("194"))).thenReturn(Map.of("194", List.of(matchedInventory)));
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, List.of("194")), new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+    }
+
+    @Test
+    void savingDynamicDefinitionWithoutMappingWarnsSeparatelyAndNeverQueriesInventory() {
+        // given
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, List.of()), new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        verify(inventoryView, never()).findAllByProductCategoryIds(any());
+        verify(messageSource).getMessage(eq("catalog.category.noMapping"), any(), any(Locale.class));
+        assertThat(redirectAttributes.getFlashAttributes()).containsKey("warningMessage");
+    }
+
+    @Test
+    void keepsProductsWhenARemainingDefinitionSharesAtLeastOneCategoryId() {
+        // given
+        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, List.of("194", "195"));
+        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, List.of("195", "989"));
         when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
         when(catalog.getCategories()).thenReturn(List.of(remaining));
 
@@ -106,57 +163,50 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void warnsWhenDynamicDefinitionIsSavedWithCategoryThatHasNoInventory() {
+    void deletesProductsWhenNoRemainingDefinitionSharesAnyCategoryId() {
         // given
-        when(inventoryView.findAllByProductCategory("Kołdry")).thenReturn(List.of());
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, List.of("194"));
+        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, List.of("989"));
+        when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
+        when(catalog.getCategories()).thenReturn(List.of(remaining));
+        when(productRepository.findAll(removed.getCategoryId())).thenReturn(List.of());
 
         // when
-        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, "Kołdry"), new ExtendedModelMap(), redirectAttributes);
+        controller.deleteCategoryDefinition(CATALOG_ID, removed.getCategoryId());
 
         // then
-        assertThat(redirectAttributes.getFlashAttributes()).containsKey("warningMessage");
+        verify(productRepository).delete(anyList());
     }
 
     @Test
-    void doesNotWarnWhenDynamicDefinitionCategoryResolvesToInventoryWithOffers() {
+    void deletesProductsWhenTheRemovedDefinitionHasNoCategories() {
         // given
-        when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, List.of());
+        CategoryDefinition remaining = definition(CategoryDefinitionType.Dynamic, List.of("989"));
+        when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
+        when(catalog.getCategories()).thenReturn(List.of(remaining));
+        when(productRepository.findAll(removed.getCategoryId())).thenReturn(List.of());
 
         // when
-        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, "Karty graficzne"), new ExtendedModelMap(), redirectAttributes);
+        controller.deleteCategoryDefinition(CATALOG_ID, removed.getCategoryId());
 
         // then
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+        verify(productRepository).delete(anyList());
     }
 
     @Test
-    void doesNotWarnForManagedDefinitionBecauseItsProductsDoNotComeFromTheCategory() {
+    void deletesProductsWhenNoDefinitionsRemain() {
         // given
-        when(inventoryView.findAllByProductCategory(any())).thenReturn(List.of());
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, List.of("194"));
+        when(catalog.removeCategoryDefinition(removed.getCategoryId())).thenReturn(removed);
+        when(catalog.getCategories()).thenReturn(List.of());
+        when(productRepository.findAll(removed.getCategoryId())).thenReturn(List.of());
 
         // when
-        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Managed, "Kołdry"), new ExtendedModelMap(), redirectAttributes);
+        controller.deleteCategoryDefinition(CATALOG_ID, removed.getCategoryId());
 
         // then
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
-    }
-
-    @Test
-    void warnsWhenDynamicDefinitionCategoryHasInventoryEntriesButNoneOfThemHasOffers() {
-        // given
-        when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(inventoryView.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-
-        // when
-        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Dynamic, "Karty graficzne"), new ExtendedModelMap(), redirectAttributes);
-
-        // then
-        assertThat(redirectAttributes.getFlashAttributes()).containsKey("warningMessage");
+        verify(productRepository).delete(anyList());
     }
 
     @Test
@@ -174,23 +224,9 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void savingDynamicDefinitionWithoutMappingDoesNotQueryInventoryForAWarning() {
-        // given
-        CategoryDefinition unmappedDefinition = definition(CategoryDefinitionType.Dynamic, "");
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-
-        // when
-        controller.saveCategoryDefinition(CATALOG_ID, unmappedDefinition, new ExtendedModelMap(), redirectAttributes);
-
-        // then
-        verify(inventoryView, never()).findAllByProductCategory(any());
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
-    }
-
-    @Test
     void savingProductWithServiceCheckboxMarksItAsService() {
         // given
-        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, null);
+        CategoryDefinition definition = definition(CategoryDefinitionType.Managed, (String) null);
         when(catalog.findCategoryDefinition(definition.getCategoryId())).thenReturn(definition);
         when(productRepository.findByProductId(definition.getCategoryId(), "prod-1")).thenReturn(null);
         when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
@@ -258,6 +294,18 @@ class ProductCatalogControllerTest {
         definition.setName("Pozycja");
         definition.setType(type);
         definition.setCategory(category);
+        definition.setStockDefinition(new StockDefinition(2, 5, 20));
+        definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 2));
+        definition.setPriceDefinitions(List.of(
+                new PriceDefinition(1.2, 100, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP)));
+        return definition;
+    }
+
+    private CategoryDefinition definition(CategoryDefinitionType type, List<String> pimCategoryIds) {
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
+        definition.setName("Pozycja");
+        definition.setType(type);
+        definition.setPimCategoryIds(new LinkedList<>(pimCategoryIds));
         definition.setStockDefinition(new StockDefinition(2, 5, 20));
         definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 2));
         definition.setPriceDefinitions(List.of(
