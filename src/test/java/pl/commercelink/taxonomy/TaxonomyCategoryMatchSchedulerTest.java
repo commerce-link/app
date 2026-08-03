@@ -9,9 +9,12 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.CategoryMatchRequest;
+import pl.commercelink.pim.api.CategoryMatchedEvent;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +45,8 @@ class TaxonomyCategoryMatchSchedulerTest {
     @Mock
     private CategoryMappingCache mappingCache;
 
+    private final CategoryMatchAttempts attempts = new CategoryMatchAttempts();
+
     @BeforeEach
     void setUp() {
         Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
@@ -50,11 +56,11 @@ class TaxonomyCategoryMatchSchedulerTest {
 
     private TaxonomyCategoryMatchScheduler scheduler(TaxonomyCategoryMatchProperties properties) {
         return new TaxonomyCategoryMatchScheduler(cache, pimCatalog, properties,
-                new TaxonomyCategoryEnrichment(cache, properties, mappingCache), mappingCache);
+                new TaxonomyCategoryEnrichment(cache, properties, mappingCache, attempts), mappingCache, attempts);
     }
 
     private TaxonomyCategoryEnrichment enrichmentFor(TaxonomyCategoryMatchProperties properties) {
-        return new TaxonomyCategoryEnrichment(cache, properties, mappingCache);
+        return new TaxonomyCategoryEnrichment(cache, properties, mappingCache, attempts);
     }
 
     private static String mfnWhere(java.util.function.IntPredicate trickleResidue) {
@@ -142,7 +148,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         when(mappingCache.findActive("Acme", "Karty graficzne"))
                 .thenReturn(Optional.of(new CategoryMappingCache.ActiveMapping("301", "GPU")));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, properties, enrichment, mappingCache);
+                cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
         scheduler.sweep();
@@ -162,7 +168,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         enrichment.addPending(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"), "Acme");
         when(mappingCache.findActive("Acme", "Karty graficzne")).thenReturn(Optional.empty());
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, properties, enrichment, mappingCache);
+                cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
         scheduler.sweep();
@@ -180,7 +186,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         TaxonomyCategoryEnrichment enrichment = enrichmentFor(properties);
         enrichment.addPending(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"), "Acme");
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, properties, enrichment, mappingCache);
+                cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
         scheduler.sweep();
@@ -197,7 +203,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 300000);
         cache.add(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"));
         TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
-                cache, pimCatalog, properties, enrichmentFor(properties), mappingCache);
+                cache, pimCatalog, properties, enrichmentFor(properties), mappingCache, attempts);
 
         // when
         scheduler.sweep();
@@ -205,6 +211,105 @@ class TaxonomyCategoryMatchSchedulerTest {
         // then
         verify(mappingCache, never()).findActive(any(), any());
         verify(pimCatalog).submitCategoryMatch(any());
+    }
+
+    @Test
+    void givesUpAfterMaxAttemptsSubmissions() {
+        // given
+        cache.add(pending("MFN-1"));
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+
+        // when
+        for (int i = 0; i < 6; i++) {
+            scheduler.sweep();
+        }
+
+        // then
+        verify(pimCatalog, times(4)).submitCategoryMatch(any());
+    }
+
+    @Test
+    void zeroMaxAttemptsKeepsSubmittingForever() {
+        // given
+        cache.add(pending("MFN-1"));
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(
+                new TaxonomyCategoryMatchProperties(1, 300000, 5, 0.9, 0.9, 20, 0));
+
+        // when
+        for (int i = 0; i < 10; i++) {
+            scheduler.sweep();
+        }
+
+        // then
+        verify(pimCatalog, times(10)).submitCategoryMatch(any());
+    }
+
+    @Test
+    void resolvedMatchClearsCounterSoReturningPendingStartsFresh() {
+        // given
+        TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 300000);
+        TaxonomyCategoryEnrichment enrichment = enrichmentFor(properties);
+        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+                cache, pimCatalog, properties, enrichment, mappingCache, attempts);
+        cache.add(pending("MFN-1"));
+        scheduler.sweep();
+        scheduler.sweep();
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.95, "gemini"));
+        Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>(List.of(pending("MFN-1")))));
+        cache.onStartUp();
+        for (int i = 0; i < 6; i++) {
+            scheduler.sweep();
+        }
+
+        // then
+        verify(pimCatalog, times(2 + 4)).submitCategoryMatch(any());
+    }
+
+    @Test
+    void failedSubmitDoesNotCountAsAttempt() {
+        // given
+        cache.add(pending("MFN-1"));
+        doThrow(new IllegalStateException("no sqs")).doNothing().when(pimCatalog).submitCategoryMatch(any());
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+
+        // when
+        for (int i = 0; i < 6; i++) {
+            scheduler.sweep();
+        }
+
+        // then
+        verify(pimCatalog, times(5)).submitCategoryMatch(any());
+    }
+
+    @Test
+    void sweepLogReportsGivenUpCount() {
+        // given
+        cache.add(pending("MFN-1"));
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        for (int i = 0; i < 4; i++) {
+            scheduler.sweep();
+        }
+
+        // when
+        String log = captureLog(scheduler::sweep);
+
+        // then
+        assertThat(log).contains("givenUp=1");
+        assertThat(log).contains("submitted=0");
+    }
+
+    private static String captureLog(Runnable action) {
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(captured));
+        try {
+            action.run();
+        } finally {
+            System.setOut(originalOut);
+        }
+        return captured.toString();
     }
 
     private static Taxonomy pending(String mfn) {

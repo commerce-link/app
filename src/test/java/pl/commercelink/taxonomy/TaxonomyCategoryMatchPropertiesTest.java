@@ -33,14 +33,30 @@ class TaxonomyCategoryMatchPropertiesTest {
         assertEquals(0.9, properties.mappingMinShare());
         assertEquals(0.9, properties.mappingMinConfidence());
         assertEquals(20, properties.mappingTrickleEvery());
+        assertEquals(4, properties.maxAttempts());
     }
 
     @Test
     void rejectsInvalidMappingThresholds() {
         // when / then
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 0, 0.9, 0.9, 20));
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 1.5, 0.9, 20));
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, -0.1, 20));
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, 0.9, 0));
+        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 0, 0.9, 0.9, 20, 4));
+        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 1.5, 0.9, 20, 4));
+        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, -0.1, 20, 4));
+        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, 0.9, 0, 4));
+    }
+
+    @Test
+    void rejectsNegativeMaxAttempts() {
+        // when / then
+        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, 0.9, 20, -1));
+    }
+
+    @Test
+    void acceptsZeroMaxAttemptsAsDisabled() {
+        // when
+        TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 100, 5, 0.9, 0.9, 20, 0);
+
+        // then
+        assertEquals(0, properties.maxAttempts());
     }
 }

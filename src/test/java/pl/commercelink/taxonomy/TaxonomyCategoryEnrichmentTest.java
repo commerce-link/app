@@ -38,7 +38,7 @@ class TaxonomyCategoryEnrichmentTest {
         cache = new TaxonomyCache(taxonomyRepository);
         cache.onStartUp();
         enrichment = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties(100, 2), mappingCache);
+                new TaxonomyCategoryMatchProperties(100, 2), mappingCache, new CategoryMatchAttempts());
     }
 
     @Test

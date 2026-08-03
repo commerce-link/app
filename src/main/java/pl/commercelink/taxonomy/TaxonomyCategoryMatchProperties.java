@@ -13,9 +13,10 @@ public class TaxonomyCategoryMatchProperties {
     private final double mappingMinShare;
     private final double mappingMinConfidence;
     private final int mappingTrickleEvery;
+    private final int maxAttempts;
 
     public TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
-        this(buckets, pendingCap, 5, 0.9, 0.9, 20);
+        this(buckets, pendingCap, 5, 0.9, 0.9, 20, 4);
     }
 
     @Autowired
@@ -25,7 +26,8 @@ public class TaxonomyCategoryMatchProperties {
             @Value("${taxonomy.category-match.mapping.min-samples:5}") int mappingMinSamples,
             @Value("${taxonomy.category-match.mapping.min-share:0.9}") double mappingMinShare,
             @Value("${taxonomy.category-match.mapping.min-confidence:0.9}") double mappingMinConfidence,
-            @Value("${taxonomy.category-match.mapping.trickle-every:20}") int mappingTrickleEvery) {
+            @Value("${taxonomy.category-match.mapping.trickle-every:20}") int mappingTrickleEvery,
+            @Value("${taxonomy.category-match.max-attempts:4}") int maxAttempts) {
         if (buckets < 1) {
             throw new IllegalArgumentException("taxonomy.category-match.buckets must be at least 1, got: " + buckets);
         }
@@ -41,12 +43,16 @@ public class TaxonomyCategoryMatchProperties {
         if (mappingTrickleEvery < 1) {
             throw new IllegalArgumentException("taxonomy.category-match.mapping.trickle-every must be at least 1, got: " + mappingTrickleEvery);
         }
+        if (maxAttempts < 0) {
+            throw new IllegalArgumentException("taxonomy.category-match.max-attempts must not be negative, got: " + maxAttempts);
+        }
         this.buckets = buckets;
         this.pendingCap = pendingCap;
         this.mappingMinSamples = mappingMinSamples;
         this.mappingMinShare = mappingMinShare;
         this.mappingMinConfidence = mappingMinConfidence;
         this.mappingTrickleEvery = mappingTrickleEvery;
+        this.maxAttempts = maxAttempts;
     }
 
     public int buckets() {
@@ -71,5 +77,9 @@ public class TaxonomyCategoryMatchProperties {
 
     public int mappingTrickleEvery() {
         return mappingTrickleEvery;
+    }
+
+    public int maxAttempts() {
+        return maxAttempts;
     }
 }

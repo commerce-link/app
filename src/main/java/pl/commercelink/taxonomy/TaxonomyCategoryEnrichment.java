@@ -15,13 +15,15 @@ public class TaxonomyCategoryEnrichment {
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
+    private final CategoryMatchAttempts attempts;
     private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
 
     TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties,
-                               CategoryMappingCache mappingCache) {
+                               CategoryMappingCache mappingCache, CategoryMatchAttempts attempts) {
         this.taxonomyCache = taxonomyCache;
         this.properties = properties;
         this.mappingCache = mappingCache;
+        this.attempts = attempts;
     }
 
     public Taxonomy enrich(Taxonomy taxonomy) {
@@ -61,6 +63,7 @@ public class TaxonomyCategoryEnrichment {
             return;
         }
         if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
+            attempts.clear(event.mfn());
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
             learnMapping(event);
