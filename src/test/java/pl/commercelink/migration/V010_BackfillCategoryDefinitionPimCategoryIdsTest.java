@@ -22,7 +22,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -173,12 +174,22 @@ class V010_BackfillCategoryDefinitionPimCategoryIdsTest {
     }
 
     @Test
-    void emptyTreeOnProdAborts() {
+    void emptyTreeOnProdWithoutPimAdapterSkipsInsteadOfAborting() {
         // given
         when(pimCatalog.allCategories()).thenReturn(List.of());
         when(environment.getProperty("application.env")).thenReturn("prod");
 
         // when / then
-        assertThrows(IllegalStateException.class, () -> migration.backfillPimCategoryIds());
+        assertDoesNotThrow(() -> migration.backfillPimCategoryIds());
+        verify(dynamoDB, never()).scan(any(ScanRequest.class));
+    }
+
+    @Test
+    void abortsOnlyWhenAPimAdapterIsPresentAndTheEnvironmentIsProd() {
+        // when / then
+        assertTrue(V010_BackfillCategoryDefinitionPimCategoryIds.shouldAbort(true, "prod"));
+        assertFalse(V010_BackfillCategoryDefinitionPimCategoryIds.shouldAbort(true, "localhost"));
+        assertFalse(V010_BackfillCategoryDefinitionPimCategoryIds.shouldAbort(false, "prod"));
+        assertFalse(V010_BackfillCategoryDefinitionPimCategoryIds.shouldAbort(false, "localhost"));
     }
 }

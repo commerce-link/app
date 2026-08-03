@@ -8,12 +8,14 @@ import io.mongock.api.annotations.RollbackExecution;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.pim.api.PimCategories;
 import pl.commercelink.pim.api.PimCategory;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.executeUpdate;
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.scanAndProcess;
@@ -34,7 +36,7 @@ public class V010_BackfillCategoryDefinitionPimCategoryIds {
         pimCatalog.refresh();
         Map<String, String> leafIdsByName = leafIdsByName();
         if (leafIdsByName.isEmpty()) {
-            if ("prod".equals(environment.getProperty("application.env"))) {
+            if (shouldAbort(pimAdapterPresent(), environment.getProperty("application.env"))) {
                 throw new IllegalStateException("PIM category tree unavailable - aborting V010");
             }
             System.err.println("V010: PIM category tree unavailable - skipping legacy category conversion");
@@ -79,6 +81,14 @@ public class V010_BackfillCategoryDefinitionPimCategoryIds {
         Map<String, AttributeValue> converted = new HashMap<>(attributes);
         converted.put("pimCategoryIds", new AttributeValue().withL(new AttributeValue().withS(leafId)));
         return new AttributeValue().withM(converted);
+    }
+
+    static boolean shouldAbort(boolean pimAdapterPresent, String applicationEnv) {
+        return pimAdapterPresent && "prod".equals(applicationEnv);
+    }
+
+    private static boolean pimAdapterPresent() {
+        return ServiceLoader.load(PimCatalogDescriptor.class).findFirst().isPresent();
     }
 
     private Map<String, String> leafIdsByName() {

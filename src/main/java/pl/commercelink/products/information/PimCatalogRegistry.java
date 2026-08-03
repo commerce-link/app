@@ -35,8 +35,8 @@ public class PimCatalogRegistry {
         Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
 
         if (descriptorOpt.isEmpty()) {
-            System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
-            this.catalog = new EmptyPimCatalog();
+            System.err.println("No PimCatalogDescriptor found on classpath — using offline PimCatalog with bundled categories");
+            this.catalog = new OfflinePimCatalog();
             return;
         }
 
