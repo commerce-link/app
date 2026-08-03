@@ -48,6 +48,12 @@ public class OrdersShippingController extends AbstractShippingController {
     }
 
     @Override
+    protected String resolveDeliveryCarrier(ShippingForm form) {
+        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        return order.getDeliveryCarrier();
+    }
+
+    @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
         order.setShipments(shipments);

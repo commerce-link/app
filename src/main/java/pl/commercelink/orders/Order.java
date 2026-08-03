@@ -60,6 +60,8 @@ public class Order {
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private ShippingDetails shippingDetails;
+    @DynamoDBAttribute(attributeName = "deliveryCarrier")
+    private String deliveryCarrier;
 
     @DynamoDBAttribute(attributeName = "comment")
     private String comment;
@@ -473,6 +475,14 @@ public class Order {
         this.shippingDetails = shippingDetails;
     }
 
+    public String getDeliveryCarrier() {
+        return deliveryCarrier;
+    }
+
+    public void setDeliveryCarrier(String deliveryCarrier) {
+        this.deliveryCarrier = deliveryCarrier;
+    }
+
     public OrderStatus getStatus() {
         return status;
     }
@@ -717,6 +727,11 @@ public class Order {
 
         public Builder withExternalOrderId(String externalOrderId) {
             order.setExternalOrderId(externalOrderId);
+            return this;
+        }
+
+        public Builder withDeliveryCarrier(String deliveryCarrier) {
+            order.setDeliveryCarrier(deliveryCarrier);
             return this;
         }
 

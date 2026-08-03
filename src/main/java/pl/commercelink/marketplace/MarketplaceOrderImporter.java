@@ -72,6 +72,7 @@ public class MarketplaceOrderImporter {
         Order order = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier())
                 .build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
@@ -114,21 +115,20 @@ public class MarketplaceOrderImporter {
         shipping.setCompanyName(customer.company());
         shipping.setEmail(customer.email());
         shipping.setPhone(address.phone());
-        shipping.setStreetAndNumber(renderStreet(address));
+        shipping.setStreetAndNumber(address.street());
         shipping.setPostalCode(address.postalCode());
         shipping.setCity(address.city());
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
+        shipping.setCollectionPoint(toCollectionPoint(address.pickupPoint()));
 
         return shipping;
     }
 
-    private String renderStreet(MarketplaceCustomer.Address address) {
-        if (address.pickupPoint() == null) {
-            return address.street();
+    private CollectionPoint toCollectionPoint(MarketplaceCustomer.PickupPoint point) {
+        if (point == null || point.id() == null || point.id().isBlank()) {
+            return null;
         }
-        MarketplaceCustomer.PickupPoint point = address.pickupPoint();
-        String label = point.name() != null ? point.id() + " (" + point.name() + ")" : point.id();
-        return address.street() != null ? label + ", " + address.street() : label;
+        return new CollectionPoint(point.id(), point.operator(), point.name());
     }
 
     private String resolveProductCategory(String mfn) {

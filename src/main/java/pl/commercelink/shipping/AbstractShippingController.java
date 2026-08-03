@@ -70,7 +70,7 @@ public abstract class AbstractShippingController {
         Store store = getStore();
 
         try {
-            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store);
+            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store, resolveDeliveryCarrier(form));
             model.addAttribute("servicePrices", estimates);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, store, form, model);
@@ -93,6 +93,10 @@ public abstract class AbstractShippingController {
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("shipping.create.success", null, locale));
 
         return "redirect:" + getEntityUrl(form);
+    }
+
+    protected String resolveDeliveryCarrier(ShippingForm form) {
+        return null;
     }
 
     protected String renderShippingForm(Store store, ShippingForm shippingForm, List<ShippingDetails> shippingDetailsList, Model model) {
