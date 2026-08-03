@@ -403,10 +403,10 @@ class InventoryViewStoreListingsTest {
 
         // when
         Map<String, Collection<MatchedInventory>> result =
-                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
+                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("Procesory"));
 
         // then
-        assertThat(result.get("989")).isEmpty();
+        assertThat(result.get("Procesory")).isEmpty();
     }
 
     @Test
@@ -430,23 +430,38 @@ class InventoryViewStoreListingsTest {
 
     @Test
     void productReachableThroughTwoSelectedCategoriesAppearsExactlyOnce() {
-        // given — real TaxonomyCache: the key's two MFNs resolve to two different selected categories
+        // given — pre-merge lookup key carries only MFN-A (categoryId "194", worse score);
+        // a second InventorySource merges in MFN-B during assemble() (categoryId "195", better/lower score) —
+        // grouping must use the pre-merge taxonomy, landing the product in "194" and never in "195"
         TaxonomyRepository taxonomyRepository = org.mockito.Mockito.mock(TaxonomyRepository.class);
         TaxonomyCache realCache = new TaxonomyCache(taxonomyRepository);
-        realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 1, null, null, null, "194"));
-        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 2, null, null, null, "195"));
-        InventoryKey key = new InventoryKey(EAN, "MFN-A");
-        key.addManufacturerCode("MFN-B");
-        MatchedInventory group = new MatchedInventory(key,
-                List.of(item("AB Group", 100.0)), realCache, supplierRegistry);
-        InventoryView view = new InventoryView(InventoryIndex.of(List.of(group)), InventoryIndex.of(List.of()),
+        realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 2, null, null, null, "194"));
+        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
+
+        InventoryKey keyA = new InventoryKey(EAN, "MFN-A");
+        MatchedInventory groupA = new MatchedInventory(keyA,
+                List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "AB Group", true, true, false)),
                 realCache, supplierRegistry);
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(groupA));
+
+        InventoryKey keyB = new InventoryKey(EAN, "MFN-B");
+        MatchedInventory groupB = new MatchedInventory(keyB,
+                List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                realCache, supplierRegistry);
+        InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
+
+        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
+                realCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true),
+                GroupInventorySource.global(mergingIndex, supplier -> true));
 
         // when
         Map<String, Collection<MatchedInventory>> result = view.findAllByProductCategoryIds(List.of("194", "195"));
 
         // then
         assertThat(result.get("194").size() + result.get("195").size()).isEqualTo(1);
+        assertThat(result.get("194")).hasSize(1);
+        assertThat(result.get("195")).isEmpty();
     }
 
     @Test
