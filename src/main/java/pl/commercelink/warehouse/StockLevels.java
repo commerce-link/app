@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 @Component
 public class StockLevels {
 
+    private static final Comparator<StockProductLevel> BY_CATEGORY_THEN_NAME =
+            Comparator.comparing(StockProductLevel::getCategory, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(StockProductLevel::getName);
+
     @Autowired
     private ProductRepository productRepository;
 
@@ -65,6 +69,9 @@ public class StockLevels {
 
         for (CategoryDefinition category : categories) {
             List<Product> products = resolveProducts(category, scope, enabledInventory);
+            String categoryLabel = category.hasCategoryMapping()
+                    ? String.join(", ", pimCategoryOptions.namesOf(category.getPimCategoryIds()))
+                    : category.getCategory();
 
             for (Product product : products) {
                 int expectedQty = product.getStockExpectedQty();
@@ -89,9 +96,7 @@ public class StockLevels {
                     spl.setExpectedQuantity(Math.max(spl.getExpectedQuantity(), expectedQty));
                 } else {
                     StockProductLevel spl = new StockProductLevel(
-                            category.hasCategoryMapping()
-                                    ? String.join(", ", pimCategoryOptions.namesOf(category.getPimCategoryIds()))
-                                    : category.getCategory(),
+                            categoryLabel,
                             product.getManufacturerCode(),
                             product.getName(),
                             restockPricePromo,
@@ -113,12 +118,12 @@ public class StockLevels {
             }
             return stockProductLevels.stream()
                     .filter(i -> !onlyMissingItems || i.isFullyMissing())
-                    .sorted(Comparator.comparing(StockProductLevel::getCategory).thenComparing(StockProductLevel::getName))
+                    .sorted(BY_CATEGORY_THEN_NAME)
                     .collect(Collectors.toList());
         }
 
         return stockProductLevels.stream()
-                .sorted(Comparator.comparing(StockProductLevel::getCategory).thenComparing(StockProductLevel::getName))
+                .sorted(BY_CATEGORY_THEN_NAME)
                 .collect(Collectors.toList());
     }
 
