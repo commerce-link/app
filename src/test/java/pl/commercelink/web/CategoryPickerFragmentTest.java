@@ -364,8 +364,11 @@ class CategoryPickerFragmentTest {
                 "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options})}\"></div>", context);
 
         // then
-        assertThat(html.indexOf("window.pickerHelpers =")).isNotNegative();
-        assertThat(html.indexOf("window.pickerHelpers =")).isLessThan(html.lastIndexOf("window.pickerHelpers."));
+        int definitionIndex = html.indexOf("window.pickerHelpers =");
+        int consumerIndex = html.indexOf("const {format, normalize, highlight} = window.pickerHelpers;");
+        assertThat(definitionIndex).isNotNegative();
+        assertThat(consumerIndex).isNotNegative();
+        assertThat(definitionIndex).isLessThan(consumerIndex);
     }
 
     @Test
@@ -379,8 +382,11 @@ class CategoryPickerFragmentTest {
                 "<div th:replace=\"~{fragments/category-picker :: pickerScript(${categories})}\"></div>", context);
 
         // then
-        assertThat(html.indexOf("window.pickerHelpers =")).isNotNegative();
-        assertThat(html.indexOf("window.pickerHelpers =")).isLessThan(html.lastIndexOf("window.pickerHelpers."));
+        int definitionIndex = html.indexOf("window.pickerHelpers =");
+        int consumerIndex = html.indexOf("const {format, normalize, escapeHtml, highlight} = window.pickerHelpers;");
+        assertThat(definitionIndex).isNotNegative();
+        assertThat(consumerIndex).isNotNegative();
+        assertThat(definitionIndex).isLessThan(consumerIndex);
     }
 
     @Test
