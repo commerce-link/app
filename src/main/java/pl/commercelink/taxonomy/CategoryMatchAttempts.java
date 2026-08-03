@@ -6,9 +6,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Liczy zgloszenia do dopasowania kategorii per mfn. Produkt, ktory po
- * max-attempts zgloszeniach nadal nie ma kategorii, przestaje byc zglaszany.
- * Licznik zyje w pamieci — restart aplikacji zeruje go tak samo jak sweepCounter.
+ * Counts category match submissions per mfn. A product that still has no
+ * category after max-attempts submissions stops being submitted. The counter
+ * lives in memory — an application restart resets it, just like sweepCounter.
  */
 @Component
 public class CategoryMatchAttempts {
