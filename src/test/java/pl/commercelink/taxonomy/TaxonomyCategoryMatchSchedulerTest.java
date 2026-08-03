@@ -232,8 +232,8 @@ class TaxonomyCategoryMatchSchedulerTest {
     void zeroMaxAttemptsKeepsSubmittingForever() {
         // given
         cache.add(pending("MFN-1"));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(
-                new TaxonomyCategoryMatchProperties(1, 300000, 5, 0.9, 0.9, 20, 0));
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(
+                1, 300000, new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 0));
 
         // when
         for (int i = 0; i < 10; i++) {

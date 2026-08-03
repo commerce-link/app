@@ -75,7 +75,7 @@ public class TaxonomyCategoryEnrichment {
         if (supplier == null || isBlank(event.categoryId())) {
             return;
         }
-        if (event.confidence() != null && event.confidence() < properties.mappingMinConfidence()) {
+        if (event.confidence() != null && event.confidence() < properties.mapping().minConfidence()) {
             return;
         }
         Taxonomy taxonomy = taxonomyCache.findByMfn(event.mfn());

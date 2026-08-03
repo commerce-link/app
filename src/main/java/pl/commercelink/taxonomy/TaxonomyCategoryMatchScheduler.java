@@ -74,7 +74,7 @@ class TaxonomyCategoryMatchScheduler {
     }
 
     private boolean resolveFromMapping(Taxonomy taxonomy) {
-        if (Math.floorMod(taxonomy.mfn().hashCode(), properties.mappingTrickleEvery()) == 0) {
+        if (Math.floorMod(taxonomy.mfn().hashCode(), properties.mapping().trickleEvery()) == 0) {
             return false;
         }
         String supplier = enrichment.supplierOf(taxonomy.mfn());
