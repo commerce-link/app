@@ -67,7 +67,8 @@ public class TaxonomyCache {
     }
 
     public boolean updateCategory(String mfn, String category, String categoryId) {
-        if (StringUtils.isBlank(mfn) || category == null || category.isBlank()) {
+        if (StringUtils.isBlank(mfn) || category == null || category.isBlank()
+                || categoryId == null || categoryId.isBlank()) {
             return false;
         }
         boolean[] updated = {false};

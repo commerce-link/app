@@ -327,9 +327,38 @@ class TaxonomyCacheTest {
     }
 
     @Test
+    void updateCategoryRejectsResolutionWithoutCategoryIdAndLeavesRowPending() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+
+        // when
+        boolean updated = cache.updateCategory("MFN-1", "CPU", null);
+
+        // then
+        assertFalse(updated);
+        assertEquals(1, cache.pendingCount());
+        assertFalse(TaxonomyCache.hasCategory(cache.findByMfn("MFN-1")));
+    }
+
+    @Test
+    void rejectedResolutionCanBeRetriedLaterWithAnId() {
+        // given
+        cache.add(uncategorized("MFN-1", 7));
+        cache.updateCategory("MFN-1", "CPU", " ");
+
+        // when
+        boolean updated = cache.updateCategory("MFN-1", "CPU", "989");
+
+        // then
+        assertTrue(updated);
+        assertEquals(0, cache.pendingCount());
+        assertEquals("989", cache.findByMfn("MFN-1").categoryId());
+    }
+
+    @Test
     void updateCategoryIgnoresMissingEntry() {
         // when / then
-        assertFalse(cache.updateCategory("MFN-GONE", "CPU", null));
+        assertFalse(cache.updateCategory("MFN-GONE", "CPU", "989"));
     }
 
     @Test
@@ -338,7 +367,7 @@ class TaxonomyCacheTest {
         cache.add(categorized("MFN-1", "GPU", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("MFN-1", "CPU", null));
+        assertFalse(cache.updateCategory("MFN-1", "CPU", "989"));
         assertEquals("GPU", cache.findByMfn("MFN-1").category());
     }
 
@@ -372,8 +401,8 @@ class TaxonomyCacheTest {
         cache.add(uncategorized("MFN-1", 7));
 
         // when
-        cache.updateCategory("MFN-1", "CPU", null);
-        cache.updateCategory("MFN-1", "GPU", null);
+        cache.updateCategory("MFN-1", "CPU", "989");
+        cache.updateCategory("MFN-1", "GPU", "170");
 
         // then
         assertEquals(0, cache.pendingCount());
