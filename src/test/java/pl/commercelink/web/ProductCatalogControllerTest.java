@@ -148,6 +148,19 @@ class ProductCatalogControllerTest {
     }
 
     @Test
+    void managedDefinitionsNeverWarnOnSave() {
+        // given
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Managed, List.of("194")), new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        verify(inventoryView, never()).findAllByProductCategoryIds(any());
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("warningMessage");
+    }
+
+    @Test
     void keepsProductsWhenARemainingDefinitionSharesAtLeastOneCategoryId() {
         // given
         CategoryDefinition removed = definition(CategoryDefinitionType.Dynamic, List.of("194", "195"));
