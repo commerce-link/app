@@ -71,7 +71,7 @@ public class CategoryMappingCache {
                 mapping = CategoryMapping.learning(supplier, rawKey, rawCategory.trim());
             }
             if (!mapping.recordSample(categoryId, categoryName,
-                    properties.mappingMinSamples(), properties.mappingMinShare())) {
+                    properties.mapping().minSamples(), properties.mapping().minShare())) {
                 return;
             }
             repository.save(mapping);
