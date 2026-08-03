@@ -52,16 +52,6 @@ public class InventoryView {
                 .collect(Collectors.toList());
     }
 
-    public Collection<MatchedInventory> findAllByProductCategory(String productCategory) {
-        return listedKeys()
-                .filter(key -> {
-                    String category = taxonomyCache.find(key).category();
-                    return category == null ? productCategory == null : category.equals(productCategory);
-                })
-                .map(this::assemble)
-                .collect(Collectors.toList());
-    }
-
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
         Map<String, Collection<MatchedInventory>> matchesByCategoryId = new LinkedHashMap<>();
         categoryIds.forEach(categoryId -> matchesByCategoryId.put(categoryId, new LinkedList<>()));
