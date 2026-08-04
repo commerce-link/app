@@ -1,75 +1,49 @@
 package pl.commercelink.taxonomy;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
-@Component
-public class TaxonomyCategoryMatchProperties {
+@ConfigurationProperties(prefix = "taxonomy.category-match")
+public record TaxonomyCategoryMatchProperties(
+        @DefaultValue("100") int buckets,
+        @DefaultValue("300000") int pendingCap,
+        @DefaultValue Mapping mapping,
+        @DefaultValue("4") int maxAttempts) {
 
-    private final int buckets;
-    private final int pendingCap;
-    private final int mappingMinSamples;
-    private final double mappingMinShare;
-    private final double mappingMinConfidence;
-    private final int mappingTrickleEvery;
-
-    public TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
-        this(buckets, pendingCap, 5, 0.9, 0.9, 20);
-    }
-
-    @Autowired
-    TaxonomyCategoryMatchProperties(
-            @Value("${taxonomy.category-match.buckets:100}") int buckets,
-            @Value("${taxonomy.category-match.pending-cap:300000}") int pendingCap,
-            @Value("${taxonomy.category-match.mapping.min-samples:5}") int mappingMinSamples,
-            @Value("${taxonomy.category-match.mapping.min-share:0.9}") double mappingMinShare,
-            @Value("${taxonomy.category-match.mapping.min-confidence:0.9}") double mappingMinConfidence,
-            @Value("${taxonomy.category-match.mapping.trickle-every:20}") int mappingTrickleEvery) {
+    @ConstructorBinding
+    public TaxonomyCategoryMatchProperties {
         if (buckets < 1) {
             throw new IllegalArgumentException("taxonomy.category-match.buckets must be at least 1, got: " + buckets);
         }
-        if (mappingMinSamples < 1) {
-            throw new IllegalArgumentException("taxonomy.category-match.mapping.min-samples must be at least 1, got: " + mappingMinSamples);
+        if (maxAttempts < 0) {
+            throw new IllegalArgumentException("taxonomy.category-match.max-attempts must not be negative, got: " + maxAttempts);
         }
-        if (mappingMinShare <= 0 || mappingMinShare > 1) {
-            throw new IllegalArgumentException("taxonomy.category-match.mapping.min-share must be in (0,1], got: " + mappingMinShare);
+    }
+
+    public TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
+        this(buckets, pendingCap, new Mapping(5, 0.9, 0.9, 20), 4);
+    }
+
+    public record Mapping(
+            @DefaultValue("5") int minSamples,
+            @DefaultValue("0.9") double minShare,
+            @DefaultValue("0.9") double minConfidence,
+            @DefaultValue("20") int trickleEvery) {
+
+        public Mapping {
+            if (minSamples < 1) {
+                throw new IllegalArgumentException("taxonomy.category-match.mapping.min-samples must be at least 1, got: " + minSamples);
+            }
+            if (minShare <= 0 || minShare > 1) {
+                throw new IllegalArgumentException("taxonomy.category-match.mapping.min-share must be in (0,1], got: " + minShare);
+            }
+            if (minConfidence < 0 || minConfidence > 1) {
+                throw new IllegalArgumentException("taxonomy.category-match.mapping.min-confidence must be in [0,1], got: " + minConfidence);
+            }
+            if (trickleEvery < 1) {
+                throw new IllegalArgumentException("taxonomy.category-match.mapping.trickle-every must be at least 1, got: " + trickleEvery);
+            }
         }
-        if (mappingMinConfidence < 0 || mappingMinConfidence > 1) {
-            throw new IllegalArgumentException("taxonomy.category-match.mapping.min-confidence must be in [0,1], got: " + mappingMinConfidence);
-        }
-        if (mappingTrickleEvery < 1) {
-            throw new IllegalArgumentException("taxonomy.category-match.mapping.trickle-every must be at least 1, got: " + mappingTrickleEvery);
-        }
-        this.buckets = buckets;
-        this.pendingCap = pendingCap;
-        this.mappingMinSamples = mappingMinSamples;
-        this.mappingMinShare = mappingMinShare;
-        this.mappingMinConfidence = mappingMinConfidence;
-        this.mappingTrickleEvery = mappingTrickleEvery;
-    }
-
-    public int buckets() {
-        return buckets;
-    }
-
-    public int pendingCap() {
-        return pendingCap;
-    }
-
-    public int mappingMinSamples() {
-        return mappingMinSamples;
-    }
-
-    public double mappingMinShare() {
-        return mappingMinShare;
-    }
-
-    public double mappingMinConfidence() {
-        return mappingMinConfidence;
-    }
-
-    public int mappingTrickleEvery() {
-        return mappingTrickleEvery;
     }
 }
