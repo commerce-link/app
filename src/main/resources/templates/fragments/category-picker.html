@@ -77,6 +77,15 @@
             </div>
         </div>
     </div>
+
+    <div class="field is-grouped is-grouped-multiline" data-picker-chips>
+        <div class="control" th:each="option : ${selectedOptions}">
+            <span class="tags has-addons">
+                <span class="tag is-link is-light" th:text="${option.name}"></span>
+                <a class="tag is-delete" th:attr="data-chip-remove=${option.id}"></a>
+            </span>
+        </div>
+    </div>
 </div>
 
 <th:block th:fragment="pickerHelpers">
@@ -110,6 +119,21 @@
 
         .category-picker .dropdown-item.is-selected {
             font-weight: 600;
+        }
+
+        .category-picker .picker-option-checkbox {
+            pointer-events: none;
+            margin-right: 0.5rem;
+            vertical-align: baseline;
+        }
+
+        .category-picker [data-picker-chips] {
+            margin-top: 0.5rem;
+            margin-bottom: 0;
+        }
+
+        .category-picker [data-picker-chips]:empty {
+            display: none;
         }
 
         .category-picker mark {
@@ -346,6 +370,7 @@
                 const search = picker.querySelector('[data-picker-search]');
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
+                const chips = root.querySelector('[data-picker-chips]');
 
                 const entries = options.map(option => ({value: option.id, label: option.name}));
 
@@ -360,7 +385,39 @@
 
                 const renderSelectionState = () => {
                     Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach(item => {
-                        item.classList.toggle('is-selected', selected.has(item.dataset.value));
+                        const isSelected = selected.has(item.dataset.value);
+                        item.classList.toggle('is-selected', isSelected);
+                        const checkbox = item.querySelector('.picker-option-checkbox');
+                        if (checkbox) {
+                            checkbox.checked = isSelected;
+                        }
+                    });
+                };
+
+                const renderChips = () => {
+                    if (!chips) {
+                        return;
+                    }
+                    chips.innerHTML = '';
+                    selected.forEach((name, id) => {
+                        const control = document.createElement('div');
+                        control.className = 'control';
+                        const tags = document.createElement('span');
+                        tags.className = 'tags has-addons';
+                        const tag = document.createElement('span');
+                        tag.className = 'tag is-link is-light';
+                        tag.textContent = name;
+                        const remove = document.createElement('a');
+                        remove.className = 'tag is-delete';
+                        remove.href = '#';
+                        remove.dataset.chipRemove = id;
+                        remove.addEventListener('click', event => {
+                            event.preventDefault();
+                            toggle({value: id, label: name});
+                        });
+                        tags.append(tag, remove);
+                        control.appendChild(tags);
+                        chips.appendChild(control);
                     });
                 };
 
@@ -374,6 +431,7 @@
                     syncHiddenInputs();
                     showSelection();
                     renderSelectionState();
+                    renderChips();
                 };
 
                 const appendChunk = () => {
@@ -384,7 +442,14 @@
                         item.setAttribute('role', 'option');
                         item.dataset.value = option.value;
                         item.classList.toggle('is-selected', selected.has(option.value));
-                        item.innerHTML = highlight(option.label, query);
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'picker-option-checkbox';
+                        checkbox.tabIndex = -1;
+                        checkbox.checked = selected.has(option.value);
+                        const text = document.createElement('span');
+                        text.innerHTML = highlight(option.label, query);
+                        item.append(checkbox, text);
                         item.addEventListener('click', event => {
                             event.preventDefault();
                             toggle(option);
@@ -491,6 +556,7 @@
                 }
 
                 showSelection();
+                renderChips();
             };
 
             document.querySelectorAll('[data-category-multi-picker]').forEach(setUp);

@@ -381,6 +381,34 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
+    void selectedCategoriesAreRenderedAsRemovableChips() {
+        // when
+        String html = renderMulti(List.of(
+                new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
+
+        // then
+        assertThat(html).contains("data-picker-chips");
+        assertThat(html).contains("data-chip-remove=\"194\"");
+        assertThat(html).contains("data-chip-remove=\"195\"");
+    }
+
+    @Test
+    void multiPickerScriptRendersOptionCheckboxesAndDrivesChips() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options})}\"></div>", context);
+
+        // then
+        assertThat(html).contains("picker-option-checkbox");
+        assertThat(html).contains("[data-picker-chips]");
+    }
+
+    @Test
     void multiPickerRendersNoSelectOptions() {
         // when
         String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")), true);
