@@ -1,0 +1,40 @@
+<th:block th:fragment="banner" xmlns:th="http://www.thymeleaf.org">
+    <div th:if="${clarityProjectId != null}" id="cookieConsent" class="notification is-dark is-radiusless m-0"
+         style="display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;">
+        <div class="is-flex is-flex-wrap-wrap is-align-items-center is-justify-content-space-between">
+            <p class="mr-4" th:text="#{cookie.consent.message}"></p>
+            <div class="buttons mb-0 mt-2">
+                <button type="button" id="cookieConsentAccept" class="button is-small is-primary"
+                        th:text="#{cookie.consent.accept}"></button>
+                <button type="button" id="cookieConsentDecline" class="button is-small"
+                        th:text="#{cookie.consent.decline}"></button>
+            </div>
+        </div>
+    </div>
+    <script th:if="${clarityProjectId != null}">
+        (function () {
+            var banner = document.getElementById("cookieConsent");
+            if (!banner) {
+                return;
+            }
+            if (!document.cookie.match(/(?:^|; )cookieConsent=/)) {
+                banner.style.display = "block";
+            }
+
+            function decide(value) {
+                document.cookie = "cookieConsent=" + value + "; path=/; max-age=31536000; SameSite=Lax";
+                banner.style.display = "none";
+                if (window.applyClarityConsent) {
+                    window.applyClarityConsent(value === "granted");
+                }
+            }
+
+            document.getElementById("cookieConsentAccept").addEventListener("click", function () {
+                decide("granted");
+            });
+            document.getElementById("cookieConsentDecline").addEventListener("click", function () {
+                decide("denied");
+            });
+        })();
+    </script>
+</th:block>

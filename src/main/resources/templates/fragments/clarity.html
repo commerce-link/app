@@ -1,0 +1,31 @@
+<th:block th:fragment="tag" xmlns:th="http://www.thymeleaf.org">
+    <script th:if="${clarityProjectId != null}" th:inline="javascript">
+        (function (c, l, a, r, i, t, y) {
+            c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+            t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+            y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+        })(window, document, "clarity", "script", [[${clarityProjectId}]]);
+
+        window.applyClarityConsent = function (granted) {
+            window.clarity("consentv2", {
+                ad_Storage: "denied",
+                analytics_Storage: granted ? "granted" : "denied"
+            });
+        };
+
+        (function () {
+            var decision = document.cookie.match(/(?:^|; )cookieConsent=([^;]*)/);
+            if (decision) {
+                window.applyClarityConsent(decision[1] === "granted");
+            }
+        })();
+
+        (function (storeId) {
+            if (!storeId) {
+                return;
+            }
+            window.clarity("identify", storeId);
+            window.clarity("set", "storeId", storeId);
+        })([[${clarityStoreId}]]);
+    </script>
+</th:block>
