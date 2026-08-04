@@ -17,11 +17,9 @@
 
         <div class="field" style="max-width: 30rem;">
             <label class="label" th:text="#{catalog.category}"></label>
-            <div th:unless="${mappingLocked}">
-                <div th:replace="~{fragments/category-picker :: emptyHint(${categoryOptions})}"></div>
-            </div>
+            <div th:replace="~{fragments/category-picker :: emptyHint(${categoryOptions})}"></div>
             <div class="control">
-                <div th:replace="~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selectedCategoryOptions}, ${mappingLocked}, false)}"></div>
+                <div th:replace="~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selectedCategoryOptions}, false)}"></div>
             </div>
             <p class="help" th:text="#{catalog.category.mapping.hint}"></p>
         </div>
@@ -325,9 +323,7 @@
         </div>
     </form>
 
-    <div th:unless="${mappingLocked}">
-        <div th:replace="~{fragments/category-picker :: multiPickerScript(${categoryOptions})}"></div>
-    </div>
+    <div th:replace="~{fragments/category-picker :: multiPickerScript(${categoryOptions})}"></div>
 </div>
 
 </body>

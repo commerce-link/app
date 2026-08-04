@@ -178,8 +178,6 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        boolean mappingLocked = isEdit && categoryDefinition.hasCategoryMapping();
-        model.addAttribute("mappingLocked", mappingLocked);
         model.addAttribute("categoryOptions", pimCategoryOptions.leafOptionsUnder(
                 store.getEnabledCategories(), categoryDefinition.getPimCategoryIds()));
         model.addAttribute("selectedCategoryOptions", selectedOptions(categoryDefinition));

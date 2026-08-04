@@ -48,18 +48,13 @@
     </div>
 </div>
 
-<div th:fragment="multiPicker(fieldName, selectedOptions, disabled, required)" class="category-picker">
+<div th:fragment="multiPicker(fieldName, selectedOptions, required)" class="category-picker">
     <span data-picker-values>
         <input type="hidden" th:each="option : ${selectedOptions}"
                th:name="${fieldName}" th:value="${option.id}" th:attr="data-name=${option.name}">
     </span>
 
-    <div th:if="${disabled}" class="control">
-        <input class="input" type="text" disabled
-               th:value="${#strings.listJoin(selectedOptions.![name], ', ')}">
-    </div>
-
-    <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-multi-picker
+    <div class="dropdown is-fullwidth" data-category-multi-picker
          th:attr="data-picker-required=${required} ? 'true' : null, data-picker-field=${fieldName}">
         <div class="dropdown-trigger">
             <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">

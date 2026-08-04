@@ -41,12 +41,12 @@ class CategoryPickerFragmentTest {
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
-    private String renderMulti(List<PimCategoryOptions.CategoryOption> selected, boolean disabled, boolean required) {
+    private String renderMulti(List<PimCategoryOptions.CategoryOption> selected, boolean required) {
         Context context = new Context();
         context.setVariable("selected", selected);
         return templateEngine().process(
                 "<div th:replace=\"~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selected}, "
-                        + disabled + ", " + required + ")}\"></div>", context);
+                        + required + ")}\"></div>", context);
     }
 
     private TemplateEngine templateEngine() {
@@ -308,7 +308,7 @@ class CategoryPickerFragmentTest {
         // when
         String html = renderMulti(List.of(
                 new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
-                new PimCategoryOptions.CategoryOption("195", "Myszki")), false, false);
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
 
         // then
         assertThat(html).contains("name=\"pimCategoryIds\" value=\"194\"");
@@ -316,24 +316,15 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void hiddenInputsSurviveTheReadOnlyRendering() {
-        // when
-        String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")), true, false);
-
-        // then
-        assertThat(html).contains("name=\"pimCategoryIds\" value=\"194\"");
-        assertThat(html).doesNotContain("data-picker-trigger");
-        assertThat(html).contains("Klawiatury");
-    }
-
-    @Test
-    void readOnlyMultiPickerShowsNamesNotIds() {
+    void savedSelectionStillRendersAnActivePickerShowingNames() {
         // when
         String html = renderMulti(List.of(
                 new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
-                new PimCategoryOptions.CategoryOption("195", "Myszki")), true, false);
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
 
         // then
+        assertThat(html).contains("data-picker-trigger");
+        assertThat(html).doesNotContain("disabled");
         assertThat(html).contains("Klawiatury, Myszki");
     }
 
@@ -392,7 +383,7 @@ class CategoryPickerFragmentTest {
     @Test
     void multiPickerRendersNoSelectOptions() {
         // when
-        String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")), false, true);
+        String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")), true);
 
         // then
         assertThat(html).doesNotContain("<option");

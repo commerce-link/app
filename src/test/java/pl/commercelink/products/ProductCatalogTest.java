@@ -61,16 +61,27 @@ class ProductCatalogTest {
     }
 
     @Test
-    void existingMappingIsImmutableButAMissingOneCanBeAdded() {
+    void existingMappingCanBeChangedToAnotherNonEmptySelection() {
         // given
         ProductCatalog catalog = new ProductCatalog("store-1", "Katalog");
         CategoryDefinition mapped = new CategoryDefinition().withGeneratedId().withName("Procesory");
         mapped.setPimCategoryIds(new LinkedList<>(List.of("989")));
         catalog.addOrUpdateCategoryDefinition(mapped);
-        CategoryDefinition remapAttempt = new CategoryDefinition().withName("Procesory");
-        remapAttempt.setCategoryId(mapped.getCategoryId());
-        remapAttempt.setPimCategoryIds(new LinkedList<>(List.of("170")));
+        CategoryDefinition remap = new CategoryDefinition().withName("Procesory");
+        remap.setCategoryId(mapped.getCategoryId());
+        remap.setPimCategoryIds(new LinkedList<>(List.of("170", "195")));
 
+        // when
+        catalog.addOrUpdateCategoryDefinition(remap);
+
+        // then
+        assertThat(catalog.findCategoryDefinition(mapped.getCategoryId()).getPimCategoryIds()).containsExactly("170", "195");
+    }
+
+    @Test
+    void aMissingMappingCanBeAddedWhenEditingAnUnmappedDefinition() {
+        // given
+        ProductCatalog catalog = new ProductCatalog("store-1", "Katalog");
         CategoryDefinition unmapped = new CategoryDefinition().withGeneratedId().withName("Klawiatury");
         catalog.addOrUpdateCategoryDefinition(unmapped);
         CategoryDefinition firstMapping = new CategoryDefinition().withName("Klawiatury");
@@ -78,12 +89,31 @@ class ProductCatalogTest {
         firstMapping.setPimCategoryIds(new LinkedList<>(List.of("194", "195")));
 
         // when
-        catalog.addOrUpdateCategoryDefinition(remapAttempt);
         catalog.addOrUpdateCategoryDefinition(firstMapping);
 
         // then
-        assertThat(catalog.findCategoryDefinition(mapped.getCategoryId()).getPimCategoryIds()).containsExactly("989");
         assertThat(catalog.findCategoryDefinition(unmapped.getCategoryId()).getPimCategoryIds()).containsExactly("194", "195");
+    }
+
+    @Test
+    void emptySelectionOnSaveKeepsExistingMapping() {
+        // given
+        ProductCatalog catalog = new ProductCatalog("store-1", "Katalog");
+        CategoryDefinition mapped = new CategoryDefinition().withGeneratedId().withName("Procesory");
+        mapped.setPimCategoryIds(new LinkedList<>(List.of("989")));
+        catalog.addOrUpdateCategoryDefinition(mapped);
+        CategoryDefinition emptySave = new CategoryDefinition().withName("Procesory");
+        emptySave.setCategoryId(mapped.getCategoryId());
+        CategoryDefinition blankSave = new CategoryDefinition().withName("Procesory");
+        blankSave.setCategoryId(mapped.getCategoryId());
+        blankSave.setPimCategoryIds(new LinkedList<>(List.of(" ", "")));
+
+        // when
+        catalog.addOrUpdateCategoryDefinition(emptySave);
+        catalog.addOrUpdateCategoryDefinition(blankSave);
+
+        // then
+        assertThat(catalog.findCategoryDefinition(mapped.getCategoryId()).getPimCategoryIds()).containsExactly("989");
     }
 
     @Test

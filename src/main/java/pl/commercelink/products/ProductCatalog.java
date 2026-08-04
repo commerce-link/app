@@ -51,7 +51,7 @@ public class ProductCatalog implements DeletionProtection {
                     categoryDefinition.setTypeChangedAt(existingCategory.get().getTypeChangedAt());
                 }
                 categoryDefinition.setCategory(existingCategory.get().getCategory());
-                if (existingCategory.get().hasCategoryMapping()) {
+                if (existingCategory.get().hasCategoryMapping() && sanitizedPimCategoryIds(categoryDefinition).isEmpty()) {
                     categoryDefinition.setPimCategoryIds(existingCategory.get().getPimCategoryIds());
                 }
         }
@@ -71,13 +71,7 @@ public class ProductCatalog implements DeletionProtection {
                 .collect(Collectors.toList());
         categoryDefinition.setGroupingOrder(completeGroupingOrder);
 
-        List<String> completePimCategoryIds = categoryDefinition.getPimCategoryIds()
-                .stream()
-                .map(String::trim)
-                .filter(StringUtils::isNotEmpty)
-                .distinct()
-                .collect(Collectors.toList());
-        categoryDefinition.setPimCategoryIds(completePimCategoryIds);
+        categoryDefinition.setPimCategoryIds(sanitizedPimCategoryIds(categoryDefinition));
 
         List<InventoryDefinition> completeInventoryDefinitions = categoryDefinition.getInventoryDefinitions()
                 .stream()
@@ -101,6 +95,15 @@ public class ProductCatalog implements DeletionProtection {
         categories.add(categoryDefinition);
 
         categories.sort(Comparator.comparing(CategoryDefinition::getSequenceNumber));
+    }
+
+    private static List<String> sanitizedPimCategoryIds(CategoryDefinition categoryDefinition) {
+        return categoryDefinition.getPimCategoryIds()
+                .stream()
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
     }
 
 
