@@ -66,6 +66,7 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static final String ACME = "Acme";
     private static final String ACME_B = "AcmeB";
+    private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
@@ -123,6 +124,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         fulfilment.setSupplierConnections(List.of(
                 new StoreSupplierConnection(ACME, ConnectionMode.GLOBAL),
                 new StoreSupplierConnection(ACME_B, ConnectionMode.GLOBAL)));
+        fulfilment.setEnabledCategories(List.of(ENABLED_CATEGORY_GROUP));
         store.setFulfilmentConfiguration(fulfilment);
 
         WarehouseConfiguration warehouse = Objects.requireNonNullElseGet(store.getWarehouseConfiguration(), WarehouseConfiguration::new);

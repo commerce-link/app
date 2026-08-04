@@ -101,6 +101,19 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void seededStoreEnablesComputerPeripheralsCategoryGroup() {
+        // given
+        Store store = new Store();
+
+        // when
+        DemoStoreSeeder.applyStoreConfiguration(store, "store-1", "Demo Store", null);
+
+        // then
+        assertEquals(List.of("Komputery i urządzenia peryferyjne"),
+                store.getFulfilmentConfiguration().getEnabledCategories());
+    }
+
+    @Test
     void seededCategoryDefinitionsAreCompleteForUiEdits() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
