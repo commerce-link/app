@@ -16,6 +16,7 @@ import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,8 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
-        Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
+        Optional<PimCatalogDescriptor> descriptorOpt = selectDescriptor(
+                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
 
         if (descriptorOpt.isEmpty()) {
             System.err.println("No PimCatalogDescriptor found on classpath — using offline PimCatalog with bundled categories");
@@ -64,6 +66,14 @@ public class PimCatalogRegistry {
         EventBindingRegistrar.forDescriptors(List.of(descriptor))
                 .withQueues(sqsAsyncClient, containers, catalog::dispatch)
                 .register();
+    }
+
+    static Optional<PimCatalogDescriptor> selectDescriptor(List<PimCatalogDescriptor> descriptors) {
+        return descriptors.stream().min(Comparator.comparing(PimCatalogRegistry::isDevAdapter));
+    }
+
+    private static boolean isDevAdapter(PimCatalogDescriptor descriptor) {
+        return Boolean.parseBoolean(descriptor.metadata().get("dev"));
     }
 
     @Bean

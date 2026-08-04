@@ -340,6 +340,11 @@
                     <artifactId>supplier-acme</artifactId>
                     <version>0.1.7</version>
                 </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>pim-dev</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
             </dependencies>
         </profile>
         <profile>
