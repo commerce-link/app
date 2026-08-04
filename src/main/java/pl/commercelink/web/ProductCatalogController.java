@@ -221,7 +221,7 @@ public class ProductCatalogController {
             throw new RuntimeException("Category definition is not complete");
         }
 
-        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryDefinition.getCategoryId();
+        return "redirect:/dashboard/catalogs/" + catalogId;
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {

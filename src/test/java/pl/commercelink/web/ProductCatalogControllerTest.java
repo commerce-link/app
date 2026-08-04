@@ -148,6 +148,18 @@ class ProductCatalogControllerTest {
     }
 
     @Test
+    void savingADefinitionRedirectsToTheCatalogPage() {
+        // given
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.saveCategoryDefinition(CATALOG_ID, definition(CategoryDefinitionType.Managed, List.of("194")), new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
+    }
+
+    @Test
     void managedDefinitionsNeverWarnOnSave() {
         // given
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
