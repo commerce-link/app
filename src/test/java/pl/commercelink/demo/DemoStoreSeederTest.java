@@ -101,6 +101,20 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void seededCategoryDefinitionsAreCompleteForUiEdits() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+
+        // then
+        assertFalse(definitions.isEmpty());
+        definitions.forEach(definition ->
+                assertTrue(definition.isComplete(), definition.getName() + " should be complete"));
+    }
+
+    @Test
     void buildsSecondOrderWithItemsInAllocation() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();

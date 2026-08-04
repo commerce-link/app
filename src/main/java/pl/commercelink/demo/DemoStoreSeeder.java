@@ -21,10 +21,13 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.rma.RMACenter;
+import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.StockDefinition;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.CheckoutConfiguration;
@@ -312,6 +315,10 @@ public class DemoStoreSeeder implements StoreSeeder {
             definition.setSequenceNumber(++sequence);
             definition.setMaxQty(10);
             definition.setDeletionProtection(false);
+            definition.setStockDefinition(new StockDefinition(2, 5, 20));
+            definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 1));
+            definition.setPriceDefinitions(new LinkedList<>(List.of(
+                    new PriceDefinition(1.15, 10, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP))));
             String pimCategoryId = pimCategoryIdByCategory.get(category);
             if (pimCategoryId != null) {
                 definition.setPimCategoryIds(new LinkedList<>(List.of(pimCategoryId)));
