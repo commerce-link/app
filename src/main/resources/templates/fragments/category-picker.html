@@ -59,7 +59,7 @@
         <div class="dropdown-trigger">
             <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
                 <span data-picker-label
-                      th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : ${#strings.listJoin(selectedOptions.![name], ', ')}"></span>
+                      th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : #{catalog.category.selectedCount(${#lists.size(selectedOptions)})}"></span>
                 <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
             </button>
         </div>
@@ -125,6 +125,12 @@
             pointer-events: none;
             margin-right: 0.5rem;
             vertical-align: baseline;
+        }
+
+        .category-picker [data-picker-label] {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .category-picker [data-picker-chips] {
@@ -342,7 +348,8 @@
             const messages = {
                 empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
-                unset: /*[[#{catalog.category.unset}]]*/ ''
+                unset: /*[[#{catalog.category.unset}]]*/ '',
+                selectedCount: /*[[#{catalog.category.selectedCount}]]*/ ''
             };
             const {format, normalize, highlight} = window.pickerHelpers;
 
@@ -380,7 +387,7 @@
                 let query = '';
 
                 const showSelection = () => {
-                    label.textContent = selected.size ? Array.from(selected.values()).join(', ') : messages.unset;
+                    label.textContent = selected.size ? format(messages.selectedCount, selected.size) : messages.unset;
                 };
 
                 const renderSelectionState = () => {

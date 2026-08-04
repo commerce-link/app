@@ -17,6 +17,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.StringTemplateResolver;
 import pl.commercelink.products.PimCategoryOptions;
 
+import java.text.MessageFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -86,7 +87,13 @@ class CategoryPickerFragmentTest {
 
         @Override
         public String resolveMessage(ITemplateContext context, Class<?> origin, String key, Object[] parameters) {
-            return messages.containsKey(key) ? messages.getString(key) : null;
+            if (!messages.containsKey(key)) {
+                return null;
+            }
+            String message = messages.getString(key);
+            return parameters == null || parameters.length == 0
+                    ? message
+                    : new MessageFormat(message, Locale.forLanguageTag("pl")).format(parameters);
         }
 
         @Override
@@ -316,7 +323,7 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void savedSelectionStillRendersAnActivePickerShowingNames() {
+    void savedSelectionRendersACountingTriggerAndNamesOnlyInChips() {
         // when
         String html = renderMulti(List.of(
                 new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
@@ -325,7 +332,10 @@ class CategoryPickerFragmentTest {
         // then
         assertThat(html).contains("data-picker-trigger");
         assertThat(html).doesNotContain("disabled");
-        assertThat(html).contains("Klawiatury, Myszki");
+        assertThat(html).contains("Wybrano: 2");
+        assertThat(html).doesNotContain("Klawiatury, Myszki");
+        assertThat(html).contains("Klawiatury");
+        assertThat(html).contains("Myszki");
     }
 
     @Test
