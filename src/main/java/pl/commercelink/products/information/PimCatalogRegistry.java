@@ -16,11 +16,9 @@ import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 
 @Configuration
@@ -33,10 +31,8 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
-        PimCatalogDescriptor descriptor = selectDescriptor(
-                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList())
-                .orElseThrow(() -> new IllegalStateException(
-                        "No PimCatalogDescriptor found on classpath — build with -Pdev (pim-dev) or add a PIM adapter to the pom"));
+        PimCatalogDescriptor descriptor = resolveDescriptor(
+                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
 
         Map<String, String> configuration = new HashMap<>();
         if (secretsManager.exists(descriptor.name())) {
@@ -62,12 +58,17 @@ public class PimCatalogRegistry {
                 .register();
     }
 
-    static Optional<PimCatalogDescriptor> selectDescriptor(List<PimCatalogDescriptor> descriptors) {
-        return descriptors.stream().min(Comparator.comparing(PimCatalogRegistry::isDevAdapter));
-    }
-
-    private static boolean isDevAdapter(PimCatalogDescriptor descriptor) {
-        return Boolean.parseBoolean(descriptor.metadata().get("dev"));
+    static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {
+        if (descriptors.isEmpty()) {
+            throw new IllegalStateException(
+                    "No PimCatalogDescriptor found on classpath — build with -Pdev (pim-dev) or add a PIM adapter to the pom");
+        }
+        if (descriptors.size() > 1) {
+            throw new IllegalStateException("Multiple PimCatalogDescriptors found on classpath: "
+                    + descriptors.stream().map(PimCatalogDescriptor::name).toList()
+                    + " — exactly one PIM adapter is expected");
+        }
+        return descriptors.get(0);
     }
 
     @Bean
