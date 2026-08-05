@@ -8,7 +8,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.pim.api.PimCatalog;
 
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -31,33 +33,32 @@ class ProductRecommendationEngineTest {
     private ProductRecommendationEngine engine;
 
     @Test
-    void queriesInventoryWithCategoryNameUnchanged() {
+    void queriesInventoryWithAllSelectedCategoryIds() {
         // given
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
-        definition.setCategory("Karty graficzne");
+        definition.setPimCategoryIds(new LinkedList<>(List.of("194", "195")));
         when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
-        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of());
+        when(inventory.findAllByProductCategoryIds(List.of("194", "195"))).thenReturn(Map.of());
 
         // when
         engine.getRecommendations(definition, inventory);
 
         // then
-        verify(inventory).findAllByProductCategory("Karty graficzne");
+        verify(inventory).findAllByProductCategoryIds(List.of("194", "195"));
     }
 
     @Test
-    void queriesInventoryWithLegacyCategoryUnchanged() {
+    void legacyNameAloneNoLongerQueriesInventory() {
         // given
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
-        definition.setCategory("Case");
-        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
-        when(inventory.findAllByProductCategory("Case")).thenReturn(List.of());
+        definition.setCategory("Karty graficzne");
 
         // when
-        engine.getRecommendations(definition, inventory);
+        List<ProductRecommendation> recommendations = engine.getRecommendations(definition, inventory);
 
         // then
-        verify(inventory).findAllByProductCategory("Case");
+        assertThat(recommendations).isEmpty();
+        verifyNoInteractions(inventory);
     }
 
     @Test

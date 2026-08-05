@@ -16,7 +16,8 @@ public record CatalogSeedRow(
         int lowest30DaysPrice,
         List<String> suppliers,
         boolean inWarehouse,
-        boolean inCatalog) {
+        boolean inCatalog,
+        String pimCategoryId) {
 
     public boolean soldBy(String supplier) {
         return suppliers.contains(supplier);

@@ -8,13 +8,16 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.context.ITemplateContext;
 import org.thymeleaf.context.WebContext;
+import org.thymeleaf.spring6.dialect.SpringStandardDialect;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import org.thymeleaf.messageresolver.IMessageResolver;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.StringTemplateResolver;
+import pl.commercelink.products.PimCategoryOptions;
 
+import java.text.MessageFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -39,6 +42,14 @@ class CategoryPickerFragmentTest {
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
+    private String renderMulti(List<PimCategoryOptions.CategoryOption> selected, boolean required) {
+        Context context = new Context();
+        context.setVariable("selected", selected);
+        return templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selected}, "
+                        + required + ")}\"></div>", context);
+    }
+
     private TemplateEngine templateEngine() {
         StringTemplateResolver stringResolver = new StringTemplateResolver();
         stringResolver.setOrder(1);
@@ -52,6 +63,7 @@ class CategoryPickerFragmentTest {
         classpathResolver.setTemplateMode(TemplateMode.HTML);
 
         TemplateEngine templateEngine = new TemplateEngine();
+        templateEngine.setDialect(new SpringStandardDialect());
         templateEngine.addTemplateResolver(stringResolver);
         templateEngine.addTemplateResolver(classpathResolver);
         templateEngine.setMessageResolver(new PolishMessages());
@@ -75,7 +87,13 @@ class CategoryPickerFragmentTest {
 
         @Override
         public String resolveMessage(ITemplateContext context, Class<?> origin, String key, Object[] parameters) {
-            return messages.containsKey(key) ? messages.getString(key) : null;
+            if (!messages.containsKey(key)) {
+                return null;
+            }
+            String message = messages.getString(key);
+            return parameters == null || parameters.length == 0
+                    ? message
+                    : new MessageFormat(message, Locale.forLanguageTag("pl")).format(parameters);
         }
 
         @Override
@@ -290,5 +308,124 @@ class CategoryPickerFragmentTest {
         // then
         assertThat(html).containsOnlyOnce("Procesory");
         assertThat(html).contains("data-category-picker");
+    }
+
+    @Test
+    void oneHiddenInputIsRenderedPerSavedCategoryId() {
+        // when
+        String html = renderMulti(List.of(
+                new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
+
+        // then
+        assertThat(html).contains("name=\"pimCategoryIds\" value=\"194\"");
+        assertThat(html).contains("name=\"pimCategoryIds\" value=\"195\"");
+    }
+
+    @Test
+    void savedSelectionRendersACountingTriggerAndNamesOnlyInChips() {
+        // when
+        String html = renderMulti(List.of(
+                new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
+
+        // then
+        assertThat(html).contains("data-picker-trigger");
+        assertThat(html).doesNotContain("disabled");
+        assertThat(html).contains("Wybrano: 2");
+        assertThat(html).doesNotContain("Klawiatury, Myszki");
+        assertThat(html).contains("Klawiatury");
+        assertThat(html).contains("Myszki");
+    }
+
+    @Test
+    void multiPickerOptionsAreInlinedAsRealJson() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options})}\"></div>", context);
+
+        // then
+        assertThat(html).contains("\"id\":\"194\"");
+        assertThat(html).contains("\"name\":\"Klawiatury\"");
+        assertThat(html).doesNotContain("[{}]");
+    }
+
+    @Test
+    void sharedHelpersAreDefinedBeforeTheirMultiPickerConsumer() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.<PimCategoryOptions.CategoryOption>of());
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options})}\"></div>", context);
+
+        // then
+        int definitionIndex = html.indexOf("window.pickerHelpers =");
+        int consumerIndex = html.indexOf("const {format, normalize, highlight} = window.pickerHelpers;");
+        assertThat(definitionIndex).isNotNegative();
+        assertThat(consumerIndex).isNotNegative();
+        assertThat(definitionIndex).isLessThan(consumerIndex);
+    }
+
+    @Test
+    void sharedHelpersAreDefinedBeforeTheirSinglePickerConsumer() {
+        // given
+        Context context = new Context();
+        context.setVariable("categories", List.of("Procesory"));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: pickerScript(${categories})}\"></div>", context);
+
+        // then
+        int definitionIndex = html.indexOf("window.pickerHelpers =");
+        int consumerIndex = html.indexOf("const {format, normalize, escapeHtml, highlight} = window.pickerHelpers;");
+        assertThat(definitionIndex).isNotNegative();
+        assertThat(consumerIndex).isNotNegative();
+        assertThat(definitionIndex).isLessThan(consumerIndex);
+    }
+
+    @Test
+    void selectedCategoriesAreRenderedAsRemovableChips() {
+        // when
+        String html = renderMulti(List.of(
+                new PimCategoryOptions.CategoryOption("194", "Klawiatury"),
+                new PimCategoryOptions.CategoryOption("195", "Myszki")), false);
+
+        // then
+        assertThat(html).contains("data-picker-chips");
+        assertThat(html).contains("data-chip-remove=\"194\"");
+        assertThat(html).contains("data-chip-remove=\"195\"");
+    }
+
+    @Test
+    void multiPickerScriptRendersOptionCheckboxesAndDrivesChips() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options})}\"></div>", context);
+
+        // then
+        assertThat(html).contains("picker-option-checkbox");
+        assertThat(html).contains("[data-picker-chips]");
+    }
+
+    @Test
+    void multiPickerRendersNoSelectOptions() {
+        // when
+        String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury")), true);
+
+        // then
+        assertThat(html).doesNotContain("<option");
+        assertThat(html).doesNotContain("<select");
+        assertThat(html).contains("data-picker-required");
     }
 }

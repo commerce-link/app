@@ -10,6 +10,7 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
@@ -25,7 +26,9 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.lang.reflect.Constructor;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +78,7 @@ class InventoryViewStoreListingsTest {
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-1");
         definition.setCategory("CPU");
+        definition.setPimCategoryIds(new LinkedList<>(List.of("989")));
         return definition;
     }
 
@@ -103,7 +107,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
     }
 
     private void stubGlobalIndex(Collection<MatchedInventory> groups) {
@@ -118,12 +122,13 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findAllByProductCategoryReachesStoreOwnInventory() {
+    void findAllByProductCategoryIdsReachesStoreOwnInventory() {
         // given
         storeWithGlobalAbGroupAndOwnAction();
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result =
+                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989")).get("989");
 
         // then
         assertThat(result).hasSize(1);
@@ -157,7 +162,7 @@ class InventoryViewStoreListingsTest {
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
@@ -181,7 +186,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
@@ -211,10 +216,11 @@ class InventoryViewStoreListingsTest {
         globalKey.addManufacturerCode(MFN);
         stubGlobalIndex(List.of(new MatchedInventory(globalKey,
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result =
+                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989")).get("989");
 
         // then
         assertThat(result).hasSize(1);
@@ -222,7 +228,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findAllByProductCategorySurfacesOwnOnlyProductThroughFullWarehouseChain() {
+    void findAllByProductCategoryIdsSurfacesOwnOnlyProductThroughFullWarehouseChain() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
@@ -230,13 +236,14 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result =
+                inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategoryIds(List.of("989")).get("989");
 
         // then
         assertThat(result).hasSize(1);
@@ -328,7 +335,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findAllByProductCategoryAppendsWarehouseStock() {
+    void findAllByProductCategoryIdsAppendsWarehouseStock() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
@@ -337,7 +344,7 @@ class InventoryViewStoreListingsTest {
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
@@ -345,7 +352,8 @@ class InventoryViewStoreListingsTest {
         when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
 
         // when
-        Collection<MatchedInventory> result = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategory("CPU");
+        Collection<MatchedInventory> result =
+                inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findAllByProductCategoryIds(List.of("989")).get("989");
 
         // then
         assertThat(result).hasSize(1);
@@ -385,6 +393,81 @@ class InventoryViewStoreListingsTest {
         assertThat(matched).isNotNull();
         assertThat(matched.isEmpty()).isTrue();
         assertThat(matched.getMfnCodes()).contains("UNKNOWN");
+    }
+
+    @Test
+    void rowWhoseCategoryNameMatchesButHasNoCategoryIdDoesNotMatch() {
+        // given
+        Store store = org.mockito.Mockito.mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
+        when(store.hasOwnSupplierConnections()).thenReturn(false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
+        stubGlobalIndex(List.of(globalGroupWithPimId()));
+        when(taxonomyCache.find(any())).thenReturn(
+                new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, null));
+
+        // when
+        Map<String, Collection<MatchedInventory>> result =
+                inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("Procesory"));
+
+        // then
+        assertThat(result.get("Procesory")).isEmpty();
+    }
+
+    @Test
+    void taxonomyLookupCountIsIndependentOfSelectionSize() {
+        // given
+        storeWithGlobalAbGroupAndOwnAction();
+
+        // when
+        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
+        Collection<org.mockito.invocation.Invocation> afterSingle =
+                org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations();
+        long singleRunFinds = afterSingle.stream().filter(i -> i.getMethod().getName().equals("find")).count();
+        org.mockito.Mockito.clearInvocations(taxonomyCache);
+        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
+        long doubleRunFinds = org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("find")).count();
+
+        // then
+        assertThat(doubleRunFinds).isEqualTo(singleRunFinds);
+    }
+
+    @Test
+    void productReachableThroughTwoSelectedCategoriesAppearsExactlyOnce() {
+        // given — pre-merge lookup key carries only MFN-A (categoryId "194", worse score);
+        // a second InventorySource merges in MFN-B during assemble() (categoryId "195", better/lower score) —
+        // grouping must use the pre-merge taxonomy, landing the product in "194" and never in "195"
+        TaxonomyRepository taxonomyRepository = org.mockito.Mockito.mock(TaxonomyRepository.class);
+        TaxonomyCache realCache = new TaxonomyCache(taxonomyRepository);
+        realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 2, null, null, null, "194"));
+        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
+
+        InventoryKey keyA = new InventoryKey(EAN, "MFN-A");
+        MatchedInventory groupA = new MatchedInventory(keyA,
+                List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                realCache, supplierRegistry);
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(groupA));
+
+        InventoryKey keyB = new InventoryKey(EAN, "MFN-B");
+        MatchedInventory groupB = new MatchedInventory(keyB,
+                List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                realCache, supplierRegistry);
+        InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
+
+        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
+                realCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true),
+                GroupInventorySource.global(mergingIndex, supplier -> true));
+
+        // when
+        Map<String, Collection<MatchedInventory>> result = view.findAllByProductCategoryIds(List.of("194", "195"));
+
+        // then
+        assertThat(result.get("194").size() + result.get("195").size()).isEqualTo(1);
+        assertThat(result.get("194")).hasSize(1);
+        assertThat(result.get("195")).isEmpty();
     }
 
     @Test

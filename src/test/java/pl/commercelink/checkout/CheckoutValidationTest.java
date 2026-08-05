@@ -32,14 +32,15 @@ class CheckoutValidationTest {
     }
 
     @Test
-    @DisplayName("required category passes when the item still carries the legacy category key from an old pricelist")
-    void passesWhenItemCarriesLegacyCategoryKey() {
+    @DisplayName("item carrying the removed legacy category key no longer satisfies the definition")
+    void itemCarryingLegacyCategoryKeyNoLongerMatches() {
         // given
         ProductCatalog catalog = catalogWithRequired("Obudowa", "Case");
 
         // when / then
-        assertThatCode(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Obudowa");
     }
 
     @Test
