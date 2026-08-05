@@ -33,16 +33,10 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
-        Optional<PimCatalogDescriptor> descriptorOpt = selectDescriptor(
-                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
-
-        if (descriptorOpt.isEmpty()) {
-            System.err.println("No PimCatalogDescriptor found on classpath — using offline PimCatalog with bundled categories");
-            this.catalog = new OfflinePimCatalog();
-            return;
-        }
-
-        PimCatalogDescriptor descriptor = descriptorOpt.get();
+        PimCatalogDescriptor descriptor = selectDescriptor(
+                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList())
+                .orElseThrow(() -> new IllegalStateException(
+                        "No PimCatalogDescriptor found on classpath — build with -Pdev (pim-dev) or add a PIM adapter to the pom"));
 
         Map<String, String> configuration = new HashMap<>();
         if (secretsManager.exists(descriptor.name())) {
