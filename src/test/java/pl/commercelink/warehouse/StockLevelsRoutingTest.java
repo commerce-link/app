@@ -11,7 +11,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -49,8 +48,6 @@ class StockLevelsRoutingTest {
     private Inventory inventory;
     @Mock
     private InventoryView inventoryView;
-    @Mock
-    private PimCategoryOptions pimCategoryOptions;
     @Mock
     private ProductCatalog catalog;
 
@@ -94,32 +91,29 @@ class StockLevelsRoutingTest {
     }
 
     @Test
-    void definitionWithoutMappingAndWithoutLegacyNameSortsLastInsteadOfThrowing() {
+    void definitionWithoutANameSortsLastInsteadOfThrowing() {
         // given
-        CategoryDefinition unmappedDefinition = new CategoryDefinition();
-        unmappedDefinition.setCategoryId("cat-u");
-        unmappedDefinition.setName("Nowa kategoria");
-        CategoryDefinition mappedDefinition = new CategoryDefinition();
-        mappedDefinition.setCategoryId("cat-m");
-        mappedDefinition.setName("Procesory");
-        mappedDefinition.setPimCategoryIds(List.of("989"));
+        CategoryDefinition namelessDefinition = new CategoryDefinition();
+        namelessDefinition.setCategoryId("cat-u");
+        CategoryDefinition namedDefinition = new CategoryDefinition();
+        namedDefinition.setCategoryId("cat-m");
+        namedDefinition.setName("Procesory");
 
-        Product unmappedProduct = new Product("cat-u");
-        unmappedProduct.setName("Zasilacz");
-        unmappedProduct.setManufacturerCode("MFN-U");
-        unmappedProduct.setStockExpectedQty(1);
-        Product mappedProduct = new Product("cat-m");
-        mappedProduct.setName("CPU");
-        mappedProduct.setManufacturerCode("MFN-M");
-        mappedProduct.setStockExpectedQty(1);
+        Product namelessProduct = new Product("cat-u");
+        namelessProduct.setName("Zasilacz");
+        namelessProduct.setManufacturerCode("MFN-U");
+        namelessProduct.setStockExpectedQty(1);
+        Product namedProduct = new Product("cat-m");
+        namedProduct.setName("CPU");
+        namedProduct.setManufacturerCode("MFN-M");
+        namedProduct.setStockExpectedQty(1);
 
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
-        when(catalog.getCategories()).thenReturn(List.of(unmappedDefinition, mappedDefinition));
+        when(catalog.getCategories()).thenReturn(List.of(namelessDefinition, namedDefinition));
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
-        when(productRepository.findAll("cat-u")).thenReturn(List.of(unmappedProduct));
-        when(productRepository.findAll("cat-m")).thenReturn(List.of(mappedProduct));
+        when(productRepository.findAll("cat-u")).thenReturn(List.of(namelessProduct));
+        when(productRepository.findAll("cat-m")).thenReturn(List.of(namedProduct));
         when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
-        when(pimCategoryOptions.namesOf(List.of("989"))).thenReturn(List.of("Procesory"));
 
         // when
         List<StockProductLevel> levels =
@@ -130,7 +124,7 @@ class StockLevelsRoutingTest {
     }
 
     @Test
-    void mappedDefinitionLabelJoinsPimCategoryNames() {
+    void rowLabelIsTheDefinitionNameNotThePimMappingOrLegacyName() {
         // given
         CategoryDefinition mappedDefinition = new CategoryDefinition();
         mappedDefinition.setCategoryId("cat-m");
@@ -148,14 +142,13 @@ class StockLevelsRoutingTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-m")).thenReturn(List.of(product));
         when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
-        when(pimCategoryOptions.namesOf(List.of("989", "170"))).thenReturn(List.of("Procesory", "Karty graficzne"));
 
         // when
         List<StockProductLevel> levels =
                 stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
 
         // then
-        assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Procesory, Karty graficzne");
+        assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Podzespoły");
     }
 
     @Test
