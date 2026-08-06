@@ -54,7 +54,7 @@ class DataCorrection {
             category = Taxonomy.SERVICES;
         }
 
-        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(ean), UnifiedProductIdentifiers.unifyMfn(product.mfn()),
+        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(ean), product.mfn(),
                 brand, name, category, score, netWeight, grossWeight,
                 product.rawCategory(), categoryId);
     }

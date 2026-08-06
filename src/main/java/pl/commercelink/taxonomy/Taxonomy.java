@@ -26,8 +26,7 @@ public record Taxonomy(String ean, String mfn, String brand, String name,
     }
 
     public static Taxonomy from(SupplierProduct product) {
-        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(product.ean()),
-                UnifiedProductIdentifiers.unifyMfn(product.mfn()), product.brand(), product.name(),
+        return new Taxonomy(product.ean(), product.mfn(), product.brand(), product.name(),
                 null, product.dataAccuracyScore(),
                 product.netWeightInGrams(), product.grossWeightInGrams(),
                 product.rawCategory(), null);

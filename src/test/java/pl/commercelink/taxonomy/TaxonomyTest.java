@@ -67,16 +67,16 @@ class TaxonomyTest {
     }
 
     @Test
-    void fromSupplierProductNormalizesEanAndMfn() {
+    void fromSupplierProductPreservesAlreadyNormalizedEanAndMfn() {
         // given
-        SupplierProduct product = new SupplierProduct("012345678905", "mfn 1", "BrandX", "Laptop Pro",
+        SupplierProduct product = new SupplierProduct("0012345678905", "mfn 1", "BrandX", "Laptop Pro",
                 7, 100, 200, "Elektronika > Laptopy");
 
         // when
         Taxonomy taxonomy = Taxonomy.from(product);
 
         // then
-        assertEquals("12345678905", taxonomy.ean());
+        assertEquals("012345678905", taxonomy.ean());
         assertEquals("MFN1", taxonomy.mfn());
     }
 }
