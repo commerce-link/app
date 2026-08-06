@@ -25,13 +25,9 @@ public record Taxonomy(String ean, String mfn, String brand, String name,
                 netWeightInGrams, grossWeightInGrams, null, null);
     }
 
-    public Taxonomy {
-        ean = UnifiedProductIdentifiers.unifyEan(ean);
-        mfn = UnifiedProductIdentifiers.unifyMfn(mfn);
-    }
-
     public static Taxonomy from(SupplierProduct product) {
-        return new Taxonomy(product.ean(), product.mfn(), product.brand(), product.name(),
+        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(product.ean()),
+                UnifiedProductIdentifiers.unifyMfn(product.mfn()), product.brand(), product.name(),
                 null, product.dataAccuracyScore(),
                 product.netWeightInGrams(), product.grossWeightInGrams(),
                 product.rawCategory(), null);

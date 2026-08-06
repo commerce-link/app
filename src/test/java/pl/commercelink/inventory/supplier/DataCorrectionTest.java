@@ -173,6 +173,20 @@ class DataCorrectionTest {
         assertThat(result.rawCategory()).isEqualTo("Services");
     }
 
+    @Test
+    void runNormalizesEanAndMfnFromSupplierProduct() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("012345678905", "mfn 1", "FeedBrand", "FeedName", 5, 100, 200);
+        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("12345678905");
+        assertThat(result.mfn()).isEqualTo("MFN1");
+    }
+
     private SupplierProduct feed(Integer net, Integer gross) {
         return new SupplierProduct("1234567890123", "MFN", "FeedBrand", "FeedName", 5, net, gross);
     }

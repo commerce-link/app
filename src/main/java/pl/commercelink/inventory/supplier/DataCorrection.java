@@ -9,6 +9,7 @@ import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.Optional;
 
@@ -53,7 +54,8 @@ class DataCorrection {
             category = Taxonomy.SERVICES;
         }
 
-        return new Taxonomy(ean, product.mfn(), brand, name, category, score, netWeight, grossWeight,
+        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(ean), UnifiedProductIdentifiers.unifyMfn(product.mfn()),
+                brand, name, category, score, netWeight, grossWeight,
                 product.rawCategory(), categoryId);
     }
 
