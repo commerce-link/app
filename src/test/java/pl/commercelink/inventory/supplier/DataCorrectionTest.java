@@ -190,6 +190,19 @@ class DataCorrectionTest {
     }
 
     @Test
+    void runDoesNotDoubleNormalizeEanWhenNoCorrectionNeeded() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("0012345678901", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
+        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("012345678901");
+    }
+
+    @Test
     void runNormalizesPimCorrectedGtinWithLeadingZeros() {
         // given
         SupplierProduct fromFeed = new SupplierProduct("1111111111111", "MFN", "FeedBrand", "FeedName", 5, 100, 200);

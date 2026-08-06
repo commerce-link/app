@@ -29,7 +29,8 @@ class DataCorrection {
     }
 
     Taxonomy run(SupplierProduct product) {
-        String ean = resolveCorrectEanForMfn(product.ean(), product.mfn()).orElse(product.ean());
+        Optional<String> correctedEan = resolveCorrectEanForMfn(product.ean(), product.mfn());
+        String ean = correctedEan.orElse(product.ean());
         String brand = brandMapper.unifyBrand(product.brand());
         String name = product.name();
         String category = null;
@@ -54,7 +55,8 @@ class DataCorrection {
             category = Taxonomy.SERVICES;
         }
 
-        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(ean), product.mfn(),
+        String normalizedEan = correctedEan.map(UnifiedProductIdentifiers::unifyEan).orElse(product.ean());
+        return new Taxonomy(normalizedEan, product.mfn(),
                 brand, name, category, score, netWeight, grossWeight,
                 product.rawCategory(), categoryId);
     }
