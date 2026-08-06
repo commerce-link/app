@@ -178,14 +178,14 @@ class DataCorrectionTest {
     @Test
     void runPreservesAlreadyNormalizedEanAndMfn() {
         // given
-        SupplierProduct fromFeed = new SupplierProduct("012345678905", "mfn 1", "FeedBrand", "FeedName", 5, 100, 200);
+        SupplierProduct fromFeed = new SupplierProduct("0012345678905", "mfn 1", "FeedBrand", "FeedName", 5, 100, 200);
         when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
         Taxonomy result = dataCorrection.run(fromFeed);
 
         // then
-        assertThat(result.ean()).isEqualTo("12345678905");
+        assertThat(result.ean()).isEqualTo("012345678905");
         assertThat(result.mfn()).isEqualTo("MFN1");
     }
 
