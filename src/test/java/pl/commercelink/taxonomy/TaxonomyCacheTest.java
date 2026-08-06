@@ -499,7 +499,7 @@ class TaxonomyCacheTest {
 
     @Test
     void poolingHandlesNullBrandCategoryAndCategoryIdWithoutThrowing() {
-        // given / when
+        // when
         cache.add(new Taxonomy("1234567890123", "MFN-1", null, "Name", null, 1, null, null, null, null));
 
         // then
