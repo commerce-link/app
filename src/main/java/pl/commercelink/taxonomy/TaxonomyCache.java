@@ -29,28 +29,6 @@ public class TaxonomyCache {
         this.taxonomyRepository = taxonomyRepository;
     }
 
-    private String pooled(String value) {
-        if (value == null) return null;
-        String existing = stringPool.putIfAbsent(value, value);
-        return existing != null ? existing : value;
-    }
-
-    private Taxonomy internLowCardinalityFields(Taxonomy taxonomy) {
-        if (!Objects.equals(taxonomy.ean(), UnifiedProductIdentifiers.unifyEan(taxonomy.ean()))) {
-            return taxonomy;
-        }
-        String brand = pooled(taxonomy.brand());
-        String category = pooled(taxonomy.category());
-        String categoryId = pooled(taxonomy.categoryId());
-        if (brand == taxonomy.brand() && category == taxonomy.category() && categoryId == taxonomy.categoryId()) {
-            return taxonomy;
-        }
-        return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), brand, taxonomy.name(),
-                category, taxonomy.dataAccuracyScore(),
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
-                taxonomy.rawCategory(), categoryId);
-    }
-
     @PostConstruct
     void onStartUp() {
         Pair<String, List<Taxonomy>> result = taxonomyRepository.loadNewest();
@@ -184,6 +162,28 @@ public class TaxonomyCache {
 
     public int size() {
         return taxonomyByMfn.size();
+    }
+
+    private String pooled(String value) {
+        if (value == null) return null;
+        String existing = stringPool.putIfAbsent(value, value);
+        return existing != null ? existing : value;
+    }
+
+    private Taxonomy internLowCardinalityFields(Taxonomy taxonomy) {
+        if (!Objects.equals(taxonomy.ean(), UnifiedProductIdentifiers.unifyEan(taxonomy.ean()))) {
+            return taxonomy;
+        }
+        String brand = pooled(taxonomy.brand());
+        String category = pooled(taxonomy.category());
+        String categoryId = pooled(taxonomy.categoryId());
+        if (brand == taxonomy.brand() && category == taxonomy.category() && categoryId == taxonomy.categoryId()) {
+            return taxonomy;
+        }
+        return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), brand, taxonomy.name(),
+                category, taxonomy.dataAccuracyScore(),
+                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
+                taxonomy.rawCategory(), categoryId);
     }
 
 }
