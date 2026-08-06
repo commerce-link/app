@@ -5,10 +5,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.baskets.*;
 import pl.commercelink.inventory.Inventory;
@@ -20,8 +22,7 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.pricelist.Pricelist;
-import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
@@ -54,7 +55,7 @@ public class OfferController {
     private StoreCategories storeCategories;
 
     @Autowired
-    private PricelistRepository pricelistRepository;
+    private PricelistFinder pricelistFinder;
 
     @Autowired
     private OfferItemReloader offerItemReloader;
@@ -157,12 +158,12 @@ public class OfferController {
     }
 
     @GetMapping("/dashboard/offer/{offerId}")
-    public String showOfferDetails(@PathVariable String offerId, @ModelAttribute("catalogId") String catalogId, Model model) {
+    public String showOfferDetails(@PathVariable String offerId, Model model) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
-        return showEditOfferForm(model, basket, catalogId, Mode.EDIT, basket.hasType(BasketType.OfferTemplate));
+        return showEditOfferForm(model, basket, Mode.EDIT, basket.hasType(BasketType.OfferTemplate));
     }
 
-    private String showEditOfferForm(Model model, Basket basket, String catalogId, Mode mode, boolean recalculate) {
+    private String showEditOfferForm(Model model, Basket basket, Mode mode, boolean recalculate) {
         List<OfferItem> offerItems = recalculate ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket);
 
         Store store = storesRepository.findById(getStoreId());
@@ -171,12 +172,6 @@ public class OfferController {
         }
         if (basket.getContactDetails() == null) {
             basket.setContactDetails(new ContactDetails());
-        }
-
-        Pricelist pricelist = Pricelist.empty();
-        if (isNotBlank(catalogId)) {
-            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(getStoreId(), catalogId);
-            pricelist = pricelistRepository.find(getStoreId(), catalogId, newestPricelistId);
         }
 
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
@@ -201,10 +196,6 @@ public class OfferController {
         model.addAttribute("backofficeDomain", appDomain);
 
         model.addAttribute("catalogs", catalogs);
-        model.addAttribute("catalogId", catalogId);
-        model.addAttribute("pricelistId", pricelist.getPricelistId());
-        model.addAttribute("availabilityAndPrices", pricelist.getAvailabilityAndPrices());
-        model.addAttribute("availableCategories", pricelist.getAvailableCategories());
         model.addAttribute("deliveryOptions", store.getCheckoutConfiguration().getDeliveryOptions());
 
         return "offerDetails";
@@ -296,31 +287,17 @@ public class OfferController {
         return "redirect:" + op.getInvoiceUrl();
     }
 
-    @PostMapping("/dashboard/offer/{offerId}/select-catalog")
-    public String onCatalogChange(@PathVariable String offerId, @RequestParam String catalogId, @ModelAttribute Basket offer, RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("catalogId", catalogId);
-        redirectAttributes.addFlashAttribute("offer", offer);
-        redirectAttributes.addFlashAttribute("openModal", true);
-        return "redirect:/dashboard/offer/" + offerId;
-    }
-
     @PostMapping("/dashboard/offer/{offerId}/add-item/pricelist")
     public String addOfferItemFromPriceList(@PathVariable String offerId,
-                                            @RequestParam("itemCatalogId") String catalogId,
-                                            @RequestParam("itemPricelistId") String pricelistId,
-                                            @RequestParam("category") String category,
-                                            @RequestParam("itemLabel") String itemLabel,
-                                            @RequestParam("itemName") String itemName) {
+                                            @RequestParam String catalogId,
+                                            @RequestParam String pimId,
+                                            @RequestParam(defaultValue = "1") long qty) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
-        Pricelist pricelist = pricelistRepository.find(getStoreId(), catalogId, pricelistId);
-        List<AvailabilityAndPrice> availabilityAndPrices = pricelist.getAvailabilityAndPrices();
+        AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), catalogId, pimId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        AvailabilityAndPrice itemAvailabilityAndPrice = availabilityAndPrices.stream()
-                .filter(a -> category.equals(a.getCategory()) && a.getLabel().equals(itemLabel) && a.getName().equals(itemName))
-                .findFirst().get();
-
-        BasketItem basketItem = BasketItem.of(itemAvailabilityAndPrice, 1, catalogId, !basket.isShowPrices());
+        BasketItem basketItem = BasketItem.of(availabilityAndPrice, qty, catalogId, !basket.isShowPrices());
         basket.addBasketItemInCategoryOrder(basketItem, catalogCategorySequenceNumbers(catalogId));
         save(basket);
 
@@ -334,14 +311,15 @@ public class OfferController {
 
     @PostMapping("/dashboard/offer/{offerId}/add-item/inventory")
     public String addOfferItemFromInventory(@PathVariable String offerId,
-                                            @RequestParam(required = false) String itemEan,
-                                            @RequestParam(required = false) String itemManufacturerCode) {
+                                            @RequestParam(required = false, defaultValue = "") String itemEan,
+                                            @RequestParam(required = false, defaultValue = "") String itemManufacturerCode,
+                                            @RequestParam(defaultValue = "1") long qty) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
 
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
 
-        basket.addBasketItem(BasketItem.of(matchedInventory, 1, !basket.isShowPrices()));
+        basket.addBasketItem(BasketItem.of(matchedInventory, qty, !basket.isShowPrices()));
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;

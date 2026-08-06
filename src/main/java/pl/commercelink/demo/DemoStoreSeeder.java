@@ -98,6 +98,13 @@ public class DemoStoreSeeder implements StoreSeeder {
     private void seedStoreData(String storeId, DemoStoreMetadata demo) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+
+        savePricelist(storeId);
+
+        if (isAlreadySeeded(mapper, storeId)) {
+            return;
+        }
+
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
@@ -106,8 +113,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
-        savePricelist(storeId);
         saveOrders(mapper, clobber, storeId, ownerEmailOrFallback(demo), rows);
+    }
+
+    private boolean isAlreadySeeded(DynamoDBMapper mapper, String storeId) {
+        return mapper.load(ProductCatalog.class, storeId, CATALOG_ID) != null;
     }
 
     static void applyStoreConfiguration(Store store, String storeId, String storeName, DemoStoreMetadata demo) {
