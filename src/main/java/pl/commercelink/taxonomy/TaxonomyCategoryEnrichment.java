@@ -41,9 +41,12 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
+        return hasIdentificationData(taxonomy) && taxonomyCache.pendingCount() < properties.pendingCap();
+    }
+
+    public boolean hasIdentificationData(Taxonomy taxonomy) {
         return isNotBlank(taxonomy.mfn()) && isNotBlank(taxonomy.ean())
-                && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name())
-                && taxonomyCache.pendingCount() < properties.pendingCap();
+                && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name());
     }
 
     public void addPending(Taxonomy taxonomy, String supplier) {
