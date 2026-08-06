@@ -69,6 +69,30 @@ public class WarehouseAllocationsManager {
         return true;
     }
 
+    public void createOrdered(String storeId, String deliveryId, String provider, DeliveryItem item, int qty) {
+        WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item, qty);
+        warehouseItem.markAsOrdered(deliveryId, item.getUnitCost());
+        warehouseRepository.save(warehouseItem);
+    }
+
+    public void increaseQty(String storeId, String itemId, int amount) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        warehouseItem.setQty(warehouseItem.getQty() + amount);
+        warehouseRepository.save(warehouseItem);
+    }
+
+    public int decreaseQty(String storeId, String itemId, int amount) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        int removed = Math.min(amount, warehouseItem.getQty());
+        if (removed == warehouseItem.getQty()) {
+            warehouseRepository.delete(warehouseItem);
+        } else {
+            warehouseItem.setQty(warehouseItem.getQty() - removed);
+            warehouseRepository.save(warehouseItem);
+        }
+        return removed;
+    }
+
     public void reassign(String storeId, String targetDeliveryId, List<Allocation> allocations) {
         for (Allocation allocation : allocations) {
             WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());

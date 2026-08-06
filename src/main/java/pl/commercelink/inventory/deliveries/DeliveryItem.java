@@ -153,6 +153,18 @@ public class DeliveryItem {
                 .sum();
     }
 
+    public int getAdjustableWarehouseQty() {
+        return allocations.stream()
+                .filter(a -> a.getType() == AllocationType.Warehouse)
+                .filter(Allocation::isInAllocation)
+                .mapToInt(Allocation::getQty)
+                .sum();
+    }
+
+    public int getMinOrderedQty() {
+        return orderedQty - getAdjustableWarehouseQty();
+    }
+
     public int getWarehouseQtyAdjustment() {
         int selectedWarehouseQty = allocations.stream()
                 .filter(Allocation::isSelected)

@@ -61,10 +61,14 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, String provider, DeliveryItem item) {
+        return create(storeId, provider, item, item.getWarehouseQtyAdjustment());
+    }
+
+    WarehouseItem create(String storeId, String provider, DeliveryItem item, int qty) {
         ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), Categories.UNCATEGORIZED);
         return new WarehouseItem(
                 storeId, provider, resolved.category(), resolved.name(),
-                item.getEan(), item.getMfn(), item.getUnitCost(), item.getWarehouseQtyAdjustment()
+                item.getEan(), item.getMfn(), item.getUnitCost(), qty
         );
     }
 }

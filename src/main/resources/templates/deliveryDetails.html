@@ -175,7 +175,7 @@
 
             <h2 th:text="#{deliveries.items}"></h2>
 
-            <div class="box">
+            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty()}">
                 <table class="table">
                     <thead>
                     <tr>
@@ -192,7 +192,16 @@
                     <tbody>
                     <tr th:each="item : ${delivery.items}">
                         <td th:text="${item.name}"></td>
-                        <td th:text="${item.orderedQty}"></td>
+                        <td>
+                            <span th:text="${item.orderedQty}"></span>
+                            <button type="button" class="button is-small is-white ml-1"
+                                    th:if="${itemQtyEditable and item.receivedQty < item.orderedQty}"
+                                    th:attr="data-name=${item.name},data-ean=${item.ean},data-mfn=${item.mfn},data-qty=${item.orderedQty},data-min-qty=${item.minOrderedQty}"
+                                    th:title="#{deliveries.editOrderedQty.title}"
+                                    onclick="openEditItemQtyModal(this)">
+                                <span class="icon is-small has-text-grey"><i class="fas fa-pencil-alt"></i></span>
+                            </button>
+                        </td>
                         <td th:text="${item.receivedQty}"></td>
                         <td th:text="${item.reservedQty}"></td>
                         <td th:text="${item.availableQty}"></td>
@@ -279,6 +288,50 @@
                 </div>
 
             </form>
+
+            <div id="editItemQtyModal" class="modal">
+                <div class="modal-background" onclick="toggleEditItemQtyModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.editOrderedQty.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleEditItemQtyModal(false)"></button>
+                    </header>
+                    <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/updateItemQty(storeId=${delivery.storeId})} : @{/dashboard/deliveries/updateItemQty}"
+                          method="post">
+                        <input type="hidden" name="deliveryId" th:value="${delivery.deliveryId}"/>
+                        <input type="hidden" name="mfn" id="editItemQtyMfn"/>
+                        <section class="modal-card-body">
+                            <p class="has-text-weight-semibold mb-0" id="editItemQtyName"></p>
+                            <p class="has-text-grey mb-4">
+                                <span th:text="#{general.ean}"></span>: <span id="editItemQtyEan"></span>
+                                &nbsp;|&nbsp;
+                                <span th:text="#{general.manufacturer.code}"></span>: <span id="editItemQtyMfnLabel"></span>
+                            </p>
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.orderedQty}"></label>
+                                <div class="control">
+                                    <input class="input" type="number" name="qty" id="editItemQtyInput"
+                                           style="width: 140px;" min="1" required
+                                           oninput="updateItemQtyDelta()"/>
+                                </div>
+                                <p class="help">
+                                    <span th:text="#{deliveries.editOrderedQty.minQty}"></span>: <span id="editItemQtyMin"></span>
+                                    &mdash; <span th:text="#{deliveries.editOrderedQty.minQty.hint}"></span>
+                                </p>
+                            </div>
+                            <div class="notification is-light py-2 px-3" id="editItemQtyDelta" style="display: none;">
+                                <strong id="editItemQtyDeltaValue"></strong>
+                                <span id="editItemQtyDeltaText"></span>
+                            </div>
+                            <p class="help" th:text="#{deliveries.editOrderedQty.note}"></p>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
+                            <button type="button" class="button" onclick="toggleEditItemQtyModal(false)" th:text="#{general.cancel}"></button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
 
             <div id="mergeDeliveryModal" class="modal">
                 <div class="modal-background" onclick="toggleMergeModal(false)"></div>
@@ -382,6 +435,48 @@
             }
             document.getElementById('invoiceIdHidden').value = invoiceId;
             document.getElementById('linkInvoiceByIdForm').submit();
+        }
+
+        function toggleEditItemQtyModal(show) {
+            document.getElementById('editItemQtyModal').classList.toggle('is-active', show);
+        }
+
+        function openEditItemQtyModal(button) {
+            const minQty = Math.max(1, parseInt(button.dataset.minQty) || 0);
+            document.getElementById('editItemQtyName').textContent = button.dataset.name || '';
+            document.getElementById('editItemQtyEan').textContent = button.dataset.ean || '';
+            document.getElementById('editItemQtyMfnLabel').textContent = button.dataset.mfn || '';
+            document.getElementById('editItemQtyMfn').value = button.dataset.mfn || '';
+            document.getElementById('editItemQtyMin').textContent = minQty;
+
+            const input = document.getElementById('editItemQtyInput');
+            input.min = minQty;
+            input.value = button.dataset.qty;
+            input.dataset.initial = button.dataset.qty;
+
+            updateItemQtyDelta();
+            toggleEditItemQtyModal(true);
+            input.focus();
+        }
+
+        function updateItemQtyDelta() {
+            const input = document.getElementById('editItemQtyInput');
+            const value = parseInt(input.value);
+            const delta = value - parseInt(input.dataset.initial);
+            const row = document.getElementById('editItemQtyDelta');
+
+            if (!value || value < parseInt(input.min) || delta === 0) {
+                row.style.display = 'none';
+                return;
+            }
+
+            row.classList.toggle('is-success', delta > 0);
+            row.classList.toggle('is-danger', delta < 0);
+            document.getElementById('editItemQtyDeltaValue').textContent = (delta > 0 ? '+' : '') + delta;
+            document.getElementById('editItemQtyDeltaText').textContent = delta > 0
+                ? /*[[#{deliveries.editOrderedQty.increase}]]*/ 'items will be added to warehouse stock'
+                : /*[[#{deliveries.editOrderedQty.decrease}]]*/ 'items will be removed from warehouse stock';
+            row.style.display = '';
         }
 
         const actionMessages = {

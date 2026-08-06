@@ -68,6 +68,9 @@ public class DeliveriesController {
     private DeliveryFulfilmentUpdateService deliveryFulfilmentUpdateService;
 
     @Autowired
+    private DeliveryOrderedQtyUpdateService deliveryOrderedQtyUpdateService;
+
+    @Autowired
     private RestockSuggestionService restockSuggestionService;
 
     @Autowired
@@ -493,6 +496,42 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + updatedDelivery.getDeliveryId();
+    }
+
+    @PostMapping("/dashboard/deliveries/updateItemQty")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateDeliveryItemQty(
+            @RequestParam String deliveryId,
+            @RequestParam String mfn,
+            @RequestParam int qty,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateItemQty(getStoreId(), deliveryId, mfn, qty, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/updateItemQty")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String updateDeliveryItemQtyForSuperAdmin(
+            @PathVariable("storeId") String storeId,
+            @RequestParam String deliveryId,
+            @RequestParam String mfn,
+            @RequestParam int qty,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateItemQty(storeId, deliveryId, mfn, qty, redirectAttributes, locale);
+    }
+
+    private String updateItemQty(String storeId, String deliveryId, String mfn, int qty, RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(storeId, deliveryId, mfn, qty);
+
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/deliveries/link-invoices")
