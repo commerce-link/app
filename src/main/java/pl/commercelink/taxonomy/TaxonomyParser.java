@@ -16,30 +16,24 @@ class TaxonomyParser {
     };
 
     private static final char NAME_REJOIN_SEPARATOR = ';';
+    private static final int TRAILING_FIELD_COUNT = 5;
 
     static Taxonomy fromCsvRow(String[] row) {
         String ean = row[0];
         String mfn = row[1];
         String brand = row[2];
-        boolean newFormat = row.length > 8;
-        // category, [category_id], score, net, gross always sit at the end of the row;
+        // category, category_id, score, net, gross always sit at the end of the row;
         // an unescaped separator inside "name" (e.g. a mangled &#39; entity) only ever
         // splits the name field itself, so anchoring the tail fields from the end and
         // rejoining everything before them survives that kind of source-data corruption.
-        int trailingFieldCount = newFormat ? 5 : 4;
-        int nameEnd = Math.max(4, row.length - trailingFieldCount);
+        int nameEnd = row.length - TRAILING_FIELD_COUNT;
         String name = String.join(String.valueOf(NAME_REJOIN_SEPARATOR), Arrays.copyOfRange(row, 3, nameEnd));
 
-        int cursor = nameEnd;
-        String category = valueOrNull(row[cursor]);
-        cursor++;
-        String categoryId = newFormat ? valueOrNull(row[cursor]) : null;
-        if (newFormat) cursor++;
-        int dataAccuracyScore = parseScore(row[cursor]);
-        cursor++;
-        Integer netWeight = row.length > cursor ? parseWeight(row[cursor]) : null;
-        cursor++;
-        Integer grossWeight = row.length > cursor ? parseWeight(row[cursor]) : null;
+        String category = valueOrNull(row[nameEnd]);
+        String categoryId = valueOrNull(row[nameEnd + 1]);
+        int dataAccuracyScore = parseScore(row[nameEnd + 2]);
+        Integer netWeight = parseWeight(row[nameEnd + 3]);
+        Integer grossWeight = parseWeight(row[nameEnd + 4]);
 
         return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore,
                 netWeight, grossWeight, null, categoryId);

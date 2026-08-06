@@ -43,7 +43,7 @@ class TaxonomyParserTest {
 
     @Test
     void blankCategoryCellYieldsNullCategory() {
-        String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "1"};
+        String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "537", "1", "", ""};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
@@ -79,22 +79,9 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void backwardCompatReadsLegacySixColumnRow() {
-        String[] legacyRow = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1"
-        };
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
-
-        assertEquals("1234567890123", parsed.ean());
-        assertEquals("MFN-1", parsed.mfn());
-        assertNull(parsed.netWeightInGrams());
-    }
-
-    @Test
     void emptyWeightCellYieldsNull() {
         String[] row = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", ""
+                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "537", "1", "", ""
         };
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
@@ -105,7 +92,7 @@ class TaxonomyParserTest {
     @Test
     void malformedWeightCellYieldsNull() {
         String[] row = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", "abc"
+                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "537", "1", "abc", ""
         };
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
@@ -129,18 +116,8 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void readsLegacyCsvWithoutWeightColumnsAsNull() {
-        String[] legacyRow = {"123", "MFN", "Brand", "Name", "Other", "5"};
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
-
-        assertThat(parsed.netWeightInGrams()).isNull();
-        assertThat(parsed.grossWeightInGrams()).isNull();
-    }
-
-    @Test
     void readsBlankWeightColumnsAsNull() {
-        String[] row = {"123", "MFN", "Brand", "Name", "Other", "5", "", ""};
+        String[] row = {"123", "MFN", "Brand", "Name", "Other", "537", "5", "", ""};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
@@ -222,18 +199,4 @@ class TaxonomyParserTest {
         assertEquals(3, parsed.dataAccuracyScore());
     }
 
-    @Test
-    void legacyEightColumnRowLeavesCategoryIdNull() {
-        // given
-        String[] legacyRow = {"5901234123457", "MFN-1", "BrandX", "Mysz", "Myszki", "5", "100", "120"};
-
-        // when
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
-
-        // then
-        assertEquals("Myszki", parsed.category());
-        assertNull(parsed.categoryId());
-        assertEquals(5, parsed.dataAccuracyScore());
-        assertEquals(100, parsed.netWeightInGrams());
-    }
 }
