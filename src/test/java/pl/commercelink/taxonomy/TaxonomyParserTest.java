@@ -182,6 +182,47 @@ class TaxonomyParserTest {
     }
 
     @Test
+    void strayUnescapedSeparatorInNameDoesNotShiftTrailingColumns() {
+        // given: real taxonomy-merged-full.csv row where a mangled "&#39;" (missing the
+        // leading &) leaves a literal ";" inside the product name, splitting it in two
+        String[] row = {
+                "8596049159455", "60312151000003", "Epico",
+                "Epico Flexiglass Szklo ochronne do iPhone#39", "a 13 i 13 Pro i 14",
+                "Ochraniacze na ekran i tyl telefonu", "1568", "3", "", ""
+        };
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("Epico Flexiglass Szklo ochronne do iPhone#39;a 13 i 13 Pro i 14", parsed.name());
+        assertEquals("Ochraniacze na ekran i tyl telefonu", parsed.category());
+        assertEquals("1568", parsed.categoryId());
+        assertEquals(3, parsed.dataAccuracyScore());
+        assertNull(parsed.netWeightInGrams());
+        assertNull(parsed.grossWeightInGrams());
+    }
+
+    @Test
+    void twoStraySeparatorsInNameStillLeaveTrailingColumnsIntact() {
+        // given: same corruption pattern, but the name gets split into three pieces
+        String[] row = {
+                "23942987499", "98749-V", "Verbatim",
+                "Verbatim Store #39", "n#39", " Go Metal Executive 32 GB srebrny",
+                "Pamiec USB", "1554", "3", "", ""
+        };
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("Verbatim Store #39;n#39; Go Metal Executive 32 GB srebrny", parsed.name());
+        assertEquals("Pamiec USB", parsed.category());
+        assertEquals("1554", parsed.categoryId());
+        assertEquals(3, parsed.dataAccuracyScore());
+    }
+
+    @Test
     void legacyEightColumnRowLeavesCategoryIdNull() {
         // given
         String[] legacyRow = {"5901234123457", "MFN-1", "BrandX", "Mysz", "Myszki", "5", "100", "120"};

@@ -4,6 +4,7 @@ import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -14,22 +15,38 @@ class TaxonomyParser {
             "data_accuracy_score", "net_weight_g", "gross_weight_g"
     };
 
+    private static final char NAME_REJOIN_SEPARATOR = ';';
+
     static Taxonomy fromCsvRow(String[] row) {
         String ean = row[0];
         String mfn = row[1];
         String brand = row[2];
-        String name = row[3];
-        String category = row[4] == null || row[4].isBlank() ? null : row[4];
         boolean newFormat = row.length > 8;
-        String categoryId = newFormat && row[5] != null && !row[5].isBlank() ? row[5] : null;
-        int scoreIndex = newFormat ? 6 : 5;
-        int netIndex = newFormat ? 7 : 6;
-        int grossIndex = newFormat ? 8 : 7;
-        int dataAccuracyScore = parseScore(row[scoreIndex]);
-        Integer netWeight = row.length > netIndex ? parseWeight(row[netIndex]) : null;
-        Integer grossWeight = row.length > grossIndex ? parseWeight(row[grossIndex]) : null;
+        // category, [category_id], score, net, gross always sit at the end of the row;
+        // an unescaped separator inside "name" (e.g. a mangled &#39; entity) only ever
+        // splits the name field itself, so anchoring the tail fields from the end and
+        // rejoining everything before them survives that kind of source-data corruption.
+        int trailingFieldCount = newFormat ? 5 : 4;
+        int nameEnd = Math.max(4, row.length - trailingFieldCount);
+        String name = String.join(String.valueOf(NAME_REJOIN_SEPARATOR), Arrays.copyOfRange(row, 3, nameEnd));
+
+        int cursor = nameEnd;
+        String category = valueOrNull(row[cursor]);
+        cursor++;
+        String categoryId = newFormat ? valueOrNull(row[cursor]) : null;
+        if (newFormat) cursor++;
+        int dataAccuracyScore = parseScore(row[cursor]);
+        cursor++;
+        Integer netWeight = row.length > cursor ? parseWeight(row[cursor]) : null;
+        cursor++;
+        Integer grossWeight = row.length > cursor ? parseWeight(row[cursor]) : null;
+
         return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore,
                 netWeight, grossWeight, null, categoryId);
+    }
+
+    private static String valueOrNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     static byte[] toCsv(Collection<Taxonomy> taxonomies) {

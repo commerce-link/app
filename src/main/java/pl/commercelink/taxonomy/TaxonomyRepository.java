@@ -4,15 +4,18 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
+import pl.commercelink.inventory.supplier.api.support.ProductFeedPurifier;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class TaxonomyRepository {
@@ -28,13 +31,15 @@ public class TaxonomyRepository {
 
     public Pair<String, List<Taxonomy>> loadNewest() {
         try {
-            Pair<String, InputStreamReader> newest = fileStorage.findNewest(bucketName, "taxonomy/");
-            if (newest == null) {
+            Optional<String> newestFileName = fileStorage.findNewestFileName(bucketName, "taxonomy/");
+            if (newestFileName.isEmpty()) {
                 return Pair.of("N/A", new ArrayList<>());
             }
 
-            String fileName = newest.getLeft();
-            CSVLoader csvLoader = new CSVLoader(newest.getRight());
+            String fileName = newestFileName.get();
+            byte[] rawBytes = fileStorage.findNewestAsBytes(bucketName, "taxonomy/");
+            byte[] purifiedBytes = new ProductFeedPurifier().purify(rawBytes);
+            CSVLoader csvLoader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(purifiedBytes)));
 
             List<Taxonomy> taxonomies = new ArrayList<>();
             csvLoader.readRows(CSVLoader.DEFAULT_SEPARATOR, row -> {
