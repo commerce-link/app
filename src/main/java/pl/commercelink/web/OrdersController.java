@@ -494,12 +494,16 @@ public class OrdersController extends BaseController {
 
             boolean wasService = orderItem.isService();
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
+            boolean priceLocked = !order.getDocuments().isEmpty();
 
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);
             }
             if (serviceFlagLocked) {
                 updatedItem.setService(orderItem.isService());
+            }
+            if (priceLocked) {
+                updatedItem.setPrice(orderItem.getPrice());
             }
             orderItem.update(updatedItem);
 
@@ -609,6 +613,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
+        model.addAttribute("priceLocked", !order.getDocuments().isEmpty());
 
         return "orderItem";
     }

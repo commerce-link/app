@@ -198,6 +198,29 @@ class OrderItemTest {
         assertThat(orderItem.hasSupplierAllocation()).isTrue();
     }
 
+    @Test
+    @DisplayName("update on a fulfilled item applies the new price but keeps fulfilment fields")
+    void updateOnFulfilledItemAppliesPriceButKeepsFulfilmentFields() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setEan("EAN-1");
+        orderItem.setDeliveryId("delivery-1");
+        orderItem.setCost(80.0);
+        orderItem.setStatus(FulfilmentStatus.Ordered);
+        OrderItem updated = new OrderItem(ORDER_ID, "Laptops", "Product", 5, 150.0, "MFN-1", false);
+        updated.setCost(60.0);
+
+        // when
+        orderItem.update(updated);
+
+        // then
+        assertThat(orderItem.getPrice()).isEqualTo(150.0);
+        assertThat(orderItem.getQty()).isEqualTo(1);
+        assertThat(orderItem.getCost()).isEqualTo(80.0);
+        assertThat(orderItem.getDeliveryId()).isEqualTo("delivery-1");
+        assertThat(orderItem.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+    }
+
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);

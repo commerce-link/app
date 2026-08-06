@@ -426,6 +426,41 @@ class OrdersControllerTest {
     }
 
     @Test
+    void postedPriceIsAppliedToAllocatedItemWhenOrderHasNoDocuments() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("delivery-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setPrice(150.0);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getPrice()).isEqualTo(150.0);
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getDeliveryId()).isEqualTo("delivery-1");
+    }
+
+    @Test
+    void postedPriceIsIgnoredWhenOrderHasDocuments() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(invoicedOrder());
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setPrice(150.0);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getPrice()).isEqualTo(100.0);
+    }
+
+    @Test
     @DisplayName("removeDocument removes the invoice and saves the order without triggering the lifecycle")
     void removeDocumentRemovesInvoiceAndSavesWithoutLifecycle() {
         // given

@@ -56,7 +56,7 @@
                     <div class="field">
                         <label class="label" th:text="#{order.item.unit.price}">Unit Price</label>
                         <div class="control">
-                            <input class="input" type="text" th:field="*{price}" th:disabled="${!orderItem.isNew() or isCompletedOrder}"/>
+                            <input class="input" type="text" th:field="*{price}" th:disabled="${priceLocked or isCompletedOrder}"/>
                         </div>
                     </div>
 
