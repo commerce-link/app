@@ -44,7 +44,7 @@ class DeliveryFulfilmentUpdateServiceTest {
                 .thenReturn(true);
         when(warehouseAllocationsManager.updateFulfilment(anyString(), anyString(), anyString(), anyString(), anyString(), anyDouble()))
                 .thenReturn(true);
-        DeliveryFulfilmentUpdateForm form = form(" new-ean ", " new-mfn ", 99.99,
+        DeliveryFulfilmentUpdateForm form = form("0123456789012", " new-mfn ", 99.99,
                 List.of(allocationRef("order-1", "item-1"), allocationRef("order-2", "item-2")),
                 List.of("warehouse-item-1"));
 
@@ -53,9 +53,9 @@ class DeliveryFulfilmentUpdateServiceTest {
 
         // then
         assertThat(result.isSuccess()).isTrue();
-        verify(orderAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "order-1", "item-1", "new-ean", "NEW-MFN", 99.99);
-        verify(orderAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "order-2", "item-2", "new-ean", "NEW-MFN", 99.99);
-        verify(warehouseAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "warehouse-item-1", "new-ean", "NEW-MFN", 99.99);
+        verify(orderAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "order-1", "item-1", "123456789012", "NEW-MFN", 99.99);
+        verify(orderAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "order-2", "item-2", "123456789012", "NEW-MFN", 99.99);
+        verify(warehouseAllocationsManager).updateFulfilment(STORE_ID, PROVIDER, "warehouse-item-1", "123456789012", "NEW-MFN", 99.99);
     }
 
     @Test
