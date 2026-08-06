@@ -81,7 +81,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 0);
+        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -110,7 +110,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 0);
+        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -133,7 +133,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 0);
+        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -158,7 +158,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 3);
+        ordersManager.addOrderItem(store, order, matchedInventory, 1, 3);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -182,7 +182,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 0);
+        ordersManager.addOrderItem(store, order, availability, 1, 0);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -198,6 +198,30 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("addOrderItem from availability and price stores the requested quantity and increments total price by qty * price")
+    void addOrderItemFromAvailabilityAndPriceStoresRequestedQuantity() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        AvailabilityAndPrice availability = new AvailabilityAndPrice(
+                "pim-1", "EAN-2", "MFN-2", "Brand", "Label", "product-name",
+                "Laptops", 200L, 10L, 5, 0L, false);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        ordersManager.addOrderItem(store, order, availability, 3, 0);
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getQty()).isEqualTo(3);
+
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(ordersRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getTotalPrice()).isEqualTo(600.0);
+    }
+
+    @Test
     @DisplayName("addOrderItem from availability and price puts a service-flagged row into the service band")
     void addOrderItemFromServiceFlaggedRowGoesToServiceBand() {
         // given
@@ -209,7 +233,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 3);
+        ordersManager.addOrderItem(store, order, availability, 1, 3);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -233,7 +257,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 3);
+        ordersManager.addOrderItem(store, order, availability, 1, 3);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -257,7 +281,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 4);
+        ordersManager.addOrderItem(store, order, availability, 1, 4);
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);

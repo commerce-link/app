@@ -4,10 +4,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
@@ -26,8 +28,7 @@ import pl.commercelink.orders.pos.PosOrderCreator;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.pricelist.Pricelist;
-import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
@@ -82,7 +83,7 @@ public class OrdersController extends BaseController {
     private OrderLifecycle orderLifecycle;
 
     @Autowired
-    private PricelistRepository pricelistRepository;
+    private PricelistFinder pricelistFinder;
 
     @Autowired
     private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
@@ -245,59 +246,51 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getOrderDetails(@PathVariable("orderId") String orderId, @ModelAttribute("catalogId") String catalogId, Model model) {
+    public String getOrderDetails(@PathVariable("orderId") String orderId, Model model) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
-        return showOrderDetails(existingOrder, catalogId, model);
+        return showOrderDetails(existingOrder, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, @ModelAttribute("catalogId") String catalogId, Model model) {
+    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
         Order existingOrder = ordersRepository.findById(storeId, orderId);
-        return showOrderDetails(existingOrder, catalogId, model);
-    }
-
-    @PostMapping("/dashboard/orders/{orderId}/select-catalog")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String onCatalogChange(@PathVariable String orderId, @RequestParam String catalogId, RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("catalogId", catalogId);
-        redirectAttributes.addFlashAttribute("openModal", true);
-        return "redirect:/dashboard/orders/" + orderId + "#orderItemsForm";
+        return showOrderDetails(existingOrder, model);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/add-item/pricelist")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addOrderItemFromPriceList(@PathVariable String orderId,
-                                            @RequestParam String itemCatalogId, @RequestParam String itemPricelistId,
-                                            @RequestParam String category, @RequestParam String itemLabel, @RequestParam String itemName,
-                                            @RequestParam int position) {
+                                            @RequestParam String catalogId, @RequestParam String pimId,
+                                            @RequestParam(defaultValue = "1") int qty, @RequestParam int position) {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
-        Pricelist pricelist = pricelistRepository.find(getStoreId(), itemCatalogId, itemPricelistId);
-        Optional<AvailabilityAndPrice> op = pricelist.findByCategoryLabelAndName(category, itemLabel, itemName);
+        AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), catalogId, pimId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        op.ifPresent(availabilityAndPrice -> ordersManager.addOrderItem(store, order, availabilityAndPrice, position));
-
-        return "redirect:/dashboard/orders/" + order.getOrderId() + "#orderItemsForm";
+        ordersManager.addOrderItem(store, order, availabilityAndPrice, qty, position);
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/add-item/inventory")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String addOrderItemFromInventory(@PathVariable String orderId, @RequestParam(required = false) String itemEan, @RequestParam(required = false) String itemManufacturerCode,
-                                            @RequestParam int position) {
+    public String addOrderItemFromInventory(@PathVariable String orderId,
+                                            @RequestParam(required = false, defaultValue = "") String itemEan,
+                                            @RequestParam(required = false, defaultValue = "") String itemManufacturerCode,
+                                            @RequestParam(defaultValue = "1") int qty, @RequestParam int position) {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
 
         MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
                 .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
-        ordersManager.addOrderItem(store, order, matchedInventory, position);
+        ordersManager.addOrderItem(store, order, matchedInventory, qty, position);
 
-        return "redirect:/dashboard/orders/" + order.getOrderId() + "#orderItemsForm";
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
-    private String showOrderDetails(Order order, String catalogId, Model model) {
-        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), catalogId, model);
+    private String showOrderDetails(Order order, Model model) {
+        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), model);
     }
 
     private String resolveTaxonomyName(String mfn) {
@@ -305,14 +298,8 @@ public class OrdersController extends BaseController {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private String showOrderDetails(Order order, List<OrderItem> orderItems, String catalogId, Model model) {
+    private String showOrderDetails(Order order, List<OrderItem> orderItems, Model model) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(order.getStoreId());
-
-        Pricelist pricelist = Pricelist.empty();
-        if (Strings.isNotBlank(catalogId)) {
-            String newestPricelistId = pricelistRepository.findNewestPricelistIdCached(order.getStoreId(), catalogId);
-            pricelist = pricelistRepository.find(order.getStoreId(), catalogId, newestPricelistId);
-        }
 
         Store store = storesRepository.findById(order.getStoreId());
 
@@ -363,10 +350,6 @@ public class OrdersController extends BaseController {
         model.addAttribute("isAdmin", isAdmin());
 
         model.addAttribute("catalogs", catalogs);
-        model.addAttribute("catalogId", catalogId);
-        model.addAttribute("pricelistId", pricelist.getPricelistId());
-        model.addAttribute("availabilityAndPrices", pricelist.getAvailabilityAndPrices());
-        model.addAttribute("availableCategories", pricelist.getAvailableCategories());
 
         DocumentType nextDocumentToIssue = order.getNextDocumentToIssue().orElse(null);
         model.addAttribute("nextInvoiceToIssue", nextDocumentToIssue);
@@ -511,12 +494,16 @@ public class OrdersController extends BaseController {
 
             boolean wasService = orderItem.isService();
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
+            boolean priceLocked = !order.getDocuments().isEmpty();
 
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);
             }
             if (serviceFlagLocked) {
                 updatedItem.setService(orderItem.isService());
+            }
+            if (priceLocked) {
+                updatedItem.setPrice(orderItem.getPrice());
             }
             orderItem.update(updatedItem);
 
@@ -580,18 +567,6 @@ public class OrdersController extends BaseController {
         return "redirect:/dashboard/orders/" + orderId;
     }
 
-    @GetMapping("/dashboard/orders/{orderId}/pricelist")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    @ResponseBody
-    public List<AvailabilityAndPrice> getPricelistForCatalog(@RequestParam String catalogId) {
-        String pricelistId = pricelistRepository.findNewestPricelistIdCached(getStoreId(), catalogId);
-        if (pricelistId == null) {
-            return List.of();
-        }
-        Pricelist pricelist = pricelistRepository.find(getStoreId(), catalogId, pricelistId);
-        return pricelist == null ? List.of() : pricelist.getAvailabilityAndPrices();
-    }
-
     @PostMapping("/dashboard/orders/{orderId}/assign-sku")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSku(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String sku) {
@@ -638,6 +613,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled));
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
+        model.addAttribute("priceLocked", !order.getDocuments().isEmpty());
 
         return "orderItem";
     }
@@ -662,29 +638,29 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/removeSelectedItemsFromOrder")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String removeSelectedItemsFromOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form, Model model) {
-        OrdersManager.Result result = ordersManager.removeFromOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
-        return showOrderDetails(result.getOrder(), result.getOrderItems(), null, model);
+    public String removeSelectedItemsFromOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
+        ordersManager.removeFromOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToAllocation")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String moveSelectedItemsToAllocation(@PathVariable String orderId, @ModelAttribute OrderItemsForm form, Model model) {
-        OrdersManager.Result result = ordersManager.moveItemsToAllocation(getStoreId(), orderId, form.getSelectedOrderItemIds());
-        return showOrderDetails(result.getOrder(), result.getOrderItems(), null, model);
+    public String moveSelectedItemsToAllocation(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
+        ordersManager.moveItemsToAllocation(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouse")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form, Model model) {
-        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
-        return showOrderDetails(result.getOrder(), result.getOrderItems(), null, model);
+    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
+        ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouseForRMA")
-    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form, Model model) {
-        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
-        return showOrderDetails(result.getOrder(), result.getOrderItems(), null, model);
+    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
+        ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/splitOrder")

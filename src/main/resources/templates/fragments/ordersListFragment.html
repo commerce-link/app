@@ -16,6 +16,7 @@
                     <th th:text="#{order.warehouse.document}"></th>
                     <th th:text="#{order.billing.document}"></th>
                     <th th:text="#{order.review.status}"></th>
+                    <th th:text="#{orders.total.price}"></th>
                     <th th:text="#{orders.unpaid}"></th>
                 </tr>
             </thead>
@@ -42,7 +43,9 @@
                         <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
                     </td>
                     <td th:text="${order.review?.status != null ? enumI18n.localize(order.review.status) : '-'}"></td>
-                    <td th:text="${order.unpaidAmount}"></td>
+                    <td th:text="${#numbers.formatDecimal(order.totalPrice, 1, 2)} + ' PLN'"></td>
+                    <td th:text="${#numbers.formatDecimal(order.unpaidAmount, 1, 2)} + ' PLN'"
+                        th:classappend="${order.unpaidAmount != 0} ? 'has-text-danger' : ''"></td>
                 </tr>
             </tbody>
         </table>

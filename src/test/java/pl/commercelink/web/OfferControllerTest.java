@@ -28,8 +28,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.offer.imports.OfferImporter;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.pricelist.Pricelist;
-import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
@@ -66,7 +65,7 @@ class OfferControllerTest {
     @Mock
     private StoreCategories storeCategories;
     @Mock
-    private PricelistRepository pricelistRepository;
+    private PricelistFinder pricelistFinder;
     @Mock
     private OfferItemReloader offerItemReloader;
     @Mock
@@ -246,13 +245,11 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
                 "Laptops", 199L, 1L, 3, 0L, false);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Laptops", "GroupLabel", "Test Product");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -273,7 +270,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromInventory(OFFER_ID, "EAN-X", "MFN-X");
+        offerController.addOfferItemFromInventory(OFFER_ID, "EAN-X", "MFN-X", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -292,13 +289,11 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Test Product",
                 "Laptops", 199L, 1L, 3, 0L, false);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Laptops", "GroupLabel", "Test Product");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -318,15 +313,13 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-CASE", "Brand", "GroupLabel", "Test Case",
                 "Case", 199L, 1L, 3, 0L, false);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
         when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Case", "GroupLabel", "Test Case");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -354,15 +347,13 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-2", "EAN-2", "MFN-CASE-2", "Brand", "GroupLabel", "Second Case",
                 "Case", 149L, 1L, 3, 0L, false);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
         when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Case", "GroupLabel", "Second Case");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-2", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -379,13 +370,11 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-S", "", "Montaż", "Montaż komputera",
                 "Usługi dodatkowe", 250L, 1L, 1, 0L, true);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Usługi dodatkowe", "Montaż", "Montaż komputera");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -403,15 +392,13 @@ class OfferControllerTest {
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Montaz",
                 "Usługi dodatkowe", 49L, 1L, 3, 0L, true);
-        Pricelist pricelist = new Pricelist("pl-1", List.of(entry));
-        when(pricelistRepository.find(STORE_ID, "cat-1", "pl-1")).thenReturn(pricelist);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
         when(productCatalogRepository.findById(STORE_ID, "cat-1")).thenReturn(
                 catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pl-1",
-                "Usługi dodatkowe", "GroupLabel", "Montaz");
+        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);

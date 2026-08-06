@@ -40,18 +40,18 @@ public class OrdersManager {
     @Autowired
     private OrderLifecycle orderLifecycle;
 
-    public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int position) {
+    public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int qty, int position) {
         OrderItem orderItem;
         if (!matchedInventory.hasAnyOffers()) {
             String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            orderItem = new OrderItem(order.getOrderId(), Categories.UNCATEGORIZED, "", 1, 0, mfn, store.isPositionConsolidationEnabled(), position);
+            orderItem = new OrderItem(order.getOrderId(), Categories.UNCATEGORIZED, "", qty, 0, mfn, store.isPositionConsolidationEnabled(), position);
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             orderItem = new OrderItem(
                     order.getOrderId(),
                     StringUtils.isNotBlank(taxonomy.category()) ? taxonomy.category() : Categories.UNCATEGORIZED,
                     taxonomy.name(),
-                    1,
+                    qty,
                     matchedInventory.getMedianPrice().grossValue(),
                     taxonomy.mfn(),
                     store.isPositionConsolidationEnabled(),
@@ -71,12 +71,12 @@ public class OrdersManager {
         automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
-    public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int position) {
+    public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int qty, int position) {
         OrderItem orderItem = new OrderItem(
                 order.getOrderId(),
                 availabilityAndPrice.getCategory(),
                 availabilityAndPrice.getName(),
-                1,
+                qty,
                 availabilityAndPrice.getPrice(),
                 availabilityAndPrice.getManufacturerCode(),
                 store.isPositionConsolidationEnabled(),
