@@ -23,9 +23,29 @@ public class TaxonomyCache {
     private String fileName = "N/A";
     private ConcurrentHashMap<String, Taxonomy> taxonomyByMfn = new ConcurrentHashMap<>();
     private final AtomicInteger pendingCount = new AtomicInteger();
+    private final ConcurrentHashMap<String, String> stringPool = new ConcurrentHashMap<>();
 
     public TaxonomyCache(TaxonomyRepository taxonomyRepository) {
         this.taxonomyRepository = taxonomyRepository;
+    }
+
+    private String pooled(String value) {
+        if (value == null) return null;
+        String existing = stringPool.putIfAbsent(value, value);
+        return existing != null ? existing : value;
+    }
+
+    private Taxonomy internLowCardinalityFields(Taxonomy taxonomy) {
+        String brand = pooled(taxonomy.brand());
+        String category = pooled(taxonomy.category());
+        String categoryId = pooled(taxonomy.categoryId());
+        if (brand == taxonomy.brand() && category == taxonomy.category() && categoryId == taxonomy.categoryId()) {
+            return taxonomy;
+        }
+        return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), brand, taxonomy.name(),
+                category, taxonomy.dataAccuracyScore(),
+                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
+                taxonomy.rawCategory(), categoryId);
     }
 
     @PostConstruct
@@ -34,7 +54,8 @@ public class TaxonomyCache {
 
         this.fileName = result.getLeft();
         result.getRight().forEach(cachedTaxonomy -> {
-            taxonomyByMfn.put(cachedTaxonomy.mfn(), cachedTaxonomy);
+            Taxonomy interned = internLowCardinalityFields(cachedTaxonomy);
+            taxonomyByMfn.put(interned.mfn(), interned);
         });
         pendingCount.set((int) taxonomyByMfn.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
 
@@ -43,8 +64,9 @@ public class TaxonomyCache {
 
     public void add(Taxonomy taxonomy) {
         if (StringUtils.isBlank(taxonomy.mfn())) return;
-        taxonomyByMfn.compute(taxonomy.mfn(), (mfn, current) -> {
-            Taxonomy merged = mergeOf(current, taxonomy);
+        Taxonomy candidate = internLowCardinalityFields(taxonomy);
+        taxonomyByMfn.compute(candidate.mfn(), (mfn, current) -> {
+            Taxonomy merged = mergeOf(current, candidate);
             pendingCount.addAndGet(pendingDelta(current, merged));
             return merged;
         });
@@ -79,9 +101,9 @@ public class TaxonomyCache {
             updated[0] = true;
             pendingCount.decrementAndGet();
             return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
-                    category, current.dataAccuracyScore(),
+                    pooled(category), current.dataAccuracyScore(),
                     current.netWeightInGrams(), current.grossWeightInGrams(),
-                    current.rawCategory(), categoryId);
+                    current.rawCategory(), pooled(categoryId));
         });
         return updated[0];
     }
