@@ -59,6 +59,16 @@ public class WarehouseAllocationsManager {
         }
     }
 
+    public boolean updateFulfilment(String storeId, String provider, String itemId, String ean, String mfn, double unitCost) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        if (warehouseItem == null || !warehouseItem.updateFulfilment(provider, ean, mfn, unitCost)) {
+            return false;
+        }
+
+        warehouseRepository.save(warehouseItem);
+        return true;
+    }
+
     public void reassign(String storeId, String targetDeliveryId, List<Allocation> allocations) {
         for (Allocation allocation : allocations) {
             WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());

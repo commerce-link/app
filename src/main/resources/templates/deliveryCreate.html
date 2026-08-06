@@ -92,7 +92,16 @@
 
                     <div class="columns is-vcentered mb-2">
                         <div class="column">
-                            <p class="has-text-weight-semibold mb-0" th:text="${item.name}">Product Name</p>
+                            <p class="has-text-weight-semibold mb-0">
+                                <span th:text="${item.name}">Product Name</span>
+                                <button type="button" class="button is-small is-white ml-1"
+                                        th:if="${!#lists.isEmpty(item.allocations)}"
+                                        th:attr="data-ean=${item.ean},data-mfn=${item.mfn},data-unit-cost=${item.unitCost},data-allocations=${#strings.listJoin(item.orderAllocations.![key.orderId + '|' + key.itemId], ';')},data-warehouse-items=${#strings.listJoin(item.warehouseAllocations.![key.itemId], ';')}"
+                                        th:title="#{deliveries.create.editFulfilment.title}"
+                                        onclick="openEditFulfilmentModal(this)">
+                                    <span class="icon is-small has-text-grey"><i class="fas fa-pencil-alt"></i></span>
+                                </button>
+                            </p>
                             <p class="has-text-grey">
                                 <span th:text="#{general.ean}">EAN</span>: <span th:text="${item.ean}"></span>
                                 &nbsp;|&nbsp;
@@ -262,10 +271,74 @@
                 </div>
             </form>
 
+            <div id="editFulfilmentModal" class="modal">
+                <div class="modal-background" onclick="toggleEditFulfilmentModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.create.editFulfilment.title}">Change assigned product</p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleEditFulfilmentModal(false)"></button>
+                    </header>
+                    <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/updateFulfilment(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/updateFulfilment(provider=${form.provider})}"
+                          method="post">
+                        <section class="modal-card-body">
+                            <p class="help mb-3" th:text="#{deliveries.create.editFulfilment.note}">Fulfilment data of all order items in this list will be updated.</p>
+                            <div id="editFulfilmentAllocations"></div>
+                            <div class="field">
+                                <label class="label" th:text="#{general.ean}">EAN</label>
+                                <input class="input" type="text" name="ean" id="editFulfilmentEan" required/>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{general.manufacturer.code}">MFN</label>
+                                <input class="input" type="text" name="mfn" id="editFulfilmentMfn" required/>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{general.net.cost}">Unit Cost</label>
+                                <input class="input" type="number" name="unitCost" id="editFulfilmentUnitCost" step="0.01" min="0" required/>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
+                            <button type="button" class="button" onclick="toggleEditFulfilmentModal(false)" th:text="#{general.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
         </div>
     </section>
 
     <script>
+        function toggleEditFulfilmentModal(show) {
+            document.getElementById('editFulfilmentModal').classList.toggle('is-active', show);
+        }
+
+        function openEditFulfilmentModal(button) {
+            document.getElementById('editFulfilmentEan').value = button.dataset.ean || '';
+            document.getElementById('editFulfilmentMfn').value = button.dataset.mfn || '';
+            document.getElementById('editFulfilmentUnitCost').value = button.dataset.unitCost || '';
+
+            const container = document.getElementById('editFulfilmentAllocations');
+            container.innerHTML = '';
+            (button.dataset.allocations || '').split(';').filter(Boolean).forEach((pair, index) => {
+                const separatorAt = pair.lastIndexOf('|');
+                container.appendChild(hiddenInput('allocations[' + index + '].orderId', pair.substring(0, separatorAt)));
+                container.appendChild(hiddenInput('allocations[' + index + '].itemId', pair.substring(separatorAt + 1)));
+            });
+            (button.dataset.warehouseItems || '').split(';').filter(Boolean).forEach(itemId => {
+                container.appendChild(hiddenInput('warehouseItemIds', itemId));
+            });
+
+            toggleEditFulfilmentModal(true);
+        }
+
+        function hiddenInput(name, value) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            return input;
+        }
+
         function updateDeliveryNetValue() {
             let total = 0;
             document.querySelectorAll('input[name$=".requestedQty"]').forEach(qtyInput => {

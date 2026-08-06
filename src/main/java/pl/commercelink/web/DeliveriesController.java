@@ -22,6 +22,7 @@ import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -62,6 +63,9 @@ public class DeliveriesController {
 
     @Autowired
     private DeliveryCreationService deliveryCreationService;
+
+    @Autowired
+    private DeliveryFulfilmentUpdateService deliveryFulfilmentUpdateService;
 
     @Autowired
     private RestockSuggestionService restockSuggestionService;
@@ -386,6 +390,40 @@ public class DeliveriesController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "deliveryCreate";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/updateFulfilment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateDeliveryItemFulfilment(
+            @PathVariable("provider") String provider,
+            @ModelAttribute DeliveryFulfilmentUpdateForm form,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateFulfilment(getStoreId(), provider, form, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/updateFulfilment")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String updateDeliveryItemFulfilmentForSuperAdmin(
+            @PathVariable("storeId") String storeId,
+            @PathVariable("provider") String provider,
+            @ModelAttribute DeliveryFulfilmentUpdateForm form,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateFulfilment(storeId, provider, form, redirectAttributes, locale);
+    }
+
+    private String updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(storeId, provider, form);
+
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
+                : "redirect:/dashboard/deliveries/create/" + provider;
     }
 
     @PostMapping("/dashboard/deliveries/create")

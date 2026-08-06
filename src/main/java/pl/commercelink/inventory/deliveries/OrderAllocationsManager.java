@@ -68,6 +68,21 @@ public class OrderAllocationsManager {
         }
     }
 
+    public boolean updateFulfilment(String storeId, String provider, String orderId, String itemId, String ean, String mfn, double unitCost) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        if (order == null) {
+            return false;
+        }
+
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        if (orderItem == null || !orderItem.updateFulfilment(provider, ean, mfn, unitCost)) {
+            return false;
+        }
+
+        orderItemsRepository.save(orderItem);
+        return true;
+    }
+
     public void reassign(String targetDeliveryId, List<Allocation> allocations) {
         for (Allocation allocation : allocations) {
             OrderItem orderItem = orderItemsRepository.findById(allocation.getKey().getOrderId(), allocation.getKey().getItemId());

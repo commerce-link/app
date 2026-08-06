@@ -163,6 +163,18 @@ public class DeliveryItem {
         return availableForWarehouse - selectedWarehouseQty;
     }
 
+    public List<Allocation> getOrderAllocations() {
+        return allocations.stream()
+                .filter(a -> a.getType() == AllocationType.Order)
+                .collect(Collectors.toList());
+    }
+
+    public List<Allocation> getWarehouseAllocations() {
+        return allocations.stream()
+                .filter(a -> a.getType() == AllocationType.Warehouse)
+                .collect(Collectors.toList());
+    }
+
     public List<Allocation> getSelectedAllocations(AllocationType type) {
         return allocations.stream()
                 .filter(a -> a.isSelected() && a.getType() == type)
