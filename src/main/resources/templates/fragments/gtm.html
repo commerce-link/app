@@ -19,3 +19,10 @@
         })(window, document, "script", "dataLayer", [[${gtmContainerId}]]);
     </script>
 </th:block>
+
+<th:block th:fragment="noscript" xmlns:th="http://www.thymeleaf.org">
+    <noscript th:if="${gtmContainerId != null}">
+        <iframe th:src="'https://www.googletagmanager.com/ns.html?id=' + ${gtmContainerId}"
+                height="0" width="0" style="display:none;visibility:hidden"></iframe>
+    </noscript>
+</th:block>
