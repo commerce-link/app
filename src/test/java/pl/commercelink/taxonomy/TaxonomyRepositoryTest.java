@@ -1,5 +1,6 @@
 package pl.commercelink.taxonomy;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -8,9 +9,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.storage.FileStorage;
 
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,8 +50,8 @@ class TaxonomyRepositoryTest {
 
     private void givenTaxonomyFile(String csv) {
         byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
-        when(fileStorage.findNewestFileName(any(), anyString())).thenReturn(Optional.of("taxonomy-merged-full.csv"));
-        when(fileStorage.findNewestAsBytes(any(), anyString())).thenReturn(bytes);
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8);
+        when(fileStorage.findNewest(any(), anyString())).thenReturn(Pair.of("taxonomy-merged-full.csv", reader));
         when(brandMapper.unifyBrand(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 }
