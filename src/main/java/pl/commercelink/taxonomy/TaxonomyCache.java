@@ -36,6 +36,9 @@ public class TaxonomyCache {
     }
 
     private Taxonomy internLowCardinalityFields(Taxonomy taxonomy) {
+        if (!Objects.equals(taxonomy.ean(), UnifiedProductIdentifiers.unifyEan(taxonomy.ean()))) {
+            return taxonomy;
+        }
         String brand = pooled(taxonomy.brand());
         String category = pooled(taxonomy.category());
         String categoryId = pooled(taxonomy.categoryId());

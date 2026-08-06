@@ -509,6 +509,21 @@ class TaxonomyCacheTest {
         assertThat(result.categoryId()).isNull();
     }
 
+    @Test
+    void addPreservesAllFieldsExactlyIncludingLeadingZeroEan() {
+        // given
+        Taxonomy input = new Taxonomy("0012345678905", "MFN-ZERO", new String("Brand"), "Name",
+                new String("Laptops"), 5, 1300, 1400, "RawCat", new String("301"));
+
+        // when
+        cache.add(input);
+
+        // then
+        Taxonomy result = cache.findByMfn("MFN-ZERO");
+        assertThat(result.ean()).isEqualTo("012345678905");
+        assertThat(result).isEqualTo(input);
+    }
+
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
         return taxonomyNamed(mfn, score, weight, "Name");
     }
