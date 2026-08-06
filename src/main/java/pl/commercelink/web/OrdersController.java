@@ -873,6 +873,23 @@ public class OrdersController extends BaseController {
         return save(order);
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/removeDocument")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String removeDocument(@PathVariable String orderId, @RequestParam DocumentType type,
+                                 @RequestParam(required = false) String number,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = ordersRepository.findById(getStoreId(), orderId);
+
+        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || !order.removeDocument(type, number)) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.document.cannot.be.removed", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        // saving via OrderLifecycle would re-trigger automatic invoice generation for delivered orders
+        ordersRepository.save(order);
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/cancelShipment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String cancelShipment(@PathVariable String orderId,

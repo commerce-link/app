@@ -243,6 +243,13 @@ public class Order {
         documents.add(document);
     }
 
+    public boolean removeDocument(DocumentType type, String number) {
+        if (type == null || !type.isInvoiceOrReceipt()) {
+            return false;
+        }
+        return documents.removeIf(d -> d.getType() == type && Objects.equals(d.getNumber(), number));
+    }
+
     public void addDocumentIfMissing(Document document) {
         if (document != null && !hasDocument(document)) {
             documents.add(document);

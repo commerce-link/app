@@ -1123,6 +1123,7 @@
                         <th th:text="#{order.document.type}"></th>
                         <th th:text="#{order.document.issuedAt}"></th>
                         <th th:text="#{order.document.status}"></th>
+                        <th th:if="${isAdmin}"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -1135,6 +1136,17 @@
                         <td th:text="${document.type}"></td>
                         <td th:text="${document.issuedAt != null ? document.issuedAt : '-'}"></td>
                         <td th:text="#{document.status.issued}"></td>
+                        <td th:if="${isAdmin}">
+                            <form th:if="${document.type.invoiceOrReceipt}" method="post"
+                                  th:action="@{/dashboard/orders/{orderId}/removeDocument(orderId=${order.orderId})}"
+                                  style="margin: 0;">
+                                <input type="hidden" name="type" th:value="${document.type}"/>
+                                <input type="hidden" name="number" th:value="${document.number}"/>
+                                <button class="button is-danger is-small" type="button" th:disabled="${isCompletedOrder}" th:title="#{order.document.remove}" onclick="confirmDelete(this)">
+                                    <span class="icon is-small"><i class="fas fa-trash" aria-hidden="true"></i></span>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     <tr th:if="${!order.closingDocument.isPresent() and !order.isRMAReplacementOrder()}">
                         <td>-</td>
@@ -1142,6 +1154,7 @@
                         <td th:text="${order.receiptType}"></td>
                         <td>-</td>
                         <td th:text="#{document.status.toBeIssued}"></td>
+                        <td th:if="${isAdmin}"></td>
                     </tr>
                     </tbody>
                 </table>
