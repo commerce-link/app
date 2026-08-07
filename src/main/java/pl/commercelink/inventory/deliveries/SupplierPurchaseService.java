@@ -4,14 +4,24 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -79,6 +89,66 @@ public class SupplierPurchaseService {
 
         return new PurchaseValidation(form.getProvider(), purchaseRef, currency,
                 totalNet, fullyAvailable, validationLines);
+    }
+
+    public OperationResult<String> purchase(String storeId, DeliveryCreationForm form,
+                                            String purchaseRef, boolean isSuperAdmin) {
+        PurchaseValidation validation = validate(storeId, form, purchaseRef);
+        if (!validation.fullyAvailable()) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+
+        List<SupplierOrderLine> lines = validation.lines().stream()
+                .map(line -> new SupplierOrderLine(line.ean(), line.mfn(), line.requestedQty()))
+                .toList();
+
+        SupplierOrderResult orderResult;
+        try {
+            orderResult = getProvider(storeId, form.getProvider())
+                    .placeOrder(new SupplierPurchaseRequest(purchaseRef, lines));
+        } catch (Exception e) {
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+
+        applyOrderResult(form, validation, orderResult);
+        String deliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin);
+        markAsOrderedAutomatically(storeId, deliveryId);
+        return OperationResult.success(deliveryId);
+    }
+
+    private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,
+                                  SupplierOrderResult orderResult) {
+        form.setExternalDeliveryId(orderResult.externalOrderId());
+        form.setSourceCurrency(orderResult.currency());
+        form.setTax(deliveryTaxResolver.resolveFor(form.getProvider()));
+
+        Map<String, PurchaseValidation.Line> linesByEan = validation.lines().stream()
+                .collect(Collectors.toMap(PurchaseValidation.Line::ean, Function.identity(), (a, b) -> a));
+        form.getItems().forEach(item -> {
+            PurchaseValidation.Line line = linesByEan.get(item.getEan());
+            if (line != null) {
+                item.setUnitCost(line.liveUnitCost());
+            }
+        });
+
+        SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
+        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
+        form.setShippingCost(resolveShippingCost(terms, validation.totalNet()));
+    }
+
+    private double resolveShippingCost(ShippingTerms terms, double totalNet) {
+        return switch (terms.costPolicy()) {
+            case ShippingCostPolicy.Free free -> 0;
+            case ShippingCostPolicy.FlatRate flatRate ->
+                    totalNet >= flatRate.threshold() ? 0 : flatRate.cost();
+        };
+    }
+
+    private void markAsOrderedAutomatically(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_ORDERED_AUTOMATICALLY", LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
     }
 
     private PurchaseValidation.Line toValidationLine(DeliveryItem item, SupplierQuote quote) {
