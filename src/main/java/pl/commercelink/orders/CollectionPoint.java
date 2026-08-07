@@ -2,7 +2,6 @@ package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 
 @DynamoDBDocument
 public class CollectionPoint {
@@ -34,10 +33,5 @@ public class CollectionPoint {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    @DynamoDBIgnore
-    public CollectionPoint copy() {
-        return new CollectionPoint(code, name);
     }
 }

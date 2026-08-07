@@ -72,4 +72,9 @@ public class WarehouseShippingController extends AbstractShippingController {
                 CustomSecurityContext.getLoggedInUserName()
         );
     }
+
+    @Override
+    protected String resolveDeliveryCarrier(ShippingForm form) {
+        return null;
+    }
 }

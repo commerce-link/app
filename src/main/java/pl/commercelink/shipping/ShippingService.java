@@ -35,7 +35,7 @@ public class ShippingService {
                 .sender(toShipmentAddress(senderAddress))
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
-                .deliveryPoint(toDeliveryPoint(form.getShippingDetails()))
+                .deliveryPointCode(toDeliveryPointCode(form.getShippingDetails()))
                 .options(new ShipmentOptions(
                         form.isSaturdayDelivery(),
                         false,
@@ -45,8 +45,7 @@ public class ShippingService {
                 .build();
 
 
-        List<AuthorizedCarrier> authorizedCarriers = store.getShippingConfiguration().getAuthorizedCarriers();
-        Set<String> carrierIds = carriersMatching(authorizedCarriers, deliveryCarrier).stream()
+        Set<String> carrierIds = carriersMatching(store.getShippingConfiguration().getAuthorizedCarriers(), deliveryCarrier).stream()
                 .map(AuthorizedCarrier::getId)
                 .collect(Collectors.toSet());
 
@@ -71,7 +70,7 @@ public class ShippingService {
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
                 .carrierId(form.getServiceId())
-                .deliveryPoint(toDeliveryPoint(form.getShippingDetails()))
+                .deliveryPointCode(toDeliveryPointCode(form.getShippingDetails()))
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
 
@@ -160,12 +159,9 @@ public class ShippingService {
                 || StringUtils.containsIgnoreCase(carrier.getDisplayName(), wanted);
     }
 
-    private static DeliveryPoint toDeliveryPoint(ShippingDetails details) {
+    private static String toDeliveryPointCode(ShippingDetails details) {
         CollectionPoint point = details.getCollectionPoint();
-        if (point == null) {
-            return null;
-        }
-        return new DeliveryPoint(point.getCode());
+        return point != null ? point.getCode() : null;
     }
 
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {

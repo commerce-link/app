@@ -208,7 +208,7 @@ public class ShippingDetails {
         copy.setEmail(this.email);
         copy.setPhone(this.phone);
         copy.set_default(this._default);
-        copy.setCollectionPoint(this.collectionPoint != null ? this.collectionPoint.copy() : null);
+        copy.setCollectionPoint(this.collectionPoint);
         return copy;
     }
 }

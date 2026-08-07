@@ -14,6 +14,7 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.stores.RMAConfiguration;
 
 import java.util.Collections;
 import java.util.List;
@@ -131,5 +132,14 @@ public class RMAShippingController extends AbstractShippingController {
         return rmaItems.stream()
                 .filter(item -> form.getOrderItemIds().contains(item.getItemId()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    protected String resolveDeliveryCarrier(ShippingForm form) {
+        RMAConfiguration rmaConfiguration = getStore().getRmaConfiguration();
+        if (rmaConfiguration == null || rmaConfiguration.getCarrier() == null) {
+            return null;
+        }
+        return rmaConfiguration.getCarrier().getName();
     }
 }
