@@ -194,10 +194,6 @@
             display: none;
         }
 
-        .category-picker mark {
-            background-color: #ffe9a8;
-            padding: 0;
-        }
 
         .category-picker .help {
             margin-top: 0;
@@ -210,11 +206,6 @@
             normalize: text => text.toLowerCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                     .replace(/\u0142/g, 'l'),
-            escapeHtml: text => {
-                const holder = document.createElement('span');
-                holder.textContent = text;
-                return holder.innerHTML;
-            },
             // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
             breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
                 const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
@@ -244,27 +235,15 @@
                     };
                 };
             },
-            pathElement: (option, query) => {
+            pathElement: option => {
                 if (!option.path) {
                     return document.createDocumentFragment();
                 }
                 const path = document.createElement('span');
                 path.className = 'category-path';
                 path.title = option.path;
-                path.innerHTML = window.pickerHelpers.highlight(option.shortPath, query);
+                path.textContent = option.shortPath;
                 return path;
-            },
-            highlight: (label, query) => {
-                if (!query) {
-                    return window.pickerHelpers.escapeHtml(label);
-                }
-                const start = window.pickerHelpers.normalize(label).indexOf(query);
-                if (start < 0) {
-                    return window.pickerHelpers.escapeHtml(label);
-                }
-                return window.pickerHelpers.escapeHtml(label.substring(0, start))
-                        + '<mark>' + window.pickerHelpers.escapeHtml(label.substring(start, start + query.length)) + '</mark>'
-                        + window.pickerHelpers.escapeHtml(label.substring(start + query.length));
             }
         };
     </script>
@@ -283,7 +262,7 @@
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, escapeHtml, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -330,10 +309,10 @@
                         item.setAttribute('role', 'option');
                         const text = document.createElement('span');
                         text.className = 'picker-option-text';
-                        text.appendChild(optionPath(option, query));
+                        text.appendChild(optionPath(option));
                         const name = document.createElement('span');
                         name.className = 'category-name';
-                        name.innerHTML = highlight(option.label, query);
+                        name.textContent = option.label;
                         text.appendChild(name);
                         item.appendChild(text);
                         item.addEventListener('click', event => {
@@ -462,7 +441,7 @@
                 unset: /*[[#{catalog.category.unset}]]*/ '',
                 selectedCount: /*[[#{catalog.category.selectedCount}]]*/ ''
             };
-            const {format, normalize, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -591,10 +570,10 @@
                         checkbox.checked = selected.has(option.value);
                         const text = document.createElement('span');
                         text.className = 'picker-option-text';
-                        text.appendChild(optionPath(option, query));
+                        text.appendChild(optionPath(option));
                         const name = document.createElement('span');
                         name.className = 'category-name';
-                        name.innerHTML = highlight(option.label, query);
+                        name.textContent = option.label;
                         text.appendChild(name);
                         item.append(checkbox, text);
                         item.addEventListener('click', event => {

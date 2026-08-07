@@ -368,7 +368,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
@@ -387,7 +387,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, escapeHtml, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
