@@ -46,7 +46,7 @@ public class RegistrationController {
     public String register(@RequestParam String email,
                            @RequestParam(required = false) String storeName,
                            @RequestParam(name = "company", required = false) String honeypot,
-                           @RequestParam(name = "analyticsConsent", required = false) String analyticsConsent,
+                           @RequestParam(name = "termsConsent", required = false) String termsConsent,
                            HttpServletRequest request,
                            Model model,
                            Locale locale) {
@@ -54,11 +54,11 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addDemoAttributes(model);
-        if (analyticsConsent == null) {
+        if (termsConsent == null) {
             model.addAttribute("email", email);
             model.addAttribute("storeName", storeName);
             model.addAttribute("errorMessage",
-                    messageSource.getMessage("registration.error.analytics-consent-required", null, locale));
+                    messageSource.getMessage("registration.error.terms-consent-required", null, locale));
             return "register";
         }
         String resolvedName = demoMode
