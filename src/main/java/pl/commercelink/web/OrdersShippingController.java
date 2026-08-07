@@ -56,6 +56,10 @@ public class OrdersShippingController extends AbstractShippingController {
     @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+
+        if (order.getShippingDetails().getCollectionPoint() != null) {
+            shipments.forEach(shipment -> shipment.setType(ShipmentType.PickupPoint));
+        }
         order.setShipments(shipments);
 
         orderLifecycle.update(order);

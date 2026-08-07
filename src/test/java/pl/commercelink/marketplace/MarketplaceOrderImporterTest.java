@@ -19,7 +19,7 @@ class MarketplaceOrderImporterTest {
         // given
         MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(
                 "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska",
-                new MarketplaceCustomer.PickupPoint("ALP123", "Paczkomat ALP123", "INPOST"));
+                new MarketplaceCustomer.PickupPoint("ALP123", "Paczkomat ALP123"));
         MarketplaceCustomer customer = new MarketplaceCustomer(
                 MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
                 "500600700", null, shippingAddress, shippingAddress);
@@ -30,9 +30,7 @@ class MarketplaceOrderImporterTest {
         // then
         assertEquals("Prosta 1", shipping.getStreetAndNumber());
         assertEquals("ALP123", shipping.getCollectionPoint().getCode());
-        assertEquals("INPOST", shipping.getCollectionPoint().getOperator());
         assertEquals("Paczkomat ALP123", shipping.getCollectionPoint().getName());
-        assertTrue(shipping.getCollectionPoint().isDispatchable());
     }
 
     @Test
@@ -50,7 +48,6 @@ class MarketplaceOrderImporterTest {
 
         // then
         assertEquals("ALP123", shipping.getCollectionPoint().getCode());
-        assertFalse(shipping.getCollectionPoint().isDispatchable());
     }
 
     @Test

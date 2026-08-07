@@ -27,7 +27,7 @@ public class MarketplaceOrderImporter {
     @Autowired
     private OrdersManager ordersManager;
 
-    public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+    public void importOrder(Store store, String marketplaceName, MarketplaceOrder<?> marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -69,11 +69,16 @@ public class MarketplaceOrderImporter {
                 commission.doubleValue()
         );
 
-        Order order = new Order.Builder(store, basket)
+        Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier())
-                .build();
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null);
+
+        if (shippingDetails.getCollectionPoint() != null) {
+            orderBuilder.withShipmentType(ShipmentType.PickupPoint);
+        }
+
+        Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
@@ -128,7 +133,7 @@ public class MarketplaceOrderImporter {
         if (point == null || point.id() == null || point.id().isBlank()) {
             return null;
         }
-        return new CollectionPoint(point.id(), point.operator(), point.name());
+        return new CollectionPoint(point.id(), point.name());
     }
 
     private String resolveProductCategory(String mfn) {

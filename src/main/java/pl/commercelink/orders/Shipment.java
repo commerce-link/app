@@ -96,7 +96,11 @@ public class Shipment {
 
     @DynamoDBIgnore
     public boolean hasShippingData() {
-        return type == ShipmentType.Courier && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+        return isCarrierShipment() && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+    }
+
+    private boolean isCarrierShipment() {
+        return type == ShipmentType.Courier || type == ShipmentType.PickupPoint;
     }
 
     public String getTrackingUrl() {

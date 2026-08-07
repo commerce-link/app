@@ -165,7 +165,7 @@ public class ShippingService {
         if (point == null) {
             return null;
         }
-        return new DeliveryPoint(point.getCode(), point.getOperator());
+        return new DeliveryPoint(point.getCode());
     }
 
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {
