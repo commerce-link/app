@@ -520,8 +520,28 @@ class TaxonomyCacheTest {
 
         // then
         Taxonomy result = cache.findByMfn("MFN-ZERO");
-        assertThat(result.ean()).isEqualTo("012345678905");
+        assertThat(result.ean()).isEqualTo("0012345678905");
         assertThat(result).isEqualTo(input);
+    }
+
+    @Test
+    void leadingZeroEanRowsAreInternedTooOnceNormalizationMovesToTheBoundary() {
+        // given
+        Taxonomy first = new Taxonomy("0012345678905", "MFN-ZERO-1", new String("Brand"), "Name",
+                new String("Laptops"), 5, null, null, null, new String("301"));
+        Taxonomy second = new Taxonomy("1234567890123", "MFN-NORMAL", new String("Brand"), "Name2",
+                new String("Laptops"), 5, null, null, null, new String("301"));
+
+        // when
+        cache.add(first);
+        cache.add(second);
+
+        // then
+        Taxonomy stored1 = cache.findByMfn("MFN-ZERO-1");
+        Taxonomy stored2 = cache.findByMfn("MFN-NORMAL");
+        assertThat(stored1.brand()).isSameAs(stored2.brand());
+        assertThat(stored1.category()).isSameAs(stored2.category());
+        assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
     }
 
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {

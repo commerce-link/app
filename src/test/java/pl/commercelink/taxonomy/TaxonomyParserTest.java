@@ -142,6 +142,19 @@ class TaxonomyParserTest {
     }
 
     @Test
+    void fromCsvRowNormalizesEanAndMfn() {
+        // given
+        String[] row = {"0012345678905", "mfn 1", "TestBrand", "Test Product", "Laptops", "537", "1", "", ""};
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("012345678905", parsed.ean());
+        assertEquals("MFN1", parsed.mfn());
+    }
+
+    @Test
     void categoryIdSurvivesCsvRoundTrip() {
         // given
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand", "Router",

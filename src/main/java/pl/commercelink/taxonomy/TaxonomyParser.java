@@ -35,7 +35,8 @@ class TaxonomyParser {
         Integer netWeight = parseWeight(row[nameEnd + 3]);
         Integer grossWeight = parseWeight(row[nameEnd + 4]);
 
-        return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore,
+        return new Taxonomy(UnifiedProductIdentifiers.unifyEan(ean), UnifiedProductIdentifiers.unifyMfn(mfn),
+                brand, name, category, dataAccuracyScore,
                 netWeight, grossWeight, null, categoryId);
     }
 

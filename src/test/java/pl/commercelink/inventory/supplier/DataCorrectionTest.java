@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.taxonomy.Taxonomy;
 
@@ -171,6 +173,50 @@ class DataCorrectionTest {
         // then
         assertThat(result.category()).isEqualTo("Services");
         assertThat(result.rawCategory()).isEqualTo("Services");
+    }
+
+    @Test
+    void runPreservesAlreadyNormalizedEanAndMfn() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("0012345678905", "mfn 1", "FeedBrand", "FeedName", 5, 100, 200);
+        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("012345678905");
+        assertThat(result.mfn()).isEqualTo("MFN1");
+    }
+
+    @Test
+    void runDoesNotDoubleNormalizeEanWhenNoCorrectionNeeded() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("0012345678901", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
+        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("012345678901");
+    }
+
+    @Test
+    void runNormalizesPimCorrectedGtinWithLeadingZeros() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("1111111111111", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
+        PimEntry pim = new PimEntry("pim-id",
+                List.of(new PimIdentifier("0012345678905", PimIdentifierType.GTIN)),
+                "PimBrand", "PimName", null, "subcategory", true, null, null, null);
+        when(pimCatalog.findByMpn("MFN")).thenReturn(Optional.of(pim));
+        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("012345678905");
     }
 
     private SupplierProduct feed(Integer net, Integer gross) {
