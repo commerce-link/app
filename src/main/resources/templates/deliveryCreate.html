@@ -77,6 +77,11 @@
                                 <strong id="deliveryNetCurrency">PLN</strong>
                             </span>
                             <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
+                            <button type="submit" class="button is-link mr-2"
+                                    th:if="${purchaseAvailable}"
+                                    formnovalidate
+                                    th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase(provider=${form.provider})}"
+                                    th:text="#{deliveries.purchase.button}">Order at supplier</button>
                         </div>
                     </div>
                 </div>

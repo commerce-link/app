@@ -97,6 +97,9 @@ public class DeliveriesController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private SupplierPurchaseService supplierPurchaseService;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -391,6 +394,7 @@ public class DeliveriesController {
         model.addAttribute("form", form);
         model.addAttribute("delivery", delivery);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
 
         return "deliveryCreate";
     }
@@ -457,6 +461,71 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
                 : "redirect:/dashboard/deliveries/preview";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/purchase")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String validatePurchase(@PathVariable("provider") String provider,
+                                   @ModelAttribute DeliveryCreationForm form, Model model) {
+        return showPurchaseConfirmation(getStoreId(), provider, form, model);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String validatePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                @PathVariable("provider") String provider,
+                                                @ModelAttribute DeliveryCreationForm form, Model model) {
+        return showPurchaseConfirmation(storeId, provider, form, model);
+    }
+
+    private String showPurchaseConfirmation(String storeId, String provider,
+                                            DeliveryCreationForm form, Model model) {
+        form.setStoreId(storeId);
+        form.setProvider(provider);
+        supplierPurchaseService.mergeSuggestedItems(form);
+        model.addAttribute("form", form);
+        model.addAttribute("validation", supplierPurchaseService.validate(storeId, form));
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
+        return "deliveryPurchaseConfirmation";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/confirm")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String confirmPurchase(@PathVariable("provider") String provider,
+                                  @RequestParam("purchaseRef") String purchaseRef,
+                                  @ModelAttribute DeliveryCreationForm form,
+                                  Model model, Locale locale) {
+        return executePurchase(getStoreId(), provider, purchaseRef, form, model, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/confirm")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String confirmPurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                               @PathVariable("provider") String provider,
+                                               @RequestParam("purchaseRef") String purchaseRef,
+                                               @ModelAttribute DeliveryCreationForm form,
+                                               Model model, Locale locale) {
+        return executePurchase(storeId, provider, purchaseRef, form, model, locale);
+    }
+
+    private String executePurchase(String storeId, String provider, String purchaseRef,
+                                   DeliveryCreationForm form, Model model, Locale locale) {
+        form.setStoreId(storeId);
+        form.setProvider(provider);
+        OperationResult<String> result = supplierPurchaseService.purchase(
+                storeId, form, purchaseRef, isSuperAdmin());
+
+        if (!result.isSuccess()) {
+            model.addAttribute("form", form);
+            model.addAttribute("validation", supplierPurchaseService.validate(storeId, form, purchaseRef));
+            model.addAttribute("isSuperAdmin", isSuperAdmin());
+            model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
+            return "deliveryPurchaseConfirmation";
+        }
+
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, result.getPayload())
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + result.getPayload();
     }
 
     @GetMapping("/dashboard/deliveries/details")
