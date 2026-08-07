@@ -178,8 +178,11 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("categoryOptions", pimCategoryOptions.leafOptionsUnder(
-                store.getEnabledCategories(), categoryDefinition.getPimCategoryIds()));
+        List<PimCategoryOptions.CategoryOption> categoryOptions = pimCategoryOptions.leafOptionsUnder(
+                store.getEnabledCategories(), categoryDefinition.getPimCategoryIds());
+        model.addAttribute("categoryOptions", categoryOptions);
+        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOf(
+                categoryOptions.stream().map(PimCategoryOptions.CategoryOption::id).toList()));
         model.addAttribute("selectedCategoryOptions", selectedOptions(categoryDefinition));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
@@ -191,12 +194,7 @@ public class ProductCatalogController {
     }
 
     private List<PimCategoryOptions.CategoryOption> selectedOptions(CategoryDefinition categoryDefinition) {
-        List<String> names = pimCategoryOptions.namesOf(categoryDefinition.getPimCategoryIds());
-        List<PimCategoryOptions.CategoryOption> options = new LinkedList<>();
-        for (int i = 0; i < categoryDefinition.getPimCategoryIds().size(); i++) {
-            options.add(new PimCategoryOptions.CategoryOption(categoryDefinition.getPimCategoryIds().get(i), names.get(i)));
-        }
-        return options;
+        return pimCategoryOptions.optionsOf(categoryDefinition.getPimCategoryIds());
     }
 
     private String displayCategories(CategoryDefinition definition) {
@@ -539,9 +537,12 @@ public class ProductCatalogController {
 
         Store store = storesRepository.findById(getStoreId());
 
-        model.addAttribute("productCategories", pimCategoryOptions.categoryOptions(
+        List<PimCategoryOptions.CategoryOption> productCategories = pimCategoryOptions.namedOptions(
                 store.getEnabledCategories(),
-                product.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList()));
+                product.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList());
+        model.addAttribute("productCategories", productCategories);
+        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOfNames(
+                productCategories.stream().map(PimCategoryOptions.CategoryOption::name).toList()));
         model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
         model.addAttribute("labels", categoryDefinition.getGroupingOrder());
         model.addAttribute("availabilityTypes", ProductAvailabilityType.values());

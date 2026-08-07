@@ -95,9 +95,10 @@
             font-weight: 400;
         }
 
+        /* The menu floats, so in narrow form columns it may overflow the trigger to keep breadcrumbs readable. */
         .category-picker .dropdown-menu {
             width: 100%;
-            min-width: 20rem;
+            min-width: min(34rem, 90vw);
         }
 
         .category-picker [data-picker-list] {
@@ -125,6 +126,57 @@
             pointer-events: none;
             margin-right: 0.5rem;
             vertical-align: baseline;
+        }
+
+        /* Two-line row: muted ancestor path on top, leaf name below. Both clipped so the row height stays put. */
+        .category-picker .dropdown-item[role="option"] {
+            display: flex;
+            align-items: flex-start;
+            line-height: 1.3;
+            padding-top: 0.375rem;
+            padding-bottom: 0.375rem;
+        }
+
+        .category-picker .picker-option-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .category-picker .category-path,
+        .category-picker .category-name {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .category-picker .category-path {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: #7a7a7a;
+        }
+
+        .category-picker .dropdown-item.is-selected .category-path {
+            font-weight: 400;
+        }
+
+        .category-picker [data-picker-chips] .tag.is-link {
+            max-width: 26rem;
+        }
+
+        .category-picker .chip-path {
+            color: #6b7280;
+            font-size: 0.75rem;
+            margin-right: 0.35rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .category-picker .chip-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .category-picker [data-picker-label] {
@@ -163,6 +215,45 @@
                 holder.textContent = text;
                 return holder.innerHTML;
             },
+            // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
+            breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
+                const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
+                const namesOf = option => {
+                    const names = [];
+                    const visited = new Set();
+                    let parentId = option.parentId;
+                    while (parentId && branchById.has(parentId) && !visited.has(parentId)) {
+                        visited.add(parentId);
+                        const parent = branchById.get(parentId);
+                        names.unshift(parent.name);
+                        parentId = parent.parentId;
+                    }
+                    return names;
+                };
+                return option => {
+                    const names = namesOf(option);
+                    // Deeper than three levels collapses the middle: "Elektronika > … > Akcesoria telefoniczne".
+                    const shortened = names.length > maxLevels
+                            ? [names[0], '\u2026', names[names.length - 1]]
+                            : names;
+                    return {
+                        path: names.join(separator),
+                        shortPath: shortened.join(separator),
+                        // Chips have room for one level only, and the direct parent is the disambiguating one.
+                        parent: names.length ? names[names.length - 1] : ''
+                    };
+                };
+            },
+            pathElement: (option, query) => {
+                if (!option.path) {
+                    return document.createDocumentFragment();
+                }
+                const path = document.createElement('span');
+                path.className = 'category-path';
+                path.title = option.path;
+                path.innerHTML = window.pickerHelpers.highlight(option.shortPath, query);
+                return path;
+            },
             highlight: (label, query) => {
                 if (!query) {
                     return window.pickerHelpers.escapeHtml(label);
@@ -179,19 +270,21 @@
     </script>
 </th:block>
 
-<th:block th:fragment="pickerScript(categories)">
+<th:block th:fragment="pickerScript(categories, categoryAncestors)">
     <th:block th:insert="~{fragments/category-picker :: pickerHelpers}"></th:block>
 
     <script th:inline="javascript">
         (function () {
             const CHUNK = 60;
             const categories = /*[[${categories}]]*/ [];
+            const categoryAncestors = /*[[${categoryAncestors}]]*/ [];
             const messages = {
                 empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, escapeHtml, highlight} = window.pickerHelpers;
+            const {format, normalize, escapeHtml, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
                 const field = picker.parentElement.querySelector('[data-picker-value]');
@@ -201,7 +294,17 @@
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
 
-                const options = categories.map(name => ({value: name, label: name}));
+                const options = categories.map(category => {
+                    const {path, shortPath} = breadcrumbOf(category);
+                    return {
+                        value: category.id,
+                        label: category.name,
+                        path: path,
+                        shortPath: shortPath,
+                        // The whole breadcrumb is searchable, so typing a parent name lists everything under it.
+                        haystack: normalize(category.name + ' ' + path)
+                    };
+                });
 
                 let matches = [];
                 let shown = [];
@@ -225,7 +328,14 @@
                         item.className = 'dropdown-item';
                         item.href = '#';
                         item.setAttribute('role', 'option');
-                        item.innerHTML = highlight(option.label, query);
+                        const text = document.createElement('span');
+                        text.className = 'picker-option-text';
+                        text.appendChild(optionPath(option, query));
+                        const name = document.createElement('span');
+                        name.className = 'category-name';
+                        name.innerHTML = highlight(option.label, query);
+                        text.appendChild(name);
+                        item.appendChild(text);
                         item.addEventListener('click', event => {
                             event.preventDefault();
                             select(option);
@@ -238,7 +348,7 @@
                 const render = () => {
                     query = normalize(search.value.trim());
                     matches = query
-                            ? options.filter(option => normalize(option.label).includes(query))
+                            ? options.filter(option => option.haystack.includes(query))
                             : options;
                     shown = [];
                     active = -1;
@@ -338,20 +448,22 @@
     </script>
 </th:block>
 
-<th:block th:fragment="multiPickerScript(categoryOptions)">
+<th:block th:fragment="multiPickerScript(categoryOptions, categoryAncestors)">
     <th:block th:insert="~{fragments/category-picker :: pickerHelpers}"></th:block>
 
     <script th:inline="javascript">
         (function () {
             const CHUNK = 60;
             const options = /*[[${categoryOptions}]]*/ [];
+            const categoryAncestors = /*[[${categoryAncestors}]]*/ [];
             const messages = {
                 empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ '',
                 selectedCount: /*[[#{catalog.category.selectedCount}]]*/ ''
             };
-            const {format, normalize, highlight} = window.pickerHelpers;
+            const {format, normalize, highlight, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
                 const root = picker.closest('.category-picker');
@@ -379,7 +491,19 @@
                 const counter = picker.querySelector('[data-picker-count]');
                 const chips = root.querySelector('[data-picker-chips]');
 
-                const entries = options.map(option => ({value: option.id, label: option.name}));
+                const entries = options.map(option => {
+                    const {path, shortPath, parent} = breadcrumbOf(option);
+                    return {
+                        value: option.id,
+                        label: option.name,
+                        path: path,
+                        shortPath: shortPath,
+                        parent: parent,
+                        // The whole breadcrumb is searchable, so typing a parent name lists everything under it.
+                        haystack: normalize(option.name + ' ' + path)
+                    };
+                });
+                const entriesByValue = new Map(entries.map(entry => [entry.value, entry]));
 
                 let matches = [];
                 let shown = [];
@@ -413,7 +537,18 @@
                         tags.className = 'tags has-addons';
                         const tag = document.createElement('span');
                         tag.className = 'tag is-link is-light';
-                        tag.textContent = name;
+                        const entry = entriesByValue.get(id);
+                        if (entry && entry.parent) {
+                            const path = document.createElement('span');
+                            path.className = 'chip-path';
+                            path.textContent = entry.parent + ' \u203a';
+                            tag.appendChild(path);
+                            tag.title = entry.path + ' \u203a ' + name;
+                        }
+                        const chipName = document.createElement('span');
+                        chipName.className = 'chip-name';
+                        chipName.textContent = name;
+                        tag.appendChild(chipName);
                         const remove = document.createElement('a');
                         remove.className = 'tag is-delete';
                         remove.href = '#';
@@ -455,7 +590,12 @@
                         checkbox.tabIndex = -1;
                         checkbox.checked = selected.has(option.value);
                         const text = document.createElement('span');
-                        text.innerHTML = highlight(option.label, query);
+                        text.className = 'picker-option-text';
+                        text.appendChild(optionPath(option, query));
+                        const name = document.createElement('span');
+                        name.className = 'category-name';
+                        name.innerHTML = highlight(option.label, query);
+                        text.appendChild(name);
                         item.append(checkbox, text);
                         item.addEventListener('click', event => {
                             event.preventDefault();
@@ -469,7 +609,7 @@
                 const render = () => {
                     query = normalize(search.value.trim());
                     matches = query
-                            ? entries.filter(option => normalize(option.label).includes(query))
+                            ? entries.filter(option => option.haystack.includes(query))
                             : entries;
                     shown = [];
                     active = -1;
