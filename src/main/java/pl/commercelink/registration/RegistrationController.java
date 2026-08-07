@@ -22,15 +22,18 @@ public class RegistrationController {
     private final MessageSource messageSource;
     private final boolean demoMode;
     private final int ttlDays;
+    private final String termsUrl;
 
     public RegistrationController(RegistrationService registrationService,
                                   MessageSource messageSource,
                                   @Value("${app.registration.demo:false}") boolean demoMode,
-                                  @Value("${app.registration.ttl-days}") int ttlDays) {
+                                  @Value("${app.registration.ttl-days}") int ttlDays,
+                                  @Value("${app.terms-url:}") String termsUrl) {
         this.registrationService = registrationService;
         this.messageSource = messageSource;
         this.demoMode = demoMode;
         this.ttlDays = ttlDays;
+        this.termsUrl = termsUrl;
     }
 
     @GetMapping("/register")
@@ -43,6 +46,7 @@ public class RegistrationController {
     public String register(@RequestParam String email,
                            @RequestParam(required = false) String storeName,
                            @RequestParam(name = "company", required = false) String honeypot,
+                           @RequestParam(name = "termsConsent", required = false) String termsConsent,
                            HttpServletRequest request,
                            Model model,
                            Locale locale) {
@@ -50,6 +54,13 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addDemoAttributes(model);
+        if (termsConsent == null) {
+            model.addAttribute("email", email);
+            model.addAttribute("storeName", storeName);
+            model.addAttribute("errorMessage",
+                    messageSource.getMessage("registration.error.terms-consent-required", null, locale));
+            return "register";
+        }
         String resolvedName = demoMode
                 ? messageSource.getMessage("registration.store-name.default", null, locale)
                 : storeName;
@@ -69,6 +80,7 @@ public class RegistrationController {
     private void addDemoAttributes(Model model) {
         model.addAttribute("demoMode", demoMode);
         model.addAttribute("ttlDays", ttlDays);
+        model.addAttribute("termsUrl", termsUrl.isBlank() ? null : termsUrl);
     }
 
     @GetMapping("/demo/register")

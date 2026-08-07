@@ -26,7 +26,7 @@ class RegistrationControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new RegistrationController(registrationService, messageSource, false, 3);
+        controller = new RegistrationController(registrationService, messageSource, false, 3, "");
     }
 
     @Test
@@ -39,7 +39,7 @@ class RegistrationControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, request, model, Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, model, Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("register-success", view);
@@ -56,7 +56,7 @@ class RegistrationControllerTest {
                 .thenReturn(new RegistrationResult("abc123def4", null));
 
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("register-success", view);
@@ -66,7 +66,7 @@ class RegistrationControllerTest {
     @Test
     void silentlyRedirectsWhenHoneypotFilled() {
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", "bot value", request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", "bot value", "on", request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("redirect:/register", view);
@@ -85,7 +85,7 @@ class RegistrationControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, request, model, Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, model, Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("register", view);
@@ -97,7 +97,7 @@ class RegistrationControllerTest {
     @Test
     void demoModeIgnoresSubmittedStoreNameAndUsesDefault() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3);
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3, "");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("10.0.0.1");
         when(messageSource.getMessage("registration.store-name.default", null, Locale.ROOT)).thenReturn("Mój sklep");
@@ -105,7 +105,7 @@ class RegistrationControllerTest {
                 .thenReturn(new RegistrationResult("demo-store-1", null));
 
         // when
-        demoController.register("user@firma.pl", "Sklep Testowy", null, request, new ExtendedModelMap(), Locale.ROOT);
+        demoController.register("user@firma.pl", "Sklep Testowy", null, "on", request, new ExtendedModelMap(), Locale.ROOT);
 
         // then
         verify(registrationService).register("user@firma.pl", "Mój sklep", "10.0.0.1");
@@ -123,7 +123,7 @@ class RegistrationControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@firma.pl", "  ", null, request, model, Locale.ROOT);
+        String view = controller.register("user@firma.pl", "  ", null, "on", request, model, Locale.ROOT);
 
         // then
         assertEquals("register", view);
@@ -143,7 +143,7 @@ class RegistrationControllerTest {
     @Test
     void registerPageExposesDemoModeFlagToTemplate() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3);
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3, "");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -158,7 +158,7 @@ class RegistrationControllerTest {
     @Test
     void postPathExposesDemoModeAndTtlDaysToTemplate() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 7);
+        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 7, "");
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("1.1.1.1");
         when(messageSource.getMessage(eq("registration.store-name.default"), any(), any(Locale.class))).thenReturn("Mój sklep");
@@ -167,7 +167,7 @@ class RegistrationControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = demoController.register("user@example.com", null, null, request, model, Locale.forLanguageTag("pl"));
+        String view = demoController.register("user@example.com", null, null, "on", request, model, Locale.forLanguageTag("pl"));
 
         // then
         assertEquals("register-success", view);
