@@ -5,6 +5,114 @@
 <body>
 <div layout:fragment="content">
 
+    <style>
+        #copyNotification {
+            display: none;
+            position: fixed;
+            top: 32px;
+            right: 32px;
+            z-index: 9999;
+            transition: opacity 0.3s;
+        }
+
+        input[readonly], textarea[readonly], select[readonly] {
+            background-color: #f5f5f5;
+            color: #555;
+        }
+        input[readonly]:focus, textarea[readonly]:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+        .mono {
+            font-family: monospace;
+            font-size: .82rem;
+            white-space: nowrap;
+        }
+
+        .events-scroll {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .events-scroll thead th {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 1;
+        }
+
+        .media-tiles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .media-tile {
+            position: relative;
+            width: 132px;
+            border: 1px solid #dbdbdb;
+            border-radius: 6px;
+            background: #fafafa;
+            padding: 8px;
+            text-align: center;
+        }
+        .media-tile a {
+            text-decoration: none;
+            color: inherit;
+        }
+        .media-tile img, .media-tile video {
+            max-width: 100%;
+            max-height: 96px;
+            border-radius: 4px;
+        }
+        .media-tile .media-name {
+            font-size: .68rem;
+            color: #666;
+            word-break: break-word;
+            margin-top: 4px;
+        }
+        .rma-media-delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .92);
+            color: #e74c3c;
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+        }
+
+        .rma-item-detail-row td {
+            background: #f6f8fc;
+        }
+        .rma-item-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: .6rem 1.4rem;
+        }
+        .rma-item-detail-label {
+            display: block;
+            font-size: .65rem;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #9aa1ab;
+            margin-bottom: 2px;
+        }
+        .rma-item-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #9aa1ab;
+            padding: 0 .3rem;
+        }
+        .rma-item-toggle:hover {
+            color: #485fc7;
+        }
+    </style>
+
     <div class="box mb-5">
         <div class="columns is-vcentered">
             <div class="column">
@@ -26,6 +134,7 @@
     <div class="columns">
         <!-- RMA Information -->
         <div class="column is-half">
+            <h2 class="subtitle" th:text="#{rma.details}"></h2>
             <div class="box">
                 <form th:action="@{/dashboard/rma/{rmaId}(rmaId=${rma.rmaId})}" method="post" th:object="${rma}" enctype="multipart/form-data">
                     <input type="hidden" th:field="*{storeId}"/>
@@ -78,16 +187,20 @@
                     <!-- RMA Link -->
                     <div class="field">
                         <label class="label" th:text="#{offers.link.for.client}"></label>
-                        <div class="control is-flex" style="gap: 8px; align-items: center;">
-                            <input class="input"
-                                   type="text"
-                                   id="rmaLinkInput"
-                                   th:value="${rma.createClientRmaUrl(backofficeDomain)}"
-                                   readonly
-                                   style="text-decoration: underline; cursor: pointer;"
-                                   onclick="openRmaLink()"/>
-                            <button class="button is-small is-info" type="button"
-                                    onclick="copyRmaLink()" th:text="#{general.copy}"></button>
+                        <div class="field has-addons mb-0">
+                            <div class="control is-expanded">
+                                <input class="input"
+                                       type="text"
+                                       id="rmaLinkInput"
+                                       th:value="${rma.createClientRmaUrl(backofficeDomain)}"
+                                       readonly
+                                       style="cursor: pointer;"
+                                       onclick="openRmaLink()"/>
+                            </div>
+                            <div class="control">
+                                <button class="button is-info" type="button"
+                                        onclick="copyRmaLink()" th:text="#{general.copy}"></button>
+                            </div>
                         </div>
                     </div>
 
@@ -95,12 +208,11 @@
                     <div class="field">
                         <label class="label" th:text="#{rma.media}"></label>
 
-                        <div class="mt-3" style="display:flex; flex-wrap:wrap; gap:16px;">
-                            <div th:each="media,iterStat : ${rma.media}" class="media-box" style="position:relative;">
+                        <div class="media-tiles mt-3">
+                            <div th:each="media,iterStat : ${rma.media}" class="media-tile media-box">
                                 <input type="hidden" name="existingMedia" th:value="${media}" th:disabled="${isClosed}"/>
                                 <button type="button"
                                         class="rma-media-delete-btn"
-                                        style="position:absolute; top:6px; right:6px; background:none; border:none; cursor:pointer; color:#e74c3c;z-index:10"
                                         th:disabled="${isClosed}">
                                     <i class="fas fa-times"></i>
                                 </button>
@@ -108,34 +220,27 @@
                                 <!-- Image preview -->
                                 <div th:if="${#strings.endsWith(#strings.toLowerCase(media), '.jpg') or #strings.endsWith(#strings.toLowerCase(media), '.jpeg') or #strings.endsWith(#strings.toLowerCase(media), '.png') or #strings.endsWith(#strings.toLowerCase(media), '.gif')}">
                                     <a th:href="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}"
-                                       target="_blank"
-                                       style="text-decoration:none; color:inherit;">
-                                        <img th:src="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}"
-                                             style="border:1px solid #ddd; max-width:100%; max-height:150px; border-radius:4px;" />
+                                       target="_blank">
+                                        <img th:src="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}" />
                                     </a>
                                 </div>
 
                                 <!-- PDF -->
-                                <div th:if="${#strings.endsWith(#strings.toLowerCase(media), '.pdf')}" class="pdf-box" style="text-align:center;">
+                                <div th:if="${#strings.endsWith(#strings.toLowerCase(media), '.pdf')}">
                                     <a th:href="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}"
-                                       target="_blank"
-                                       style="text-decoration:none; color:inherit;">
-
-                                        <div style="border:1px solid #ddd; border-radius:8px; padding:16px; width:130px; height:150px;background:#fafafa;">
-                                            <i class="fas fa-file-pdf fa-3x" style="color:#e74c3c;"></i>
-                                            <div style="font-size:13px; color:#333; word-break:break-word;"
-                                                 th:text="${media.substring(media.lastIndexOf('/') + 1)}"></div>
-                                        </div>
+                                       target="_blank">
+                                        <i class="fas fa-file-pdf fa-2x has-text-danger"></i>
+                                        <div class="media-name"
+                                             th:text="${media.substring(media.lastIndexOf('/') + 1)}"></div>
                                     </a>
                                 </div>
 
                                 <!-- Video preview -->
                                 <div th:if="${#strings.endsWith(#strings.toLowerCase(media), '.mov') or #strings.endsWith(#strings.toLowerCase(media), '.mp4') or #strings.endsWith(#strings.toLowerCase(media), '.avi') or #strings.endsWith(#strings.toLowerCase(media), '.mkv')}">
                                     <a th:href="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}"
-                                       target="_blank"
-                                       style="text-decoration:none; color:inherit;">
+                                       target="_blank">
                                         <video th:src="@{'/rma/' + ${rma.rmaId} + '/media/' + ${media.substring(media.lastIndexOf('/') + 1)}}"
-                                               controls style="border:1px solid #ddd; max-width:200px; max-height:150px; border-radius:4px;"></video>
+                                               controls></video>
                                     </a>
                                 </div>
                             </div>
@@ -156,7 +261,7 @@
                     </div>
 
                     <div class="control">
-                        <button type="submit" class="button is-link is-small" th:text="#{general.save}" th:disabled="${isClosed}"></button>
+                        <button type="submit" class="button is-primary is-small" th:text="#{general.save}" th:disabled="${isClosed}"></button>
                     </div>
                 </form>
             </div>
@@ -164,23 +269,26 @@
 
         <!-- RMA Events -->
         <div class="column is-half">
+            <h2 class="subtitle" th:text="#{rma.events}"></h2>
             <div class="box">
-                <table class="table is-fullwidth">
-                    <thead>
-                    <tr>
-                        <th th:text="#{order.event.type}"></th>
-                        <th th:text="#{order.event.name}"></th>
-                        <th th:text="#{order.event.date}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="event : ${rma.events}">
-                        <td th:text="${event.type}"></td>
-                        <td th:text="${event.name}"></td>
-                        <td th:text="${#temporals.format(event.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+                <div class="events-scroll table-container">
+                    <table class="table is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th th:text="#{order.event.type}"></th>
+                            <th th:text="#{order.event.name}"></th>
+                            <th th:text="#{order.event.date}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="event : ${rma.events}">
+                            <td><span class="tag is-light" th:text="${event.type}"></span></td>
+                            <td th:text="${event.name}"></td>
+                            <td th:text="${#temporals.format(event.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -190,53 +298,87 @@
         <h2 class="subtitle" th:text="#{rma.items}"></h2>
         <div class="box">
             <div class="table-container mb-4">
-                <table class="table is-fullwidth is-striped">
+                <table class="table is-fullwidth is-striped is-hoverable">
                     <thead>
                     <tr>
                         <th th:text="#{order.item.select}"></th>
+                        <th></th>
                         <th>ID</th>
-                        <th th:text="#{rma.desired.resolution}"></th>
-                        <th th:text="#{rma.actual.resolution}"></th>
                         <th th:text="#{rma.item.name}"></th>
                         <th th:text="#{rma.quantity}"></th>
-                        <th th:text="#{general.delivery.id}"></th>
-                        <th th:text="#{fulfilment.ean}"></th>
-                        <th th:text="#{product.manufacturer.code}"></th>
-                        <th th:text="#{order.item.price}"></th>
-                        <th th:text="#{order.item.cost}"></th>
-                        <th th:text="#{order.item.serial.no}"></th>
+                        <th th:text="#{rma.desired.resolution}"></th>
+                        <th th:text="#{rma.actual.resolution}"></th>
                         <th th:text="#{rma.status}"></th>
                         <th th:text="#{rma.reason}"></th>
-                        <th th:text="#{order.item.comment}"></th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="item, iterStat : *{rmaItems}">
-                        <td>
-                            <input type="checkbox" th:field="*{rmaItems[__${iterStat.index}__].selected}" th:disabled="${isClosed}" />
-                            <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaId}" readonly />
-                            <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaItemId}" readonly />
-                            <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].itemId}" readonly />
-                            <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].tax}" readonly />
-                        </td>
-                        <td>
-                            <a th:href="@{/dashboard/rma/{rmaId}/items/{rmaItemId}(rmaId=${item.rmaId}, rmaItemId=${item.rmaItemId})}"
-                               th:text="${#strings.substring(item.rmaItemId, 0, 8)}"></a>
-                        </td>
-                        <td style="min-width: 80px;" th:text="${item.desiredResolution}"></td>
-                        <td style="min-width: 80px;" th:text="${item.actualResolution}"></td>
-                        <td style="min-width: 120px;" th:text="${item.name}"></td>
-                        <td style="min-width: 80px;" th:text="${item.qty}"></td>
-                        <td style="min-width: 120px;" th:text="${item.shortenedDeliveryId}"></td>
-                        <td style="min-width: 120px;" th:text="${item.ean}"></td>
-                        <td style="min-width: 120px;" th:text="${item.mfn}"></td>
-                        <td style="min-width: 80px;" th:text="${item.price}"></td>
-                        <td style="min-width: 80px;" th:text="${item.unitCost.grossValue}"></td>
-                        <td style="min-width: 120px;" th:text="${item.serialNo}"></td>
-                        <td style="min-width: 120px;" th:text="${item.status}"></td>
-                        <td style="min-width: 120px;" th:text="${item.reason}"></td>
-                        <td style="min-width: 120px;" th:text="${item.comment}"></td>
-                    </tr>
+                    <th:block th:each="item, iterStat : *{rmaItems}">
+                        <tr th:attr="data-qty=${item.qty}">
+                            <td>
+                                <input type="checkbox" th:field="*{rmaItems[__${iterStat.index}__].selected}" th:disabled="${isClosed}" />
+                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaId}" readonly />
+                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaItemId}" readonly />
+                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].itemId}" readonly />
+                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].tax}" readonly />
+                            </td>
+                            <td>
+                                <button type="button" class="rma-item-toggle"
+                                        th:attr="data-target='rma-item-detail-' + ${iterStat.index}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </td>
+                            <td>
+                                <a th:href="@{/dashboard/rma/{rmaId}/items/{rmaItemId}(rmaId=${item.rmaId}, rmaItemId=${item.rmaItemId})}"
+                                   th:text="${#strings.substring(item.rmaItemId, 0, 8)}"></a>
+                            </td>
+                            <td th:text="${item.name}"></td>
+                            <td th:text="${item.qty}"></td>
+                            <td th:text="${item.desiredResolution != null ? enumI18n.localize(item.desiredResolution) : ''}"></td>
+                            <td th:text="${item.actualResolution != null ? enumI18n.localize(item.actualResolution) : ''}"></td>
+                            <td>
+                                <span th:if="${item.status != null}"
+                                      class="tag"
+                                      th:classappend="${item.status.tagClass()}"
+                                      th:text="${enumI18n.localize(item.status)}"></span>
+                            </td>
+                            <td th:text="${item.reason}"></td>
+                        </tr>
+                        <tr class="rma-item-detail-row" th:attr="id='rma-item-detail-' + ${iterStat.index}" style="display:none;">
+                            <td colspan="9">
+                                <div class="rma-item-detail-grid">
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{fulfilment.ean}"></span>
+                                        <span class="mono" th:text="${item.ean}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{product.manufacturer.code}"></span>
+                                        <span class="mono" th:text="${item.mfn}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{order.item.serial.no}"></span>
+                                        <span class="mono" th:text="${item.serialNo}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{order.item.price}"></span>
+                                        <span th:text="${item.price}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{order.item.cost}"></span>
+                                        <span th:text="${item.unitCost.grossValue}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{general.delivery.id}"></span>
+                                        <span th:text="${item.shortenedDeliveryId}"></span>
+                                    </div>
+                                    <div>
+                                        <span class="rma-item-detail-label" th:text="#{order.item.comment}"></span>
+                                        <span th:text="${item.comment}"></span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </th:block>
                     </tbody>
                 </table>
             </div>
@@ -525,32 +667,9 @@
         </div>
     </div>
 
-    <div class="control">
-        <a class="button is-light" th:href="@{/dashboard/rma}" th:text="#{general.cancel}"></a>
-    </div>
-
-    <div id="copyNotification"
-         style="display:none; position:fixed; top:32px; right:32px; z-index:9999;
-                background:#48c774; color:#fff; padding:16px 32px; border-radius:8px;
-                box-shadow:0 2px 8px rgba(0,0,0,0.15); font-size:1.1em;">
+    <div id="copyNotification" class="notification is-success">
         <span th:text="#{general.copied}"></span>
     </div>
-
-    <style>
-        /* Możesz przenieść do pliku CSS */
-        #copyNotification {
-            transition: opacity 0.3s;
-        }
-
-        input[readonly], textarea[readonly], select[readonly] {
-            background-color: #f5f5f5;
-            color: #555;
-        }
-        input[readonly]:focus, textarea[readonly]:focus {
-            outline: none;
-            box-shadow: none;
-        }
-    </style>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
@@ -558,6 +677,18 @@
                 btn.addEventListener("click", function() {
                     const box = this.closest(".media-box");
                     if (box) box.remove();
+                });
+            });
+
+            document.querySelectorAll(".rma-item-toggle").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    const detailRow = document.getElementById(this.getAttribute("data-target"));
+                    if (!detailRow) return;
+                    const isHidden = detailRow.style.display === "none";
+                    detailRow.style.display = isHidden ? "" : "none";
+                    const icon = this.querySelector("i");
+                    icon.classList.toggle("fa-chevron-right", !isHidden);
+                    icon.classList.toggle("fa-chevron-down", isHidden);
                 });
             });
         });
@@ -579,8 +710,6 @@
             const selectedAction = actionSelect.value;
             const rmaId = form.getAttribute('data-rma-id');
 
-            const selectedItems = form.querySelectorAll('input[type="checkbox"]:checked');
-
             form.action = `/dashboard/rma/${rmaId}/${selectedAction}`;
             form.method = 'POST';
             form.submit();
@@ -596,9 +725,8 @@
             }
 
             const selectedRow = selectedItems[0].closest('tr');
-            const qtyInput = selectedRow.querySelector('input[name*=".qty"]');
             const rmaItemIdInput = selectedRow.querySelector('input[name*=".rmaItemId"]');
-            const qty = parseInt(qtyInput.value);
+            const qty = parseInt(selectedRow.dataset.qty);
             const rmaItemId = rmaItemIdInput.value;
 
             if (qty < 2) {
@@ -694,7 +822,7 @@
                 setTimeout(() => {
                     notification.style.opacity = '0';
                     setTimeout(() => notification.style.display = 'none', 300);
-                }, 2000); // znika po 2 sekundach
+                }, 2000);
             });
         }
 
