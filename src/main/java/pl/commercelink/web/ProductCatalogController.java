@@ -94,8 +94,6 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
-        model.addAttribute("categoryNamesById", productCatalog.getCategories().stream()
-                .collect(Collectors.toMap(CategoryDefinition::getCategoryId, this::displayCategories)));
         return "catalogDetails";
     }
 
