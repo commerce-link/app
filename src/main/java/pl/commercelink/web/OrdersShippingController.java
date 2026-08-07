@@ -11,6 +11,7 @@ import pl.commercelink.shipping.AbstractShippingController;
 
 import java.util.Collections;
 import java.util.List;
+import pl.commercelink.shipping.DeliveryTarget;
 
 @Controller
 @RequestMapping("/dashboard/orders/{orderId}/shipping")
@@ -48,16 +49,16 @@ public class OrdersShippingController extends AbstractShippingController {
     }
 
     @Override
-    protected String resolveDeliveryCarrier(ShippingForm form) {
+    protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
-        return order.getDeliveryCarrier();
+        return new DeliveryTarget(order.getDeliveryCarrier(), order.getCollectionPointCode());
     }
 
     @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
 
-        if (order.getShippingDetails().getCollectionPoint() != null) {
+        if (order.isDeliveredToCollectionPoint()) {
             shipments.forEach(shipment -> shipment.setType(ShipmentType.PickupPoint));
         }
         order.setShipments(shipments);

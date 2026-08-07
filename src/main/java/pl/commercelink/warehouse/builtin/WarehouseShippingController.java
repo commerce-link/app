@@ -16,6 +16,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import pl.commercelink.shipping.DeliveryTarget;
 
 @Controller
 @RequestMapping("/dashboard/warehouse/shipping")
@@ -74,7 +75,7 @@ public class WarehouseShippingController extends AbstractShippingController {
     }
 
     @Override
-    protected String resolveDeliveryCarrier(ShippingForm form) {
-        return null;
+    protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
+        return DeliveryTarget.NONE;
     }
 }

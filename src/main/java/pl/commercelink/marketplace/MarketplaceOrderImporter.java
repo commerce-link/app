@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
@@ -69,12 +70,15 @@ public class MarketplaceOrderImporter {
                 commission.doubleValue()
         );
 
+        String collectionPointCode = StringUtils.trimToNull(marketplaceOrder.pickupPointCode());
+
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null);
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null)
+                .withCollectionPointCode(collectionPointCode);
 
-        if (shippingDetails.getCollectionPoint() != null) {
+        if (collectionPointCode != null) {
             orderBuilder.withShipmentType(ShipmentType.PickupPoint);
         }
 
@@ -124,16 +128,8 @@ public class MarketplaceOrderImporter {
         shipping.setPostalCode(address.postalCode());
         shipping.setCity(address.city());
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
-        shipping.setCollectionPoint(toCollectionPoint(address.pickupPoint()));
 
         return shipping;
-    }
-
-    private CollectionPoint toCollectionPoint(MarketplaceCustomer.PickupPoint point) {
-        if (point == null || point.id() == null || point.id().isBlank()) {
-            return null;
-        }
-        return new CollectionPoint(point.id(), point.name());
     }
 
     private String resolveProductCategory(String mfn) {

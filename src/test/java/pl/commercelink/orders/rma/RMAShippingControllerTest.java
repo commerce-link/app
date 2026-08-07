@@ -1,6 +1,7 @@
 package pl.commercelink.orders.rma;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.RMAConfiguration;
 import pl.commercelink.stores.Store;
@@ -32,10 +33,11 @@ class RMAShippingControllerTest {
         configuration.setCarrier(new AuthorizedCarrier("12", "inpost", "InPost Paczkomaty"));
 
         // when
-        String carrier = controllerFor(storeWith(configuration)).resolveDeliveryCarrier(null);
+        DeliveryTarget target = controllerFor(storeWith(configuration)).resolveDeliveryTarget(null);
 
         // then
-        assertEquals("inpost", carrier);
+        assertEquals("inpost", target.carrier());
+        assertNull(target.pointCode());
     }
 
     @Test
@@ -44,12 +46,12 @@ class RMAShippingControllerTest {
         RMAConfiguration configuration = new RMAConfiguration();
 
         // when / then
-        assertNull(controllerFor(storeWith(configuration)).resolveDeliveryCarrier(null));
+        assertEquals(DeliveryTarget.NONE, controllerFor(storeWith(configuration)).resolveDeliveryTarget(null));
     }
 
     @Test
     void returnsNothingWhenTheStoreHasNoReturnsConfiguration() {
         // when / then
-        assertNull(controllerFor(storeWith(null)).resolveDeliveryCarrier(null));
+        assertEquals(DeliveryTarget.NONE, controllerFor(storeWith(null)).resolveDeliveryTarget(null));
     }
 }

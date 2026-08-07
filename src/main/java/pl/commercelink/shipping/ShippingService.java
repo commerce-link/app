@@ -3,7 +3,6 @@ package pl.commercelink.shipping;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pl.commercelink.orders.CollectionPoint;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
@@ -26,7 +25,7 @@ public class ShippingService {
     @Autowired
     private ShippingProviderFactory shippingProviderFactory;
 
-    public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, String deliveryCarrier) {
+    public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -35,7 +34,7 @@ public class ShippingService {
                 .sender(toShipmentAddress(senderAddress))
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
-                .deliveryPointCode(toDeliveryPointCode(form.getShippingDetails()))
+                .deliveryPointCode(deliveryTarget.pointCode())
                 .options(new ShipmentOptions(
                         form.isSaturdayDelivery(),
                         false,
@@ -45,7 +44,7 @@ public class ShippingService {
                 .build();
 
 
-        Set<String> carrierIds = carriersMatching(store.getShippingConfiguration().getAuthorizedCarriers(), deliveryCarrier).stream()
+        Set<String> carrierIds = carriersMatching(store.getShippingConfiguration().getAuthorizedCarriers(), deliveryTarget.carrier()).stream()
                 .map(AuthorizedCarrier::getId)
                 .collect(Collectors.toSet());
 
@@ -53,7 +52,7 @@ public class ShippingService {
         return shippingProvider.estimateShipment(request, carrierIds);
     }
 
-    public OperationResult<List<Shipment>> createShipping(ShippingForm form, Store store) {
+    public OperationResult<List<Shipment>> createShipping(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -70,7 +69,7 @@ public class ShippingService {
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
                 .carrierId(form.getServiceId())
-                .deliveryPointCode(toDeliveryPointCode(form.getShippingDetails()))
+                .deliveryPointCode(deliveryTarget.pointCode())
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
 
@@ -157,11 +156,6 @@ public class ShippingService {
         String wanted = deliveryCarrier.replace('_', ' ').trim();
         return StringUtils.containsIgnoreCase(carrier.getName(), wanted)
                 || StringUtils.containsIgnoreCase(carrier.getDisplayName(), wanted);
-    }
-
-    private static String toDeliveryPointCode(ShippingDetails details) {
-        CollectionPoint point = details.getCollectionPoint();
-        return point != null ? point.getCode() : null;
     }
 
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {

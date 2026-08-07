@@ -32,8 +32,6 @@ public class ShippingDetails {
     private String phone;
     @DynamoDBAttribute(attributeName = "default")
     private boolean _default = true;
-    @DynamoDBAttribute(attributeName = "collectionPoint")
-    private CollectionPoint collectionPoint;
 
     public ShippingDetails() {
     }
@@ -127,19 +125,6 @@ public class ShippingDetails {
         this._default = isDefault;
     }
 
-    public CollectionPoint getCollectionPoint() {
-        return collectionPoint;
-    }
-
-    public void setCollectionPoint(CollectionPoint collectionPoint) {
-        this.collectionPoint = collectionPoint;
-    }
-
-    @DynamoDBIgnore
-    public boolean isDeliveredToCollectionPoint() {
-        return collectionPoint != null;
-    }
-
     @DynamoDBIgnore
     public String getFullName() {
         if (StringUtils.isNotBlank(surname)) {
@@ -208,7 +193,6 @@ public class ShippingDetails {
         copy.setEmail(this.email);
         copy.setPhone(this.phone);
         copy.set_default(this._default);
-        copy.setCollectionPoint(this.collectionPoint);
         return copy;
     }
 }

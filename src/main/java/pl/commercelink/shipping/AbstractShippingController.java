@@ -70,8 +70,8 @@ public abstract class AbstractShippingController {
         Store store = getStore();
 
         try {
-            String deliveryCarrier = resolveDeliveryCarrier(form);
-            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store, deliveryCarrier);
+            DeliveryTarget deliveryTarget = resolveDeliveryTarget(form);
+            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store, deliveryTarget);
             model.addAttribute("servicePrices", estimates);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, store, form, model);
@@ -83,7 +83,7 @@ public abstract class AbstractShippingController {
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
         Store store = getStore();
-        OperationResult<List<Shipment>> result = shippingService.createShipping(form, store);
+        OperationResult<List<Shipment>> result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
             return "redirect:" + form.getShippingAction();
@@ -150,7 +150,7 @@ public abstract class AbstractShippingController {
 
     protected abstract void onShippingCreated(ShippingForm form, List<Shipment> shipments);
 
-    protected abstract String resolveDeliveryCarrier(ShippingForm form);
+    protected abstract DeliveryTarget resolveDeliveryTarget(ShippingForm form);
 
 }
 
