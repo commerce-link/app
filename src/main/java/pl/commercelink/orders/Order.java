@@ -60,6 +60,10 @@ public class Order {
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private ShippingDetails shippingDetails;
+    @DynamoDBAttribute(attributeName = "deliveryCarrier")
+    private String deliveryCarrier;
+    @DynamoDBAttribute(attributeName = "collectionPointCode")
+    private String collectionPointCode;
 
     @DynamoDBAttribute(attributeName = "comment")
     private String comment;
@@ -480,6 +484,27 @@ public class Order {
         this.shippingDetails = shippingDetails;
     }
 
+    public String getDeliveryCarrier() {
+        return deliveryCarrier;
+    }
+
+    public void setDeliveryCarrier(String deliveryCarrier) {
+        this.deliveryCarrier = deliveryCarrier;
+    }
+
+    public String getCollectionPointCode() {
+        return collectionPointCode;
+    }
+
+    public void setCollectionPointCode(String collectionPointCode) {
+        this.collectionPointCode = collectionPointCode;
+    }
+
+    @DynamoDBIgnore
+    public boolean isDeliveredToCollectionPoint() {
+        return collectionPointCode != null;
+    }
+
     public OrderStatus getStatus() {
         return status;
     }
@@ -724,6 +749,16 @@ public class Order {
 
         public Builder withExternalOrderId(String externalOrderId) {
             order.setExternalOrderId(externalOrderId);
+            return this;
+        }
+
+        public Builder withDeliveryCarrier(String deliveryCarrier) {
+            order.setDeliveryCarrier(deliveryCarrier);
+            return this;
+        }
+
+        public Builder withCollectionPointCode(String collectionPointCode) {
+            order.setCollectionPointCode(collectionPointCode);
             return this;
         }
 

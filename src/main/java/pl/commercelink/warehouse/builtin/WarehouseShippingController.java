@@ -16,6 +16,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import pl.commercelink.shipping.DeliveryTarget;
 
 @Controller
 @RequestMapping("/dashboard/warehouse/shipping")
@@ -71,5 +72,10 @@ public class WarehouseShippingController extends AbstractShippingController {
                 form.getShippingDetails(),
                 CustomSecurityContext.getLoggedInUserName()
         );
+    }
+
+    @Override
+    protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
+        return DeliveryTarget.NONE;
     }
 }

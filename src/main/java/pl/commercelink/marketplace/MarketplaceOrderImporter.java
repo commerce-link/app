@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
@@ -27,7 +28,7 @@ public class MarketplaceOrderImporter {
     @Autowired
     private OrdersManager ordersManager;
 
-    public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+    public void importOrder(Store store, String marketplaceName, MarketplaceOrder<?> marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -69,10 +70,19 @@ public class MarketplaceOrderImporter {
                 commission.doubleValue()
         );
 
-        Order order = new Order.Builder(store, basket)
+        String collectionPointCode = StringUtils.trimToNull(marketplaceOrder.pickupPointCode());
+
+        Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .build();
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null)
+                .withCollectionPointCode(collectionPointCode);
+
+        if (collectionPointCode != null) {
+            orderBuilder.withShipmentType(ShipmentType.PickupPoint);
+        }
+
+        Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
@@ -114,21 +124,12 @@ public class MarketplaceOrderImporter {
         shipping.setCompanyName(customer.company());
         shipping.setEmail(customer.email());
         shipping.setPhone(address.phone());
-        shipping.setStreetAndNumber(renderStreet(address));
+        shipping.setStreetAndNumber(address.street());
         shipping.setPostalCode(address.postalCode());
         shipping.setCity(address.city());
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
 
         return shipping;
-    }
-
-    private String renderStreet(MarketplaceCustomer.Address address) {
-        if (address.pickupPoint() == null) {
-            return address.street();
-        }
-        MarketplaceCustomer.PickupPoint point = address.pickupPoint();
-        String label = point.name() != null ? point.id() + " (" + point.name() + ")" : point.id();
-        return address.street() != null ? label + ", " + address.street() : label;
     }
 
     private String resolveProductCategory(String mfn) {

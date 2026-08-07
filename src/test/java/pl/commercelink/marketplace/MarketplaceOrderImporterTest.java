@@ -6,17 +6,19 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarketplaceOrderImporterTest {
 
     private final MarketplaceOrderImporter importer = new MarketplaceOrderImporter();
 
     @Test
-    void rendersPickupPointInShippingStreetLine() {
+    void keepsTheDeliveryStreetIntactForPointOrders() {
         // given
         MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(
-                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska",
-                new MarketplaceCustomer.PickupPoint("ALP123", "Paczkomat ALP123"));
+                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
         MarketplaceCustomer customer = new MarketplaceCustomer(
                 MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
                 "500600700", null, shippingAddress, shippingAddress);
@@ -25,7 +27,7 @@ class MarketplaceOrderImporterTest {
         ShippingDetails shipping = importer.toShippingDetails(customer);
 
         // then
-        assertEquals("ALP123 (Paczkomat ALP123), Prosta 1", shipping.getStreetAndNumber());
+        assertEquals("Prosta 1", shipping.getStreetAndNumber());
     }
 
     @Test

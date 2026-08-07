@@ -14,12 +14,14 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.stores.RMAConfiguration;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import pl.commercelink.shipping.DeliveryTarget;
 
 @Controller
 @RequestMapping("/dashboard/rma/{rmaId}/shipping")
@@ -131,5 +133,14 @@ public class RMAShippingController extends AbstractShippingController {
         return rmaItems.stream()
                 .filter(item -> form.getOrderItemIds().contains(item.getItemId()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
+        RMAConfiguration rmaConfiguration = getStore().getRmaConfiguration();
+        if (rmaConfiguration == null || rmaConfiguration.getCarrier() == null) {
+            return DeliveryTarget.NONE;
+        }
+        return DeliveryTarget.carrier(rmaConfiguration.getCarrier().getName());
     }
 }
