@@ -167,23 +167,19 @@
             font-weight: 400;
         }
 
+        /* A chip carries the whole path, so it wraps onto another line instead of clipping it. */
         .category-picker [data-picker-chips] .tag.is-link {
-            max-width: 26rem;
+            height: auto;
+            white-space: normal;
+            text-align: left;
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
         }
 
         .category-picker .chip-path {
             color: #6b7280;
             font-size: 0.75rem;
             margin-right: 0.35rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .category-picker .chip-name {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
 
         .category-picker [data-picker-label] {
@@ -234,12 +230,7 @@
                     const shortened = names.length > maxLevels
                             ? [names[0], '\u2026', names[names.length - 1]]
                             : names;
-                    return {
-                        path: names.join(separator),
-                        shortPath: shortened.join(separator),
-                        // Chips have room for one level only, and the direct parent is the disambiguating one.
-                        parent: names.length ? names[names.length - 1] : ''
-                    };
+                    return {path: names.join(separator), shortPath: shortened.join(separator)};
                 };
             },
             pathElement: option => {
@@ -478,13 +469,12 @@
                 const chips = root.querySelector('[data-picker-chips]');
 
                 const entries = options.map(option => {
-                    const {path, shortPath, parent} = breadcrumbOf(option);
+                    const {path, shortPath} = breadcrumbOf(option);
                     return {
                         value: option.id,
                         label: option.name,
                         path: path,
                         shortPath: shortPath,
-                        parent: parent,
                         // The whole breadcrumb is searchable, so typing a parent name lists everything under it.
                         haystack: normalize(option.name + ' ' + path)
                     };
@@ -524,12 +514,11 @@
                         const tag = document.createElement('span');
                         tag.className = 'tag is-link is-light';
                         const entry = entriesByValue.get(id);
-                        if (entry && entry.parent) {
+                        if (entry && entry.path) {
                             const path = document.createElement('span');
                             path.className = 'chip-path';
-                            path.textContent = entry.parent + ' \u203a';
+                            path.textContent = entry.path + ' \u203a';
                             tag.appendChild(path);
-                            tag.title = entry.path + ' \u203a ' + name;
                         }
                         const chipName = document.createElement('span');
                         chipName.className = 'chip-name';
