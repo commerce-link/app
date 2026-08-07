@@ -26,11 +26,13 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -67,6 +69,8 @@ class SupplierPurchaseServiceTest {
     void setUp() {
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
         lenient().when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
+        lenient().when(deliveriesRepository.findByExternalDeliveryId(eq(STORE_ID), anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -272,6 +276,29 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertEquals(115.0, form.getItems().get(0).getUnitCost());
+    }
+
+    @Test
+    void purchaseReturnsExistingDeliveryOnConfirmReplay() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "ACME-PO-ref-1", 550.0, "PLN", List.of()));
+        Delivery existing = new Delivery();
+        existing.setDeliveryId("delivery-1");
+        when(deliveriesRepository.findByExternalDeliveryId(STORE_ID, "ACME-PO-ref-1"))
+                .thenReturn(Optional.of(existing));
+
+        // when
+        OperationResult<String> result = service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals("delivery-1", result.getPayload());
+        verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {

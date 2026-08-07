@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -25,6 +26,23 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
     public Delivery findById(String storeId, String deliveryId) {
         return dynamoDBMapper.load(Delivery.class, storeId, deliveryId);
+    }
+
+    public Optional<Delivery> findByExternalDeliveryId(String storeId, String externalDeliveryId) {
+        Delivery deliveryKey = new Delivery();
+        deliveryKey.setStoreId(storeId);
+
+        Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
+        expressionAttributeValues.put(":externalDeliveryId", new AttributeValue().withS(externalDeliveryId));
+
+        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
+                .withHashKeyValues(deliveryKey)
+                .withFilterExpression("externalDeliveryId = :externalDeliveryId")
+                .withExpressionAttributeValues(expressionAttributeValues);
+
+        return dynamoDBMapper.query(Delivery.class, queryExpression)
+                .stream()
+                .findFirst();
     }
 
     public List<Delivery> findAll(String storeId, LocalDateTime from, LocalDateTime to) {

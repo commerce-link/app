@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -107,6 +108,12 @@ public class SupplierPurchaseService {
                     .placeOrder(new SupplierPurchaseRequest(purchaseRef, lines));
         } catch (Exception e) {
             return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+
+        Optional<Delivery> existingDelivery = deliveriesRepository.findByExternalDeliveryId(
+                storeId, orderResult.externalOrderId());
+        if (existingDelivery.isPresent()) {
+            return OperationResult.success(existingDelivery.get().getDeliveryId());
         }
 
         applyOrderResult(form, validation, orderResult);
