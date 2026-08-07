@@ -139,8 +139,8 @@ public class RMAShippingController extends AbstractShippingController {
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         RMAConfiguration rmaConfiguration = getStore().getRmaConfiguration();
         if (rmaConfiguration == null || rmaConfiguration.getCarrier() == null) {
-            return DeliveryTarget.NONE;
+            return new DeliveryTarget(null, null);
         }
-        return DeliveryTarget.carrier(rmaConfiguration.getCarrier().getName());
+        return new DeliveryTarget(rmaConfiguration.getCarrier().getName(), null);
     }
 }
