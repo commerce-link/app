@@ -234,7 +234,7 @@
 
         <!-- New Profit Information Section -->
         <div class="column">
-            <div class="box">
+            <div class="box" id="orderFinancialsBox">
                 <table class="table is-fullwidth">
                     <thead>
                     <tr>
@@ -443,7 +443,7 @@
                 </table>
             </div>
 
-            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${order.orderId}, actionPrefix='/dashboard/orders', formId='orderItemsForm')}"></div>
+            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${order.orderId}, actionPrefix='/dashboard/orders')}"></div>
 
             <div class="field">
                 <div class="control">
@@ -642,7 +642,7 @@
                         <div class="control">
                             <div class="select is-small">
                                 <select id="assignSkuCatalog" onchange="onAssignSkuCatalogChange(this)"
-                                        th:attr="data-url=@{/dashboard/orders/{orderId}/pricelist(orderId=${order.orderId})}">
+                                        th:attr="data-url=@{/dashboard/pricelist}">
                                     <option value="" th:text="#{orders.select.catalog}"></option>
                                     <option th:each="catalog : ${catalogs}"
                                             th:value="${catalog.catalogId}"
@@ -1123,6 +1123,7 @@
                         <th th:text="#{order.document.type}"></th>
                         <th th:text="#{order.document.issuedAt}"></th>
                         <th th:text="#{order.document.status}"></th>
+                        <th th:if="${isAdmin}"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -1135,6 +1136,17 @@
                         <td th:text="${document.type}"></td>
                         <td th:text="${document.issuedAt != null ? document.issuedAt : '-'}"></td>
                         <td th:text="#{document.status.issued}"></td>
+                        <td th:if="${isAdmin}">
+                            <form th:if="${document.type.invoiceOrReceipt}" method="post"
+                                  th:action="@{/dashboard/orders/{orderId}/removeDocument(orderId=${order.orderId})}"
+                                  style="margin: 0;">
+                                <input type="hidden" name="type" th:value="${document.type}"/>
+                                <input type="hidden" name="number" th:value="${document.number}"/>
+                                <button class="button is-danger is-small" type="button" th:disabled="${isCompletedOrder}" th:title="#{order.document.remove}" onclick="confirmDelete(this)">
+                                    <span class="icon is-small"><i class="fas fa-trash" aria-hidden="true"></i></span>
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                     <tr th:if="${!order.closingDocument.isPresent() and !order.isRMAReplacementOrder()}">
                         <td>-</td>
@@ -1142,6 +1154,7 @@
                         <td th:text="${order.receiptType}"></td>
                         <td>-</td>
                         <td th:text="#{document.status.toBeIssued}"></td>
+                        <td th:if="${isAdmin}"></td>
                     </tr>
                     </tbody>
                 </table>
@@ -1353,11 +1366,6 @@
     </div>
 
     <script th:inline="javascript">
-        document.addEventListener('DOMContentLoaded', () => {
-            const shouldOpenModal = /*[[${openModal}]]*/ false;
-            if (shouldOpenModal) toggleOrderItemModal(true);
-        });
-
         function submitCancelForm(orderId) {
             if (confirm("Are you sure you want to cancel this shipment?")) {
                 const form = document.createElement('form');
@@ -1379,29 +1387,21 @@
         }
 
         function toggleOrderItemModal(show) {
-            const modal = document.getElementById('itemAddModalId');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
+            toggleAddItemModal(show);
         }
 
-        function updateAddItemPosition(category) {
+        window.resolveAddItemPosition = function (category) {
             const positionInput = document.querySelector('#orderItemsForm input[name="position"]');
-            if (!positionInput) return;
-            let position = positionInput.dataset.defaultPosition;
-            document.querySelectorAll('#orderItemsRows tr[data-category]').forEach(row => {
-                if (row.dataset.service !== 'true' && row.dataset.category === category) {
-                    position = row.dataset.position;
-                }
-            });
-            positionInput.value = position;
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const categorySelect = document.querySelector('#itemAddModalId select[name="category"]');
-            if (categorySelect) {
-                categorySelect.addEventListener('change', () => updateAddItemPosition(categorySelect.value));
+            let position = positionInput ? positionInput.dataset.defaultPosition : 0;
+            if (category) {
+                document.querySelectorAll('#orderItemsRows tr[data-category]').forEach(row => {
+                    if (row.dataset.service !== 'true' && row.dataset.category === category) {
+                        position = row.dataset.position;
+                    }
+                });
             }
-        });
+            return position;
+        };
 
         function toggleReceiptModal(show) {
             const modal = document.getElementById('receiptModal');
@@ -1651,12 +1651,6 @@
         let assignSkuSelected = [];
         let assignSkuData = [];
         const assignSkuPricelists = {};
-        {
-            const catalogSelect = document.getElementById('assignSkuCatalog');
-            if (catalogSelect && catalogSelect.value) {
-                assignSkuPricelists[catalogSelect.value] = availabilityAndPrices;
-            }
-        }
 
         function toggleAssignSkuModal(show) {
             const modal = document.getElementById('assignSkuModal');

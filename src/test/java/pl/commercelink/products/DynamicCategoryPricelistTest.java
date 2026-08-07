@@ -21,6 +21,7 @@ import pl.commercelink.pricelist.AvailabilityAndPriceList;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.pricelist.SellingPriceHistoryRepository;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,7 +77,7 @@ class DynamicCategoryPricelistTest {
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
-        when(inventory.findAllByProductCategory("Karty graficzne")).thenReturn(List.of(matchedInventory));
+        when(inventory.findAllByProductCategoryIds(List.of("170"))).thenReturn(Map.of("170", List.of(matchedInventory)));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
 
         mockInventoryWithSingleGraphicsCard();
@@ -123,6 +124,9 @@ class DynamicCategoryPricelistTest {
         definition.setName("Karta graficzna");
         definition.setType(CategoryDefinitionType.Dynamic);
         definition.setCategory(category);
+        if ("Karty graficzne".equals(category)) {
+            definition.setPimCategoryIds(new LinkedList<>(List.of("170")));
+        }
         definition.setStockDefinition(new StockDefinition(2, 5, 20));
         definition.setPriceDefinitions(List.of(new PriceDefinition(1.2, 100, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP)));
         definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 2));

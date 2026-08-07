@@ -52,7 +52,8 @@ public final class CatalogSeed {
                 f[0].trim(), f[1].trim(), f[2].trim(), f[3].trim(), f[4].trim(), f[5].trim(), f[6].trim(),
                 Integer.parseInt(f[7].trim()), Integer.parseInt(f[8].trim()),
                 Integer.parseInt(f[9].trim()), Integer.parseInt(f[10].trim()),
-                suppliers, Boolean.parseBoolean(f[12].trim()), Boolean.parseBoolean(f[13].trim()));
+                suppliers, Boolean.parseBoolean(f[12].trim()), Boolean.parseBoolean(f[13].trim()),
+                f.length > 14 ? f[14].trim() : "");
     }
 
     public static String categoryId(String category, String storeId) {

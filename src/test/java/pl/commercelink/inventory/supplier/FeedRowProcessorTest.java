@@ -21,7 +21,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,7 +59,9 @@ class FeedRowProcessorTest {
         // then
         assertEquals(Optional.of(sellableItem), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
-        verifyNoInteractions(stats);
+        verify(stats).markImported();
+        verify(stats, never()).markImportedCategorized();
+        verify(stats, never()).markInvalid();
     }
 
     @Test
@@ -81,19 +82,21 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(enrichment).addPending(pendingTaxonomy, "Acme");
         verify(taxonomyCache, never()).add(any());
-        verify(stats).markPendingAdded();
-        verify(stats, never()).markDropped();
-        verify(stats, never()).markAdopted();
+        verify(stats).markCategorizationScheduled();
+        verify(stats, never()).markCategorizationPostponed();
+        verify(stats, never()).markIncomplete();
+        verify(stats, never()).markImportedCategorized();
     }
 
     @Test
-    void pendingIneligibleRowIsDroppedLikeToday() {
+    void pendingIneligibleRowWithCompleteDataIsDeferredToNextFeed() {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
+        when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
@@ -103,8 +106,32 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(enrichment, never()).addPending(any(), any());
         verify(taxonomyCache, never()).add(any());
-        verify(stats).markDropped();
-        verify(stats, never()).markPendingAdded();
+        verify(stats).markCategorizationPostponed();
+        verify(stats, never()).markIncomplete();
+        verify(stats, never()).markCategorizationScheduled();
+    }
+
+    @Test
+    void pendingIneligibleRowWithMissingDataIsDropped() {
+        // given
+        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
+        when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(false);
+        FeedParseStats stats = mock(FeedParseStats.class);
+
+        // when
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(enrichment, never()).addPending(any(), any());
+        verify(taxonomyCache, never()).add(any());
+        verify(stats).markIncomplete();
+        verify(stats, never()).markCategorizationPostponed();
+        verify(stats, never()).markCategorizationScheduled();
     }
 
     @Test
@@ -122,7 +149,31 @@ class FeedRowProcessorTest {
         // then
         assertEquals(Optional.of(sellableItem), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
-        verify(stats).markAdopted();
+        verify(stats).markImportedCategorized();
+        verify(stats).markImported();
+    }
+
+    @Test
+    void adoptedCategoryOnIncompleteRowIsNotCountedAsImportedCategorized() {
+        // given
+        Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", null, 5, null, null);
+        Taxonomy enrichedNoBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", "CPU", 5, null, null);
+        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(noBrand);
+        when(enrichment.enrich(noBrand)).thenReturn(enrichedNoBrand);
+        when(enrichment.isPendingEligible(enrichedNoBrand)).thenReturn(false);
+        when(enrichment.hasIdentificationData(enrichedNoBrand)).thenReturn(false);
+        FeedParseStats stats = mock(FeedParseStats.class);
+
+        // when
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(stats).markIncomplete();
+        verify(stats, never()).markImportedCategorized();
+        verify(stats, never()).markImported();
     }
 
     @Test
@@ -141,7 +192,8 @@ class FeedRowProcessorTest {
         assertTrue(result.isEmpty());
         verify(taxonomyCache, never()).add(any());
         verify(enrichment, never()).addPending(any(), any());
-        verifyNoInteractions(stats);
+        verify(stats).markInvalid();
+        verify(stats, never()).markImported();
     }
 
     @Test

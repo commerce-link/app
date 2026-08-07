@@ -39,6 +39,30 @@ class StoreCopyServiceTest {
     private StoreCopyService storeCopyService;
 
     @Test
+    void copiedDefinitionsKeepThePimCategoryIds() {
+        // given
+        Store source = new Store();
+        source.setStoreId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(source);
+
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-1");
+        definition.setName("Karty graficzne");
+        definition.setPimCategoryIds(List.of("194", "195"));
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(definition));
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
+
+        // when
+        storeCopyService.copyStore("store-1", "Kopia");
+
+        // then
+        ArgumentCaptor<ProductCatalog> catalogCaptor = ArgumentCaptor.forClass(ProductCatalog.class);
+        verify(productCatalogRepository).save(catalogCaptor.capture());
+        assertThat(catalogCaptor.getValue().getCategories().get(0).getPimCategoryIds()).containsExactly("194", "195");
+    }
+
+    @Test
     void copiedDefinitionsProductsKeepTheServiceFlag() {
         // given
         Store source = new Store();

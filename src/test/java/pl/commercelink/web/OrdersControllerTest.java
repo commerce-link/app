@@ -425,6 +425,97 @@ class OrdersControllerTest {
         assertThat(item.getPosition()).isEqualTo(2);
     }
 
+    @Test
+    void postedPriceIsAppliedToAllocatedItemWhenOrderHasNoDocuments() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("delivery-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setPrice(150.0);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getPrice()).isEqualTo(150.0);
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getDeliveryId()).isEqualTo("delivery-1");
+    }
+
+    @Test
+    void postedPriceIsIgnoredWhenOrderHasDocuments() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(invoicedOrder());
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setPrice(150.0);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getPrice()).isEqualTo(100.0);
+    }
+
+    @Test
+    @DisplayName("removeDocument removes the invoice and saves the order without triggering the lifecycle")
+    void removeDocumentRemovesInvoiceAndSavesWithoutLifecycle() {
+        // given
+        Order existingOrder = invoicedOrder();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        String view = ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.InvoiceVat, "FV/1/2026", redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getDocuments()).isEmpty();
+        verify(ordersRepository).save(existingOrder);
+        verifyNoInteractions(orderLifecycle);
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("removeDocument sets error flash and does not save when the order is completed")
+    void removeDocumentRejectsCompletedOrder() {
+        // given
+        Order existingOrder = invoicedOrder();
+        existingOrder.setStatus(OrderStatus.Completed);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(messageSource.getMessage(eq("error.message.document.cannot.be.removed"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot remove");
+
+        // when
+        ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.InvoiceVat, "FV/1/2026", redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getDocuments()).hasSize(1);
+        verify(ordersRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
+    }
+
+    @Test
+    @DisplayName("removeDocument sets error flash and does not save when the document is a warehouse document")
+    void removeDocumentRejectsWarehouseDocument() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.addDocument(new pl.commercelink.documents.Document(
+                "wz-1", "WZ/1/2026", null, pl.commercelink.documents.DocumentType.GoodsIssue));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(messageSource.getMessage(eq("error.message.document.cannot.be.removed"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot remove");
+
+        // when
+        ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.GoodsIssue, "WZ/1/2026", redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getDocuments()).hasSize(1);
+        verify(ordersRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
+    }
+
     private OrderItem existingOrderItem(String category, boolean service) {
         OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
         item.setService(service);

@@ -2,51 +2,43 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FeedParseStatsTest {
 
     @Test
-    void logsNothingWhenAllCountersAreZero() {
+    void summaryContainsAllCounters() {
         // given
         FeedParseStats stats = new FeedParseStats("Acme");
+        stats.markImported();
+        stats.markImported();
+        stats.markImportedCategorized();
+        stats.markCategorizationScheduled();
+        stats.markCategorizationScheduled();
+        stats.markCategorizationPostponed();
+        stats.markIncomplete();
+        stats.markInvalid();
 
         // when
-        String output = captureLog(stats);
+        String summary = stats.summary();
 
         // then
-        assertEquals("", output);
+        assertTrue(summary.contains("Feed Acme: imported=2 importedCategorized=1"
+                + " categorizationScheduled=2 categorizationPostponed=1 incomplete=1 invalid=1"));
     }
 
     @Test
-    void logsAggregatedCountersLine() {
+    void summaryContainsDurationSinceCreation() throws InterruptedException {
         // given
         FeedParseStats stats = new FeedParseStats("Acme");
-        stats.markAdopted();
-        stats.markPendingAdded();
-        stats.markPendingAdded();
-        stats.markDropped();
+        Thread.sleep(5);
 
         // when
-        String output = captureLog(stats);
+        String summary = stats.summary();
 
         // then
-        assertTrue(output.contains("Feed Acme: adoptedCategories=1 pendingAdded=2 droppedUnprocessable=1"));
-    }
-
-    private static String captureLog(FeedParseStats stats) {
-        PrintStream originalOut = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(captured));
-        try {
-            stats.log();
-        } finally {
-            System.setOut(originalOut);
-        }
-        return captured.toString();
+        long importDurationInMs = Long.parseLong(
+                summary.substring(summary.indexOf("importDurationInMs=") + "importDurationInMs=".length()));
+        assertTrue(importDurationInMs >= 5);
     }
 }

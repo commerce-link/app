@@ -228,6 +228,18 @@ public abstract class Item implements Delivered {
     }
 
     @DynamoDBIgnore
+    public boolean updateFulfilment(String provider, String ean, String mfn, double cost) {
+        if (!isInAllocation() || !provider.equals(this.deliveryId)) {
+            return false;
+        }
+
+        setEan(ean);
+        setManufacturerCode(mfn);
+        setCost(cost);
+        return true;
+    }
+
+    @DynamoDBIgnore
     public void markAsReceived() {
         this.setStatus(FulfilmentStatus.Delivered);
     }

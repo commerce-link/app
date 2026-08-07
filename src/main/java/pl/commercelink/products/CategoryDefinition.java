@@ -44,6 +44,8 @@ public class CategoryDefinition implements DeletionProtection {
     @DynamoDBAttribute(attributeName = "typeChangedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime typeChangedAt;
+    @DynamoDBAttribute(attributeName = "pimCategoryIds")
+    private List<String> pimCategoryIds = new LinkedList<>();
 
     // required by DynamoDB
     public CategoryDefinition() {
@@ -260,5 +262,18 @@ public class CategoryDefinition implements DeletionProtection {
 
     public void setTypeChangedAt(LocalDateTime typeChangedAt) {
         this.typeChangedAt = typeChangedAt;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasCategoryMapping() {
+        return !pimCategoryIds.isEmpty();
+    }
+
+    public List<String> getPimCategoryIds() {
+        return pimCategoryIds;
+    }
+
+    public void setPimCategoryIds(List<String> pimCategoryIds) {
+        this.pimCategoryIds = pimCategoryIds == null ? new LinkedList<>() : pimCategoryIds;
     }
 }

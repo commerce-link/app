@@ -30,6 +30,10 @@ public enum DocumentType {
         return this == InvoiceVat || this == InvoiceAdvance || this == InvoiceFinal;
     }
 
+    public boolean isInvoiceOrReceipt() {
+        return this == Proforma || this == InvoicePersonal || this == Receipt || isB2BInvoice();
+    }
+
     public boolean isClosingInvoice() {
         return this == InvoiceVat || this == InvoiceFinal || this == InvoicePersonal || this == Receipt;
     }

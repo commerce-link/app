@@ -15,13 +15,15 @@ public class TaxonomyCategoryEnrichment {
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
+    private final CategoryMatchAttempts attempts;
     private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
 
     TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties,
-                               CategoryMappingCache mappingCache) {
+                               CategoryMappingCache mappingCache, CategoryMatchAttempts attempts) {
         this.taxonomyCache = taxonomyCache;
         this.properties = properties;
         this.mappingCache = mappingCache;
+        this.attempts = attempts;
     }
 
     public Taxonomy enrich(Taxonomy taxonomy) {
@@ -39,9 +41,12 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
+        return hasIdentificationData(taxonomy) && taxonomyCache.pendingCount() < properties.pendingCap();
+    }
+
+    public boolean hasIdentificationData(Taxonomy taxonomy) {
         return isNotBlank(taxonomy.mfn()) && isNotBlank(taxonomy.ean())
-                && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name())
-                && taxonomyCache.pendingCount() < properties.pendingCap();
+                && isNotBlank(taxonomy.brand()) && isNotBlank(taxonomy.name());
     }
 
     public void addPending(Taxonomy taxonomy, String supplier) {
@@ -61,6 +66,7 @@ public class TaxonomyCategoryEnrichment {
             return;
         }
         if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
+            attempts.clear(event.mfn());
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
             learnMapping(event);
@@ -72,7 +78,7 @@ public class TaxonomyCategoryEnrichment {
         if (supplier == null || isBlank(event.categoryId())) {
             return;
         }
-        if (event.confidence() != null && event.confidence() < properties.mappingMinConfidence()) {
+        if (event.confidence() != null && event.confidence() < properties.mapping().minConfidence()) {
             return;
         }
         Taxonomy taxonomy = taxonomyCache.findByMfn(event.mfn());

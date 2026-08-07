@@ -21,10 +21,13 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.rma.RMACenter;
+import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.StockDefinition;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.CheckoutConfiguration;
@@ -50,7 +53,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Objects;
 
 @Service
@@ -61,6 +66,7 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static final String ACME = "Acme";
     private static final String ACME_B = "AcmeB";
+    private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
@@ -92,6 +98,13 @@ public class DemoStoreSeeder implements StoreSeeder {
     private void seedStoreData(String storeId, DemoStoreMetadata demo) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+
+        savePricelist(storeId);
+
+        if (isAlreadySeeded(mapper, storeId)) {
+            return;
+        }
+
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
@@ -100,8 +113,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
-        savePricelist(storeId);
         saveOrders(mapper, clobber, storeId, ownerEmailOrFallback(demo), rows);
+    }
+
+    private boolean isAlreadySeeded(DynamoDBMapper mapper, String storeId) {
+        return mapper.load(ProductCatalog.class, storeId, CATALOG_ID) != null;
     }
 
     static void applyStoreConfiguration(Store store, String storeId, String storeName, DemoStoreMetadata demo) {
@@ -118,6 +134,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         fulfilment.setSupplierConnections(List.of(
                 new StoreSupplierConnection(ACME, ConnectionMode.GLOBAL),
                 new StoreSupplierConnection(ACME_B, ConnectionMode.GLOBAL)));
+        fulfilment.setEnabledCategories(List.of(ENABLED_CATEGORY_GROUP));
         store.setFulfilmentConfiguration(fulfilment);
 
         WarehouseConfiguration warehouse = Objects.requireNonNullElseGet(store.getWarehouseConfiguration(), WarehouseConfiguration::new);
@@ -145,20 +162,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId) {
-        List<CategoryDefinition> categories = new ArrayList<>();
-        int sequence = 0;
-        for (String category : distinctCategories(rows)) {
-            CategoryDefinition definition = new CategoryDefinition();
-            definition.setCategoryId(CatalogSeed.categoryId(category, storeId));
-            definition.setName(category);
-            definition.setCategory(category);
-            definition.setType(CategoryDefinitionType.Managed);
-            definition.setRequiredDuringOrder(false);
-            definition.setSequenceNumber(++sequence);
-            definition.setMaxQty(10);
-            definition.setDeletionProtection(false);
-            categories.add(definition);
-        }
+        List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId);
 
         ProductCatalog catalog = new ProductCatalog();
         catalog.setStoreId(storeId);
@@ -304,6 +308,36 @@ public class DemoStoreSeeder implements StoreSeeder {
         item.setEan(row.ean());
         item.setManufacturerCode(row.mfn());
         return item;
+    }
+
+    static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId) {
+        Map<String, String> pimCategoryIdByCategory = rows.stream()
+                .filter(row -> !row.pimCategoryId().isBlank())
+                .collect(Collectors.toMap(CatalogSeedRow::category, CatalogSeedRow::pimCategoryId, (first, second) -> first));
+
+        List<CategoryDefinition> categories = new ArrayList<>();
+        int sequence = 0;
+        for (String category : distinctCategories(rows)) {
+            CategoryDefinition definition = new CategoryDefinition();
+            definition.setCategoryId(CatalogSeed.categoryId(category, storeId));
+            definition.setName(category);
+            definition.setCategory(category);
+            definition.setType(CategoryDefinitionType.Managed);
+            definition.setRequiredDuringOrder(false);
+            definition.setSequenceNumber(++sequence);
+            definition.setMaxQty(10);
+            definition.setDeletionProtection(false);
+            definition.setStockDefinition(new StockDefinition(2, 5, 20));
+            definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 1));
+            definition.setPriceDefinitions(new LinkedList<>(List.of(
+                    new PriceDefinition(1.15, 10, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP))));
+            String pimCategoryId = pimCategoryIdByCategory.get(category);
+            if (pimCategoryId != null) {
+                definition.setPimCategoryIds(new LinkedList<>(List.of(pimCategoryId)));
+            }
+            categories.add(definition);
+        }
+        return categories;
     }
 
     private static List<String> distinctCategories(List<CatalogSeedRow> rows) {

@@ -94,6 +94,8 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
+        model.addAttribute("categoryNamesById", productCatalog.getCategories().stream()
+                .collect(Collectors.toMap(CategoryDefinition::getCategoryId, this::displayCategories)));
         return "catalogDetails";
     }
 
@@ -176,8 +178,9 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("productCategories", pimCategoryOptions.categoryOptions(
-                store.getEnabledCategories(), Collections.singletonList(categoryDefinition.getCategory())));
+        model.addAttribute("categoryOptions", pimCategoryOptions.leafOptionsUnder(
+                store.getEnabledCategories(), categoryDefinition.getPimCategoryIds()));
+        model.addAttribute("selectedCategoryOptions", selectedOptions(categoryDefinition));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
@@ -185,6 +188,22 @@ public class ProductCatalogController {
         model.addAttribute("edit", isEdit);
 
         return "catalogDetails_categoryDefinition";
+    }
+
+    private List<PimCategoryOptions.CategoryOption> selectedOptions(CategoryDefinition categoryDefinition) {
+        List<String> names = pimCategoryOptions.namesOf(categoryDefinition.getPimCategoryIds());
+        List<PimCategoryOptions.CategoryOption> options = new LinkedList<>();
+        for (int i = 0; i < categoryDefinition.getPimCategoryIds().size(); i++) {
+            options.add(new PimCategoryOptions.CategoryOption(categoryDefinition.getPimCategoryIds().get(i), names.get(i)));
+        }
+        return options;
+    }
+
+    private String displayCategories(CategoryDefinition definition) {
+        if (!definition.hasCategoryMapping()) {
+            return StringUtils.defaultString(definition.getCategory());
+        }
+        return String.join(", ", pimCategoryOptions.namesOf(definition.getPimCategoryIds()));
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category")
@@ -202,24 +221,27 @@ public class ProductCatalogController {
             throw new RuntimeException("Category definition is not complete");
         }
 
-        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryDefinition.getCategoryId();
+        return "redirect:/dashboard/catalogs/" + catalogId;
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (categoryDefinition.getCategory() == null || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
             return;
         }
-
-        String inventoryCategory = categoryDefinition.getCategory();
-        boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findAllByProductCategory(inventoryCategory)
-                .stream()
-                .anyMatch(MatchedInventory::hasAnyOffers);
-
-        if (!hasAnyOffers) {
+        if (!categoryDefinition.hasCategoryMapping()) {
+            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
+                    "catalog.category.noMapping", null, LocaleContextHolder.getLocale()));
+            return;
+        }
+        Map<String, Collection<MatchedInventory>> matchesByCategoryId = inventory.withEnabledSuppliersOnly(getStoreId())
+                .findAllByProductCategoryIds(categoryDefinition.getPimCategoryIds());
+        List<String> emptyCategoryIds = categoryDefinition.getPimCategoryIds().stream()
+                .filter(id -> matchesByCategoryId.getOrDefault(id, List.of()).stream().noneMatch(MatchedInventory::hasAnyOffers))
+                .toList();
+        if (!emptyCategoryIds.isEmpty()) {
             redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
                     "catalog.category.emptyInventory",
-                    new Object[]{categoryDefinition.getCategory()},
+                    new Object[]{String.join(", ", pimCategoryOptions.namesOf(emptyCategoryIds))},
                     LocaleContextHolder.getLocale()));
         }
     }
@@ -229,10 +251,11 @@ public class ProductCatalogController {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
         CategoryDefinition removedCategoryDefinition = productCatalog.removeCategoryDefinition(categoryId);
 
-        // if no other CategoryDefinition is associated with the same category, then delete all products associated with this category
-        if (productCatalog.getCategories().stream().noneMatch(c -> Objects.equals(
-                c.getCategory(),
-                removedCategoryDefinition.getCategory()))) {
+        boolean keepProducts = removedCategoryDefinition.hasCategoryMapping()
+                && productCatalog.getCategories().stream()
+                .anyMatch(c -> c.getPimCategoryIds().stream()
+                        .anyMatch(removedCategoryDefinition.getPimCategoryIds()::contains));
+        if (!keepProducts) {
             List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
             productRepository.delete(products);
         }
@@ -396,6 +419,7 @@ public class ProductCatalogController {
 
         model.addAttribute("catalogId", catalogId);
         model.addAttribute("categoryDefinition", categoryDefinition);
+        model.addAttribute("categoryDisplayName", displayCategories(categoryDefinition));
 
         Map<String, Object> paginationParams = new HashMap<>();
         if (StringUtils.isNotBlank(status)) paginationParams.put("status", status);

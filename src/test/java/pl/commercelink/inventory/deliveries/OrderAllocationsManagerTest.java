@@ -102,6 +102,72 @@ class OrderAllocationsManagerTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.New);
     }
 
+    @Test
+    @DisplayName("updateFulfilment updates fulfilment data of item in Allocation state assigned to the given provider")
+    void updateFulfilmentUpdatesItemInAllocationState() {
+        // given
+        OrderItem allocatedItem = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWithStatus(OrderStatus.Assembly));
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(allocatedItem);
+
+        // when
+        boolean updated = orderAllocationsManager.updateFulfilment(STORE_ID, "delivery-1", ORDER_ID, "item-1", "new-ean", "NEW-MFN", 55.5);
+
+        // then
+        assertThat(updated).isTrue();
+        verify(orderItemsRepository).save(allocatedItem);
+        assertThat(allocatedItem.getEan()).isEqualTo("new-ean");
+        assertThat(allocatedItem.getManufacturerCode()).isEqualTo("NEW-MFN");
+        assertThat(allocatedItem.getCost()).isEqualTo(55.5);
+    }
+
+    @Test
+    @DisplayName("updateFulfilment does not touch item that is no longer in Allocation state")
+    void updateFulfilmentSkipsItemOutsideAllocationState() {
+        // given
+        OrderItem orderedItem = orderItemInStatus("item-1", FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWithStatus(OrderStatus.Assembly));
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderedItem);
+
+        // when
+        boolean updated = orderAllocationsManager.updateFulfilment(STORE_ID, "delivery-1", ORDER_ID, "item-1", "new-ean", "NEW-MFN", 55.5);
+
+        // then
+        assertThat(updated).isFalse();
+        verify(orderItemsRepository, never()).save(any());
+        assertThat(orderedItem.getEan()).isEqualTo("EAN-item-1");
+    }
+
+    @Test
+    @DisplayName("updateFulfilment does not touch item assigned to a different provider")
+    void updateFulfilmentSkipsItemOfDifferentProvider() {
+        // given
+        OrderItem allocatedItem = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWithStatus(OrderStatus.Assembly));
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(allocatedItem);
+
+        // when
+        boolean updated = orderAllocationsManager.updateFulfilment(STORE_ID, "other-provider", ORDER_ID, "item-1", "new-ean", "NEW-MFN", 55.5);
+
+        // then
+        assertThat(updated).isFalse();
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateFulfilment does not touch item when order does not belong to the store")
+    void updateFulfilmentSkipsItemWhenOrderNotFound() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        boolean updated = orderAllocationsManager.updateFulfilment(STORE_ID, "delivery-1", ORDER_ID, "item-1", "new-ean", "NEW-MFN", 55.5);
+
+        // then
+        assertThat(updated).isFalse();
+        verify(orderItemsRepository, never()).save(any());
+    }
+
     private Order orderWithStatus(OrderStatus status) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ServiceLoader;
 
 @Configuration
@@ -32,15 +31,8 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
-        Optional<PimCatalogDescriptor> descriptorOpt = ServiceLoader.load(PimCatalogDescriptor.class).findFirst();
-
-        if (descriptorOpt.isEmpty()) {
-            System.err.println("No PimCatalogDescriptor found on classpath — using empty PimCatalog");
-            this.catalog = new EmptyPimCatalog();
-            return;
-        }
-
-        PimCatalogDescriptor descriptor = descriptorOpt.get();
+        PimCatalogDescriptor descriptor = resolveDescriptor(
+                ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
 
         Map<String, String> configuration = new HashMap<>();
         if (secretsManager.exists(descriptor.name())) {
@@ -64,6 +56,19 @@ public class PimCatalogRegistry {
         EventBindingRegistrar.forDescriptors(List.of(descriptor))
                 .withQueues(sqsAsyncClient, containers, catalog::dispatch)
                 .register();
+    }
+
+    static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {
+        if (descriptors.isEmpty()) {
+            throw new IllegalStateException(
+                    "No PimCatalogDescriptor found on classpath — build with -Pdev (pim-dev) or add a PIM adapter to the pom");
+        }
+        if (descriptors.size() > 1) {
+            throw new IllegalStateException("Multiple PimCatalogDescriptors found on classpath: "
+                    + descriptors.stream().map(PimCatalogDescriptor::name).toList()
+                    + " — exactly one PIM adapter is expected");
+        }
+        return descriptors.get(0);
     }
 
     @Bean

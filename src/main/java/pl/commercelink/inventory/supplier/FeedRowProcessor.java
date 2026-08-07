@@ -23,25 +23,28 @@ class FeedRowProcessor {
         InventoryItem item = dataCorrection.run(parsed.item());
         Taxonomy corrected = dataCorrection.run(parsed.product());
         if (item == null || corrected == null || !item.isSellable()) {
+            stats.markInvalid();
             return Optional.empty();
         }
 
         Taxonomy taxonomy = enrichment.enrich(corrected);
-        if (!TaxonomyCache.hasCategory(corrected) && TaxonomyCache.hasCategory(taxonomy)) {
-            stats.markAdopted();
-        }
-
         Taxonomy deprioritized = StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty);
         if (taxonomy.isProcessable()) {
             taxonomyCache.add(deprioritized);
+            stats.markImported();
+            if (!TaxonomyCache.hasCategory(corrected)) {
+                stats.markImportedCategorized();
+            }
             return Optional.of(item);
         }
 
         if (enrichment.isPendingEligible(taxonomy)) {
             enrichment.addPending(deprioritized, stats.supplierName());
-            stats.markPendingAdded();
+            stats.markCategorizationScheduled();
+        } else if (enrichment.hasIdentificationData(taxonomy)) {
+            stats.markCategorizationPostponed();
         } else {
-            stats.markDropped();
+            stats.markIncomplete();
         }
         return Optional.empty();
     }

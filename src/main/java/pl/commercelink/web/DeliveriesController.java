@@ -22,6 +22,7 @@ import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -62,6 +63,12 @@ public class DeliveriesController {
 
     @Autowired
     private DeliveryCreationService deliveryCreationService;
+
+    @Autowired
+    private DeliveryFulfilmentUpdateService deliveryFulfilmentUpdateService;
+
+    @Autowired
+    private DeliveryOrderedQtyUpdateService deliveryOrderedQtyUpdateService;
 
     @Autowired
     private RestockSuggestionService restockSuggestionService;
@@ -388,6 +395,40 @@ public class DeliveriesController {
         return "deliveryCreate";
     }
 
+    @PostMapping("/dashboard/deliveries/create/{provider}/updateFulfilment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateDeliveryItemFulfilment(
+            @PathVariable("provider") String provider,
+            @ModelAttribute DeliveryFulfilmentUpdateForm form,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateFulfilment(getStoreId(), provider, form, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/updateFulfilment")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String updateDeliveryItemFulfilmentForSuperAdmin(
+            @PathVariable("storeId") String storeId,
+            @PathVariable("provider") String provider,
+            @ModelAttribute DeliveryFulfilmentUpdateForm form,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateFulfilment(storeId, provider, form, redirectAttributes, locale);
+    }
+
+    private String updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(storeId, provider, form);
+
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
+                : "redirect:/dashboard/deliveries/create/" + provider;
+    }
+
     @PostMapping("/dashboard/deliveries/create")
     @PreAuthorize("hasRole('ADMIN')")
     public String processDeliveryCreation(@ModelAttribute DeliveryCreationForm form) {
@@ -455,6 +496,42 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + updatedDelivery.getDeliveryId();
+    }
+
+    @PostMapping("/dashboard/deliveries/updateItemQty")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateDeliveryItemQty(
+            @RequestParam String deliveryId,
+            @RequestParam String mfn,
+            @RequestParam int qty,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateItemQty(getStoreId(), deliveryId, mfn, qty, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/updateItemQty")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String updateDeliveryItemQtyForSuperAdmin(
+            @PathVariable("storeId") String storeId,
+            @RequestParam String deliveryId,
+            @RequestParam String mfn,
+            @RequestParam int qty,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updateItemQty(storeId, deliveryId, mfn, qty, redirectAttributes, locale);
+    }
+
+    private String updateItemQty(String storeId, String deliveryId, String mfn, int qty, RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(storeId, deliveryId, mfn, qty);
+
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/deliveries/link-invoices")

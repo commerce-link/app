@@ -9,12 +9,19 @@ import pl.commercelink.pim.api.PimCategory;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class PimCategoryOptions {
+
+    public record CategoryOption(String id, String name) {
+    }
 
     private static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
 
@@ -49,6 +56,39 @@ public class PimCategoryOptions {
                 .forEach(options::add);
         options.sort(POLISH_COLLATOR);
         return List.copyOf(options);
+    }
+
+    public List<CategoryOption> leafOptionsUnder(Collection<String> topLevelNames, Collection<String> currentIds) {
+        PimCategories categories = categories();
+        Map<String, CategoryOption> optionsById = new LinkedHashMap<>();
+        categories.topLevels().stream()
+                .filter(top -> topLevelNames.contains(top.name()))
+                .flatMap(top -> categories.leavesUnder(top.id()).stream())
+                .forEach(leaf -> optionsById.putIfAbsent(leaf.id(), new CategoryOption(leaf.id(), leaf.name())));
+        Map<String, String> namesById = namesById(categories);
+        currentIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(id -> optionsById.putIfAbsent(id, new CategoryOption(id, namesById.getOrDefault(id, id))));
+        return optionsById.values().stream()
+                .sorted(Comparator.comparing(CategoryOption::name, POLISH_COLLATOR))
+                .toList();
+    }
+
+    public String nameOf(String categoryId) {
+        return namesOf(List.of(categoryId)).getFirst();
+    }
+
+    public List<String> namesOf(Collection<String> categoryIds) {
+        Map<String, String> namesById = namesById(categories());
+        return categoryIds.stream()
+                .map(id -> namesById.getOrDefault(id, id))
+                .toList();
+    }
+
+    private Map<String, String> namesById(PimCategories categories) {
+        return categories.all().stream()
+                .filter(category -> category.name() != null)
+                .collect(Collectors.toMap(PimCategory::id, PimCategory::name, (first, second) -> first));
     }
 
     private PimCategories categories() {

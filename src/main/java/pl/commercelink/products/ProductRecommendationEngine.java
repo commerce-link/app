@@ -8,6 +8,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -29,7 +30,7 @@ public class ProductRecommendationEngine {
      * recommendations for products that are not currently available via PimIndex.
      */
     public List<ProductRecommendation> getRecommendations(CategoryDefinition categoryDefinition, InventoryView inventory) {
-        if (categoryDefinition.getCategory() == null) {
+        if (!categoryDefinition.hasCategoryMapping()) {
             return List.of();
         }
 
@@ -38,8 +39,10 @@ public class ProductRecommendationEngine {
                 .map(InventoryKey::fromProduct)
                 .collect(Collectors.toList());
 
-        return inventory.findAllByProductCategory(categoryDefinition.getCategory())
+        return inventory.findAllByProductCategoryIds(categoryDefinition.getPimCategoryIds())
+                .values()
                 .stream()
+                .flatMap(Collection::stream)
                 .filter(MatchedInventory::hasAnyOffers)
                 .filter(i -> isNotMapped(i.getInventoryKey(), alreadyMappedInventoryKeys))
                 .filter(i -> matchesAllDefinitions(i, categoryDefinition.getInventoryDefinitions()))
