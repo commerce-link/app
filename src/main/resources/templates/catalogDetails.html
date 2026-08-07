@@ -48,7 +48,6 @@
                             <thead>
                             <tr>
                                 <th th:text="#{catalog.category.name}"></th>
-                                <th th:text="#{product.category}"></th>
                                 <th th:text="#{catalog.category.type}"></th>
                                 <th th:text="#{catalog.category.required}"></th>
                                 <th th:text="#{catalog.category.sequence}"></th>
@@ -59,7 +58,6 @@
                             <tbody>
                             <tr th:each="category : ${productCatalog.categories}">
                                 <td><span th:text="${category.name}"></span></td>
-                                <td><span th:replace="~{fragments/category-picker :: categoryName(${categoryNamesById.get(category.categoryId)})}"></span></td>
                                 <td><span th:text="${category.type}"></span></td>
                                 <td><span th:text="${category.requiredDuringOrder}"></span></td>
                                 <td><span th:text="${category.sequenceNumber}"></span></td>
