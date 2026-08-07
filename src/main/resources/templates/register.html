@@ -87,6 +87,16 @@
             </div>
         </div>
         <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
+        <div class="field">
+            <label class="checkbox">
+                <input type="checkbox" name="termsConsent" required>
+                <span th:text="#{registration.terms-consent}"></span>
+                <a th:if="${termsUrl != null}" th:href="${termsUrl}" target="_blank" rel="noopener"
+                   th:text="#{registration.terms-consent.link}"></a>
+                <span th:unless="${termsUrl != null}" th:text="#{registration.terms-consent.link}"></span>
+                <span th:text="#{registration.terms-consent.suffix}"></span>
+            </label>
+        </div>
         <button type="submit" class="button is-primary" th:text="#{registration.submit}"></button>
     </form>
 </div>
