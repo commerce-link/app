@@ -234,6 +234,48 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void purchaseFailsGracefullyWhenDeliveryCreationThrows() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "ACME-PO-ref-1", 550.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN"))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        when(deliveryCreationService.run(eq(STORE_ID), any(), eq(false)))
+                .thenThrow(new RuntimeException("ddb throttled"));
+
+        // when
+        OperationResult<String> result = service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.deliveryCreation", result.getMessage());
+    }
+
+    @Test
+    void purchaseFailsGracefullyWhenExternalOrderIdBlank() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "", 550.0, "PLN", List.of()));
+
+        // when
+        OperationResult<String> result = service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.deliveryCreation", result.getMessage());
+        verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
+    }
+
+    @Test
     void purchaseAppliesFlatRateShippingBelowThreshold() {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 1, 100.0);

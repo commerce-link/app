@@ -480,6 +480,12 @@ public class DeliveriesController {
 
     private String showPurchaseConfirmation(String storeId, String provider,
                                             DeliveryCreationForm form, Model model) {
+        if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
+            return isSuperAdmin()
+                    ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
+                    : "redirect:/dashboard/deliveries/create/" + provider;
+        }
+
         form.setStoreId(storeId);
         form.setProvider(provider);
         supplierPurchaseService.mergeSuggestedItems(form);
@@ -510,6 +516,12 @@ public class DeliveriesController {
 
     private String executePurchase(String storeId, String provider, String purchaseRef,
                                    DeliveryCreationForm form, Model model, Locale locale) {
+        if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
+            return isSuperAdmin()
+                    ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
+                    : "redirect:/dashboard/deliveries/create/" + provider;
+        }
+
         form.setStoreId(storeId);
         form.setProvider(provider);
         OperationResult<String> result = supplierPurchaseService.purchase(

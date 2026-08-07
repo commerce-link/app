@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -110,16 +111,24 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.failed");
         }
 
-        Optional<Delivery> existingDelivery = deliveriesRepository.findByExternalDeliveryId(
-                storeId, orderResult.externalOrderId());
-        if (existingDelivery.isPresent()) {
-            return OperationResult.success(existingDelivery.get().getDeliveryId());
+        if (StringUtils.isBlank(orderResult.externalOrderId())) {
+            return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
         }
 
-        applyOrderResult(form, validation, orderResult);
-        String deliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin);
-        markAsOrderedAutomatically(storeId, deliveryId);
-        return OperationResult.success(deliveryId);
+        try {
+            Optional<Delivery> existingDelivery = deliveriesRepository.findByExternalDeliveryId(
+                    storeId, orderResult.externalOrderId());
+            if (existingDelivery.isPresent()) {
+                return OperationResult.success(existingDelivery.get().getDeliveryId());
+            }
+
+            applyOrderResult(form, validation, orderResult);
+            String deliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin);
+            markAsOrderedAutomatically(storeId, deliveryId);
+            return OperationResult.success(deliveryId);
+        } catch (Exception e) {
+            return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
+        }
     }
 
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,

@@ -55,11 +55,14 @@
             </div>
 
             <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/confirm(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/confirm(provider=${form.provider})}"
-                  th:object="${form}" method="post">
+                  th:object="${form}" method="post"
+                  onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
                 <input type="hidden" name="purchaseRef" th:value="${validation.purchaseRef()}"/>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
+                <input type="hidden" th:field="*{paymentCost}"/>
+                <input type="hidden" th:field="*{paymentTerms}"/>
 
                 <th:block th:each="item, itemStat : *{items}">
                     <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
@@ -84,7 +87,7 @@
                 </th:block>
 
                 <div class="buttons">
-                    <button type="submit" class="button is-primary"
+                    <button type="submit" id="purchase-confirm-submit" class="button is-primary"
                             th:disabled="${!validation.fullyAvailable()}"
                             th:text="#{deliveries.purchase.confirm.submit}">Place order</button>
                     <a class="button"
