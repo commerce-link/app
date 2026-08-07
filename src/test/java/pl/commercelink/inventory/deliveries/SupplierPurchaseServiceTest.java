@@ -251,6 +251,29 @@ class SupplierPurchaseServiceTest {
         assertEquals(20.0, form.getShippingCost());
     }
 
+    @Test
+    void purchaseUsesSupplierConfirmedPricesOverPreOrderQuote() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "PO-3", 575.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 5, 115.0, "PLN"))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        when(deliveryCreationService.run(eq(STORE_ID), any(), eq(false))).thenReturn("delivery-3");
+        when(deliveriesRepository.findById(STORE_ID, "delivery-3")).thenReturn(new Delivery());
+
+        // when
+        service.purchase(STORE_ID, form, "ref-3", false);
+
+        // then
+        assertEquals(115.0, form.getItems().get(0).getUnitCost());
+    }
+
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);

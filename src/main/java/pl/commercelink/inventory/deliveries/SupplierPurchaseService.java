@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
@@ -122,27 +121,29 @@ public class SupplierPurchaseService {
         form.setSourceCurrency(orderResult.currency());
         form.setTax(deliveryTaxResolver.resolveFor(form.getProvider()));
 
+        Map<String, Double> confirmedPricesByEan = orderResult.confirmedLines() != null
+                ? orderResult.confirmedLines().stream()
+                        .collect(Collectors.toMap(SupplierQuote::ean, SupplierQuote::netPrice, (a, b) -> a))
+                : Map.of();
         Map<String, PurchaseValidation.Line> linesByEan = validation.lines().stream()
                 .collect(Collectors.toMap(PurchaseValidation.Line::ean, Function.identity(), (a, b) -> a));
         form.getItems().forEach(item -> {
-            PurchaseValidation.Line line = linesByEan.get(item.getEan());
-            if (line != null) {
-                item.setUnitCost(line.liveUnitCost());
+            Double confirmedPrice = confirmedPricesByEan.get(item.getEan());
+            if (confirmedPrice != null) {
+                item.setUnitCost(confirmedPrice);
+            } else {
+                PurchaseValidation.Line line = linesByEan.get(item.getEan());
+                if (line != null) {
+                    item.setUnitCost(line.liveUnitCost());
+                }
             }
         });
 
         SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
         ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
-        form.setShippingCost(resolveShippingCost(terms, validation.totalNet()));
-    }
-
-    private double resolveShippingCost(ShippingTerms terms, double totalNet) {
-        return switch (terms.costPolicy()) {
-            case ShippingCostPolicy.Free free -> 0;
-            case ShippingCostPolicy.FlatRate flatRate ->
-                    totalNet >= flatRate.threshold() ? 0 : flatRate.cost();
-        };
+        double totalNetForShipping = orderResult.totalNet() > 0 ? orderResult.totalNet() : validation.totalNet();
+        form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
     }
 
     private void markAsOrderedAutomatically(String storeId, String deliveryId) {
