@@ -74,9 +74,10 @@ public class RMAController {
                       @RequestParam(required = false) String email,
                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtStart,
                       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtEnd,
+                      @RequestParam(required = false) List<RMAStatus> statuses,
                       @RequestParam(required = false, defaultValue = "1") int page,
                       Model model) {
-        RMAFilter filter = new RMAFilter(rmaId, orderId, email, createdAtStart, createdAtEnd);
+        RMAFilter filter = new RMAFilter(rmaId, orderId, email, createdAtStart, createdAtEnd, statuses);
         List<RMA> paginatedRmaEntries = rmaRepository.searchRMAEntries(getStoreId(), filter, page, RMA_PAGE_SIZE);
 
         HashMap<String, Object> searchParams = new HashMap<>();
@@ -85,11 +86,24 @@ public class RMAController {
         searchParams.put("email", email);
         searchParams.put("createdAtStart", createdAtStart);
         searchParams.put("createdAtEnd", createdAtEnd);
+        if (filter.hasStatuses()) {
+            searchParams.put("statuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.joining(",")));
+        }
 
         model.addAttribute("rmaEntries", paginatedRmaEntries.subList(0, Math.min(paginatedRmaEntries.size(), RMA_PAGE_SIZE)));
         model.addAttribute("currentPage", page);
         model.addAttribute("hasNextPage", paginatedRmaEntries.size() > RMA_PAGE_SIZE);
         model.addAttribute("searchParams", searchParams);
+        model.addAttribute("activeStatuses", Arrays.stream(RMAStatus.values())
+                .filter(status -> !status.isClosed())
+                .collect(Collectors.toList()));
+        model.addAttribute("closedStatusNames", Arrays.stream(RMAStatus.values())
+                .filter(RMAStatus::isClosed)
+                .map(Enum::name)
+                .collect(Collectors.toList()));
+        model.addAttribute("selectedStatuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()));
+        model.addAttribute("closedSelected", filter.getStatuses().stream().anyMatch(RMAStatus::isClosed));
+        model.addAttribute("countsByStatus", rmaRepository.countActiveByStatus(getStoreId()));
 
         return "rma";
     }

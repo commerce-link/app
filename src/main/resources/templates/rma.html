@@ -8,99 +8,191 @@
     <section class="section">
         <div class="container">
             <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
-                <h1 class="mb-0" th:text="#{rma.title}"></h1>
+                <h1 class="title is-3 mb-0" th:text="#{rma.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
             </div>
 
             <div th:replace="~{fragments/screen-intro :: panel('rma', 'fas fa-undo')}"></div>
 
             <div class="box">
+                <div class="field is-grouped is-grouped-multiline is-align-items-center" id="filterTags">
+                    <div class="control">
+                        <span class="tag is-info" th:text="#{rma.filter.statuses}"></span>
+                    </div>
+                    <div class="control" th:each="status : ${activeStatuses}">
+                        <button type="button"
+                                class="button is-small status-tag"
+                                th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
+                                th:data-status="${status.name()}">
+                            <span th:text="${enumI18n.localize(status)}"></span>
+                            <span th:text="'(' + ${countsByStatus.get(status) ?: 0} + ')'"></span>
+                        </button>
+                    </div>
+                    <div class="control">
+                        <button type="button" id="closedToggle"
+                                class="button is-small"
+                                th:classappend="${closedSelected} ? 'is-dark' : 'is-light'">
+                            <span class="icon is-small"><i class="fas fa-archive"></i></span>
+                            <span th:text="#{rma.filter.closed}"></span>
+                        </button>
+                    </div>
+                    <div class="control">
+                        <button type="button" class="button is-small is-danger is-light" id="clearFilters">
+                            <span class="icon is-small"><i class="fas fa-times"></i></span>
+                            <span th:text="#{general.clear.filters}"></span>
+                        </button>
+                    </div>
+                    <div class="control ml-auto">
+                        <a href="/dashboard/rma/new" class="button is-small is-link">
+                            <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                            <span th:text="#{create.new.rma}"></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box">
                 <form method="get" action="/dashboard/rma">
-                    <div class="field">
-                        <label class="label" th:text="#{rma.id}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="rmaId" th:value="${searchParams.rmaId}">
+                    <div class="columns is-multiline mb-0">
+                        <div class="column is-half py-2">
+                            <div class="field">
+                                <label class="label" th:text="#{rma.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="rmaId" th:value="${searchParams.rmaId}">
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.order.id}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="orderId" th:value="${searchParams.orderId}">
+                        <div class="column is-half py-2">
+                            <div class="field">
+                                <label class="label" th:text="#{rma.order.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="orderId" th:value="${searchParams.orderId}">
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.email}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="email" th:value="${searchParams.email}">
+                        <div class="column is-half py-2">
+                            <div class="field">
+                                <label class="label" th:text="#{rma.email}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="email" th:value="${searchParams.email}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-half py-2">
+                            <div class="field is-grouped">
+                                <div class="control is-expanded">
+                                    <label class="label" th:text="#{rma.created.at.start}"></label>
+                                    <input class="input" type="date" name="createdAtStart"
+                                           th:value="${searchParams.createdAtStart}">
+                                </div>
+                                <div class="control is-expanded">
+                                    <label class="label" th:text="#{rma.created.at.end}"></label>
+                                    <input class="input" type="date" name="createdAtEnd"
+                                           th:value="${searchParams.createdAtEnd}">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="field is-grouped">
-                        <div class="control is-expanded">
-                            <label class="label" th:text="#{rma.created.at.start}"></label>
-                            <input class="input" type="date" name="createdAtStart"
-                                   th:value="${searchParams.createdAtStart}">
-                        </div>
-                        <div class="control is-expanded">
-                            <label class="label" th:text="#{rma.created.at.end}"></label>
-                            <input class="input" type="date" name="createdAtEnd"
-                                   th:value="${searchParams.createdAtEnd}">
-                        </div>
-                    </div>
-
-                    <div class="field">
                         <div class="control">
                             <button class="button is-link" type="submit" th:text="#{general.search}"></button>
+                        </div>
+                        <div class="control">
+                            <a href="/dashboard/item/history" class="button is-light">
+                                <span class="icon"><i class="fas fa-history"></i></span>
+                                <span th:text="#{item.history}"></span>
+                            </a>
                         </div>
                     </div>
                 </form>
 
                 <div class="mt-5">
-                    <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
-                        <thead>
-                        <tr>
-                            <th th:text="#{rma.id}"></th>
-                            <th th:text="#{rma.order.id}"></th>
-                            <th th:text="#{rma.email}"></th>
-                            <th th:text="#{rma.status}"></th>
-                            <th th:text="#{rma.created.at}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="rmaEntry : ${rmaEntries}">
-                            <td>
-                                <a th:href="@{/dashboard/rma/{id}(id=${rmaEntry.rmaId})}">
-                                    <span th:text="${rmaEntry.rmaId}"></span>
-                                </a>
-                            </td>
-                            <td>
-                                <a th:href="@{/dashboard/orders/{id}(id=${rmaEntry.orderId})}">
-                                    <span th:text="${rmaEntry.orderId}"></span>
-                                </a>
-                            </td>
-                            <td th:text="${rmaEntry.email}"></td>
-                            <td th:text="${rmaEntry.status}"></td>
-                            <td th:text="${#temporals.format(rmaEntry.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-striped is-hoverable">
+                            <thead>
+                            <tr>
+                                <th th:text="#{rma.id}"></th>
+                                <th th:text="#{rma.order.id}"></th>
+                                <th th:text="#{rma.email}"></th>
+                                <th th:text="#{rma.status}"></th>
+                                <th th:text="#{rma.created.at}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="rmaEntry : ${rmaEntries}">
+                                <td>
+                                    <a th:href="@{/dashboard/rma/{id}(id=${rmaEntry.rmaId})}">
+                                        <span th:text="${rmaEntry.rmaId}"></span>
+                                    </a>
+                                </td>
+                                <td>
+                                    <a th:href="@{/dashboard/orders/{id}(id=${rmaEntry.orderId})}">
+                                        <span th:text="${rmaEntry.orderId}"></span>
+                                    </a>
+                                </td>
+                                <td th:text="${rmaEntry.email}"></td>
+                                <td>
+                                    <span th:if="${rmaEntry.status != null}"
+                                          class="tag"
+                                          th:classappend="${rmaEntry.status.tagClass()}"
+                                          th:text="${enumI18n.localize(rmaEntry.status)}"></span>
+                                </td>
+                                <td th:text="${#temporals.format(rmaEntry.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(rmaEntries)}">
+                                <td colspan="5" class="has-text-centered" th:text="#{rma.list.empty}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div th:replace="~{fragments/pagination :: pagination(${'/dashboard/rma'}, ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
                 </div>
             </div>
 
-            <div class="buttons">
-                <a href="/dashboard/rma/new" class="button is-link" th:text="#{create.new.rma}"></a>
-                <a href="/dashboard/item/history" class="button is-light">
-                    <span class="icon"><i class="fas fa-history"></i></span>
-                    <span th:text="#{item.history}"></span>
-                </a>
-            </div>
-
         </div>
     </section>
+
+    <script th:inline="javascript">
+        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
+        const closedStatuses = /*[[${closedStatusNames}]]*/ [];
+
+        function navigateWithFilters() {
+            const params = new URLSearchParams();
+            if (selectedStatuses.size > 0) {
+                params.append('statuses', Array.from(selectedStatuses).join(','));
+            }
+            const query = params.toString();
+            window.location.href = '/dashboard/rma' + (query ? '?' + query : '');
+        }
+
+        document.querySelectorAll('.status-tag').forEach(tag => {
+            tag.addEventListener('click', function () {
+                closedStatuses.forEach(status => selectedStatuses.delete(status));
+                const status = this.getAttribute('data-status');
+                if (selectedStatuses.has(status)) {
+                    selectedStatuses.delete(status);
+                } else {
+                    selectedStatuses.add(status);
+                }
+                navigateWithFilters();
+            });
+        });
+
+        document.getElementById('closedToggle').addEventListener('click', function () {
+            const wasSelected = closedStatuses.every(status => selectedStatuses.has(status));
+            selectedStatuses.clear();
+            if (!wasSelected) {
+                closedStatuses.forEach(status => selectedStatuses.add(status));
+            }
+            navigateWithFilters();
+        });
+
+        document.getElementById('clearFilters').addEventListener('click', function () {
+            window.location.href = '/dashboard/rma';
+        });
+    </script>
 </div>
 </body>
 </html>
