@@ -95,7 +95,14 @@
             font-weight: 400;
         }
 
-        /* The menu floats, so in narrow form columns it may overflow the trigger to keep breadcrumbs readable. */
+        /* Fill the field like the inputs next to it, so a whole breadcrumb fits on one line. */
+        .category-picker .dropdown,
+        .category-picker .dropdown-trigger {
+            display: block;
+            width: 100%;
+        }
+
+        /* The menu floats, so in narrow form columns it may still overflow the trigger to stay readable. */
         .category-picker .dropdown-menu {
             width: 100%;
             min-width: min(34rem, 90vw);
