@@ -115,7 +115,7 @@ public class SupplierPurchaseService {
         }
 
         if (StringUtils.isBlank(orderResult.externalOrderId())) {
-            return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
+            return OperationResult.failure("deliveries.purchase.error.unconfirmed");
         }
 
         try {

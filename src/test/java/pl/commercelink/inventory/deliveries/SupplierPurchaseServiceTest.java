@@ -290,7 +290,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.error.deliveryCreation", result.getMessage());
+        assertEquals("deliveries.purchase.error.unconfirmed", result.getMessage());
         verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
     }
 
