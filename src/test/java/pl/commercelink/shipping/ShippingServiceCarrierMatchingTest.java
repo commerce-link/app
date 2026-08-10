@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.stores.AuthorizedCarrier;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -15,10 +16,21 @@ class ShippingServiceCarrierMatchingTest {
 
     private final List<AuthorizedCarrier> authorized = List.of(INPOST, DPD, POCZTA);
 
+    private final CarrierDictionary dictionary = dictionaryWithDefaults();
+
+    private static CarrierDictionary dictionaryWithDefaults() {
+        CarrierDictionary dictionary = new CarrierDictionary();
+        dictionary.setCarriers(Map.of(
+                "INPOST", List.of("InPost", "Paczkomat", "Paczkomaty"),
+                "POCZTA_POLSKA", List.of("Poczta Polska", "Pocztex", "Poczta"),
+                "DPD", List.of("DPD")));
+        return dictionary;
+    }
+
     @Test
     void narrowsToTheCarrierChosenByTheBuyer() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, "INPOST");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "INPOST");
 
         // then
         assertEquals(List.of(INPOST), matching);
@@ -27,7 +39,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void matchesMultiWordCarrierNames() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, "POCZTA_POLSKA");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "POCZTA_POLSKA");
 
         // then
         assertEquals(List.of(POCZTA), matching);
@@ -36,7 +48,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void keepsEveryCarrierWhenBuyerChoiceIsUnknown() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, null);
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, null);
 
         // then
         assertEquals(authorized, matching);
@@ -45,7 +57,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void fallsBackToEveryCarrierWhenChoiceCannotBeMatched() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, "MEEST");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "MEEST");
 
         // then
         assertEquals(authorized, matching);

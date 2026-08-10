@@ -29,7 +29,7 @@ public class MarketplaceOrderImporter {
     @Autowired
     private OrdersManager ordersManager;
 
-    public void importOrder(Store store, String marketplaceName, MarketplaceOrder<?> marketplaceOrder) {
+    public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -74,7 +74,7 @@ public class MarketplaceOrderImporter {
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null);
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier());
 
         CollectionPoint collectionPoint = toCollectionPoint(marketplaceOrder.pickupPoint());
         if (collectionPoint != null) {

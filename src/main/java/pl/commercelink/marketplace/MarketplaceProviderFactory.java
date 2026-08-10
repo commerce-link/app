@@ -11,7 +11,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 @Service
-public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProviderDescriptor, MarketplaceProvider<?>> {
+public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProviderDescriptor, MarketplaceProvider> {
 
     public MarketplaceProviderFactory(ProviderConfigurationManager configurationManager,
                                       OAuth2CredentialStore credentialStore,

@@ -8,6 +8,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
+import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.orders.*;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -28,6 +29,9 @@ public class MarketplaceOrderLifecycleEventListener {
 
     @Autowired
     private MarketplaceProviderFactory providerFactory;
+
+    @Autowired
+    private CarrierDictionary carrierDictionary;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -111,7 +115,10 @@ public class MarketplaceOrderLifecycleEventListener {
         Optional<ShipmentUpdate> tracked = order.getShipments().stream()
                 .filter(Shipment::hasShippingData)
                 .findFirst()
-                .map(s -> new ShipmentUpdate(s.getTrackingNo(), s.getCarrier(), s.getTrackingUrl()));
+                .map(s -> new ShipmentUpdate(s.getTrackingNo(),
+                        carrierDictionary.resolve(s.getCarrier()).orElse(null),
+                        s.getCarrier(),
+                        s.getTrackingUrl()));
 
         if (tracked.isPresent()) {
             return tracked;
@@ -119,7 +126,7 @@ public class MarketplaceOrderLifecycleEventListener {
 
         boolean hasCollectionShipment = order.getShipments().stream().anyMatch(Shipment::hasCollectionData);
         if (hasCollectionShipment) {
-            return Optional.of(new ShipmentUpdate(null, null, null));
+            return Optional.of(new ShipmentUpdate(null, null, null, null));
         }
 
         return Optional.empty();
