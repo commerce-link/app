@@ -34,7 +34,7 @@ public class ShippingService {
                 .sender(toShipmentAddress(senderAddress))
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
-                .deliveryPointCode(deliveryTarget.pointCode())
+                .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
                 .options(new ShipmentOptions(
                         form.isSaturdayDelivery(),
                         false,
@@ -69,7 +69,7 @@ public class ShippingService {
                 .receiver(toShipmentAddress(form.getShippingDetails()))
                 .parcels(toParcels(form.getCompleteParcels()))
                 .carrierId(form.getServiceId())
-                .deliveryPointCode(deliveryTarget.pointCode())
+                .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
 
@@ -156,6 +156,10 @@ public class ShippingService {
         String wanted = deliveryCarrier.replace('_', ' ').trim();
         return StringUtils.containsIgnoreCase(carrier.getName(), wanted)
                 || StringUtils.containsIgnoreCase(carrier.getDisplayName(), wanted);
+    }
+
+    private static DeliveryPoint toDeliveryPoint(String pointCode) {
+        return pointCode != null ? new DeliveryPoint(pointCode) : null;
     }
 
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {
