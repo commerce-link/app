@@ -60,10 +60,6 @@ public class Order {
     private BillingDetails billingDetails;
     @DynamoDBAttribute(attributeName = "shippingDetails")
     private ShippingDetails shippingDetails;
-    @DynamoDBAttribute(attributeName = "deliveryCarrier")
-    private String deliveryCarrier;
-    @DynamoDBAttribute(attributeName = "collectionPointCode")
-    private String collectionPointCode;
 
     @DynamoDBAttribute(attributeName = "comment")
     private String comment;
@@ -344,7 +340,10 @@ public class Order {
         copy.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
 
         Shipment shipment = new Shipment();
-        shipment.setType(shipments.isEmpty() ? ShipmentType.Courier : shipments.get(0).getType());
+        firstShipment().ifPresent(previous -> {
+            shipment.setType(previous.getType());
+            shipment.setCollectionPoint(previous.getCollectionPoint());
+        });
         copy.addShipment(shipment);
 
         Payment payment = new Payment();
@@ -477,27 +476,6 @@ public class Order {
         this.shippingDetails = shippingDetails;
     }
 
-    public String getDeliveryCarrier() {
-        return deliveryCarrier;
-    }
-
-    public void setDeliveryCarrier(String deliveryCarrier) {
-        this.deliveryCarrier = deliveryCarrier;
-    }
-
-    public String getCollectionPointCode() {
-        return collectionPointCode;
-    }
-
-    public void setCollectionPointCode(String collectionPointCode) {
-        this.collectionPointCode = collectionPointCode;
-    }
-
-    @DynamoDBIgnore
-    public boolean isDeliveredToCollectionPoint() {
-        return collectionPointCode != null;
-    }
-
     public OrderStatus getStatus() {
         return status;
     }
@@ -536,6 +514,17 @@ public class Order {
 
     public void setShipments(List<Shipment> shipments) {
         this.shipments = shipments;
+    }
+
+    public void replaceShipments(List<Shipment> replacements) {
+        firstShipment().ifPresent(previous ->
+                replacements.forEach(replacement -> replacement.inheritDeliveryChoiceFrom(previous)));
+        this.shipments = replacements;
+    }
+
+    @DynamoDBIgnore
+    public Optional<Shipment> firstShipment() {
+        return shipments.isEmpty() ? Optional.empty() : Optional.of(shipments.get(0));
     }
 
     public List<Document> getDocuments() {
@@ -665,6 +654,8 @@ public class Order {
 
     public static class Builder {
 
+        private final Shipment shipment;
+
         private final Order order;
 
         private Builder(String storeId, String affiliateId, int orderRealizationDays, boolean emailNotificationsEnabled, String comment, OrderReviewStatus reviewStatus, FulfilmentType fulfilmentType, double totalPrice, BillingDetails billingDetails, ShippingDetails shippingDetails, OrderSource source) {
@@ -684,7 +675,7 @@ public class Order {
             order.setShippingDetails(shippingDetails.copy());
 
             // shipment
-            Shipment shipment = new Shipment();
+            shipment = new Shipment();
             shipment.setType(ShipmentType.Courier);
             order.addShipment(shipment);
 
@@ -721,7 +712,7 @@ public class Order {
         }
 
         public Builder withShipmentType(ShipmentType shipmentType) {
-            order.getShipments().get(0).setType(shipmentType);
+            shipment.setType(shipmentType);
             return this;
         }
 
@@ -746,12 +737,12 @@ public class Order {
         }
 
         public Builder withDeliveryCarrier(String deliveryCarrier) {
-            order.setDeliveryCarrier(deliveryCarrier);
+            shipment.setCarrier(deliveryCarrier);
             return this;
         }
 
-        public Builder withCollectionPointCode(String collectionPointCode) {
-            order.setCollectionPointCode(collectionPointCode);
+        public Builder withCollectionPoint(CollectionPoint collectionPoint) {
+            shipment.setCollectionPoint(collectionPoint);
             return this;
         }
 

@@ -5,6 +5,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 @DynamoDBDocument
@@ -21,6 +22,8 @@ public class Shipment {
     private String externalId;
     @DynamoDBAttribute(attributeName = "carrier")
     private String carrier;
+    @DynamoDBAttribute(attributeName = "collectionPoint")
+    private CollectionPoint collectionPoint;
     @DynamoDBAttribute(attributeName = "shippedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime shippedAt;
@@ -58,6 +61,26 @@ public class Shipment {
 
     public void setExternalId(String externalId) {
         this.externalId = externalId;
+    }
+
+    public CollectionPoint getCollectionPoint() {
+        return collectionPoint;
+    }
+
+    public void setCollectionPoint(CollectionPoint collectionPoint) {
+        this.collectionPoint = collectionPoint;
+    }
+
+    void inheritDeliveryChoiceFrom(Shipment previous) {
+        if (collectionPoint == null) {
+            collectionPoint = previous.collectionPoint;
+        }
+        if (isEmpty(carrier)) {
+            carrier = previous.carrier;
+        }
+        if (collectionPoint != null && type == ShipmentType.Courier) {
+            type = ShipmentType.PickupPoint;
+        }
     }
 
     public String getCarrier() {

@@ -840,7 +840,7 @@ public class OrdersController extends BaseController {
                 shipments.add(updatedOrder.getShipments().get(0));
             }
 
-            existingOrder.setShipments(shipments);
+            existingOrder.replaceShipments(shipments);
         }
         String view = save(existingOrder);
         boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()

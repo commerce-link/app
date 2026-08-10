@@ -51,17 +51,20 @@ public class OrdersShippingController extends AbstractShippingController {
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
-        return new DeliveryTarget(order.getDeliveryCarrier(), order.getCollectionPointCode());
+        return order.firstShipment()
+                .map(shipment -> new DeliveryTarget(shipment.getCarrier(), toPointCode(shipment.getCollectionPoint())))
+                .orElseGet(() -> new DeliveryTarget(null, null));
+    }
+
+    private static String toPointCode(CollectionPoint collectionPoint) {
+        return collectionPoint != null ? collectionPoint.getCode() : null;
     }
 
     @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
 
-        if (order.isDeliveredToCollectionPoint()) {
-            shipments.forEach(shipment -> shipment.setType(ShipmentType.PickupPoint));
-        }
-        order.setShipments(shipments);
+        order.replaceShipments(shipments);
 
         orderLifecycle.update(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);

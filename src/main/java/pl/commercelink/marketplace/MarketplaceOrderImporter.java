@@ -70,16 +70,14 @@ public class MarketplaceOrderImporter {
                 commission.doubleValue()
         );
 
-        String collectionPointCode = StringUtils.trimToNull(marketplaceOrder.pickupPointCode());
-
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null)
-                .withCollectionPointCode(collectionPointCode);
+                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null);
 
-        if (collectionPointCode != null) {
-            orderBuilder.withShipmentType(ShipmentType.PickupPoint);
+        CollectionPoint collectionPoint = toCollectionPoint(marketplaceOrder.pickupPointCode());
+        if (collectionPoint != null) {
+            orderBuilder.withCollectionPoint(collectionPoint).withShipmentType(ShipmentType.PickupPoint);
         }
 
         Order order = orderBuilder.build();
@@ -89,6 +87,11 @@ public class MarketplaceOrderImporter {
                 .collect(Collectors.toList());
 
         ordersManager.saveWithFulfilment(order, orderItems);
+    }
+
+    static CollectionPoint toCollectionPoint(String pickupPointCode) {
+        String code = StringUtils.trimToNull(pickupPointCode);
+        return code != null ? new CollectionPoint(code) : null;
     }
 
     BillingDetails toBillingDetails(MarketplaceCustomer customer) {
