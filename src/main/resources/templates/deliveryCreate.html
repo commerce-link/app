@@ -77,7 +77,7 @@
                                 <strong id="deliveryNetCurrency">PLN</strong>
                             </span>
                             <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
-                            <button type="submit" class="button is-link mr-2"
+                            <button type="submit" class="button is-link ml-2" id="purchase-order-button"
                                     th:if="${purchaseAvailable}"
                                     formnovalidate
                                     th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase(provider=${form.provider})}"
@@ -346,13 +346,19 @@
 
         function updateDeliveryNetValue() {
             let total = 0;
+            let totalQty = 0;
             document.querySelectorAll('input[name$=".requestedQty"]').forEach(qtyInput => {
                 const qty = parseInt(qtyInput.value) || 0;
                 if (qty <= 0) return;
+                totalQty += qty;
                 const costInput = document.querySelector('input[name="' + qtyInput.name.replace('.requestedQty', '.unitCost') + '"]');
                 total += qty * (costInput ? parseFloat(costInput.value) || 0 : 0);
             });
             document.getElementById('deliveryNetValue').textContent = total.toFixed(2);
+            const purchaseButton = document.getElementById('purchase-order-button');
+            if (purchaseButton) {
+                purchaseButton.disabled = totalQty === 0;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function () {
