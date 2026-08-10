@@ -163,6 +163,22 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(validation.lines().isEmpty());
+        assertFalse(validation.fullyAvailable());
+    }
+
+    @Test
+    void purchaseRejectsEmptyForm() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
+
+        // when
+        OperationResult<String> result = service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        verify(supplierProvider, never()).placeOrder(any());
+        verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
     }
 
     @Test

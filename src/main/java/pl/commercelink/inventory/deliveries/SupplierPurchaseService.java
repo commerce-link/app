@@ -82,7 +82,8 @@ public class SupplierPurchaseService {
                 .map(item -> toValidationLine(item, quotesByEan.get(item.getEan())))
                 .toList();
 
-        boolean fullyAvailable = validationLines.stream().allMatch(PurchaseValidation.Line::isAvailable);
+        boolean fullyAvailable = !validationLines.isEmpty()
+                && validationLines.stream().allMatch(PurchaseValidation.Line::isAvailable);
         double totalNet = validationLines.stream()
                 .mapToDouble(line -> line.requestedQty() * line.liveUnitCost())
                 .sum();
