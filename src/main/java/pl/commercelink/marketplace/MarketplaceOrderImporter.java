@@ -8,6 +8,7 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
+import pl.commercelink.marketplace.api.PickupPoint;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.pim.api.PimCatalog;
@@ -75,7 +76,7 @@ public class MarketplaceOrderImporter {
                 .withPayment(payment)
                 .withDeliveryCarrier(marketplaceOrder.deliveryCarrier() != null ? marketplaceOrder.deliveryCarrier().name() : null);
 
-        CollectionPoint collectionPoint = toCollectionPoint(marketplaceOrder.pickupPointCode());
+        CollectionPoint collectionPoint = toCollectionPoint(marketplaceOrder.pickupPoint());
         if (collectionPoint != null) {
             orderBuilder.withCollectionPoint(collectionPoint).withShipmentType(ShipmentType.PickupPoint);
         }
@@ -89,8 +90,8 @@ public class MarketplaceOrderImporter {
         ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    static CollectionPoint toCollectionPoint(String pickupPointCode) {
-        String code = StringUtils.trimToNull(pickupPointCode);
+    static CollectionPoint toCollectionPoint(PickupPoint pickupPoint) {
+        String code = pickupPoint != null ? StringUtils.trimToNull(pickupPoint.code()) : null;
         return code != null ? new CollectionPoint(code) : null;
     }
 
