@@ -146,6 +146,11 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
+    public boolean hasEvent(String name) {
+        return events.stream().anyMatch(event -> StringUtils.equals(event.getName(), name));
+    }
+
+    @DynamoDBIgnore
     public boolean hasDocumentOfType(DocumentType documentType) {
         return documents.stream().anyMatch(document -> document.getType() == documentType);
     }

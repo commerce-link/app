@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SupplierPurchaseService {
 
+    private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
+
     private final SupplierProviderFactory supplierProviderFactory;
     private final StoresRepository storesRepository;
     private final DeliveryCreationService deliveryCreationService;
@@ -120,7 +122,10 @@ public class SupplierPurchaseService {
             Optional<Delivery> existingDelivery = deliveriesRepository.findByExternalDeliveryId(
                     storeId, orderResult.externalOrderId());
             if (existingDelivery.isPresent()) {
-                return OperationResult.success(existingDelivery.get().getDeliveryId());
+                if (existingDelivery.get().hasEvent(ORDERED_AUTOMATICALLY_EVENT)) {
+                    return OperationResult.success(existingDelivery.get().getDeliveryId());
+                }
+                return OperationResult.failure("deliveries.purchase.error.incomplete");
             }
 
             applyOrderResult(form, validation, orderResult);
@@ -165,7 +170,7 @@ public class SupplierPurchaseService {
 
     private void markAsOrderedAutomatically(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        delivery.addEvent(new Event(EventType.action, "DELIVERY_ORDERED_AUTOMATICALLY", LocalDateTime.now()));
+        delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
     }
 

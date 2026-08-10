@@ -19,12 +19,15 @@ import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -346,6 +349,7 @@ class SupplierPurchaseServiceTest {
                 "ACME-PO-ref-1", 550.0, "PLN", List.of()));
         Delivery existing = new Delivery();
         existing.setDeliveryId("delivery-1");
+        existing.addEvent(new Event(EventType.action, "DELIVERY_ORDERED_AUTOMATICALLY", LocalDateTime.now()));
         when(deliveriesRepository.findByExternalDeliveryId(STORE_ID, "ACME-PO-ref-1"))
                 .thenReturn(Optional.of(existing));
 
@@ -355,6 +359,29 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         assertEquals("delivery-1", result.getPayload());
+        verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
+    }
+
+    @Test
+    void purchaseFailsOnReplayOfIncompleteDelivery() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "ACME-PO-ref-1", 550.0, "PLN", List.of()));
+        Delivery incomplete = new Delivery();
+        incomplete.setDeliveryId("delivery-1");
+        when(deliveriesRepository.findByExternalDeliveryId(STORE_ID, "ACME-PO-ref-1"))
+                .thenReturn(Optional.of(incomplete));
+
+        // when
+        OperationResult<String> result = service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.incomplete", result.getMessage());
         verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
         verify(deliveriesRepository, never()).save(any(Delivery.class));
     }
