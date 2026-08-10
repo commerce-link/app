@@ -111,6 +111,9 @@ public class SupplierPurchaseService {
             orderResult = getProvider(storeId, form.getProvider())
                     .placeOrder(new SupplierPurchaseRequest(purchaseRef, lines));
         } catch (Exception e) {
+            System.err.println("[SupplierPurchase] placeOrder failed for store " + storeId
+                    + ", ref " + purchaseRef + ": " + e.getMessage());
+            e.printStackTrace();
             return OperationResult.failure("deliveries.purchase.error.failed");
         }
 
@@ -133,6 +136,9 @@ public class SupplierPurchaseService {
             markAsOrderedAutomatically(storeId, deliveryId);
             return OperationResult.success(deliveryId);
         } catch (Exception e) {
+            System.err.println("[SupplierPurchase] delivery creation failed for store " + storeId
+                    + ", ref " + purchaseRef + ", PO " + orderResult.externalOrderId() + ": " + e.getMessage());
+            e.printStackTrace();
             return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
         }
     }

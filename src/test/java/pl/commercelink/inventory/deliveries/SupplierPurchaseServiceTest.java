@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
@@ -59,7 +60,7 @@ class SupplierPurchaseServiceTest {
     @Mock
     private DeliveryTaxResolver deliveryTaxResolver;
     @Mock
-    private pl.commercelink.inventory.supplier.SupplierRegistry supplierRegistry;
+    private SupplierRegistry supplierRegistry;
     @Mock
     private SupplierProvider supplierProvider;
 
