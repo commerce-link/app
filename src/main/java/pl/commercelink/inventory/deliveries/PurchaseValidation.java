@@ -6,7 +6,7 @@ public record PurchaseValidation(String provider, String purchaseRef, String cur
                                  double totalNet, boolean fullyAvailable,
                                  List<Line> lines) {
 
-    public record Line(String name, String ean, String mfn, int requestedQty,
+    public record Line(String name, String sku, String ean, String mfn, int requestedQty,
                        int availableQty, double feedUnitCost, double liveUnitCost) {
 
         public boolean isAvailable() { return availableQty >= requestedQty; }

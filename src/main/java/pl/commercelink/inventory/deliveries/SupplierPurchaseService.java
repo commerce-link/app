@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Component
 @RequiredArgsConstructor
@@ -41,6 +43,7 @@ public class SupplierPurchaseService {
     private final DeliveriesRepository deliveriesRepository;
     private final DeliveryTaxResolver deliveryTaxResolver;
     private final SupplierRegistry supplierRegistry;
+    private final SupplierSkuResolver supplierSkuResolver;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -71,8 +74,11 @@ public class SupplierPurchaseService {
                 .filter(item -> item.getRequestedQty() > 0)
                 .toList();
 
+        SupplierSkuResolver.StoreSkuLookup skuLookup = supplierSkuResolver.forStore(storeId, form.getProvider());
+
         List<SupplierOrderLine> lines = items.stream()
-                .map(item -> new SupplierOrderLine(null, item.getEan(), item.getMfn(), item.getRequestedQty()))
+                .map(item -> new SupplierOrderLine(skuLookup.skuFor(item.getEan(), item.getMfn()),
+                        item.getEan(), item.getMfn(), item.getRequestedQty()))
                 .toList();
 
         SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
@@ -80,8 +86,9 @@ public class SupplierPurchaseService {
         Map<String, SupplierQuote> quotesByEan = quotes.stream()
                 .collect(Collectors.toMap(SupplierQuote::ean, Function.identity(), (a, b) -> a));
 
-        List<PurchaseValidation.Line> validationLines = items.stream()
-                .map(item -> toValidationLine(item, quotesByEan.get(item.getEan())))
+        List<PurchaseValidation.Line> validationLines = IntStream.range(0, items.size())
+                .mapToObj(i -> toValidationLine(items.get(i), lines.get(i).sku(),
+                        quotesByEan.get(items.get(i).getEan())))
                 .toList();
 
         boolean fullyAvailable = !validationLines.isEmpty()
@@ -103,7 +110,7 @@ public class SupplierPurchaseService {
         }
 
         List<SupplierOrderLine> lines = validation.lines().stream()
-                .map(line -> new SupplierOrderLine(null, line.ean(), line.mfn(), line.requestedQty()))
+                .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
                 .toList();
 
         SupplierOrderResult orderResult;
@@ -180,10 +187,10 @@ public class SupplierPurchaseService {
         deliveriesRepository.save(delivery);
     }
 
-    private PurchaseValidation.Line toValidationLine(DeliveryItem item, SupplierQuote quote) {
+    private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote) {
         int availableQty = quote != null ? quote.availableQuantity() : 0;
         double livePrice = quote != null ? quote.netPrice() : 0;
-        return new PurchaseValidation.Line(item.getName(), item.getEan(), item.getMfn(),
+        return new PurchaseValidation.Line(item.getName(), sku, item.getEan(), item.getMfn(),
                 item.getRequestedQty(), availableQty, item.getUnitCost(), livePrice);
     }
 

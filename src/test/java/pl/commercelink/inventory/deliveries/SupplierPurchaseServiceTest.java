@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
@@ -63,6 +64,8 @@ class SupplierPurchaseServiceTest {
     private SupplierRegistry supplierRegistry;
     @Mock
     private SupplierProvider supplierProvider;
+    @Mock
+    private SupplierSkuResolver supplierSkuResolver;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -75,6 +78,7 @@ class SupplierPurchaseServiceTest {
         lenient().when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
         lenient().when(deliveriesRepository.findByExternalDeliveryId(eq(STORE_ID), anyString()))
                 .thenReturn(Optional.empty());
+        lenient().when(supplierSkuResolver.forStore(anyString(), anyString())).thenReturn((ean, mfn) -> null);
     }
 
     @Test
@@ -385,6 +389,48 @@ class SupplierPurchaseServiceTest {
         assertEquals("deliveries.purchase.error.incomplete", result.getMessage());
         verify(deliveryCreationService, never()).run(any(), any(), anyBoolean());
         verify(deliveriesRepository, never()).save(any(Delivery.class));
+    }
+
+    @Test
+    void validateEnrichesLinesWithSkuFromResolver() {
+        // given
+        when(supplierSkuResolver.forStore(STORE_ID, PROVIDER)).thenReturn((ean, mfn) -> "101");
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 110.0, "PLN")));
+
+        // when
+        service.validate(STORE_ID, form);
+
+        // then
+        ArgumentCaptor<List<SupplierOrderLine>> captor = ArgumentCaptor.forClass(List.class);
+        verify(supplierProvider).checkAvailability(captor.capture());
+        assertEquals("101", captor.getValue().getFirst().sku());
+    }
+
+    @Test
+    void purchasePassesSkuThroughToPlaceOrder() {
+        // given
+        when(supplierSkuResolver.forStore(STORE_ID, PROVIDER)).thenReturn((ean, mfn) -> "101");
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "PO-1", 220.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        when(deliveryCreationService.run(eq(STORE_ID), any(), eq(false))).thenReturn("delivery-1");
+        when(deliveriesRepository.findById(STORE_ID, "delivery-1")).thenReturn(new Delivery());
+
+        // when
+        service.purchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).placeOrder(captor.capture());
+        assertEquals("101", captor.getValue().lines().getFirst().sku());
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {
