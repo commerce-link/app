@@ -53,6 +53,16 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "provider")
     private String provider;
 
+    @DynamoDBAttribute(attributeName = "orderStatus")
+    @DynamoDBTypeConvertedEnum
+    private DeliveryOrderStatus orderStatus;
+    @DynamoDBAttribute(attributeName = "orderErrorMessage")
+    private String orderErrorMessage;
+    @DynamoDBAttribute(attributeName = "purchaseRef")
+    private String purchaseRef;
+    @DynamoDBAttribute(attributeName = "pendingOrderForm")
+    private String pendingOrderForm;
+
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
     @DynamoDBAttribute(attributeName = "paymentCost")
@@ -390,6 +400,48 @@ public class Delivery {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public DeliveryOrderStatus getOrderStatus() {
+        return orderStatus;
+    }
+
+    public void setOrderStatus(DeliveryOrderStatus orderStatus) {
+        this.orderStatus = orderStatus;
+    }
+
+    public String getOrderErrorMessage() {
+        return orderErrorMessage;
+    }
+
+    public void setOrderErrorMessage(String orderErrorMessage) {
+        this.orderErrorMessage = orderErrorMessage;
+    }
+
+    public String getPurchaseRef() {
+        return purchaseRef;
+    }
+
+    public void setPurchaseRef(String purchaseRef) {
+        this.purchaseRef = purchaseRef;
+    }
+
+    public String getPendingOrderForm() {
+        return pendingOrderForm;
+    }
+
+    public void setPendingOrderForm(String pendingOrderForm) {
+        this.pendingOrderForm = pendingOrderForm;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOrderPending() {
+        return orderStatus == DeliveryOrderStatus.ORDER_PENDING;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOrderFailed() {
+        return orderStatus == DeliveryOrderStatus.FAILED;
     }
 
     public boolean isPaid() {

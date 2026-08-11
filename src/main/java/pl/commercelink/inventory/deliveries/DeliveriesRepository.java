@@ -45,6 +45,23 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .findFirst();
     }
 
+    public Optional<Delivery> findByPurchaseRef(String storeId, String purchaseRef) {
+        Delivery deliveryKey = new Delivery();
+        deliveryKey.setStoreId(storeId);
+
+        Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
+        expressionAttributeValues.put(":purchaseRef", new AttributeValue().withS(purchaseRef));
+
+        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
+                .withHashKeyValues(deliveryKey)
+                .withFilterExpression("purchaseRef = :purchaseRef")
+                .withExpressionAttributeValues(expressionAttributeValues);
+
+        return dynamoDBMapper.query(Delivery.class, queryExpression)
+                .stream()
+                .findFirst();
+    }
+
     public List<Delivery> findAll(String storeId, LocalDateTime from, LocalDateTime to) {
         Delivery deliveryKey = new Delivery();
         deliveryKey.setStoreId(storeId);
