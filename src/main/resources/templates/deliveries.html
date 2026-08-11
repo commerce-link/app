@@ -101,7 +101,7 @@
                                 <span class="tag is-warning ml-1" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
                                 <span class="tag is-danger ml-1" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                             </td>
-                            <td th:text="${delivery.externalDeliveryId}"></td>
+                            <td th:text="${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>
                             <td th:text="${#numbers.formatDecimal(delivery.totalCost, 1, 2)}"></td>
                             <td th:text="${#numbers.formatDecimal(delivery.totalCostGross, 1, 2)}"></td>
