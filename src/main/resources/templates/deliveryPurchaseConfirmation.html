@@ -119,7 +119,7 @@
                     const submit = document.getElementById('purchase-confirm-submit');
                     submit.disabled = true;
                     area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
-                    fetch(form.dataset.validateUrl, {method: 'POST', body: new FormData(form)})
+                    fetch(form.dataset.validateUrl, {method: 'POST', body: new URLSearchParams(new FormData(form))})
                         .then(function (response) {
                             if (!response.ok) {
                                 throw new Error('HTTP ' + response.status);
