@@ -1,6 +1,9 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,7 +75,10 @@ class SupplierPurchaseServiceTest {
     @Mock
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private ObjectMapper objectMapper = JsonMapper.builder()
+            .addModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -441,11 +447,12 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void enqueuePurchaseCreatesPendingDeliveryAndPublishes() {
+    void enqueuePurchaseCreatesPendingDeliveryAndPublishes() throws Exception {
         // given
         when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
         form.setProvider("Acme");
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
 
         // when
         OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
@@ -461,6 +468,11 @@ class SupplierPurchaseServiceTest {
                 request.getPurchaseRef().equals("ref-1")
                         && request.getDeliveryId().equals(saved.getValue().getDeliveryId())));
         assertEquals(saved.getValue().getDeliveryId(), result.getPayload());
+        DeliveryCreationForm rehydrated = objectMapper.readValue(
+                saved.getValue().getPendingOrderForm(), DeliveryCreationForm.class);
+        assertEquals(form.getItems().get(0).getEan(), rehydrated.getItems().get(0).getEan());
+        assertEquals(form.getItems().get(0).getRequestedQty(), rehydrated.getItems().get(0).getRequestedQty());
+        assertEquals(form.getEstimatedDeliveryAt(), rehydrated.getEstimatedDeliveryAt());
     }
 
     @Test

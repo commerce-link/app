@@ -55,7 +55,8 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
                 .withHashKeyValues(deliveryKey)
                 .withFilterExpression("purchaseRef = :purchaseRef")
-                .withExpressionAttributeValues(expressionAttributeValues);
+                .withExpressionAttributeValues(expressionAttributeValues)
+                .withConsistentRead(true);
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)
                 .stream()
