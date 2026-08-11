@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,7 @@ import java.util.stream.IntStream;
 public class SupplierPurchaseService {
 
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
+    private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
 
     private final SupplierProviderFactory supplierProviderFactory;
     private final StoresRepository storesRepository;
@@ -44,6 +47,8 @@ public class SupplierPurchaseService {
     private final DeliveryTaxResolver deliveryTaxResolver;
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
+    private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    private final ObjectMapper objectMapper;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -148,6 +153,34 @@ public class SupplierPurchaseService {
             e.printStackTrace();
             return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
         }
+    }
+
+    public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
+                                                   String purchaseRef, boolean isSuperAdmin) {
+        Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
+        if (existing.isPresent()) {
+            return OperationResult.success(existing.get().getDeliveryId());
+        }
+
+        Delivery delivery = new Delivery(storeId, null, form.getProvider());
+        delivery.setManaged(isSuperAdmin);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setPurchaseRef(purchaseRef);
+        try {
+            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
+        } catch (JsonProcessingException e) {
+            System.err.println("[SupplierPurchase] failed to serialize pending order form for store " + storeId
+                    + ", ref " + purchaseRef + ": " + e.getMessage());
+            e.printStackTrace();
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
+
+        deliveriesRepository.save(delivery);
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+
+        return OperationResult.success(delivery.getDeliveryId());
     }
 
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,

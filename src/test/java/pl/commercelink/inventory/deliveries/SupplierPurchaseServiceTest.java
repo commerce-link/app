@@ -1,11 +1,13 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -66,6 +69,10 @@ class SupplierPurchaseServiceTest {
     private SupplierProvider supplierProvider;
     @Mock
     private SupplierSkuResolver supplierSkuResolver;
+    @Mock
+    private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -431,6 +438,48 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
         verify(supplierProvider).placeOrder(captor.capture());
         assertEquals("101", captor.getValue().lines().getFirst().sku());
+    }
+
+    @Test
+    void enqueuePurchaseCreatesPendingDeliveryAndPublishes() {
+        // given
+        when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setProvider("Acme");
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
+        assertEquals("ref-1", saved.getValue().getPurchaseRef());
+        assertNotNull(saved.getValue().getPendingOrderForm());
+        verify(supplierPurchaseEventPublisher).publish(argThat(request ->
+                request.getPurchaseRef().equals("ref-1")
+                        && request.getDeliveryId().equals(saved.getValue().getDeliveryId())));
+        assertEquals(saved.getValue().getDeliveryId(), result.getPayload());
+    }
+
+    @Test
+    void enqueuePurchaseIsIdempotentPerPurchaseRef() {
+        // given
+        Delivery existing = new Delivery();
+        existing.setDeliveryId("delivery-1");
+        when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.of(existing));
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setProvider("Acme");
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals("delivery-1", result.getPayload());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {
