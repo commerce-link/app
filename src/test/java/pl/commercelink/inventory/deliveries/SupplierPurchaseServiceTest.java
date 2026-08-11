@@ -245,6 +245,33 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void processPendingThrowsWhenDeliveryNotFound() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
+
+        // when / then
+        assertThrows(IllegalStateException.class, () -> service.processPending(STORE_ID, DELIVERY_ID));
+        verify(supplierProviderFactory, never()).get(any(), any());
+    }
+
+    @Test
+    void processPendingFailsDeliveryWhenNoOrderableLines() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
+        assertEquals("No orderable lines in pending purchase", delivery.getOrderErrorMessage());
+        verify(supplierProvider, never()).placeOrder(any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
     void processPendingRethrowsUnexpectedExceptions() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -281,7 +308,8 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
-        assertEquals("Supplier confirmed the order without an order number", delivery.getOrderErrorMessage());
+        assertEquals("Supplier confirmed the order without an order number - check the supplier panel before ordering again",
+                delivery.getOrderErrorMessage());
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
     }
 
@@ -354,6 +382,21 @@ class SupplierPurchaseServiceTest {
         assertEquals(form.getItems().get(0).getEan(), rehydrated.getItems().get(0).getEan());
         assertEquals(form.getItems().get(0).getRequestedQty(), rehydrated.getItems().get(0).getRequestedQty());
         assertEquals(form.getEstimatedDeliveryAt(), rehydrated.getEstimatedDeliveryAt());
+    }
+
+    @Test
+    void enqueuePurchaseRejectsFormWithNoOrderableItems() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
     }
 
     @Test

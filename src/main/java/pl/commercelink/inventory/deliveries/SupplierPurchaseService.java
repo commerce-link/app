@@ -110,7 +110,10 @@ public class SupplierPurchaseService {
 
     public void processPending(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderPending()) {
+        if (delivery == null) {
+            throw new IllegalStateException("Delivery " + deliveryId + " not found for pending purchase");
+        }
+        if (!delivery.isOrderPending()) {
             return;
         }
 
@@ -120,11 +123,15 @@ public class SupplierPurchaseService {
             List<SupplierOrderLine> lines = validation.lines().stream()
                     .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
                     .toList();
+            if (lines.isEmpty()) {
+                throw new SupplierOrderException("No orderable lines in pending purchase");
+            }
 
             SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
                     .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
-                throw new SupplierOrderException("Supplier confirmed the order without an order number");
+                throw new SupplierOrderException(
+                        "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
             }
 
             applyOrderResult(form, validation, orderResult);
@@ -147,6 +154,11 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
                                                    String purchaseRef, boolean isSuperAdmin) {
+        boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
+        if (!hasOrderableItems) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
             return OperationResult.success(existing.get().getDeliveryId());
