@@ -524,7 +524,7 @@ public class DeliveriesController {
 
         form.setStoreId(storeId);
         form.setProvider(provider);
-        OperationResult<String> result = supplierPurchaseService.purchase(
+        OperationResult<String> result = supplierPurchaseService.enqueuePurchase(
                 storeId, form, purchaseRef, isSuperAdmin());
 
         if (!result.isSuccess()) {

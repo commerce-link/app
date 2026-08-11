@@ -10,6 +10,7 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -107,51 +108,40 @@ public class SupplierPurchaseService {
                 totalNet, fullyAvailable, validationLines);
     }
 
-    public OperationResult<String> purchase(String storeId, DeliveryCreationForm form,
-                                            String purchaseRef, boolean isSuperAdmin) {
-        PurchaseValidation validation = validate(storeId, form, purchaseRef);
-        if (!validation.fullyAvailable()) {
-            return OperationResult.failure("deliveries.purchase.error.availability");
+    public void processPending(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderPending()) {
+            return;
         }
 
-        List<SupplierOrderLine> lines = validation.lines().stream()
-                .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
-                .toList();
-
-        SupplierOrderResult orderResult;
+        DeliveryCreationForm form = readPendingForm(delivery);
         try {
-            orderResult = getProvider(storeId, form.getProvider())
-                    .placeOrder(new SupplierPurchaseRequest(purchaseRef, lines));
-        } catch (Exception e) {
-            System.err.println("[SupplierPurchase] placeOrder failed for store " + storeId
-                    + ", ref " + purchaseRef + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
+            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
+            List<SupplierOrderLine> lines = validation.lines().stream()
+                    .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
+                    .toList();
 
-        if (StringUtils.isBlank(orderResult.externalOrderId())) {
-            return OperationResult.failure("deliveries.purchase.error.unconfirmed");
-        }
-
-        try {
-            Optional<Delivery> existingDelivery = deliveriesRepository.findByExternalDeliveryId(
-                    storeId, orderResult.externalOrderId());
-            if (existingDelivery.isPresent()) {
-                if (existingDelivery.get().hasEvent(ORDERED_AUTOMATICALLY_EVENT)) {
-                    return OperationResult.success(existingDelivery.get().getDeliveryId());
-                }
-                return OperationResult.failure("deliveries.purchase.error.incomplete");
+            SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
+                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines));
+            if (StringUtils.isBlank(orderResult.externalOrderId())) {
+                throw new SupplierOrderException("Supplier confirmed the order without an order number");
             }
 
             applyOrderResult(form, validation, orderResult);
-            String deliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin);
-            markAsOrderedAutomatically(storeId, deliveryId);
-            return OperationResult.success(deliveryId);
-        } catch (Exception e) {
-            System.err.println("[SupplierPurchase] delivery creation failed for store " + storeId
-                    + ", ref " + purchaseRef + ", PO " + orderResult.externalOrderId() + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.deliveryCreation");
+            delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
+            deliveryCreationService.completePending(storeId, delivery, form);
+        } catch (SupplierOrderException e) {
+            delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+            delivery.setOrderErrorMessage(e.getMessage());
+            deliveriesRepository.save(delivery);
+        }
+    }
+
+    private DeliveryCreationForm readPendingForm(Delivery delivery) {
+        try {
+            return objectMapper.readValue(delivery.getPendingOrderForm(), DeliveryCreationForm.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Unreadable pending order form on delivery " + delivery.getDeliveryId(), e);
         }
     }
 
@@ -212,12 +202,6 @@ public class SupplierPurchaseService {
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNetForShipping = orderResult.totalNet() > 0 ? orderResult.totalNet() : validation.totalNet();
         form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
-    }
-
-    private void markAsOrderedAutomatically(String storeId, String deliveryId) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-        deliveriesRepository.save(delivery);
     }
 
     private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote) {
