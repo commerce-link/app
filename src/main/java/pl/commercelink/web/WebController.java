@@ -6,40 +6,34 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import pl.commercelink.starter.util.PaginationUtil;
-import pl.commercelink.web.dtos.InventoryItemView;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
-import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderIndexEntry;
-import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.PastOrderFilter;
-import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.orders.*;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.starter.util.PaginationUtil;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
-import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.dtos.InventoryItemView;
+import pl.commercelink.web.dtos.StoreSupplierView;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static pl.commercelink.starter.util.ConversionUtil.asLocallyFormattedDate;
 
 @Controller
 public class WebController {
@@ -64,9 +58,6 @@ public class WebController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
-
-    @Autowired
-    private ManualSupplierService manualSupplierService;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -186,17 +177,17 @@ public class WebController {
                 new ArrayList<>(supplierRegistry.getAllSupplierNames());
         enabledSuppliers.add(SupplierRegistry.WAREHOUSE);
 
-        Map<String, String> providerUpdateDates = _inventory.getMatchedSuppliers()
-                .stream()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        p -> asLocallyFormattedDate(_inventory.getLastUpdateDate(p))
-                ));
+        List<StoreSupplierView> storeSuppliers = store != null ?
+                store.getSupplierConnections()
+                        .stream()
+                        .filter(StoreSupplierConnection::isEnabled)
+                        .map(StoreSupplierView::from)
+                        .toList() :
+                List.of();
 
         model.addAttribute("enabledSuppliers", enabledSuppliers);
-        model.addAttribute("manualSuppliers", store != null ? manualSupplierService.list(store) : List.of());
+        model.addAttribute("storeSuppliers", storeSuppliers);
         model.addAttribute("inventorySize", _inventory.size());
-        model.addAttribute("supplierUpdateEntries", providerUpdateDates.entrySet());
         model.addAttribute("taxonomyFileName", taxonomyCache.getFileName());
         model.addAttribute("taxonomySize", taxonomyCache.size());
         model.addAttribute("pimIndexSize", pimCatalog.findAll().size());
