@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.context.MessageSource;
@@ -490,9 +491,43 @@ public class DeliveriesController {
         form.setProvider(provider);
         supplierPurchaseService.mergeSuggestedItems(form);
         model.addAttribute("form", form);
-        model.addAttribute("validation", supplierPurchaseService.validate(storeId, form));
+        model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         return "deliveryPurchaseConfirmation";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/validate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String validatePurchaseQuotes(@PathVariable("provider") String provider,
+                                         @ModelAttribute DeliveryCreationForm form,
+                                         Model model, Locale locale) {
+        return renderValidationFragment(getStoreId(), provider, form, model, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/validate")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String validatePurchaseQuotesForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                      @PathVariable("provider") String provider,
+                                                      @ModelAttribute DeliveryCreationForm form,
+                                                      Model model, Locale locale) {
+        return renderValidationFragment(storeId, provider, form, model, locale);
+    }
+
+    private String renderValidationFragment(String storeId, String provider,
+                                            DeliveryCreationForm form, Model model, Locale locale) {
+        form.setStoreId(storeId);
+        form.setProvider(provider);
+        try {
+            if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
+                throw new IllegalStateException(provider);
+            }
+            model.addAttribute("validation", supplierPurchaseService.validate(storeId, form));
+        } catch (Exception e) {
+            model.addAttribute("validationError",
+                    messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
+                            + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+        }
+        return "deliveryPurchaseConfirmation :: validationResult";
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/purchase/confirm")
@@ -529,7 +564,7 @@ public class DeliveriesController {
 
         if (!result.isSuccess()) {
             model.addAttribute("form", form);
-            model.addAttribute("validation", supplierPurchaseService.validate(storeId, form, purchaseRef));
+            model.addAttribute("purchaseRef", purchaseRef);
             model.addAttribute("isSuperAdmin", isSuperAdmin());
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             return "deliveryPurchaseConfirmation";

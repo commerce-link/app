@@ -12,52 +12,69 @@
             <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
 
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
-            <div class="notification is-warning" th:if="${!validation.fullyAvailable()}"
-                 th:text="#{deliveries.purchase.confirm.unavailable.note}">Some items unavailable</div>
 
-            <table class="table is-fullwidth is-striped">
-                <thead>
-                <tr>
-                    <th th:text="#{general.product}">Product</th>
-                    <th th:text="#{general.ean}">EAN</th>
-                    <th th:text="#{deliveries.purchase.confirm.requested}">Requested</th>
-                    <th th:text="#{deliveries.purchase.confirm.available}">Available</th>
-                    <th th:text="#{deliveries.purchase.confirm.feedPrice}">Price (feed)</th>
-                    <th th:text="#{deliveries.purchase.confirm.livePrice}">Price (live)</th>
-                    <th>&Delta;</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="line : ${validation.lines()}"
-                    th:classappend="${!line.isAvailable()} ? 'has-background-danger-light'">
-                    <td th:text="${line.name}"></td>
-                    <td th:text="${line.ean}"></td>
-                    <td th:text="${line.requestedQty}"></td>
-                    <td>
-                        <span th:text="${line.availableQty}"></span>
-                        <span class="tag is-danger ml-1" th:if="${!line.isAvailable()}"
-                              th:text="#{deliveries.purchase.confirm.missing} + ' ' + ${line.missingQty}"></span>
-                    </td>
-                    <td th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 2)}"></td>
-                    <td th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 2)}"></td>
-                    <td th:text="${#numbers.formatDecimal(line.priceDelta, 1, 2)}"></td>
-                </tr>
-                </tbody>
-            </table>
-
-            <div class="level">
-                <div class="level-left">
-                    <p>
-                        <strong th:text="#{deliveries.purchase.confirm.total}">Net total</strong>:
-                        <span th:text="${#numbers.formatDecimal(validation.totalNet(), 1, 2)} + ' ' + ${validation.currency()}"></span>
-                    </p>
-                </div>
+            <div id="validation-area">
+                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
+                <progress class="progress is-small is-primary" max="100"></progress>
             </div>
 
-            <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/confirm(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/confirm(provider=${form.provider})}"
+            <div th:fragment="validationResult" th:remove="${validation == null && validationError == null} ? all : none"
+                 th:attr="data-fully-available=${validation != null && validation.fullyAvailable()}">
+                <div class="notification is-danger" th:if="${validationError}">
+                    <span th:text="${validationError}"></span>
+                    <a href="javascript:void(0)" onclick="loadValidation()" th:text="#{deliveries.purchase.confirm.retry}">Retry</a>
+                </div>
+                <th:block th:if="${validation != null}">
+                    <div class="notification is-warning" th:if="${!validation.fullyAvailable()}"
+                         th:text="#{deliveries.purchase.confirm.unavailable.note}">Some items unavailable</div>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.product}">Product</th>
+                            <th th:text="#{general.ean}">EAN</th>
+                            <th th:text="#{deliveries.purchase.confirm.requested}">Requested</th>
+                            <th th:text="#{deliveries.purchase.confirm.available}">Available</th>
+                            <th th:text="#{deliveries.purchase.confirm.feedPrice}">Price (feed)</th>
+                            <th th:text="#{deliveries.purchase.confirm.livePrice}">Price (live)</th>
+                            <th>&Delta;</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="line : ${validation.lines()}"
+                            th:classappend="${!line.isAvailable()} ? 'has-background-danger-light'">
+                            <td th:text="${line.name}"></td>
+                            <td th:text="${line.ean}"></td>
+                            <td th:text="${line.requestedQty}"></td>
+                            <td>
+                                <span th:text="${line.availableQty}"></span>
+                                <span class="tag is-danger ml-1" th:if="${!line.isAvailable()}"
+                                      th:text="#{deliveries.purchase.confirm.missing} + ' ' + ${line.missingQty}"></span>
+                            </td>
+                            <td th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(line.priceDelta, 1, 2)}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="level">
+                        <div class="level-left">
+                            <p>
+                                <strong th:text="#{deliveries.purchase.confirm.total}">Net total</strong>:
+                                <span th:text="${#numbers.formatDecimal(validation.totalNet(), 1, 2)} + ' ' + ${validation.currency()}"></span>
+                            </p>
+                        </div>
+                    </div>
+                </th:block>
+            </div>
+
+            <form id="purchase-confirm-form"
+                  th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/confirm(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/confirm(provider=${form.provider})}"
+                  th:attr="data-validate-url=${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/validate(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/validate(provider=${form.provider})}"
                   th:object="${form}" method="post"
                   onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
-                <input type="hidden" name="purchaseRef" th:value="${validation.purchaseRef()}"/>
+                <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
@@ -87,14 +104,50 @@
                 </th:block>
 
                 <div class="buttons">
-                    <button type="submit" id="purchase-confirm-submit" class="button is-primary"
-                            th:disabled="${!validation.fullyAvailable()}"
+                    <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
                             th:text="#{deliveries.purchase.confirm.submit}">Place order</button>
                     <a class="button"
                        th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}(provider=${form.provider})}"
                        th:text="#{deliveries.purchase.confirm.back}">Back</a>
                 </div>
             </form>
+
+            <script th:inline="none">
+                function loadValidation() {
+                    const form = document.getElementById('purchase-confirm-form');
+                    const area = document.getElementById('validation-area');
+                    const submit = document.getElementById('purchase-confirm-submit');
+                    submit.disabled = true;
+                    area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
+                    fetch(form.dataset.validateUrl, {method: 'POST', body: new FormData(form)})
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status);
+                            }
+                            return response.text();
+                        })
+                        .then(function (html) {
+                            area.innerHTML = html;
+                            const result = area.querySelector('[data-fully-available]');
+                            submit.disabled = !(result && result.dataset.fullyAvailable === 'true');
+                        })
+                        .catch(function () {
+                            area.innerHTML = document.getElementById('validation-error-template').innerHTML;
+                        });
+                }
+                document.addEventListener('DOMContentLoaded', loadValidation);
+            </script>
+
+            <template id="validation-spinner-template">
+                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
+                <progress class="progress is-small is-primary" max="100"></progress>
+            </template>
+            <template id="validation-error-template">
+                <div class="notification is-danger">
+                    <span th:text="#{deliveries.purchase.confirm.checkFailed}">Failed to fetch availability from the supplier.</span>
+                    <a href="javascript:void(0)" onclick="loadValidation()" th:text="#{deliveries.purchase.confirm.retry}">Retry</a>
+                </div>
+            </template>
         </div>
     </section>
 
