@@ -72,7 +72,7 @@ public class SupplierPurchaseService {
                 .toList();
 
         List<SupplierOrderLine> lines = items.stream()
-                .map(item -> new SupplierOrderLine(item.getEan(), item.getMfn(), item.getRequestedQty()))
+                .map(item -> new SupplierOrderLine(null, item.getEan(), item.getMfn(), item.getRequestedQty()))
                 .toList();
 
         SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
@@ -103,7 +103,7 @@ public class SupplierPurchaseService {
         }
 
         List<SupplierOrderLine> lines = validation.lines().stream()
-                .map(line -> new SupplierOrderLine(line.ean(), line.mfn(), line.requestedQty()))
+                .map(line -> new SupplierOrderLine(null, line.ean(), line.mfn(), line.requestedQty()))
                 .toList();
 
         SupplierOrderResult orderResult;
