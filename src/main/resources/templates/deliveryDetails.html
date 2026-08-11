@@ -49,7 +49,10 @@
                                 <span class="tag ml-1"
                                       th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                             </div>
+                            <p class="has-text-danger" th:if="${delivery.orderFailed}" th:text="${delivery.orderErrorMessage}"></p>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.cost}"></label>
