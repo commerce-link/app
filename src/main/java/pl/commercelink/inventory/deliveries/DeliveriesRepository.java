@@ -107,7 +107,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
         return queryWithPagination(queryExpression, page, pageSize, Delivery.class)
                 .stream()
-                .sorted(Comparator.comparing(Delivery::getEstimatedDeliveryAt))
+                .sorted(Comparator.comparing(Delivery::getEstimatedDeliveryAt, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
     }
 
