@@ -46,12 +46,12 @@ class RMAShippingControllerTest {
         RMAConfiguration configuration = new RMAConfiguration();
 
         // when / then
-        assertEquals(new DeliveryTarget(null, null), controllerFor(storeWith(configuration)).resolveDeliveryTarget(null));
+        assertEquals(new DeliveryTarget(null, null, null), controllerFor(storeWith(configuration)).resolveDeliveryTarget(null));
     }
 
     @Test
     void returnsNothingWhenTheStoreHasNoReturnsConfiguration() {
         // when / then
-        assertEquals(new DeliveryTarget(null, null), controllerFor(storeWith(null)).resolveDeliveryTarget(null));
+        assertEquals(new DeliveryTarget(null, null, null), controllerFor(storeWith(null)).resolveDeliveryTarget(null));
     }
 }

@@ -15,6 +15,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
+import pl.commercelink.stores.IntegrationType;
 
 
 @Component
@@ -87,7 +88,7 @@ public class MarketplaceOrderLifecycleEventListener {
                 if (order.getStatus().isOneOf(OrderStatus.Completed, OrderStatus.Cancelled)) {
                     break;
                 }
-                extractShipmentUpdate(order)
+                extractShipmentUpdate(order, store, marketplace)
                         .ifPresent(update -> provider.shipOrder(externalOrderId, update));
                 break;
             case OrderCancelled:
@@ -111,12 +112,12 @@ public class MarketplaceOrderLifecycleEventListener {
         }
     }
 
-    private Optional<ShipmentUpdate> extractShipmentUpdate(Order order) {
+    private Optional<ShipmentUpdate> extractShipmentUpdate(Order order, Store store, String marketplace) {
         Optional<ShipmentUpdate> tracked = order.getShipments().stream()
                 .filter(Shipment::hasShippingData)
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
-                        carrierDictionary.resolve(s.getCarrier()).orElse(null),
+                        carrierDictionary.translate(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), marketplace, s.getCarrier()).orElse(null),
                         s.getCarrier(),
                         s.getTrackingUrl()));
 

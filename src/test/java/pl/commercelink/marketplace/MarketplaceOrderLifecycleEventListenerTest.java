@@ -46,7 +46,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
 
     private static CarrierDictionary dictionaryWithDpd() {
         CarrierDictionary dictionary = new CarrierDictionary();
-        dictionary.setCarriers(java.util.Map.of("DPD", java.util.List.of("DPD")));
+        dictionary.setCarriers(java.util.Map.of("furgonetka", java.util.Map.of("Empik", "{\"DPD\":\"dpd-1\"}")));
         return dictionary;
     }
 
@@ -75,6 +75,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         when(order.isMarketplaceOrder()).thenReturn(true);
         when(order.getSource()).thenReturn(source);
         when(source.getName()).thenReturn(MARKETPLACE);
+        when(store.getConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER)).thenReturn("furgonetka");
         when(order.getExternalOrderId()).thenReturn(EXTERNAL_ORDER_ID);
         when(order.getShipments()).thenReturn(List.of());
         when(order.getDocuments()).thenReturn(List.of());
@@ -139,7 +140,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "DPD", "https://track.example/TRACK-9"));
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "dpd-1", "DPD", "https://track.example/TRACK-9"));
         verifyNoMoreInteractions(provider);
     }
 

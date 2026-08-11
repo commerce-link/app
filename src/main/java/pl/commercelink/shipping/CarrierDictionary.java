@@ -1,11 +1,12 @@
 package pl.commercelink.shipping;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -13,45 +14,70 @@ import java.util.Optional;
 @ConfigurationProperties(prefix = "shipping")
 public class CarrierDictionary {
 
-    private Map<String, List<String>> carriers = new LinkedHashMap<>();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final TypeReference<Map<String, String>> CODES = new TypeReference<>() {
+    };
 
-    public Map<String, List<String>> getCarriers() {
+    private Map<String, Map<String, String>> carriers = new LinkedHashMap<>();
+
+    public Map<String, Map<String, String>> getCarriers() {
         return carriers;
     }
 
-    public void setCarriers(Map<String, List<String>> carriers) {
+    public void setCarriers(Map<String, Map<String, String>> carriers) {
         this.carriers = carriers;
     }
 
-    public Optional<String> resolve(String name) {
-        if (name == null || name.isBlank()) {
+    @PostConstruct
+    void validate() {
+        carriers.forEach((source, targets) -> targets.forEach((target, codes) -> parse(source, target, codes)));
+    }
+
+    public Optional<String> translate(String source, String target, String value) {
+        if (value == null || value.isBlank()) {
             return Optional.empty();
         }
-        String normalized = name.trim();
-        return matchExactly(normalized).or(() -> matchByContent(normalized.toUpperCase()));
+        Map<String, String> codes = codesFor(source, target);
+        String normalized = value.trim();
+        return matchExactly(codes, normalized).or(() -> matchByContent(codes, normalized.toUpperCase()));
     }
 
-    public boolean describes(String carrier, String name) {
-        return carrier != null && resolve(name).filter(carrier::equalsIgnoreCase).isPresent();
+    public boolean describes(String source, String target, String value, String expected) {
+        return expected != null && translate(source, target, value)
+                .filter(expected::equalsIgnoreCase)
+                .isPresent();
     }
 
-    private Optional<String> matchExactly(String normalized) {
-        return carriers.keySet().stream()
-                .filter(carrier -> namesOf(carrier).stream().anyMatch(alias -> alias.equalsIgnoreCase(normalized)))
+    private Optional<String> matchExactly(Map<String, String> codes, String normalized) {
+        return codes.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(normalized))
+                .map(Map.Entry::getValue)
                 .findFirst();
     }
 
-    private Optional<String> matchByContent(String normalized) {
-        return carriers.keySet().stream()
-                .filter(carrier -> namesOf(carrier).stream().anyMatch(alias -> normalized.contains(alias.toUpperCase())))
+    private Optional<String> matchByContent(Map<String, String> codes, String normalized) {
+        return codes.entrySet().stream()
+                .filter(entry -> normalized.contains(entry.getKey().toUpperCase()))
+                .map(Map.Entry::getValue)
                 .findFirst();
     }
 
-    private List<String> namesOf(String carrier) {
-        List<String> names = new ArrayList<>();
-        names.add(carrier);
-        names.add(carrier.replace('_', ' '));
-        carriers.getOrDefault(carrier, List.of()).forEach(alias -> names.add(alias.trim()));
-        return names;
+    private Map<String, String> codesFor(String source, String target) {
+        return carriers.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(source))
+                .flatMap(entry -> entry.getValue().entrySet().stream()
+                        .filter(byTarget -> byTarget.getKey().equalsIgnoreCase(target))
+                        .map(byTarget -> parse(source, target, byTarget.getValue())))
+                .findFirst()
+                .orElse(Map.of());
+    }
+
+    private Map<String, String> parse(String source, String target, String codes) {
+        try {
+            return MAPPER.readValue(codes, CODES);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Malformed carrier mapping shipping.carriers." + source + "." + target + ": " + codes, e);
+        }
     }
 }

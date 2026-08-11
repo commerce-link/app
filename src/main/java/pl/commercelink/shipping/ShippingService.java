@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import pl.commercelink.stores.IntegrationType;
 
 @Service
 public class ShippingService {
@@ -48,7 +49,8 @@ public class ShippingService {
                 .build();
 
 
-        Set<String> carrierIds = carriersMatching(carrierDictionary, store.getShippingConfiguration().getAuthorizedCarriers(), deliveryTarget.carrier()).stream()
+        Set<String> carrierIds = carriersMatching(carrierDictionary, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER),
+                deliveryTarget.source(), store.getShippingConfiguration().getAuthorizedCarriers(), deliveryTarget.carrier()).stream()
                 .map(AuthorizedCarrier::getId)
                 .collect(Collectors.toSet());
 
@@ -145,22 +147,24 @@ public class ShippingService {
         );
     }
 
-    static List<AuthorizedCarrier> carriersMatching(CarrierDictionary dictionary,
-            List<AuthorizedCarrier> authorizedCarriers, String deliveryCarrier) {
-        Optional<String> chosen = dictionary.resolve(deliveryCarrier);
+    static List<AuthorizedCarrier> carriersMatching(CarrierDictionary dictionary, String shippingProvider,
+            String source, List<AuthorizedCarrier> authorizedCarriers, String shippingCarrier) {
+        Optional<String> chosen = StringUtils.equalsIgnoreCase(shippingProvider, source)
+                ? Optional.ofNullable(StringUtils.trimToNull(shippingCarrier))
+                : dictionary.translate(source, shippingProvider, shippingCarrier);
         if (chosen.isEmpty()) {
             return authorizedCarriers;
         }
         List<AuthorizedCarrier> matching = authorizedCarriers.stream()
-                .filter(carrier -> describes(dictionary, chosen.get(), carrier))
+                .filter(carrier -> describes(chosen.get(), carrier))
                 .collect(Collectors.toList());
 
         return matching.isEmpty() ? authorizedCarriers : matching;
     }
 
-    private static boolean describes(CarrierDictionary dictionary, String chosen, AuthorizedCarrier carrier) {
-        return dictionary.describes(chosen, carrier.getName())
-                || dictionary.describes(chosen, carrier.getDisplayName());
+    private static boolean describes(String chosen, AuthorizedCarrier carrier) {
+        return StringUtils.containsIgnoreCase(carrier.getName(), chosen)
+                || StringUtils.containsIgnoreCase(carrier.getDisplayName(), chosen);
     }
 
     private static DeliveryPoint toDeliveryPoint(String pointCode) {

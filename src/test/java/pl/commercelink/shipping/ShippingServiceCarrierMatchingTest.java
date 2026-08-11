@@ -20,17 +20,15 @@ class ShippingServiceCarrierMatchingTest {
 
     private static CarrierDictionary dictionaryWithDefaults() {
         CarrierDictionary dictionary = new CarrierDictionary();
-        dictionary.setCarriers(Map.of(
-                "INPOST", List.of("InPost", "Paczkomat", "Paczkomaty"),
-                "POCZTA_POLSKA", List.of("Poczta Polska", "Pocztex", "Poczta"),
-                "DPD", List.of("DPD")));
+        dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka",
+                "{\"2\":\"InPost\",\"3\":\"Poczta Polska\"}")));
         return dictionary;
     }
 
     @Test
     void narrowsToTheCarrierChosenByTheBuyer() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "INPOST");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "2");
 
         // then
         assertEquals(List.of(INPOST), matching);
@@ -39,7 +37,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void matchesMultiWordCarrierNames() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "POCZTA_POLSKA");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "3");
 
         // then
         assertEquals(List.of(POCZTA), matching);
@@ -48,7 +46,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void keepsEveryCarrierWhenBuyerChoiceIsUnknown() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, null);
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, null);
 
         // then
         assertEquals(authorized, matching);
@@ -57,7 +55,7 @@ class ShippingServiceCarrierMatchingTest {
     @Test
     void fallsBackToEveryCarrierWhenChoiceCannotBeMatched() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, authorized, "MEEST");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "99");
 
         // then
         assertEquals(authorized, matching);

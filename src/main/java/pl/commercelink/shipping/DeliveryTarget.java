@@ -1,4 +1,4 @@
 package pl.commercelink.shipping;
 
-public record DeliveryTarget(String carrier, String pointCode) {
+public record DeliveryTarget(String source, String carrier, String pointCode) {
 }

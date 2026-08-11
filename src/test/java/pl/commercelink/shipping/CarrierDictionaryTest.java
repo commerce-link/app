@@ -2,12 +2,12 @@ package pl.commercelink.shipping;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CarrierDictionaryTest {
@@ -17,52 +17,64 @@ class CarrierDictionaryTest {
     private static CarrierDictionary configured() {
         CarrierDictionary dictionary = new CarrierDictionary();
         dictionary.setCarriers(Map.of(
-                "INPOST", List.of("InPost", "Paczkomat", "Paczkomaty"),
-                "POCZTA_POLSKA", List.of("Poczta Polska", "Pocztex", "Poczta"),
-                "ORLEN", List.of("Orlen Paczka", "Orlen", "RUCH")));
+                "furgonetka", Map.of(
+                        "Ceneo", "{\"InPost\":\"1\",\"DPD\":\"3\"}",
+                        "Allegro", "{\"InPost\":\"INPOST\"}"),
+                "Allegro", Map.of("furgonetka", "{\"Paczkomat\":\"InPost\",\"RUCH\":\"Orlen\"}"),
+                "Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\"}")));
         return dictionary;
     }
 
     @Test
-    void resolvesAConfiguredAliasIgnoringCase() {
+    void translatesTheSameNameDifferentlyPerTargetSystem() {
         // when / then
-        assertEquals(Optional.of("INPOST"), dictionary.resolve("inpost"));
-        assertEquals(Optional.of("ORLEN"), dictionary.resolve("RUCH"));
+        assertEquals(Optional.of("1"), dictionary.translate("furgonetka", "Ceneo", "InPost"));
+        assertEquals(Optional.of("INPOST"), dictionary.translate("furgonetka", "Allegro", "InPost"));
     }
 
     @Test
-    void treatsTheCarrierKeyItselfAsItsOwnAlias() {
+    void translatesFromTheMarketplaceBackToTheShippingProvider() {
         // when / then
-        assertEquals(Optional.of("POCZTA_POLSKA"), dictionary.resolve("POCZTA_POLSKA"));
-        assertEquals(Optional.of("POCZTA_POLSKA"), dictionary.resolve("Poczta Polska"));
+        assertEquals(Optional.of("InPost"), dictionary.translate("Morele", "furgonetka", "2"));
+        assertEquals(Optional.of("Zabka"), dictionary.translate("Morele", "furgonetka", "6"));
     }
 
     @Test
-    void knowsOnlyTheCarriersThatConfigurationDeclares() {
+    void matchesAFragmentEmbeddedInFreeText() {
         // when / then
-        assertEquals(Optional.empty(), dictionary.resolve("DHL"));
+        assertEquals(Optional.of("InPost"), dictionary.translate("Allegro", "furgonetka", "InPost Paczkomat 24/7"));
+        assertEquals(Optional.of("Orlen"), dictionary.translate("Allegro", "furgonetka", "Punkt RUCH"));
     }
 
     @Test
-    void resolvesAnAliasEmbeddedInALongerName() {
+    void ignoresTheCaseOfSystemNames() {
         // when / then
-        assertEquals(Optional.of("INPOST"), dictionary.resolve("InPost Paczkomaty 24/7"));
-        assertEquals(Optional.of("POCZTA_POLSKA"), dictionary.resolve("Kurier Pocztex Expres24"));
+        assertEquals(Optional.of("1"), dictionary.translate("FURGONETKA", "ceneo", "InPost"));
     }
 
     @Test
-    void returnsNothingForUnknownOrBlankNames() {
+    void returnsNothingWhenThePairOrValueIsUnknown() {
         // when / then
-        assertEquals(Optional.empty(), dictionary.resolve("Meest Express"));
-        assertEquals(Optional.empty(), dictionary.resolve(null));
-        assertEquals(Optional.empty(), dictionary.resolve("   "));
+        assertEquals(Optional.empty(), dictionary.translate("furgonetka", "Empik", "InPost"));
+        assertEquals(Optional.empty(), dictionary.translate("furgonetka", "Ceneo", "Meest"));
+        assertEquals(Optional.empty(), dictionary.translate("furgonetka", "Ceneo", null));
     }
 
     @Test
-    void describesTellsWhetherANameBelongsToTheCarrier() {
+    void describesComparesTheTranslatedValue() {
         // when / then
-        assertTrue(dictionary.describes("INPOST", "InPost Paczkomaty"));
-        assertFalse(dictionary.describes("DPD", "InPost Paczkomaty"));
-        assertFalse(dictionary.describes(null, "InPost Paczkomaty"));
+        assertTrue(dictionary.describes("furgonetka", "Ceneo", "InPost", "1"));
+        assertFalse(dictionary.describes("furgonetka", "Ceneo", "InPost", "3"));
+        assertFalse(dictionary.describes("furgonetka", "Ceneo", "InPost", null));
+    }
+
+    @Test
+    void malformedMappingFailsAtStartup() {
+        // given
+        CarrierDictionary broken = new CarrierDictionary();
+        broken.setCarriers(Map.of("furgonetka", Map.of("Ceneo", "{\"InPost\": }")));
+
+        // when / then
+        assertThrows(IllegalStateException.class, broken::validate);
     }
 }

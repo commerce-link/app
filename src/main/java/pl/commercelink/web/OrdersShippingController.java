@@ -12,6 +12,9 @@ import pl.commercelink.shipping.AbstractShippingController;
 import java.util.Collections;
 import java.util.List;
 import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 
 @Controller
 @RequestMapping("/dashboard/orders/{orderId}/shipping")
@@ -51,9 +54,17 @@ public class OrdersShippingController extends AbstractShippingController {
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         return order.firstShipment()
-                .map(shipment -> new DeliveryTarget(shipment.getCarrier(), toPointCode(shipment.getCollectionPoint())))
-                .orElseGet(() -> new DeliveryTarget(null, null));
+                .map(shipment -> new DeliveryTarget(sourceOf(order, shipment, shippingProvider), shipment.getCarrier(),
+                        toPointCode(shipment.getCollectionPoint())))
+                .orElseGet(() -> new DeliveryTarget(null, null, null));
+    }
+
+    private static String sourceOf(Order order, Shipment shipment, String shippingProvider) {
+        return shipment.hasShippingData() || !order.isMarketplaceOrder()
+                ? shippingProvider
+                : order.getSource().getName();
     }
 
     private static String toPointCode(CollectionPoint collectionPoint) {

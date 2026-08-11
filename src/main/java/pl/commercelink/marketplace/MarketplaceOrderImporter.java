@@ -74,7 +74,7 @@ public class MarketplaceOrderImporter {
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.deliveryCarrier());
+                .withDeliveryCarrier(marketplaceOrder.shippingCarrier());
 
         CollectionPoint collectionPoint = toCollectionPoint(marketplaceOrder.pickupPoint());
         if (collectionPoint != null) {

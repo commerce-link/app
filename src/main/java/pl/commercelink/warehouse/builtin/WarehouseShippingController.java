@@ -76,6 +76,6 @@ public class WarehouseShippingController extends AbstractShippingController {
 
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
-        return new DeliveryTarget(null, null);
+        return new DeliveryTarget(null, null, null);
     }
 }

@@ -22,6 +22,8 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 
 @Controller
 @RequestMapping("/dashboard/rma/{rmaId}/shipping")
@@ -139,8 +141,9 @@ public class RMAShippingController extends AbstractShippingController {
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         RMAConfiguration rmaConfiguration = getStore().getRmaConfiguration();
         if (rmaConfiguration == null || rmaConfiguration.getCarrier() == null) {
-            return new DeliveryTarget(null, null);
+            return new DeliveryTarget(null, null, null);
         }
-        return new DeliveryTarget(rmaConfiguration.getCarrier().getName(), null);
+        return new DeliveryTarget(getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER),
+                rmaConfiguration.getCarrier().getName(), null);
     }
 }
