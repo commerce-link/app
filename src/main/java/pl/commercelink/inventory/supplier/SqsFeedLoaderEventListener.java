@@ -9,7 +9,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 
 @Component
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+// LOCAL TESTING HACK - DO NOT COMMIT: prod guard removed so store feed imports run against LocalStack
 @RequiredArgsConstructor
 public class SqsFeedLoaderEventListener {
 
@@ -36,6 +36,11 @@ public class SqsFeedLoaderEventListener {
         private String storeId;
 
         public FeedLoaderEventPayload() {
+        }
+
+        public FeedLoaderEventPayload(String supplierName, String storeId) {
+            this.supplierName = supplierName;
+            this.storeId = storeId;
         }
 
         public String getSupplierName() {

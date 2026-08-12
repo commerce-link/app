@@ -13,8 +13,6 @@ import software.amazon.awssdk.services.scheduler.model.FlexibleTimeWindowMode;
 import software.amazon.awssdk.services.scheduler.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.scheduler.model.Target;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Random;
 
 @Component
@@ -52,7 +50,8 @@ public class StoreSupplierFeedScheduler {
                 .target(Target.builder()
                         .arn(feedImportQueueArn)
                         .roleArn(eventBridgeSchedulerRoleArn)
-                        .input(ConversionUtil.toJson(feedImportRequest(storeId, supplierName)))
+                        .input(ConversionUtil.toJson(
+                                new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId)))
                         .build())
                 .build();
 
@@ -77,14 +76,8 @@ public class StoreSupplierFeedScheduler {
             return;
         }
 
-        sqsTemplate.send(FEED_IMPORT_QUEUE, feedImportRequest(storeId, supplierName));
-    }
-
-    private Map<String, String> feedImportRequest(String storeId, String supplierName) {
-        Map<String, String> request = new LinkedHashMap<>();
-        request.put("supplierName", supplierName);
-        request.put("storeId", storeId);
-        return request;
+        sqsTemplate.send(FEED_IMPORT_QUEUE,
+                new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId));
     }
 
     private String generateRandomDailySchedule() {
