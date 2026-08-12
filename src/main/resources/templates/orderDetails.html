@@ -943,9 +943,9 @@
                         <th th:text="#{person.surname}"></th>
                         <td th:text="${order.shippingDetails?.surname}"></td>
                     </tr>
-                    <tr th:if="${!order.shipments.isEmpty() and order.shipments[0].collectionPoint != null}">
+                    <tr th:if="${!order.shipments.isEmpty() and order.shipments[0].collectionPointCode != null}">
                         <th th:text="#{order.collection.point}"></th>
-                        <td th:text="${order.shipments[0].collectionPoint.code}"></td>
+                        <td th:text="${order.shipments[0].collectionPointCode}"></td>
                     </tr>
                     <tr>
                         <th th:text="#{address.street}"></th>

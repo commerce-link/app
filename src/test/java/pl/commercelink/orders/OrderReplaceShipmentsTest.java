@@ -12,7 +12,7 @@ class OrderReplaceShipmentsTest {
     private Order orderShippedTo(String collectionPointCode, String carrier) {
         Order order = new Order();
         Shipment imported = new Shipment(ShipmentType.PickupPoint);
-        imported.setCollectionPoint(collectionPointCode != null ? new CollectionPoint(collectionPointCode) : null);
+        imported.setCollectionPointCode(collectionPointCode);
         imported.setCarrier(carrier);
         order.addShipment(imported);
         return order;
@@ -30,7 +30,7 @@ class OrderReplaceShipmentsTest {
         order.replaceShipments(List.of(fromCarrier));
 
         // then
-        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPoint().getCode());
+        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPointCode());
         assertEquals(ShipmentType.PickupPoint, order.getShipments().get(0).getType());
         assertEquals("InPost", order.getShipments().get(0).getCarrier());
     }
@@ -46,7 +46,7 @@ class OrderReplaceShipmentsTest {
         // then
         assertEquals(2, order.getShipments().size());
         order.getShipments().forEach(shipment -> {
-            assertEquals("KRA01M", shipment.getCollectionPoint().getCode());
+            assertEquals("KRA01M", shipment.getCollectionPointCode());
             assertEquals(ShipmentType.PickupPoint, shipment.getType());
         });
     }
@@ -60,7 +60,7 @@ class OrderReplaceShipmentsTest {
         order.replaceShipments(List.of(new Shipment(ShipmentType.PickupPoint)));
 
         // then
-        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPoint().getCode());
+        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPointCode());
         assertEquals("INPOST", order.getShipments().get(0).getCarrier());
     }
 
@@ -74,7 +74,7 @@ class OrderReplaceShipmentsTest {
         order.replaceShipments(List.of(new Shipment()));
 
         // then
-        assertNull(order.getShipments().get(0).getCollectionPoint());
+        assertNull(order.getShipments().get(0).getCollectionPointCode());
         assertEquals(ShipmentType.Courier, order.getShipments().get(0).getType());
     }
 
@@ -88,6 +88,6 @@ class OrderReplaceShipmentsTest {
 
         // then
         assertEquals(ShipmentType.PersonalCollection, order.getShipments().get(0).getType());
-        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPoint().getCode());
+        assertEquals("KRA01M", order.getShipments().get(0).getCollectionPointCode());
     }
 }

@@ -57,7 +57,7 @@ public class OrdersShippingController extends AbstractShippingController {
         String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         return order.firstShipment()
                 .map(shipment -> new DeliveryTarget(sourceOf(order, shipment, shippingProvider), shipment.getCarrier(),
-                        toPointCode(shipment.getCollectionPoint())))
+                        shipment.getCollectionPointCode()))
                 .orElseGet(() -> new DeliveryTarget(null, null, null));
     }
 
@@ -65,10 +65,6 @@ public class OrdersShippingController extends AbstractShippingController {
         return shipment.hasShippingData() || !order.isMarketplaceOrder()
                 ? shippingProvider
                 : order.getSource().getName();
-    }
-
-    private static String toPointCode(CollectionPoint collectionPoint) {
-        return collectionPoint != null ? collectionPoint.getCode() : null;
     }
 
     @Override

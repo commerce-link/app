@@ -349,7 +349,7 @@ public class Order {
         Shipment shipment = new Shipment();
         firstShipment().ifPresent(previous -> {
             shipment.setType(previous.getType());
-            shipment.setCollectionPoint(previous.getCollectionPoint());
+            shipment.setCollectionPointCode(previous.getCollectionPointCode());
         });
         copy.addShipment(shipment);
 
@@ -748,8 +748,8 @@ public class Order {
             return this;
         }
 
-        public Builder withCollectionPoint(CollectionPoint collectionPoint) {
-            shipment.setCollectionPoint(collectionPoint);
+        public Builder withCollectionPointCode(String collectionPointCode) {
+            shipment.setCollectionPointCode(collectionPointCode);
             return this;
         }
 

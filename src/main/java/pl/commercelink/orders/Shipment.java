@@ -22,8 +22,8 @@ public class Shipment {
     private String externalId;
     @DynamoDBAttribute(attributeName = "carrier")
     private String carrier;
-    @DynamoDBAttribute(attributeName = "collectionPoint")
-    private CollectionPoint collectionPoint;
+    @DynamoDBAttribute(attributeName = "collectionPointCode")
+    private String collectionPointCode;
     @DynamoDBAttribute(attributeName = "shippedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime shippedAt;
@@ -63,22 +63,22 @@ public class Shipment {
         this.externalId = externalId;
     }
 
-    public CollectionPoint getCollectionPoint() {
-        return collectionPoint;
+    public String getCollectionPointCode() {
+        return collectionPointCode;
     }
 
-    public void setCollectionPoint(CollectionPoint collectionPoint) {
-        this.collectionPoint = collectionPoint;
+    public void setCollectionPointCode(String collectionPointCode) {
+        this.collectionPointCode = collectionPointCode;
     }
 
     void inheritDeliveryChoiceFrom(Shipment previous) {
-        if (collectionPoint == null) {
-            collectionPoint = previous.collectionPoint;
+        if (collectionPointCode == null) {
+            collectionPointCode = previous.collectionPointCode;
         }
         if (isEmpty(carrier)) {
             carrier = previous.carrier;
         }
-        if (collectionPoint != null && type == ShipmentType.Courier) {
+        if (collectionPointCode != null && type == ShipmentType.Courier) {
             type = ShipmentType.PickupPoint;
         }
     }
