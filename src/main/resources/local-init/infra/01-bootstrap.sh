@@ -26,6 +26,8 @@ awslocal s3 sync /local/s3/stores s3://stores/ --exclude ".gitkeep"
 ## SQS Queues - FIFO (explicit create to ensure FifoQueue attribute is set)
 awslocal sqs create-queue --queue-name order-goods-out-queue.fifo \
   --attributes FifoQueue=true,ContentBasedDeduplication=false
+awslocal sqs create-queue --queue-name supplier-purchase-queue.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false
 
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue

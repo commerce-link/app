@@ -19,11 +19,12 @@
                         <input type="hidden" th:field="*{externalDeliveryId}"/>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.order.no}"></label>
-                            <div class="control" th:with="partnerSiteUrl=${supplierRegistry.getPartnerSiteUrl(delivery.provider, delivery.externalDeliveryId)}">
+                            <div class="control" th:with="partnerSiteUrl=${supplierRegistry.getPartnerSiteUrl(delivery.provider, delivery.externalDeliveryId)},
+                                                          externalId=${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})">
                                 <a th:if="${not #strings.isEmpty(partnerSiteUrl)}" th:href="${partnerSiteUrl}" target="_blank"
-                                   th:text="${delivery.shortenedDeliveryId} + ' (' + ${delivery.externalDeliveryId} + ')'"
+                                   th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"
                                 ></a>
-                                <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${delivery.externalDeliveryId} + ')'"></span>
+                                <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"></span>
                             </div>
                         </div>
                         <div class="field">
@@ -49,7 +50,10 @@
                                 <span class="tag ml-1"
                                       th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                             </div>
+                            <p class="has-text-danger" th:if="${delivery.orderFailed}" th:text="${delivery.orderErrorMessage}"></p>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.cost}"></label>
