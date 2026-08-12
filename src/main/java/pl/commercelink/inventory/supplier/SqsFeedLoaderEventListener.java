@@ -13,8 +13,11 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @RequiredArgsConstructor
 public class SqsFeedLoaderEventListener {
 
+    static final int MAX_CONFIGURATION_RETRIES = 5;
+
     private final StoreSupplierFeedService storeSupplierFeedService;
     private final GlobalSupplierFeedService globalSupplierFeedService;
+    private final StoreSupplierFeedScheduler feedScheduler;
 
     @SqsListener(
             value = "supplier-feed-import-queue",
@@ -24,16 +27,29 @@ public class SqsFeedLoaderEventListener {
     )
     public void handleMessage(FeedLoaderEventPayload payload) throws Exception {
         if (isNotBlank(payload.getStoreId())) {
-            storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+            loadStoreFeed(payload);
             return;
         }
         globalSupplierFeedService.loadFeed(payload.getSupplierName());
+    }
+
+    private void loadStoreFeed(FeedLoaderEventPayload payload) throws Exception {
+        try {
+            storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+        } catch (SupplierConfigurationNotReadyException e) {
+            if (payload.getAttempt() >= MAX_CONFIGURATION_RETRIES) {
+                throw e;
+            }
+            feedScheduler.scheduleConfigurationRetry(
+                    payload.getStoreId(), payload.getSupplierName(), payload.getAttempt() + 1);
+        }
     }
 
     public static class FeedLoaderEventPayload {
 
         private String supplierName;
         private String storeId;
+        private int attempt;
 
         public FeedLoaderEventPayload() {
         }
@@ -44,6 +60,10 @@ public class SqsFeedLoaderEventListener {
 
         public String getStoreId() {
             return storeId;
+        }
+
+        public int getAttempt() {
+            return attempt;
         }
 
     }

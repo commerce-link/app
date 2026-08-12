@@ -21,6 +21,7 @@ import java.util.Random;
 public class StoreSupplierFeedScheduler {
 
     private static final String FEED_IMPORT_QUEUE = "supplier-feed-import-queue";
+    private static final int CONFIGURATION_RETRY_DELAY_SECONDS = 10;
 
     @Value("${application.env}")
     private String env;
@@ -78,6 +79,14 @@ public class StoreSupplierFeedScheduler {
         }
 
         sqsTemplate.send(FEED_IMPORT_QUEUE, feedImportRequest(storeId, supplierName));
+    }
+
+    public void scheduleConfigurationRetry(String storeId, String supplierName, int attempt) {
+        Map<String, String> request = feedImportRequest(storeId, supplierName);
+        request.put("attempt", String.valueOf(attempt));
+        sqsTemplate.send(to -> to.queue(FEED_IMPORT_QUEUE)
+                .payload(request)
+                .delaySeconds(CONFIGURATION_RETRY_DELAY_SECONDS));
     }
 
     private Map<String, String> feedImportRequest(String storeId, String supplierName) {

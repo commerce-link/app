@@ -23,6 +23,8 @@ class SqsFeedLoaderEventListenerTest {
     private StoreSupplierFeedService storeSupplierFeedService;
     @Mock
     private GlobalSupplierFeedService globalSupplierFeedService;
+    @Mock
+    private StoreSupplierFeedScheduler feedScheduler;
 
     @InjectMocks
     private SqsFeedLoaderEventListener listener;
@@ -33,6 +35,12 @@ class SqsFeedLoaderEventListenerTest {
         if (storeId != null) {
             setField(payload, "storeId", storeId);
         }
+        return payload;
+    }
+
+    private FeedLoaderEventPayload payload(String supplierName, String storeId, int attempt) throws Exception {
+        FeedLoaderEventPayload payload = payload(supplierName, storeId);
+        setField(payload, "attempt", attempt);
         return payload;
     }
 
@@ -80,5 +88,30 @@ class SqsFeedLoaderEventListenerTest {
 
         // when / then
         assertThrows(Exception.class, () -> listener.handleMessage(payload("Wortmann", null)));
+    }
+
+    @Test
+    void reschedulesImportWhenConfigurationNotReady() throws Exception {
+        // given
+        doThrow(new SupplierConfigurationNotReadyException("store-1", "Wortmann"))
+                .when(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
+
+        // when
+        listener.handleMessage(payload("Wortmann", "store-1", 2));
+
+        // then
+        verify(feedScheduler).scheduleConfigurationRetry("store-1", "Wortmann", 3);
+    }
+
+    @Test
+    void rethrowsWhenConfigurationRetriesExhausted() throws Exception {
+        // given
+        doThrow(new SupplierConfigurationNotReadyException("store-1", "Wortmann"))
+                .when(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
+
+        // when / then
+        assertThrows(SupplierConfigurationNotReadyException.class,
+                () -> listener.handleMessage(payload("Wortmann", "store-1", 5)));
+        verify(feedScheduler, never()).scheduleConfigurationRetry(anyString(), anyString(), anyInt());
     }
 }

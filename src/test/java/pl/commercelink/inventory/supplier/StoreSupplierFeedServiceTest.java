@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,8 +32,6 @@ class StoreSupplierFeedServiceTest {
     private SupplierProviderFactory supplierProviderFactory;
     @Mock
     private StoreFeedRepository storeFeedRepository;
-    @Mock
-    private StoreSupplierFeedService.Sleeper sleeper;
 
     @InjectMocks
     private StoreSupplierFeedService service;
@@ -108,29 +105,7 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
-    void waitsUntilConfigurationBecomesReadable() throws Exception {
-        // given
-        Store store = storeWithId("store-1");
-        byte[] data = "rows".getBytes();
-        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
-        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
-        when(descriptor.configurationFields()).thenReturn(List.of(requiredField()));
-        when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
-        when(supplierProviderFactory.loadConfiguration(store, "Wortmann"))
-                .thenReturn(Map.of(), Map.of(), Map.of("apiKey", "secret"));
-        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
-
-        // when
-        service.loadStoreFeed("store-1", "Wortmann");
-
-        // then
-        verify(sleeper, times(2)).sleep(2000L);
-        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
-    }
-
-    @Test
-    void failsWhenConfigurationNeverBecomesReadable() throws Exception {
+    void throwsWhenRequiredConfigurationNotReadable() {
         // given
         Store store = storeWithId("store-1");
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
@@ -140,14 +115,34 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.loadConfiguration(store, "Wortmann")).thenReturn(Map.of());
 
         // when / then
-        assertThrows(ResourceDownloadException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
-        verify(sleeper, times(4)).sleep(2000L);
+        assertThrows(SupplierConfigurationNotReadyException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
         verify(supplierProviderFactory, never()).get(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
     @Test
-    void doesNotWaitWhenSupplierHasNoRequiredFields() throws Exception {
+    void downloadsWhenRequiredConfigurationReadable() throws Exception {
+        // given
+        Store store = storeWithId("store-1");
+        byte[] data = "rows".getBytes();
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of(requiredField()));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
+        when(supplierProviderFactory.loadConfiguration(store, "Wortmann")).thenReturn(Map.of("apiKey", "secret"));
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+    }
+
+    @Test
+    void doesNotCheckConfigurationWhenNoRequiredFields() throws Exception {
         // given
         Store store = storeWithId("store-1");
         byte[] data = "rows".getBytes();
@@ -162,13 +157,12 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        verifyNoInteractions(sleeper);
         verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
     }
 
     @Test
-    void doesNotWaitWhenDescriptorUnknown() throws Exception {
+    void doesNotCheckConfigurationWhenDescriptorUnknown() throws Exception {
         // given
         Store store = storeWithId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
@@ -179,23 +173,7 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        verifyNoInteractions(sleeper);
+        verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
-    }
-
-    @Test
-    void failsWhenInterruptedWhileWaiting() throws Exception {
-        // given
-        Store store = storeWithId("store-1");
-        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
-        when(descriptor.configurationFields()).thenReturn(List.of(requiredField()));
-        when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
-        when(supplierProviderFactory.loadConfiguration(store, "Wortmann")).thenReturn(Map.of());
-        doThrow(new InterruptedException()).when(sleeper).sleep(2000L);
-
-        // when / then
-        assertThrows(ResourceDownloadException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
-        assertTrue(Thread.interrupted());
     }
 }
