@@ -45,7 +45,7 @@ public class ShipmentCancelService {
         ShippingProvider shippingProvider = shippingProviderFactory.get(store);
         shippingProvider.cancelShipment(shipment.getExternalId());
 
-        order.setShipments(Collections.singletonList(new Shipment(shipment.getType())));
+        order.replaceShipments(Collections.singletonList(new Shipment(shipment.getType())));
         orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
         ordersRepository.save(order);
     }

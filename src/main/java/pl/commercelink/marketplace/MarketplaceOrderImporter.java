@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
@@ -7,6 +8,7 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
+import pl.commercelink.marketplace.api.PickupPoint;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.pim.api.PimCatalog;
@@ -69,16 +71,27 @@ public class MarketplaceOrderImporter {
                 commission.doubleValue()
         );
 
-        Order order = new Order.Builder(store, basket)
+        Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .build();
+                .withDeliveryCarrier(marketplaceOrder.shippingCarrier());
+
+        String collectionPointCode = toCollectionPointCode(marketplaceOrder.pickupPoint());
+        if (collectionPointCode != null) {
+            orderBuilder.withCollectionPointCode(collectionPointCode).withShipmentType(ShipmentType.PickupPoint);
+        }
+
+        Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
                 .collect(Collectors.toList());
 
         ordersManager.saveWithFulfilment(order, orderItems);
+    }
+
+    static String toCollectionPointCode(PickupPoint pickupPoint) {
+        return pickupPoint != null ? StringUtils.trimToNull(pickupPoint.code()) : null;
     }
 
     BillingDetails toBillingDetails(MarketplaceCustomer customer) {
@@ -114,21 +127,12 @@ public class MarketplaceOrderImporter {
         shipping.setCompanyName(customer.company());
         shipping.setEmail(customer.email());
         shipping.setPhone(address.phone());
-        shipping.setStreetAndNumber(renderStreet(address));
+        shipping.setStreetAndNumber(address.street());
         shipping.setPostalCode(address.postalCode());
         shipping.setCity(address.city());
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
 
         return shipping;
-    }
-
-    private String renderStreet(MarketplaceCustomer.Address address) {
-        if (address.pickupPoint() == null) {
-            return address.street();
-        }
-        MarketplaceCustomer.PickupPoint point = address.pickupPoint();
-        String label = point.name() != null ? point.id() + " (" + point.name() + ")" : point.id();
-        return address.street() != null ? label + ", " + address.street() : label;
     }
 
     private String resolveProductCategory(String mfn) {
