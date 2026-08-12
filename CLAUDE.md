@@ -2,32 +2,34 @@
 
 ## Project Overview
 
-CommerceLink is a Spring Boot 3.5.10 / Java 21 multi-tenant B2B e-commerce platform. It aggregates inventory from 14 suppliers (distributors/retailers), manages product catalogs, processes orders, and integrates with service providers for payments (Stripe, PayNow), invoicing, and shipping (Furgonetka).
+CommerceLink is a Spring Boot 3.5.10 / Java 21 multi-tenant B2B e-commerce platform. It aggregates inventory from supplier feeds, manages product catalogs, processes orders, and integrates with marketplaces and service providers for payments, invoicing, shipping and label printing.
 
-The project is being modularized: integrations are extracted into separate libraries following the provider-api plugin pattern. Invoicing is fully extracted behind `invoicing-api`. Shipping is fully extracted behind `shipping-api`. Label printing is extracted behind `printing-api`. PIM is fully extracted to a separate microservice. Payments, marketplace integrations, and multistore management will all be extracted, making the core platform simpler.
+The platform is fully modularized: `app` is the orchestration core, and every integration (suppliers, marketplaces, payments, invoicing, shipping, printing, PIM) lives behind a domain `*-api` contract library. Concrete adapters are separate private modules consumed as Maven artifacts (GitHub Packages, `commerce-link/*`) and discovered at runtime via `ServiceLoader` — the app has no compile-time references to any adapter and contains zero provider-specific code. Product information lives in a separate PIM microservice consumed over HTTP.
+
+The workspace directory containing `app` may also contain local checkouts of other parts of the system (contract libraries, adapters, shared libraries, the PIM microservice). Each is its own git repository and Maven artifact; adapter modules can be numerous and their set changes over time, so never assume a fixed list — discover what is present when needed.
 
 ## Development Commands
 
 ```bash
-mvn clean compile            # Build
-mvn clean compile -Pdev      # Build (core only, no adapters)
-mvn spring-boot:run          # Run
-mvn spring-boot:run -Pdev    # Run (core only, no adapters)
+mvn clean compile            # Build (no adapters on classpath)
+mvn clean compile -Pdev      # Build with dev adapters (test supplier + dev PIM adapter)
+mvn spring-boot:run -Pdev    # Run locally
 mvn test -Dtest=ClassName    # Run specific test class
 mvn test -Dtest=ClassName#methodName  # Run specific test method
 ```
 
 ### Maven Profiles
 
-- **`full`** (default) — includes all dependencies including private supplier adapters
-- **`dev`** (`-Pdev`) — core dependencies only, no private adapters. Use for local development when adapter repos aren't built locally.
+- Default (no profile) — contract libraries only, **no adapters**. Provider registries come up empty and `PimCatalogRegistry` fails application startup (it requires exactly one PIM adapter on the classpath), so this is fine for compiling but not for running.
+- **`dev`** (`-Pdev`) — adds development adapters: a fictional test supplier and a dev PIM adapter. Use for local development.
+- In production, real adapters are added to the runtime classpath as jars outside the app build; `ServiceLoader` picks them up via `META-INF/services/` entries.
 
 ### Local Infrastructure
 
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`, v5.5.1). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes (e.g. `V001_CreateDynamoDbTables` creates schema, `V002_LocalDevelopmentSeed` seeds local data). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` DynamoDB table (configurable via `mongock.migration-repository-name` in `application.properties`) and uses `mongockLock` for distributed locking. The `ConnectionDriver` bean is wired manually in `MongockDynamoDbConfig` because the driver's autoconfigure does not work under Spring Boot 3. To add a new migration, create a new `@ChangeUnit` class in the `migration` package with an incrementing `V###` prefix.
+**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V009: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, store registration backfill, taxonomy mappings table). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -36,7 +38,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 - **No Logger**: We log all entries to Sentry automatically. Use `System.out`/`System.err` only in rare cases.
 - **No comments**: Code should be self-explanatory. Refactor instead of commenting.
 - **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.
-- **Email templates**: Rendered with Mustache.
+- **Email templates**: Stored per store in DynamoDB (`EmailTemplates` table) and rendered at runtime with Mustache by `EmailClient` — there are no `.mustache` files in resources.
 - **Localization**: `LocalizedEnum` interface. Polish is primary language. Messages in `messages_pl.properties` / `messages_en.properties`.
 - **DTOs**: Controllers use DTOs (in `web/dtos/`) with factory methods like `OrderDto.from(Order order)`.
 - **Error handling**: `GlobalExceptionHandler` catches common exceptions. Sentry logs errors automatically.
@@ -44,160 +46,133 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 
 ## Project Structure
 
-### Workspace Layout (`D:/Workspace/commercelink/`)
+### Modules the app depends on
 
-| Directory | Artifact | Description |
-|-----------|----------|-------------|
-| `app/` | `commercelink` | Main Spring Boot application |
-| `commercelink-starter/` | `commercelink-starter` | Common infrastructure: AWS config, DynamoDB, email, security, REST, CSV, storage |
-| `api/` | `commercelink-api` (2.1) | Public API contracts and shared DTOs |
-| `pim-api/` | `pim-api` (0.1.0) | PIM client contract: `PimEntry`, `PimCatalog`, `PimIdentifier` — clients must implement this |
-| `provider-api/` | `provider-api` (0.1.0) | Base plugin system: `ProviderDescriptor`, `ProviderField` |
-| `invoicing-api/` | `invoicing-api` (0.2.0) | Invoicing provider interface: `InvoicingProvider`, `InvoicingProviderDescriptor` |
-| `shipping-api/` | `shipping-api` | Shipping provider interface: `ShippingProvider`, `ShippingProviderDescriptor` |
-| `printing-api/` | `printing-api` (0.1.0) | Label printer interface: `PrintProvider`, `PrintProviderDescriptor`, `WarehouseLabel` |
-| `localstack/` | - | Local S3 simulation data |
+The app depends only on contract and shared libraries, never on adapter implementations:
 
-### Library Extraction Pattern
+- `commercelink-starter` — shared infrastructure: AWS autoconfiguration (DynamoDB, S3, SQS, SES, Secrets Manager, Parameter Store, cache, scheduler, Sentry), `DynamoDbRepository<T>`, converters, migration support, localization, security, storage
+- `commercelink-commons` — plain-Java shared types (`UnifiedProductIdentifiers`, `WeightInGrams`)
+- `rest-client` — shared HTTP/OAuth2 client library (`RestApi`, `RestApiWithRetry`, OAuth2 credential/token stores, device flow); used by `ProviderFactory` to build OAuth2 context for adapters
+- `provider-api` — base plugin system: `ProviderDescriptor<T>` with `name()`, `displayName()`, `configurationFields()`, `create(Map)`
+- Domain contracts extending it: `supplier-api`, `marketplace-api`, `payments-api`, `invoicing-api`, `shipping-api`, `printing-api`, `pim-api`
 
-All extracted integrations follow this pattern:
-1. `provider-api` defines `ProviderDescriptor<T>` with `name()`, `displayName()`, `configurationFields()`, `create(Map)`
-2. Domain-specific API (e.g. `invoicing-api`) extends it with domain interfaces (e.g. `InvoicingProvider`)
-3. Implementation libraries implement the interfaces
-4. Registered via `META-INF/services/` for `ServiceLoader` discovery
-5. Main app uses factory classes (e.g. `InvoicingProviderFactory`) to instantiate per-store providers
+### Provider Plugin Pattern
+
+1. `provider-api` defines `ProviderDescriptor<T>`
+2. A domain `*-api` library extends it with domain interfaces (e.g. `InvoicingProvider`, `MarketplaceProvider`, `SupplierProvider`)
+3. Adapter libraries implement the interfaces and register via `META-INF/services/` for `ServiceLoader` discovery
+4. The app's `ProviderFactory` subclasses (e.g. `InvoicingProviderFactory`, `MarketplaceProviderFactory`, `SupplierProviderFactory`, `PaymentProviderFactory`) instantiate per-store providers from the discovered descriptors
 
 ### Package Layout (`src/main/java/pl/commercelink/`)
 
 | Package | Purpose |
 |---------|---------|
-| `starter/` | Extracted to `commercelink-starter` library. AWS config, DynamoDB, email, file ops, security, REST, CSV, localization, storage |
-| `inventory/` | Feed loading, auto-discovery, supplier implementations (14 suppliers) |
-| `products/` | Product catalog, health scoring, filters. PIM index fetched from external PIM microservice via `/PIM/Index` |
-| `orders/` | Order lifecycle, fulfilment algorithms, RMA, notifications, events, imports |
-| `invoicing/` | Invoice orchestration using extracted invoicing libraries |
-| `payments/` | Stripe and PayNow integration with webhook handlers |
-| `shipping/` | Shipping orchestration using extracted shipping libraries |
-| `warehouse/` | Built-in warehouse: goods in/out, stock, reservations, document management |
-| `pricelist/` | Pricelist generation, daily snapshots, price aggregates |
-| `baskets/` | Shopping cart management |
+| `baskets/` | Shopping carts: model, repository, REST API, abandoned-basket cleanup |
 | `checkout/` | Checkout flow and REST API |
-| `stores/` | Store (tenant) configuration: branding, checkout, shipping, invoicing, RMA settings |
-| `marketplaces/` | Morele (active) marketplace integration |
-| `offer/` | Product offers and CSV offer import |
-| `taxonomy/` | Product category taxonomy |
-| `templates/` | Email template storage (DynamoDB-backed) |
+| `demo/` | Demo stores: seeder, demo order generator, cleanup job |
 | `documents/` | Document types and reasons |
-| `financials/` | Financial reports, exchange rates, orders export |
-| `web/` | Controllers and REST APIs |
 | `exception/` | Global exception handling |
-| `provider/` | Service provider configuration management |
-| `printing/` | Label printing: `PrintProviderRegistry` discovers printer adapters (`printing-api` SPI). Printer profiles are stored per store in `WarehouseConfiguration.printers`; warehouse labels are rendered by the configured provider and printed client-side |
+| `financials/` | Financial reports, exchange rates, exports |
+| `inventory/` | Inventory index and caching, feed reload scheduling, auto-discovery matching; `supplier/` holds feed infrastructure (loaders, registry, per-store feeds), `deliveries/` supplier deliveries |
+| `invoicing/` | Invoice orchestration via invoicing providers |
+| `localdev/` | Local development seed data |
+| `marketplace/` | Marketplace orchestration: order import, offer export, provider factory, lifecycle listeners |
+| `migration/` | Mongock `@ChangeUnit` schema migrations |
+| `offer/` | Customer-facing product offer views and CSV offer import |
+| `orders/` | Order core: lifecycle, statuses, fulfilment algorithms, RMA, notifications, events, imports, POS |
+| `payments/` | Payment orchestration: `PaymentProviderFactory`, `PaymentWebhookRegistry` |
+| `pricelist/` | Pricelist generation, daily snapshots, rolling price aggregates |
+| `printing/` | `PrintProviderRegistry` discovers printer adapters; printer profiles per store in `WarehouseConfiguration.printers` |
+| `products/` | Store product catalog, pricing strategies, health scoring, filters; `information/` consumes the external PIM |
+| `provider/` | Provider infrastructure: `ProviderFactory`, configuration management, event binding |
+| `registration/` | New store/user registration |
+| `shipping/` | Shipping orchestration: `ShippingService`, provider factory, webhook registry, shipment cancellation |
+| `starter/` | Remaining in-app shared utilities: `csv`, `dynamodb`, `email`, `rest`, `security`, `storage`, `util` (see note below) |
+| `stores/` | Store (tenant) configuration: branding, checkout, shipping, invoicing, RMA, integrations, printers |
+| `taxonomy/` | Category taxonomy: parser, generator, resolver, localization, `mapping/` supplier category mappings |
+| `templates/` | Email template storage (DynamoDB-backed) |
+| `users/` | AWS Cognito integration (`CognitoConfig`, `CognitoUserService`) |
+| `warehouse/` | Built-in warehouse: stock levels, goods in/out, restock suggestions, warehouse fulfilment |
+| `web/` | Controllers and REST APIs + `dtos/` |
 
-### `starter/` Subpackages (formerly `infrastructure/`)
-
-| Subpackage | Key Classes |
-|------------|-------------|
-| `autoconfigure/` | `DynamoDBConfig`, `S3Config`, `SqsConfig`, `SesConfig`, `SecretsManagerConfig`, `SchedulerConfig`, `CacheConfig`, `SentryConfig` |
-| `dynamodb/` | `DynamoDbRepository<T>` (base), converters, `Metadata` (table provisioning lives in shell scripts under `src/main/resources/local-init/dynamodb/`, not in Java) |
-| `security/` | `WebSecurityConfiguration`, `CognitoOAuthConfig`, `StoreAccessInterceptor`, `CustomOAuth2UserService`, `UserRole` |
-| `email/` | `EmailClient` (SES), `EmailNotification`, `EmailAttachmentBuilder` |
-| `rest/` | `RestApi`, `RestApiWithRetry`, `OAuth2AuthorizationService` |
-| `csv/` | `CSVLoader`, `CSVWriter`, `CSVReady` |
-| `file/` | `FileZipper`, `FtpFileDownloader`, `SftpFileDownloader`, `HttpFileDownloader` |
-| `storage/` | `FileStorage`, `FileImageStorage` |
-| `secrets/` | `SecretsManager`, `ParameterStore` |
-| `localization/` | `LocalizedEnum`, `GlobalLocalizationHandler` |
+**Starter split note**: the starter library extraction is partial. The external `commercelink-starter` library and the in-app `starter/` package coexist and share the `pl.commercelink.starter.*` package namespace; a few classes (e.g. `WebSecurityConfiguration`) exist in both places with different content, and the app's version wins on the classpath. Check both locations when working on starter classes.
 
 ## Terminology
 
-- **Supplier**: A distributor or retailer that supplies goods/inventory (e.g. AbGroup, Action, IngramMicro). Defined by the `Supplier` enum.
-- **Provider**: A service provider for payments, shipping, invoicing, etc. (e.g. Stripe, Furgonetka). Uses the `provider-api` plugin pattern.
-
-## SQS Queue Naming Convention
-
-Queue names follow the pattern: **`{module}-{domain}-{action}-queue[.fifo]`**
-
-- **`{module}`** — module prefix: `app-` for main application, `pim-` for PIM microservice
-- **`{domain}`** — business domain: `order`, `marketplace`, `pricing`, `inventory`, `product`, `basket`, `rma`, `taxonomy`, `warehouse`
-- **`{action}`** — verb describing the operation: `generate`, `import`, `export`, `cleanup`, `notify`, `fulfil`, `process`, `load`, `submit`, `rebuild`, `sync`, `track`
-- **`-queue`** — required suffix
-- **`.fifo`** — only for FIFO queues (AWS requirement)
-
-Rules:
-- Always use singular nouns (e.g. `order` not `orders`, `notification` not `notifications`)
-- Always use verb form for action (e.g. `generate` not `generator`, `notify` not `notifications`)
-- Avoid redundancy (e.g. `app-product-cleanup-queue` not `app-product-cleanup-orphaned-products-queue`)
-- Domain should reflect the actual business area, not legacy naming (e.g. `pricing` not `distributors`)
-
-See `QUEUE_NAMES.md` for the full migration plan with current → proposed name mappings.
+- **Supplier**: A distributor or retailer that supplies goods/inventory. There is **no `Supplier` enum** — suppliers are identified by name (`String`) with a `SupplierInfo` record (name, type, accuracy score, origin, shipping policy) provided by each adapter's `SupplierProviderDescriptor`. `SupplierRegistry` collects all descriptors from `ServiceLoader` and adds three built-in entries: `Amazon`, `Warehouse` (internal), `Other` (fallback). `SupplierType` is `Distributor` or `Retailer`.
+- **Provider**: Any pluggable integration (suppliers, marketplaces, payments, shipping, invoicing, printing) using the `provider-api` plugin pattern.
 
 ## Architecture
 
 ### Multi-Tenancy
 
-The system is organized around `Store` entities. Each store has independent product catalogs, enabled suppliers, service provider configuration (payment/shipping/invoicing), branding, and RMA settings.
+The system is organized around `Store` entities. Each store has independent product catalogs, supplier connections, service provider configuration (payment/shipping/invoicing), branding, and RMA settings.
 
 Shipping, invoicing and WMS providers are single-instance per store (selected provider stored as a single `Integration` entry in `Store.integrations`, keyed by `IntegrationType`). Marketplace and payment integrations are multi-instance — a store can connect any number of them via `Store.marketplaces` (`List<MarketplaceIntegration>`) and `Store.payments` (`List<PaymentIntegration>`). Payment integrations carry a `default` flag and exactly one is treated as the store's default (used by `Checkout` for now); `Store.getDefaultPaymentIntegration()` resolves it.
 
 ### DynamoDB Tables
 
-All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annotations. Repositories extend `DynamoDbRepository<T>`.
+All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annotations. Repositories extend `DynamoDbRepository<T>`. Tables are created by Mongock migrations.
 
-| Table | Entity | Keys |
-|-------|--------|------|
-| Orders | `Order` | hash: storeId, range: orderId |
-| OrderItems | `OrderItem` | hash: orderId, range: itemId |
-| OrderEvents | `OrderEvent` | Event tracking per order |
-| Products | `Product` | Product data |
-| Catalogs | `ProductCatalog` | Category definitions |
-| Baskets | `Basket` | Shopping carts |
-| Stores | `Store` | Tenant configuration |
-| Deliveries | `Delivery` | Supplier deliveries |
-| RMA | `RMA` | Return merchandise |
-| RMAItems | `RMAItem` | RMA line items |
-| RMACenters | `RMACenter` | Return centers |
-| WarehouseItems | `WarehouseItem` | Warehouse stock |
-| WarehouseDocuments | `WarehouseDocument` | Warehouse documents |
-| WarehouseDocumentItems | `WarehouseDocumentItem` | Document line items |
-| WarehouseDocumentSequences | `WarehouseDocumentSequence` | Document numbering |
-| EmailTemplates | `EmailTemplate` | Notification templates |
+| Table | Entity | Hash key | Range key | Indexes |
+|-------|--------|----------|-----------|---------|
+| Stores | `Store` | storeId | — | |
+| Orders | `Order` | storeId | orderId | GSI `StoreIdOrderedAtIndex`, GSI `ExternalOrderIdIndex` |
+| OrderItems | `OrderItem` | orderId | itemId | |
+| OrderEvents | `OrderEvent` | orderId | eventId | LSI `NameIndex` |
+| Products | `Product` | categoryId | productId | GSI `PimIdIndex` |
+| Catalogs | `ProductCatalog` | storeId | catalogId | |
+| Baskets | `Basket` | storeId | basketId | GSI `BasketCreatedAtIndex` |
+| Deliveries | `Delivery` | storeId | deliveryId | |
+| EmailTemplates | `EmailTemplate` | storeId | templateName | |
+| RMA | `RMA` | storeId | rmaId | |
+| RMAItems | `RMAItem` | rmaId | rmaItemId | |
+| RMACenters | `RMACenter` | storeId | rmaCenterId | |
+| WarehouseItems | `WarehouseItem` | storeId | itemId | |
+| WarehouseDocuments | `WarehouseDocument` | storeId | documentId | GSI `DeliveryIdIndex`, `CreatedAtIndex`, `OrderIdIndex`, `RMAIdIndex` |
+| WarehouseDocumentItems | `WarehouseDocumentItem` | documentId | itemId | GSI `DeliveryIdIndex` |
+| WarehouseDocumentSequences | `WarehouseDocumentSequence` | storeId | sequenceKey | |
+| TaxonomyCategoryMappings | `CategoryMapping` | supplier | rawCategory | |
 
-Product information lives in the external PIM microservice — the main app no longer owns a `PIM` DynamoDB table; it consumes the index via `/PIM/Index`.
+Mongock additionally owns `AppMigrationsHistory` and `mongockLock` (no entity classes). Product information tables (PIM index, brands, queue, category matches) live in the PIM microservice, not in the app — the app consumes the index via HTTP (`/PIM/Index`).
 
 ### Inventory Suppliers
 
-The `Supplier` enum defines all distributors/retailers with metadata (type, shipping calculator, accuracy score, locality, estimated arrival days):
+Supplier adapters implement `SupplierProvider` (a single `download()` returning `FeedData`) with a `SupplierProviderDescriptor` carrying `SupplierInfo` and a `FeedFormat` (CSV with a row parser, or XML with an item class). Feed parsing lives in the app (`CsvProductFeedLoader` / `XmlProductFeedLoader` in `inventory/supplier/`).
 
-AbGroup, Acadia, Action, Also, Amazon, Elko, IncomGroup, IngramMicro, Kosatec, Senetic, Wortmann, MxSolution, Proline, Morele, Warehouse (internal), Other (fallback)
+Feed loading runs on two tracks:
 
-Each supplier (except Amazon, Warehouse, Other) has a package under `inventory/suppliers/` with `FeedLoader`, `InventoryItem`, and `ProductFeedParser` implementations.
+- **Global feeds** — `FeedReloaderScheduler` runs every 5 minutes, compares each provider's last update with the feed file date in S3, and reloads only suppliers with newer feeds; prices are converted to the local currency, then the inventory index is updated in one pass.
+- **Per-store feeds** — `StoreSupplierFeedScheduler` creates an EventBridge Scheduler entry per store+supplier (once daily at a random night hour, Europe/Warsaw) targeting `supplier-feed-import-queue`, consumed by `SqsFeedLoaderEventListener`; `triggerImmediateImport()` allows ad-hoc imports. Active only when `application.env=prod`.
 
-Feeds are reloaded every 5 minutes by `FeedReloaderScheduler`. Products are matched across suppliers by EAN and manufacturer code via `InventoryAutoDiscovery`.
+Products are matched across suppliers by EAN and manufacturer code via `InventoryAutoDiscovery`.
 
 ### Order Lifecycle
 
-1. **Checkout**: `Basket` via REST API → payment link (Stripe/PayNow) → `Order` creation
-2. **Fulfilment**: Auto-allocation via `AutomatedOrderFulfilment` (strategies: `CheapestFulfilmentPathSelector`, `ShortestAndCheapestPathSelector`) or manual via `ManualOrderFulfilment`
-3. **Shipping**: `Furgonetka` API for label generation and tracking
-4. **Invoicing**: `InvoicingService` creates invoices via extracted provider libraries (proforma, standard, advance, final, credit notes)
+1. **Order intake**: `Basket` via REST API → payment link from the store's payment provider → `Order` creation; orders are also imported from connected marketplaces (`MarketplaceOrderImporter`)
+2. **Fulfilment**: Auto-allocation via `AutomatedOrderFulfilment` or manual via `ManualOrderFulfilment`
+3. **Shipping**: label generation and tracking via the store's shipping provider
+4. **Invoicing**: `InvoicingService` creates invoices via the store's invoicing provider (proforma, standard, advance, final, credit notes)
 5. **Notifications**: Email notifications via SES for each lifecycle stage
 
-**Order statuses**: New -> InProgress -> Completed | Cancelled
-**Fulfilment statuses**: Pending -> Ordered -> Received -> Allocated -> Shipped -> Delivered | Returned
+**Order statuses** (`OrderStatus`): New, Blocked, Assembly, Assembled, Realization, Shipping, Delivered, Cancelled, Completed
+**Fulfilment statuses** (`FulfilmentStatus`): New, Allocation, Ordered, Reserved, Delivered, InRMA, InExternalService, Returned, Replaced, Destroyed
+**RMA statuses** (`RMAStatus`): New, Approved, Rejected, WaitingForItems, ItemsReceived, Processing, Completed
 
 ### Event-Driven Processing
 
-Most async work is driven through SQS listeners (20+ `@SqsListener` methods across the codebase). Key queues handle: feed loading, pricelist generation, PIM indexing, order fulfilment, notifications, marketplace sync, invoice creation, goods out, taxonomy generation, RMA lifecycle, basket cleanup, and more.
+Async work is driven through 17 `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
 
 **Scheduled tasks** (`@Scheduled`):
-- Every 5 min: `FeedReloaderScheduler` - reload inventory feeds
-- Hourly: `PIMIndex.refreshCaches()` - refresh PIM cache
+- Every 5 min: `FeedReloaderScheduler` — reload global inventory feeds
+- Every 5 min: `TaxonomyCategoryMatchScheduler` — taxonomy category match sweep
+- Hourly: `PimCatalogRegistry` — refresh PIM caches
+- Hourly: `DemoStoreCleanupJob` — clean up demo stores
 
 ### Security
 
-- OAuth2 authentication via AWS Cognito (configured in `CognitoOAuthConfig`)
-- Roles: `ADMIN`, `SUPER_ADMIN`
+- OAuth2 authentication via AWS Cognito (`users/CognitoConfig`, security config in `starter/security/config/`: `WebSecurityConfiguration`, `WebConfig`, `LocalDevOAuth2UserService`)
+- Roles (`UserRole`): `USER`, `ADMIN`, `SUPER_ADMIN`
 - `@PreAuthorize` on controller methods
 - `StoreAccessInterceptor` enforces tenant isolation
 - `StoreApiKeyAuthorizationInterceptor` for API key auth
@@ -207,9 +182,9 @@ Most async work is driven through SQS listeners (20+ `@SqsListener` methods acro
 | Service | Usage |
 |---------|-------|
 | DynamoDB | Primary database |
-| S3 | Feed storage, PIM data, pricelists, images, stores |
-| SQS | Async job queues (20+ listeners) |
-| EventBridge Scheduler | Recurring pricelist/PIM generation |
+| S3 | Feed storage, pricelists, images, stores |
+| SQS | Async job queues (17 listeners) |
+| EventBridge Scheduler | Per-store daily feed imports, recurring generation jobs |
 | SES v2 | Email delivery |
 | Secrets Manager | External API credentials |
 | SSM Parameter Store | Configuration values |
@@ -218,45 +193,40 @@ Environment switching: `application.env=localhost` uses local DynamoDB and files
 
 ## Key Entry Points
 
-| Purpose | Path                                                                                                  |
-|---------|-------------------------------------------------------------------------------------------------------|
-| Application | `Application.java`                                                                                    |
-| Security | `starter/security/config/WebSecurityConfiguration.java`                                               |
-| DynamoDB config | `starter/autoconfigure/DynamoDBConfig.java`                                                           |
-| Schema migration | `migration/V001_CreateDynamoDbTables.java` (tables), `migration/V002_LocalDevelopmentSeed.java` (local seed)|
-| Orders API | `web/OrdersController.java`                                                                           |
-| Order lifecycle | `orders/OrderLifecycle.java`                                                                          |
-| Fulfilment | `orders/fulfilment/AutomatedOrderFulfilment.java`                                                     |
-| Inventory | `inventory/Inventory.java`                                                                            |
-| Feed loading | `inventory/FeedReloaderScheduler.java`                                                                |
-| Product catalog | `products/ProductCatalog.java`                                                                        |
-| PIM | `products/information/PIMIndex.java` (fetches from external service) |
-| Pricelist | `pricelist/PricelistEventListener.java`                                                               |
-| Invoicing | `invoicing/InvoicingService.java`                                                                     |
-| Shipping | `shipping/ShippingService.java`                                                                       |
-| Payments | `payments/PaymentProviderFactory.java`                                                                |
-| Warehouse | `warehouse/builtin/BuiltInWarehouse.java`                                                             |
-| RMA | `orders/rma/RMAManager.java`                                                                          |
-| Store config | `stores/Store.java`                                                                                   |
+| Purpose | Path |
+|---------|------|
+| Application | `Application.java` |
+| Security | `starter/security/config/WebSecurityConfiguration.java` |
+| Schema migration | `migration/V001_CreateDynamoDbTables.java` and subsequent `V###` classes |
+| Provider plugins | `provider/ProviderFactory.java` |
+| Orders API | `web/OrdersController.java` |
+| Order lifecycle | `orders/OrderLifecycle.java` |
+| Fulfilment | `orders/fulfilment/AutomatedOrderFulfilment.java` |
+| Inventory | `inventory/Inventory.java` |
+| Feed loading | `inventory/FeedReloaderScheduler.java` |
+| Supplier registry | `inventory/supplier/SupplierRegistry.java` |
+| Product catalog | `products/ProductCatalog.java` |
+| PIM | `products/information/PimCatalogRegistry.java` (consumes external PIM service) |
+| Pricelist | `pricelist/PricelistEventListener.java` |
+| Invoicing | `invoicing/InvoicingService.java` |
+| Shipping | `shipping/ShippingService.java` |
+| Payments | `payments/PaymentProviderFactory.java` |
+| Marketplaces | `marketplace/MarketplaceProviderFactory.java` |
+| Warehouse | `warehouse/builtin/BuiltInWarehouse.java` |
+| RMA | `orders/rma/RMAManager.java` |
+| Store config | `stores/Store.java` |
 
 All paths relative to `src/main/java/pl/commercelink/`.
 
 ## External Integrations
 
-| Service | Purpose | Status |
-|---------|---------|--------|
-| Furgonetka | Polish shipping aggregator | Extracted (behind `shipping-api`) |
-| Stripe | Payment processing | Active (to be extracted) |
-| PayNow | Payment processing (Polish) | Active (to be extracted) |
-| Morele | Polish marketplace (orders + offers) | Active (to be extracted) |
-| Google Sheets | Data import | Deprecated (dependency remains in pom.xml) |
+All external integrations (payment processors, marketplaces, invoicing services, shipping aggregators, label printers, suppliers) are implemented as adapter modules behind the domain `*-api` contracts and discovered via `ServiceLoader`. The app itself contains no integration-specific code; which integrations are available depends on which adapter jars are on the runtime classpath, and the adapter set grows over time.
 
 ## Testing
 
-- JUnit 5 + Mockito 5.12.0
+- JUnit 5 + Mockito
 - Prefer `@ExtendWith(MockitoExtension.class)` with `@Mock` / `@InjectMocks` fields over manual `Mockito.mock(...)` calls — always use the annotations when the collaborators map to fixed fields. Fall back to `mock(...)` only for mocks created dynamically (e.g. several instances of the same type produced by a helper)
-- Test files in `src/test/java` mirror source structure
-- Currently minimal coverage (4 test files: pricelist, products)
+- Test files in `src/test/java` mirror source structure (~150+ test classes covering most packages)
 - `mvn test -Dtest=ClassName#methodName`
 - Test method names are camelCase (not snake_case)
 - Structure every `@Test` body with `// given` / `// when` / `// then` section comments. Use a combined `// when / then` when a single statement both invokes and asserts (e.g. `assertThrows`). Omit a section when it has no lines — never leave an empty section.

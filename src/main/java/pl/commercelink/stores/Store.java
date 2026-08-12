@@ -481,10 +481,15 @@ public class Store {
     }
 
     @DynamoDBIgnore
-    public List<StoreSupplierConnection> getOwnAndManualConnections() {
+    public List<StoreSupplierConnection> getSupplierConnections() {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getSupplierConnections)
-                .orElse(Collections.emptyList())
+                .orElse(Collections.emptyList());
+    }
+
+    @DynamoDBIgnore
+    public List<StoreSupplierConnection> getOwnAndManualConnections() {
+        return getSupplierConnections()
                 .stream()
                 .filter(connection -> connection.getMode() == ConnectionMode.OWN
                         || connection.getMode() == ConnectionMode.MANUAL)
@@ -519,9 +524,7 @@ public class Store {
     }
 
     private List<String> supplierNamesMatching(Predicate<StoreSupplierConnection> filter) {
-        return Optional.ofNullable(fulfilmentConfiguration)
-                .map(FulfilmentConfiguration::getSupplierConnections)
-                .orElse(Collections.emptyList())
+        return getSupplierConnections()
                 .stream()
                 .filter(filter)
                 .map(StoreSupplierConnection::getSupplierName)

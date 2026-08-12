@@ -176,8 +176,12 @@ public class ProductCatalogController {
 
         model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
         model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        model.addAttribute("productCategories", pimCategoryOptions.categoryOptions(
-                store.getEnabledCategories(), Collections.singletonList(categoryDefinition.getCategory())));
+        List<PimCategoryOptions.CategoryOption> categoryOptions = pimCategoryOptions.leafOptionsUnder(
+                store.getEnabledCategories(), categoryDefinition.getPimCategoryIds());
+        model.addAttribute("categoryOptions", categoryOptions);
+        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOf(
+                categoryOptions.stream().map(PimCategoryOptions.CategoryOption::id).toList()));
+        model.addAttribute("selectedCategoryOptions", selectedOptions(categoryDefinition));
         model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
         model.addAttribute("categoryDefinition", categoryDefinition);
         model.addAttribute("catalogId", catalogId);
@@ -185,6 +189,17 @@ public class ProductCatalogController {
         model.addAttribute("edit", isEdit);
 
         return "catalogDetails_categoryDefinition";
+    }
+
+    private List<PimCategoryOptions.CategoryOption> selectedOptions(CategoryDefinition categoryDefinition) {
+        return pimCategoryOptions.optionsOf(categoryDefinition.getPimCategoryIds());
+    }
+
+    private String displayCategories(CategoryDefinition definition) {
+        if (!definition.hasCategoryMapping()) {
+            return StringUtils.defaultString(definition.getCategory());
+        }
+        return String.join(", ", pimCategoryOptions.namesOf(definition.getPimCategoryIds()));
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category")
@@ -202,24 +217,27 @@ public class ProductCatalogController {
             throw new RuntimeException("Category definition is not complete");
         }
 
-        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryDefinition.getCategoryId();
+        return "redirect:/dashboard/catalogs/" + catalogId;
     }
 
     private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (categoryDefinition.getCategory() == null || !categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
+        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
             return;
         }
-
-        String inventoryCategory = categoryDefinition.getCategory();
-        boolean hasAnyOffers = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findAllByProductCategory(inventoryCategory)
-                .stream()
-                .anyMatch(MatchedInventory::hasAnyOffers);
-
-        if (!hasAnyOffers) {
+        if (!categoryDefinition.hasCategoryMapping()) {
+            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
+                    "catalog.category.noMapping", null, LocaleContextHolder.getLocale()));
+            return;
+        }
+        Map<String, Collection<MatchedInventory>> matchesByCategoryId = inventory.withEnabledSuppliersOnly(getStoreId())
+                .findAllByProductCategoryIds(categoryDefinition.getPimCategoryIds());
+        List<String> emptyCategoryIds = categoryDefinition.getPimCategoryIds().stream()
+                .filter(id -> matchesByCategoryId.getOrDefault(id, List.of()).stream().noneMatch(MatchedInventory::hasAnyOffers))
+                .toList();
+        if (!emptyCategoryIds.isEmpty()) {
             redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
                     "catalog.category.emptyInventory",
-                    new Object[]{categoryDefinition.getCategory()},
+                    new Object[]{String.join(", ", pimCategoryOptions.namesOf(emptyCategoryIds))},
                     LocaleContextHolder.getLocale()));
         }
     }
@@ -229,10 +247,11 @@ public class ProductCatalogController {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
         CategoryDefinition removedCategoryDefinition = productCatalog.removeCategoryDefinition(categoryId);
 
-        // if no other CategoryDefinition is associated with the same category, then delete all products associated with this category
-        if (productCatalog.getCategories().stream().noneMatch(c -> Objects.equals(
-                c.getCategory(),
-                removedCategoryDefinition.getCategory()))) {
+        boolean keepProducts = removedCategoryDefinition.hasCategoryMapping()
+                && productCatalog.getCategories().stream()
+                .anyMatch(c -> c.getPimCategoryIds().stream()
+                        .anyMatch(removedCategoryDefinition.getPimCategoryIds()::contains));
+        if (!keepProducts) {
             List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
             productRepository.delete(products);
         }
@@ -396,6 +415,7 @@ public class ProductCatalogController {
 
         model.addAttribute("catalogId", catalogId);
         model.addAttribute("categoryDefinition", categoryDefinition);
+        model.addAttribute("categoryDisplayName", displayCategories(categoryDefinition));
 
         Map<String, Object> paginationParams = new HashMap<>();
         if (StringUtils.isNotBlank(status)) paginationParams.put("status", status);
@@ -515,9 +535,12 @@ public class ProductCatalogController {
 
         Store store = storesRepository.findById(getStoreId());
 
-        model.addAttribute("productCategories", pimCategoryOptions.categoryOptions(
+        List<PimCategoryOptions.CategoryOption> productCategories = pimCategoryOptions.namedOptions(
                 store.getEnabledCategories(),
-                product.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList()));
+                product.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList());
+        model.addAttribute("productCategories", productCategories);
+        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOfNames(
+                productCategories.stream().map(PimCategoryOptions.CategoryOption::name).toList()));
         model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
         model.addAttribute("labels", categoryDefinition.getGroupingOrder());
         model.addAttribute("availabilityTypes", ProductAvailabilityType.values());

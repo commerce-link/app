@@ -43,7 +43,7 @@ class TaxonomyParserTest {
 
     @Test
     void blankCategoryCellYieldsNullCategory() {
-        String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "1"};
+        String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "537", "1", "", ""};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
@@ -79,22 +79,9 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void backwardCompatReadsLegacySixColumnRow() {
-        String[] legacyRow = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1"
-        };
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
-
-        assertEquals("1234567890123", parsed.ean());
-        assertEquals("MFN-1", parsed.mfn());
-        assertNull(parsed.netWeightInGrams());
-    }
-
-    @Test
     void emptyWeightCellYieldsNull() {
         String[] row = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", ""
+                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "537", "1", "", ""
         };
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
@@ -105,7 +92,7 @@ class TaxonomyParserTest {
     @Test
     void malformedWeightCellYieldsNull() {
         String[] row = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "1", "abc"
+                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "537", "1", "abc", ""
         };
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
@@ -129,18 +116,8 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void readsLegacyCsvWithoutWeightColumnsAsNull() {
-        String[] legacyRow = {"123", "MFN", "Brand", "Name", "Other", "5"};
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
-
-        assertThat(parsed.netWeightInGrams()).isNull();
-        assertThat(parsed.grossWeightInGrams()).isNull();
-    }
-
-    @Test
     void readsBlankWeightColumnsAsNull() {
-        String[] row = {"123", "MFN", "Brand", "Name", "Other", "5", "", ""};
+        String[] row = {"123", "MFN", "Brand", "Name", "Other", "537", "5", "", ""};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
@@ -165,6 +142,19 @@ class TaxonomyParserTest {
     }
 
     @Test
+    void fromCsvRowNormalizesEanAndMfn() {
+        // given
+        String[] row = {"0012345678905", "mfn 1", "TestBrand", "Test Product", "Laptops", "537", "1", "", ""};
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("012345678905", parsed.ean());
+        assertEquals("MFN1", parsed.mfn());
+    }
+
+    @Test
     void categoryIdSurvivesCsvRoundTrip() {
         // given
         Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand", "Router",
@@ -182,17 +172,44 @@ class TaxonomyParserTest {
     }
 
     @Test
-    void legacyEightColumnRowLeavesCategoryIdNull() {
-        // given
-        String[] legacyRow = {"5901234123457", "MFN-1", "BrandX", "Mysz", "Myszki", "5", "100", "120"};
+    void strayUnescapedSeparatorInNameDoesNotShiftTrailingColumns() {
+        // given: real taxonomy-merged-full.csv row where a mangled "&#39;" (missing the
+        // leading &) leaves a literal ";" inside the product name, splitting it in two
+        String[] row = {
+                "8596049159455", "60312151000003", "Epico",
+                "Epico Flexiglass Szklo ochronne do iPhone#39", "a 13 i 13 Pro i 14",
+                "Ochraniacze na ekran i tyl telefonu", "1568", "3", "", ""
+        };
 
         // when
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(legacyRow);
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
         // then
-        assertEquals("Myszki", parsed.category());
-        assertNull(parsed.categoryId());
-        assertEquals(5, parsed.dataAccuracyScore());
-        assertEquals(100, parsed.netWeightInGrams());
+        assertEquals("Epico Flexiglass Szklo ochronne do iPhone#39;a 13 i 13 Pro i 14", parsed.name());
+        assertEquals("Ochraniacze na ekran i tyl telefonu", parsed.category());
+        assertEquals("1568", parsed.categoryId());
+        assertEquals(3, parsed.dataAccuracyScore());
+        assertNull(parsed.netWeightInGrams());
+        assertNull(parsed.grossWeightInGrams());
     }
+
+    @Test
+    void twoStraySeparatorsInNameStillLeaveTrailingColumnsIntact() {
+        // given: same corruption pattern, but the name gets split into three pieces
+        String[] row = {
+                "23942987499", "98749-V", "Verbatim",
+                "Verbatim Store #39", "n#39", " Go Metal Executive 32 GB srebrny",
+                "Pamiec USB", "1554", "3", "", ""
+        };
+
+        // when
+        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
+
+        // then
+        assertEquals("Verbatim Store #39;n#39; Go Metal Executive 32 GB srebrny", parsed.name());
+        assertEquals("Pamiec USB", parsed.category());
+        assertEquals("1554", parsed.categoryId());
+        assertEquals(3, parsed.dataAccuracyScore());
+    }
+
 }

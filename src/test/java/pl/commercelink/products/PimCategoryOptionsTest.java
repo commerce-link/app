@@ -227,4 +227,141 @@ class PimCategoryOptionsTest {
         // then
         assertThat(options).containsExactly("Stoły");
     }
+
+    @Test
+    void leafOptionsUnderReturnIdAndNamePairsForLeavesOfEnabledTopLevels() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl"),
+                new PimCategory("3", "1", "Krzesła", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.CategoryOption> options =
+                pimCategoryOptions().leafOptionsUnder(List.of("Dom"), List.of());
+
+        // then
+        assertThat(options).containsExactly(
+                new PimCategoryOptions.CategoryOption("3", "Krzesła", "1"),
+                new PimCategoryOptions.CategoryOption("2", "Stoły", "1"));
+    }
+
+    @Test
+    void leafOptionsUnderKeepCurrentIdsThatAreNotUnderEnabledTopLevels() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl"),
+                new PimCategory("5", null, "Biuro", "pl"),
+                new PimCategory("6", "5", "Artykuły biurowe", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.CategoryOption> options =
+                pimCategoryOptions().leafOptionsUnder(List.of("Dom"), List.of("6"));
+
+        // then
+        assertThat(options).containsExactly(
+                new PimCategoryOptions.CategoryOption("6", "Artykuły biurowe", "5"),
+                new PimCategoryOptions.CategoryOption("2", "Stoły", "1"));
+    }
+
+    @Test
+    void namesOfResolvesIdsAndFallsBackToTheRawIdWhenUnresolvable() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("194", "1", "Klawiatury", "pl"),
+                new PimCategory("1", null, "Peryferia", "pl")
+        ));
+
+        // when
+        List<String> names = pimCategoryOptions().namesOf(List.of("194", "999"));
+
+        // then
+        assertThat(names).containsExactly("Klawiatury", "999");
+    }
+
+    @Test
+    void ancestorsOfCarryOnlyTheBranchesOnThePathsOfTheGivenCategories() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "2", "Stoły", "pl"),
+                new PimCategory("8", null, "Biuro", "pl"),
+                new PimCategory("9", "8", "Krzesła biurowe", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.CategoryOption> ancestors = pimCategoryOptions().ancestorsOf(List.of("3"));
+
+        // then
+        assertThat(ancestors).containsExactly(
+                new PimCategoryOptions.CategoryOption("2", "Meble", "1"),
+                new PimCategoryOptions.CategoryOption("1", "Dom", null));
+    }
+
+    @Test
+    void ancestorsOfIgnoreCategoriesThatAreNotInTheTree() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when / then
+        assertThat(pimCategoryOptions().ancestorsOf(Arrays.asList("nie-ma-takiego", null))).isEmpty();
+    }
+
+    @Test
+    void ancestorsOfNamesResolveTheSamePathsByCategoryName() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Meble", "pl"),
+                new PimCategory("3", "2", "Stoły", "pl")
+        ));
+
+        // when / then
+        assertThat(pimCategoryOptions().ancestorsOfNames(List.of("Stoły", "Spoza drzewa")))
+                .containsExactly(
+                        new PimCategoryOptions.CategoryOption("2", "Meble", "1"),
+                        new PimCategoryOptions.CategoryOption("1", "Dom", null));
+    }
+
+    @Test
+    void namedOptionsSubmitTheNameButStillCarryTheParentForTheBreadcrumb() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.CategoryOption> options =
+                pimCategoryOptions().namedOptions(List.of("Dom"), List.of("Kategoria spoza drzewa"));
+
+        // then
+        assertThat(options).containsExactly(
+                new PimCategoryOptions.CategoryOption("Kategoria spoza drzewa", "Kategoria spoza drzewa", null),
+                new PimCategoryOptions.CategoryOption("Stoły", "Stoły", "1"));
+    }
+
+    @Test
+    void optionsOfKeepTheGivenOrderAndFallBackToTheIdForUnknownCategories() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Dom", "pl"),
+                new PimCategory("2", "1", "Stoły", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.CategoryOption> options = pimCategoryOptions().optionsOf(List.of("2", "nieznane-id"));
+
+        // then
+        assertThat(options).containsExactly(
+                new PimCategoryOptions.CategoryOption("2", "Stoły", "1"),
+                new PimCategoryOptions.CategoryOption("nieznane-id", "nieznane-id", null));
+    }
 }

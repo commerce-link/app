@@ -4,27 +4,36 @@
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
+    <style>
+        .tabs ul {
+            margin: 0;
+            list-style: none;
+        }
+        .tabs li + li {
+            margin-top: 0;
+        }
+    </style>
+
     <section class="section">
         <div class="container">
-            <h1 class="title" th:text="#{rma.new}"></h1>
+            <h1 class="title is-3" th:text="#{rma.new}"></h1>
 
             <div class="box">
                 <form id="createRmaForm" th:action="@{/dashboard/rma/new}" method="post" th:object="${rma}">
-                    <div class="field">
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" name="mode" value="BY_ORDER_LINE" th:checked="${mode == 'BY_ORDER_LINE'}">
-                                <span th:text="#{rma.by.order.line}"></span>
-                            </label>
-                            <label class="radio ml-4">
-                                <input type="radio" name="mode" value="BY_SERIAL_NO" th:checked="${mode == 'BY_SERIAL_NO'}">
-                                <span th:text="#{rma.by.serial.no}"></span>
-                            </label>
-                            <label class="radio ml-4">
-                                <input type="radio" name="mode" value="BY_EMAIL" th:checked="${mode == 'BY_EMAIL'}">
-                                <span th:text="#{rma.by.email}"></span>
-                            </label>
-                        </div>
+                    <input type="hidden" name="mode" id="modeInput" th:value="${mode}">
+
+                    <div class="tabs is-boxed" id="modeTabs">
+                        <ul>
+                            <li th:classappend="${mode == 'BY_ORDER_LINE'} ? 'is-active'">
+                                <a data-mode="BY_ORDER_LINE"><span th:text="#{rma.by.order.line}"></span></a>
+                            </li>
+                            <li th:classappend="${mode == 'BY_SERIAL_NO'} ? 'is-active'">
+                                <a data-mode="BY_SERIAL_NO"><span th:text="#{rma.by.serial.no}"></span></a>
+                            </li>
+                            <li th:classappend="${mode == 'BY_EMAIL'} ? 'is-active'">
+                                <a data-mode="BY_EMAIL"><span th:text="#{rma.by.email}"></span></a>
+                            </li>
+                        </ul>
                     </div>
 
                     <div class="field mt-2" th:if="${emailOrders != null}">
@@ -69,44 +78,55 @@
                         <label class="label" th:text="#{rma.order.item}"></label>
 
                         <div class="control" th:if="${orderItems != null and !#lists.isEmpty(orderItems)}">
-                            <div class="box" th:each="orderItem, i : ${orderItems}">
-                                <label class="checkbox">
-                                    <input type="checkbox"
-                                           class="rma-item-checkbox"
-                                           th:attr="data-row=${i.index}"
-                                           th:field="*{draftRmaItems[__${i.index}__].itemId}"
-                                           th:value="${orderItem.itemId}">
-                                    <span th:text="${orderItem.name}"></span>
-                                </label>
+                            <div class="box has-background-white-ter mb-3" th:each="orderItem, i : ${orderItems}">
+                                <div class="is-flex is-align-items-center" style="gap: 0.6rem">
+                                    <label class="checkbox is-flex-grow-1">
+                                        <input type="checkbox"
+                                               class="rma-item-checkbox"
+                                               th:attr="data-row=${i.index}"
+                                               th:field="*{draftRmaItems[__${i.index}__].itemId}"
+                                               th:value="${orderItem.itemId}">
+                                        <span class="has-text-weight-semibold" th:text="${orderItem.name}"></span>
+                                    </label>
+                                    <span class="tag" th:text="#{rma.max.qty(${orderItem.qty})}"></span>
+                                </div>
 
                                 <!-- Per-item details: hidden until checkbox is checked -->
-                                <div class="mt-3 rma-item-details" th:attr="id='rma-item-details-' + ${i.index}" style="display:none;">
-                                    <div class="field">
-                                        <label class="label" th:text="#{rma.resolution}"></label>
-                                        <div class="control">
-                                            <div class="select is-fullwidth">
-                                                <select class="rma-item-resolution"
-                                                        th:field="*{draftRmaItems[__${i.index}__].desiredResolution}" disabled>
-                                                    <option th:each="res : ${T(pl.commercelink.orders.rma.RMAResolutionType).values()}"
-                                                            th:value="${res}" th:text="${enumI18n.localize(res)}"></option>
-                                                </select>
+                                <div class="mt-3 pt-3 rma-item-details"
+                                     th:attr="id='rma-item-details-' + ${i.index}"
+                                     style="display:none; border-top: 1px dashed #dbdbdb;">
+                                    <div class="columns mb-0">
+                                        <div class="column is-half py-2">
+                                            <div class="field">
+                                                <label class="label" th:text="#{rma.resolution}"></label>
+                                                <div class="control">
+                                                    <div class="select is-fullwidth">
+                                                        <select class="rma-item-resolution"
+                                                                th:field="*{draftRmaItems[__${i.index}__].desiredResolution}" disabled>
+                                                            <option th:each="res : ${rmaResolutionTypes}"
+                                                                    th:value="${res}" th:text="${enumI18n.localize(res)}"></option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="column is-half py-2">
+                                            <div class="field">
+                                                <label class="label" th:text="#{rma.quantity}"></label>
+                                                <div class="control">
+                                                    <input class="input rma-item-quantity" type="number" min="1"
+                                                           th:attr="max=${orderItem.qty}"
+                                                           th:field="*{draftRmaItems[__${i.index}__].qty}" disabled>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-
                                     <div class="field">
                                         <label class="label" th:text="#{rma.reason}"></label>
                                         <div class="control">
-                                            <textarea class="textarea rma-item-reason"
+                                            <textarea class="textarea rma-item-reason" rows="2"
                                                       th:field="*{draftRmaItems[__${i.index}__].reason}"
                                                       th:placeholder="#{rma.reason.placeholder}" disabled></textarea>
-                                        </div>
-                                    </div>
-
-                                    <div class="field">
-                                        <label class="label" th:text="#{rma.quantity}"></label>
-                                        <div class="control">
-                                            <input class="input rma-item-quantity" type="number" min="1" th:attr="max=${orderItem.qty}" th:field="*{draftRmaItems[__${i.index}__].qty}" disabled>
                                         </div>
                                     </div>
                                 </div>
@@ -143,18 +163,24 @@
             const orderIdField = document.getElementById('orderIdField');
             const serialNoField = document.getElementById('serialNoField');
             const emailField = document.getElementById('emailField');
+            const modeInput = document.getElementById('modeInput');
+            const tabs = document.querySelectorAll('#modeTabs a[data-mode]');
 
             function setMode(mode) {
                 orderIdField.style.display = (mode === 'BY_ORDER_LINE') ? '' : 'none';
                 serialNoField.style.display = (mode === 'BY_SERIAL_NO') ? '' : 'none';
                 emailField.style.display = (mode === 'BY_EMAIL') ? '' : 'none';
+                modeInput.value = mode;
+                tabs.forEach(tab => tab.closest('li').classList.toggle('is-active', tab.dataset.mode === mode));
             }
 
-            const checked = document.querySelector('input[name="mode"]:checked');
-            setMode(checked ? checked.value : 'BY_ORDER_LINE');
+            setMode(modeInput.value || 'BY_ORDER_LINE');
 
-            document.querySelectorAll('input[name="mode"]').forEach(r => {
-                r.addEventListener('change', e => setMode(e.target.value));
+            tabs.forEach(tab => {
+                tab.addEventListener('click', e => {
+                    e.preventDefault();
+                    setMode(tab.dataset.mode);
+                });
             });
         })();
 

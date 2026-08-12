@@ -55,7 +55,7 @@ class StockLevelsRoutingTest {
     private StockLevels stockLevels;
 
     @Test
-    void serviceProductsAreSkippedEvenThoughBothDefinitionsAreMapped() {
+    void serviceProductsAreSkippedInBothLegacyNamedDefinitions() {
         // given
         CategoryDefinition mixedDefinition = new CategoryDefinition();
         mixedDefinition.setCategoryId("cat-s");
@@ -88,6 +88,67 @@ class StockLevelsRoutingTest {
 
         // then
         assertThat(levels).extracting(StockProductLevel::getName).containsExactly("Obudowa");
+    }
+
+    @Test
+    void definitionWithoutANameSortsLastInsteadOfThrowing() {
+        // given
+        CategoryDefinition namelessDefinition = new CategoryDefinition();
+        namelessDefinition.setCategoryId("cat-u");
+        CategoryDefinition namedDefinition = new CategoryDefinition();
+        namedDefinition.setCategoryId("cat-m");
+        namedDefinition.setName("Procesory");
+
+        Product namelessProduct = new Product("cat-u");
+        namelessProduct.setName("Zasilacz");
+        namelessProduct.setManufacturerCode("MFN-U");
+        namelessProduct.setStockExpectedQty(1);
+        Product namedProduct = new Product("cat-m");
+        namedProduct.setName("CPU");
+        namedProduct.setManufacturerCode("MFN-M");
+        namedProduct.setStockExpectedQty(1);
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(namelessDefinition, namedDefinition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-u")).thenReturn(List.of(namelessProduct));
+        when(productRepository.findAll("cat-m")).thenReturn(List.of(namedProduct));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels =
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+
+        // then
+        assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Procesory", null);
+    }
+
+    @Test
+    void rowLabelIsTheDefinitionNameNotThePimMappingOrLegacyName() {
+        // given
+        CategoryDefinition mappedDefinition = new CategoryDefinition();
+        mappedDefinition.setCategoryId("cat-m");
+        mappedDefinition.setName("Podzespoły");
+        mappedDefinition.setCategory("Legacy name");
+        mappedDefinition.setPimCategoryIds(List.of("989", "170"));
+
+        Product product = new Product("cat-m");
+        product.setName("CPU");
+        product.setManufacturerCode("MFN-M");
+        product.setStockExpectedQty(1);
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(mappedDefinition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-m")).thenReturn(List.of(product));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels =
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+
+        // then
+        assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Podzespoły");
     }
 
     @Test

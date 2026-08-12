@@ -193,7 +193,7 @@
                 </table>
             </div>
             <button class="button is-info is-small" type="button" onclick="toggleOfferItemModal(true)" th:text="#{offers.add.items}"></button>
-            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${offer.basketId}, actionPrefix='/dashboard/offer', formId='offerForm')}"></div>
+            <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${offer.basketId}, actionPrefix='/dashboard/offer')}"></div>
         </div>
 
         <div class="field">
@@ -203,7 +203,7 @@
             </div>
         </div>
 
-        <fieldset class="box">
+        <fieldset class="box" id="offerSummary">
             <legend class="label" th:text="#{offers.summary}"></legend>
             <div class="field">
                 <label class="label" th:text="#{offers.client.price} + ': ' + ${totalPrice}"></label>
@@ -293,8 +293,6 @@
 
     <script th:inline="javascript">
         document.addEventListener('DOMContentLoaded', () => {
-            const shouldOpenModal = /*[[${openModal}]]*/ false;
-            if (shouldOpenModal) toggleOfferItemModal(true);
             new Sortable(document.getElementById('offerRows'), {
                 handle: '.drag-handle',
                 animation: 150,
@@ -355,9 +353,7 @@
         }
 
         function toggleOfferItemModal(show) {
-            const modal = document.getElementById('itemAddModalId');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
+            toggleAddItemModal(show);
         }
     </script>
 </div>

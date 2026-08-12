@@ -63,6 +63,22 @@ class CatalogSeedConsistencyTest {
     }
 
     @Test
+    void everyRowCarriesAPimLeafCategoryIdConsistentWithinItsCategory() {
+        // given
+        Map<String, Set<String>> idsByCategory = rows.stream()
+                .collect(Collectors.groupingBy(CatalogSeedRow::category,
+                        Collectors.mapping(CatalogSeedRow::pimCategoryId, Collectors.toSet())));
+
+        // when / then
+        for (CatalogSeedRow row : rows) {
+            assertThat(row.pimCategoryId()).as("pimCategoryId of %s", row.pimId()).isNotBlank();
+            assertThat(row.pimCategoryId()).as("pimCategoryId of %s is a raw icecat id", row.pimId()).matches("\\d+");
+        }
+        idsByCategory.forEach((category, ids) ->
+                assertThat(ids).as("category %s maps to exactly one pim leaf", category).hasSize(1));
+    }
+
+    @Test
     void identifiersAreUnique() {
         // when / then
         assertNoDuplicates(rows, CatalogSeedRow::pimId, "pimId");

@@ -11,13 +11,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TaxonomyTest {
 
     @Test
-    void constructorUnifiesEanAndMfn() {
+    void constructorDoesNotNormalizeEanOrMfn() {
         // given / when
         Taxonomy taxonomy = new Taxonomy("0590123412345", "mfn 1", "BrandX", "Laptop Pro", "Laptops", 10, null, null);
 
         // then
-        assertEquals("590123412345", taxonomy.ean());
-        assertEquals("MFN1", taxonomy.mfn());
+        assertEquals("0590123412345", taxonomy.ean());
+        assertEquals("mfn 1", taxonomy.mfn());
     }
 
     @Test
@@ -64,5 +64,19 @@ class TaxonomyTest {
         assertEquals(100, taxonomy.netWeightInGrams());
         assertEquals(200, taxonomy.grossWeightInGrams());
         assertFalse(taxonomy.isProcessable());
+    }
+
+    @Test
+    void fromSupplierProductPreservesAlreadyNormalizedEanAndMfn() {
+        // given
+        SupplierProduct product = new SupplierProduct("0012345678905", "mfn 1", "BrandX", "Laptop Pro",
+                7, 100, 200, "Elektronika > Laptopy");
+
+        // when
+        Taxonomy taxonomy = Taxonomy.from(product);
+
+        // then
+        assertEquals("012345678905", taxonomy.ean());
+        assertEquals("MFN1", taxonomy.mfn());
     }
 }

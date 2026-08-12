@@ -50,6 +50,10 @@ public class ProductCatalog implements DeletionProtection {
                 }else{
                     categoryDefinition.setTypeChangedAt(existingCategory.get().getTypeChangedAt());
                 }
+                categoryDefinition.setCategory(existingCategory.get().getCategory());
+                if (existingCategory.get().hasCategoryMapping() && sanitizedPimCategoryIds(categoryDefinition).isEmpty()) {
+                    categoryDefinition.setPimCategoryIds(existingCategory.get().getPimCategoryIds());
+                }
         }
 
         categories.removeIf(c -> c.getCategoryId().equals(categoryDefinition.getCategoryId()));
@@ -66,6 +70,8 @@ public class ProductCatalog implements DeletionProtection {
                 .distinct()
                 .collect(Collectors.toList());
         categoryDefinition.setGroupingOrder(completeGroupingOrder);
+
+        categoryDefinition.setPimCategoryIds(sanitizedPimCategoryIds(categoryDefinition));
 
         List<InventoryDefinition> completeInventoryDefinitions = categoryDefinition.getInventoryDefinitions()
                 .stream()
@@ -89,6 +95,15 @@ public class ProductCatalog implements DeletionProtection {
         categories.add(categoryDefinition);
 
         categories.sort(Comparator.comparing(CategoryDefinition::getSequenceNumber));
+    }
+
+    private static List<String> sanitizedPimCategoryIds(CategoryDefinition categoryDefinition) {
+        return categoryDefinition.getPimCategoryIds()
+                .stream()
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .collect(Collectors.toList());
     }
 
 

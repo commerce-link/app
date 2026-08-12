@@ -86,6 +86,67 @@ class OrderTest {
         assertThat(order.getIssuableDocumentTypes()).isEmpty();
     }
 
+    @Test
+    @DisplayName("removeDocument removes an invoice matched by type and number")
+    void removeDocumentRemovesInvoiceMatchedByTypeAndNumber() {
+        // given
+        Order order = b2bOrder();
+        order.addDocument(new Document("vat-1", "FV/1/2026", null, DocumentType.InvoiceVat));
+
+        // when
+        boolean removed = order.removeDocument(DocumentType.InvoiceVat, "FV/1/2026");
+
+        // then
+        assertThat(removed).isTrue();
+        assertThat(order.getDocuments()).isEmpty();
+        assertThat(order.isInvoiced()).isFalse();
+    }
+
+    @Test
+    @DisplayName("removeDocument refuses to remove a warehouse document")
+    void removeDocumentRefusesWarehouseDocument() {
+        // given
+        Order order = b2bOrder();
+        order.addDocument(new Document("wz-1", "WZ/1/2026", null, DocumentType.GoodsIssue));
+
+        // when
+        boolean removed = order.removeDocument(DocumentType.GoodsIssue, "WZ/1/2026");
+
+        // then
+        assertThat(removed).isFalse();
+        assertThat(order.getDocuments()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("removeDocument refuses to remove an order document")
+    void removeDocumentRefusesOrderDocument() {
+        // given
+        Order order = b2bOrder();
+        order.addDocument(orderDocument());
+
+        // when
+        boolean removed = order.removeDocument(DocumentType.Order, "ZAM/1/2026");
+
+        // then
+        assertThat(removed).isFalse();
+        assertThat(order.getDocuments()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("removeDocument returns false when no document matches the number")
+    void removeDocumentReturnsFalseWhenNumberDoesNotMatch() {
+        // given
+        Order order = b2bOrder();
+        order.addDocument(new Document("vat-1", "FV/1/2026", null, DocumentType.InvoiceVat));
+
+        // when
+        boolean removed = order.removeDocument(DocumentType.InvoiceVat, "FV/2/2026");
+
+        // then
+        assertThat(removed).isFalse();
+        assertThat(order.getDocuments()).hasSize(1);
+    }
+
     private Order b2bOrder() {
         Order order = new Order("store-1");
         order.setOrderId("order-1");

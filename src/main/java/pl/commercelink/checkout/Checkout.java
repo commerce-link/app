@@ -190,8 +190,7 @@ public class Checkout {
     }
 
     private boolean matchesCategory(BasketItem item, CategoryDefinition category) {
-        return Objects.equals(item.getCategory(), category.getName())
-                || (category.getCategory() != null && Objects.equals(item.getCategory(), category.getCategory()));
+        return Objects.equals(item.getCategory(), category.getName());
     }
 
     static class CatalogProcessingResult {

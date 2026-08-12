@@ -123,6 +123,7 @@ public class OrderItem extends Item {
         this.setCategory(other.getCategory());
         this.setService(other.isService());
         this.setName(other.getName());
+        this.setPrice(other.getPrice());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
         this.setConsolidated(other.isConsolidated());

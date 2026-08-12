@@ -5,6 +5,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderSourceType;
@@ -77,6 +78,53 @@ class DemoStoreSeederTest {
             assertNotNull(i.getEan());
             assertNotNull(i.getManufacturerCode());
         });
+    }
+
+    @Test
+    void seededCategoryDefinitionsCarryPimCategoryIdsNextToLegacyNames() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+
+        // then
+        assertFalse(definitions.isEmpty());
+        definitions.forEach(definition -> {
+            assertNotNull(definition.getCategory());
+            assertTrue(definition.hasCategoryMapping(), definition.getName() + " should be mapped");
+        });
+        CategoryDefinition cpu = definitions.stream()
+                .filter(d -> "CPU".equals(d.getName())).findFirst().orElseThrow();
+        assertEquals(List.of("989"), cpu.getPimCategoryIds());
+        assertEquals("CPU", cpu.getCategory());
+    }
+
+    @Test
+    void seededStoreEnablesComputerPeripheralsCategoryGroup() {
+        // given
+        Store store = new Store();
+
+        // when
+        DemoStoreSeeder.applyStoreConfiguration(store, "store-1", "Demo Store", null);
+
+        // then
+        assertEquals(List.of("Komputery i urządzenia peryferyjne"),
+                store.getFulfilmentConfiguration().getEnabledCategories());
+    }
+
+    @Test
+    void seededCategoryDefinitionsAreCompleteForUiEdits() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+
+        // then
+        assertFalse(definitions.isEmpty());
+        definitions.forEach(definition ->
+                assertTrue(definition.isComplete(), definition.getName() + " should be complete"));
     }
 
     @Test
