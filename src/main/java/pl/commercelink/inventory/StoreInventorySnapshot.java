@@ -21,16 +21,17 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             String supplier,
             boolean sellable,
             boolean inStock,
-            boolean inDelivery
+            boolean inDelivery,
+            String sku
     ) {
         static ItemData from(InventoryItem item) {
             return new ItemData(item.ean(), item.mfn(), item.netPrice(), item.currency(),
                     item.qty(), item.leadTimeDays(), item.supplier(),
-                    item.sellable(), item.inStock(), item.inDelivery());
+                    item.sellable(), item.inStock(), item.inDelivery(), item.sku());
         }
 
         InventoryItem toInventoryItem() {
-            return new InventoryItem(ean, mfn, netPrice, currency, qty, leadTimeDays, supplier, sellable, inStock, inDelivery);
+            return new InventoryItem(ean, mfn, netPrice, currency, qty, leadTimeDays, supplier, sellable, inStock, inDelivery, sku);
         }
     }
 

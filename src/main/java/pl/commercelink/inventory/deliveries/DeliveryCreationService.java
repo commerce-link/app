@@ -28,7 +28,33 @@ public class DeliveryCreationService {
     private ExchangeRates exchangeRates;
 
     public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+        prepareForm(storeId, form);
 
+        if (form.hasDeliveryDetails()) {
+            var delivery = createDelivery(storeId, form, isSuperAdmin);
+            finalizeDelivery(storeId, delivery, form);
+            return delivery.getDeliveryId();
+        }
+
+        return null;
+    }
+
+    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        prepareForm(storeId, form);
+
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
+        delivery.setShippingCost(form.getShippingCost());
+        delivery.setPaymentCost(form.getPaymentCost());
+        delivery.setPaymentTerms(form.getPaymentTerms());
+        delivery.setTax(form.getTax());
+        delivery.setOrderStatus(null);
+        delivery.setPendingOrderForm(null);
+
+        finalizeDelivery(storeId, delivery, form);
+    }
+
+    private void prepareForm(String storeId, DeliveryCreationForm form) {
         if (form.getSuggestedItems() != null) {
             form.getSuggestedItems().stream()
                     .filter(suggested -> suggested.getRequestedQty() > 0)
@@ -43,24 +69,18 @@ public class DeliveryCreationService {
         if (form.hasPricesInForeignCurrency()) {
             form.applyExchangeRate(exchangeRates.getCurrentSellRates().get(form.getSourceCurrency()));
         }
+    }
 
-        if (form.hasDeliveryDetails()) {
-            var delivery = createDelivery(storeId, form, isSuperAdmin);
+    private void finalizeDelivery(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        double allocationsCost = form.getItems().stream()
+                .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
+                .sum();
+        delivery.increaseTotalCost(allocationsCost);
 
-            double allocationsCost = form.getItems().stream()
-                    .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
-                    .sum();
-            delivery.increaseTotalCost(allocationsCost);
+        deliveriesRepository.save(delivery);
 
-            deliveriesRepository.save(delivery);
-
-            orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
-            warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
-
-            return delivery.getDeliveryId();
-        }
-
-        return null;
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
     private Delivery createDelivery(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
