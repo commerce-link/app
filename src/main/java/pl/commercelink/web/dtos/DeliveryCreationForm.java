@@ -25,6 +25,7 @@ public class DeliveryCreationForm {
     private double tax = DEFAULT_VAT_RATE;
     private int paymentTerms;
     private boolean removeUnselected;
+    private String deliveryAddressId;
 
     private List<DeliveryItem> items = new ArrayList<>();
     private List<SuggestedDeliveryItem> suggestedItems = new ArrayList<>();
@@ -45,6 +46,14 @@ public class DeliveryCreationForm {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public String getDeliveryAddressId() {
+        return deliveryAddressId;
+    }
+
+    public void setDeliveryAddressId(String deliveryAddressId) {
+        this.deliveryAddressId = deliveryAddressId;
     }
 
     public String getExternalDeliveryId() {

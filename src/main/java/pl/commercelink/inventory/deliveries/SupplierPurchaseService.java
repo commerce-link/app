@@ -10,6 +10,7 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
@@ -58,6 +59,14 @@ public class SupplierPurchaseService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
+        SupplierProvider supplierProvider = getProvider(storeId, provider);
+        if (supplierProvider == null || !supplierProvider.requiresDeliveryAddress()) {
+            return List.of();
+        }
+        return supplierProvider.deliveryAddresses();
     }
 
     public void mergeSuggestedItems(DeliveryCreationForm form) {
@@ -128,7 +137,8 @@ public class SupplierPurchaseService {
             }
 
             SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
-                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines));
+                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
+                            form.getDeliveryAddressId()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
                 throw new SupplierOrderException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
@@ -157,6 +167,9 @@ public class SupplierPurchaseService {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
             return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+        if (isDeliveryAddressMissing(storeId, form)) {
+            return OperationResult.failure("deliveries.purchase.error.address");
         }
 
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
@@ -221,6 +234,12 @@ public class SupplierPurchaseService {
         double livePrice = quote != null ? quote.netPrice() : 0;
         return new PurchaseValidation.Line(item.getName(), sku, item.getEan(), item.getMfn(),
                 item.getRequestedQty(), availableQty, item.getUnitCost(), livePrice);
+    }
+
+    private boolean isDeliveryAddressMissing(String storeId, DeliveryCreationForm form) {
+        SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
+        return supplierProvider != null && supplierProvider.requiresDeliveryAddress()
+                && StringUtils.isBlank(form.getDeliveryAddressId());
     }
 
     private SupplierProvider getProvider(String storeId, String provider) {

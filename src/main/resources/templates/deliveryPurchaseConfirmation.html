@@ -75,6 +75,27 @@
                   th:object="${form}" method="post"
                   onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
+
+                <input type="hidden" id="delivery-address-blocked" th:if="${deliveryAddressError}"/>
+                <div class="notification is-danger" th:if="${deliveryAddressError}">
+                    <span th:text="#{deliveries.purchase.confirm.addressUnavailable}">Could not fetch delivery addresses.</span>
+                    <span th:text="' (' + ${deliveryAddressError} + ')'"></span>
+                </div>
+
+                <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
+                    <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="delivery-address-select" th:field="*{deliveryAddressId}"
+                                    onchange="refreshSubmitState()">
+                                <option th:if="${#lists.size(deliveryAddresses) > 1}" value=""
+                                        th:text="#{deliveries.purchase.confirm.addressPlaceholder}">Choose an address</option>
+                                <option th:each="address : ${deliveryAddresses}"
+                                        th:value="${address.id()}" th:text="${address.label()}"></option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
@@ -113,11 +134,21 @@
             </form>
 
             <script th:inline="none">
+                let validationPassed = false;
+
+                function refreshSubmitState() {
+                    const submit = document.getElementById('purchase-confirm-submit');
+                    const select = document.getElementById('delivery-address-select');
+                    const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
+                    const addressChosen = !select || select.value !== '';
+                    submit.disabled = addressBlocked || !validationPassed || !addressChosen;
+                }
+
                 function loadValidation() {
                     const form = document.getElementById('purchase-confirm-form');
                     const area = document.getElementById('validation-area');
-                    const submit = document.getElementById('purchase-confirm-submit');
-                    submit.disabled = true;
+                    validationPassed = false;
+                    refreshSubmitState();
                     area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
                     fetch(form.dataset.validateUrl, {method: 'POST', body: new URLSearchParams(new FormData(form))})
                         .then(function (response) {
@@ -129,10 +160,13 @@
                         .then(function (html) {
                             area.innerHTML = html;
                             const result = area.querySelector('[data-fully-available]');
-                            submit.disabled = !(result && result.dataset.fullyAvailable === 'true');
+                            validationPassed = !!(result && result.dataset.fullyAvailable === 'true');
+                            refreshSubmitState();
                         })
                         .catch(function () {
                             area.innerHTML = document.getElementById('validation-error-template').innerHTML;
+                            validationPassed = false;
+                            refreshSubmitState();
                         });
                 }
                 document.addEventListener('DOMContentLoaded', loadValidation);
