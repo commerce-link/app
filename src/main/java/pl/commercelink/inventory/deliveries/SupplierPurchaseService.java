@@ -187,23 +187,30 @@ public class SupplierPurchaseService {
         }
     }
 
-    public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
-                                                   String purchaseRef) {
+    public OperationResult<PurchaseSubmission> submitPurchase(String storeId, DeliveryCreationForm form,
+                                                              String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
-        if (isDeliveryAddressMissing(storeId, form)) {
+
+        Store store = storesRepository.findById(storeId);
+        boolean requiresApproval = store != null && store.isGlobalSupplier(form.getProvider());
+
+        if (!requiresApproval && isDeliveryAddressMissing(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
-            return OperationResult.success(existing.get().getDeliveryId());
+            return OperationResult.success(
+                    new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
         }
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderStatus(requiresApproval
+                ? DeliveryOrderStatus.AWAITING_APPROVAL
+                : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         try {
             delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
@@ -216,10 +223,13 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
 
-        return OperationResult.success(delivery.getDeliveryId());
+        if (!requiresApproval) {
+            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+        }
+
+        return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }
 
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,

@@ -190,7 +190,7 @@ class SupplierPurchaseServiceTest {
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
 
         // when
-        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1");
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
 
         // then
         assertFalse(result.isSuccess());
@@ -208,7 +208,7 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
 
         // when
-        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1");
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
@@ -545,7 +545,67 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void enqueuePurchaseCreatesPendingDeliveryAndPublishes() throws Exception {
+    void globalSubmissionAwaitsApprovalAndPublishesNothing() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        lenient().when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithOneOrderableItem();
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertTrue(result.getPayload().awaitingApproval());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void ownSubmissionGoesStraightToTheQueue() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.OWN);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithOneOrderableItem();
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-2");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertFalse(result.getPayload().awaitingApproval());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
+        verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+    }
+
+    @Test
+    void globalSubmissionDoesNotRequireADeliveryAddressUpFront() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        lenient().when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithOneOrderableItem();
+        form.setDeliveryAddressId(null);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-3");
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(globalSupplierProvider, never()).requiresDeliveryAddress();
+    }
+
+    @Test
+    void submitPurchaseCreatesPendingDeliveryAndPublishes() throws Exception {
         // given
         when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
@@ -553,7 +613,7 @@ class SupplierPurchaseServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
+        OperationResult<PurchaseSubmission> result = service.submitPurchase("store-1", form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
@@ -565,7 +625,7 @@ class SupplierPurchaseServiceTest {
         verify(supplierPurchaseEventPublisher).publish(argThat(request ->
                 request.getPurchaseRef().equals("ref-1")
                         && request.getDeliveryId().equals(saved.getValue().getDeliveryId())));
-        assertEquals(saved.getValue().getDeliveryId(), result.getPayload());
+        assertEquals(saved.getValue().getDeliveryId(), result.getPayload().deliveryId());
         DeliveryCreationForm rehydrated = objectMapper.readValue(
                 saved.getValue().getPendingOrderForm(), DeliveryCreationForm.class);
         assertEquals(form.getItems().get(0).getEan(), rehydrated.getItems().get(0).getEan());
@@ -574,12 +634,12 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void enqueuePurchaseRejectsFormWithNoOrderableItems() {
+    void submitPurchaseRejectsFormWithNoOrderableItems() {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
+        OperationResult<PurchaseSubmission> result = service.submitPurchase("store-1", form, "ref-1");
 
         // then
         assertFalse(result.isSuccess());
@@ -589,7 +649,7 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void enqueuePurchaseIsIdempotentPerPurchaseRef() {
+    void submitPurchaseIsIdempotentPerPurchaseRef() {
         // given
         Delivery existing = new Delivery();
         existing.setDeliveryId("delivery-1");
@@ -598,11 +658,11 @@ class SupplierPurchaseServiceTest {
         form.setProvider("Acme");
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
+        OperationResult<PurchaseSubmission> result = service.submitPurchase("store-1", form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
-        assertEquals("delivery-1", result.getPayload());
+        assertEquals("delivery-1", result.getPayload().deliveryId());
         verify(deliveriesRepository, never()).save(any(Delivery.class));
         verify(supplierPurchaseEventPublisher, never()).publish(any());
     }
@@ -672,6 +732,20 @@ class SupplierPurchaseServiceTest {
         assertTrue(java.util.Arrays.stream(Delivery.class.getDeclaredMethods())
                 .noneMatch(method -> method.getName().equals("isManaged")
                         || method.getName().equals("setManaged")));
+    }
+
+    private DeliveryCreationForm formWithOneOrderableItem() {
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setStoreId(STORE_ID);
+        form.setProvider(PROVIDER);
+        DeliveryItem item = new DeliveryItem();
+        item.setEan("5900000000001");
+        item.setMfn("MFN-1");
+        item.setName("Item");
+        item.setRequestedQty(1);
+        item.setUnitCost(10.0);
+        form.getItems().add(item);
+        return form;
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {

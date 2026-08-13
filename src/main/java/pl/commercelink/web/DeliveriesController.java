@@ -583,7 +583,7 @@ public class DeliveriesController {
 
         form.setStoreId(storeId);
         form.setProvider(provider);
-        OperationResult<String> result = supplierPurchaseService.enqueuePurchase(storeId, form, purchaseRef);
+        OperationResult<PurchaseSubmission> result = supplierPurchaseService.submitPurchase(storeId, form, purchaseRef);
 
         if (!result.isSuccess()) {
             model.addAttribute("form", form);
@@ -594,9 +594,10 @@ public class DeliveriesController {
             return "deliveryPurchaseConfirmation";
         }
 
+        String deliveryId = result.getPayload().deliveryId();
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, result.getPayload())
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + result.getPayload();
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @GetMapping("/dashboard/deliveries/details")

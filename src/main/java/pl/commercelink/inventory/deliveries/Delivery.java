@@ -58,6 +58,8 @@ public class Delivery {
     private DeliveryOrderStatus orderStatus;
     @DynamoDBAttribute(attributeName = "orderErrorMessage")
     private String orderErrorMessage;
+    @DynamoDBAttribute(attributeName = "rejectionReason")
+    private String rejectionReason;
     @DynamoDBAttribute(attributeName = "purchaseRef")
     private String purchaseRef;
     @DynamoDBAttribute(attributeName = "pendingOrderForm")
@@ -416,6 +418,14 @@ public class Delivery {
         this.orderErrorMessage = orderErrorMessage;
     }
 
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
     public String getPurchaseRef() {
         return purchaseRef;
     }
@@ -440,6 +450,16 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isOrderFailed() {
         return orderStatus == DeliveryOrderStatus.FAILED;
+    }
+
+    @DynamoDBIgnore
+    public boolean isAwaitingApproval() {
+        return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOrderRejected() {
+        return orderStatus == DeliveryOrderStatus.REJECTED;
     }
 
     public boolean isPaid() {
