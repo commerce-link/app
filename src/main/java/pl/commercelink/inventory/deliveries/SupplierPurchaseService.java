@@ -190,8 +190,8 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isAwaitingApproval()) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
 
@@ -222,8 +222,8 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isAwaitingApproval()) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
         delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
@@ -231,6 +231,14 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, PURCHASE_REJECTED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
         return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    private Delivery findAwaitingApproval(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isAwaitingApproval()) {
+            return null;
+        }
+        return delivery;
     }
 
     private DeliveryCreationForm readPendingForm(Delivery delivery) {

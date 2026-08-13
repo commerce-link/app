@@ -748,7 +748,9 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
-        assertTrue(delivery.getPendingOrderForm().contains("17200617"));
+        DeliveryCreationForm persistedForm = objectMapper.readValue(
+                delivery.getPendingOrderForm(), DeliveryCreationForm.class);
+        assertEquals("17200617", persistedForm.getDeliveryAddressId());
         verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
     }
 
@@ -801,6 +803,34 @@ class SupplierPurchaseServiceTest {
         assertEquals(DeliveryOrderStatus.REJECTED, delivery.getOrderStatus());
         assertEquals("Cena wzrosla o 20%", delivery.getRejectionReason());
         verify(deliveriesRepository).save(delivery);
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approvalIsRefusedWhenTheDeliveryDoesNotExist() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void rejectionIsRefusedWhenTheDeliveryDoesNotExist() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
+
+        // when
+        OperationResult<String> result = service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 
