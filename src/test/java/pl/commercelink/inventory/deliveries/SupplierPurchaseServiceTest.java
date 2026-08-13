@@ -681,6 +681,129 @@ class SupplierPurchaseServiceTest {
         verify(supplierPurchaseEventPublisher, never()).publish(any());
     }
 
+    @Test
+    void processPendingRecordsTheResolvedAddressLabelWhenTheSupplierListsTheChosenAddress() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("17200617");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
+                new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals("ul. Łobzowska 22/1, 31-140 Kraków, PL", delivery.getDeliveryAddress());
+    }
+
+    @Test
+    void processPendingFallsBackToTheRawIdWhenTheSupplierNoLongerListsTheChosenAddress() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("99999999");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
+                new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals("99999999", delivery.getDeliveryAddress());
+    }
+
+    @Test
+    void processPendingFallsBackToTheRawIdWhenAddressLookupThrowsAndTheOrderStillCompletes() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("17200617");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenThrow(new RuntimeException("503 Service Unavailable"));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals("17200617", delivery.getDeliveryAddress());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+    }
+
+    @Test
+    void processPendingRecordsNothingWhenNoAddressWasChosen() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertNull(delivery.getDeliveryAddress());
+    }
+
+    @Test
+    void processPendingRecordsTheAttemptedAddressEvenWhenThePurchaseFails() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("17200617");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
+                new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any()))
+                .thenThrow(new SupplierOrderException("No Elko code found for EAN 4006381333931"));
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
+        assertEquals("ul. Łobzowska 22/1, 31-140 Kraków, PL", delivery.getDeliveryAddress());
+    }
+
     private Delivery pendingDelivery(DeliveryCreationForm form, String purchaseRef) throws Exception {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);

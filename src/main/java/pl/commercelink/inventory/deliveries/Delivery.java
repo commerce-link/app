@@ -64,6 +64,8 @@ public class Delivery {
     private String purchaseRef;
     @DynamoDBAttribute(attributeName = "pendingOrderForm")
     private String pendingOrderForm;
+    @DynamoDBAttribute(attributeName = "deliveryAddress")
+    private String deliveryAddress;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -440,6 +442,14 @@ public class Delivery {
 
     public void setPendingOrderForm(String pendingOrderForm) {
         this.pendingOrderForm = pendingOrderForm;
+    }
+
+    public String getDeliveryAddress() {
+        return deliveryAddress;
+    }
+
+    public void setDeliveryAddress(String deliveryAddress) {
+        this.deliveryAddress = deliveryAddress;
     }
 
     @DynamoDBIgnore

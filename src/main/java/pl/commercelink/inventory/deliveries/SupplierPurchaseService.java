@@ -159,6 +159,7 @@ public class SupplierPurchaseService {
         }
 
         DeliveryCreationForm form = readPendingForm(delivery);
+        delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
             List<SupplierOrderLine> lines = validation.lines().stream()
@@ -183,6 +184,21 @@ public class SupplierPurchaseService {
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery);
+        }
+    }
+
+    private String resolveDeliveryAddressLabel(String storeId, DeliveryCreationForm form) {
+        if (StringUtils.isBlank(form.getDeliveryAddressId())) {
+            return null;
+        }
+        try {
+            return deliveryAddresses(storeId, form.getProvider()).stream()
+                    .filter(address -> address.id().equals(form.getDeliveryAddressId()))
+                    .map(SupplierDeliveryAddress::label)
+                    .findFirst()
+                    .orElse(form.getDeliveryAddressId());
+        } catch (Exception e) {
+            return form.getDeliveryAddressId();
         }
     }
 

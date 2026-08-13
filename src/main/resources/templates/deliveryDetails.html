@@ -68,6 +68,12 @@
                                       th:text="#{deliveries.cost.reverseCharge(${#numbers.formatDecimal(delivery.totalCost, 1, 2)})}"></span>
                             </div>
                         </div>
+                        <div class="field" th:if="${not #strings.isEmpty(delivery.deliveryAddress)}">
+                            <label class="label" th:text="#{deliveries.deliveryAddress}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.deliveryAddress}"></span>
+                            </div>
+                        </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentTerms}"></label>
                             <div class="control">
