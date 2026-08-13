@@ -809,7 +809,7 @@ public class OrdersController extends BaseController {
         List<String> shipmentDataBeforeUpdate = shipmentDataSnapshot(existingOrder);
         if (updatedOrder.getShipments() != null) {
             List<Shipment> shipments = updatedOrder.getShipments().stream()
-                    .filter(s -> s.hasShippingData() || s.hasCollectionData())
+                    .filter(s -> s.hasShippingData() || s.hasCollectionData() || s.isDeliveredToCollectionPoint())
                     .collect(Collectors.toList());
 
             if (shipments.isEmpty()) {
