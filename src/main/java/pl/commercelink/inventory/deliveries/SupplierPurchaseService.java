@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -50,6 +51,7 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final ObjectMapper objectMapper;
+    private final ExchangeRates exchangeRates;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -92,9 +94,11 @@ public class SupplierPurchaseService {
         Map<String, SupplierQuote> quotesByEan = quotes.stream()
                 .collect(Collectors.toMap(SupplierQuote::ean, Function.identity(), (a, b) -> a));
 
+        LiveCostConversion conversion = liveCostConversion(quotes);
+
         List<PurchaseValidation.Line> validationLines = IntStream.range(0, items.size())
                 .mapToObj(i -> toValidationLine(items.get(i), lines.get(i).sku(),
-                        quotesByEan.get(items.get(i).getEan())))
+                        quotesByEan.get(items.get(i).getEan()), conversion.sellRate()))
                 .toList();
 
         boolean fullyAvailable = !validationLines.isEmpty()
@@ -102,10 +106,29 @@ public class SupplierPurchaseService {
         double totalNet = validationLines.stream()
                 .mapToDouble(line -> line.requestedQty() * line.liveUnitCost())
                 .sum();
-        String currency = quotes.stream().map(SupplierQuote::currency).findFirst().orElse("PLN");
 
-        return new PurchaseValidation(form.getProvider(), purchaseRef, currency,
+        return new PurchaseValidation(form.getProvider(), purchaseRef, conversion.currency(),
                 totalNet, fullyAvailable, validationLines);
+    }
+
+    private record LiveCostConversion(String currency, double sellRate) {
+    }
+
+    private LiveCostConversion liveCostConversion(List<SupplierQuote> quotes) {
+        String quoteCurrency = quotes.stream()
+                .map(SupplierQuote::currency)
+                .filter(currency -> currency != null && !currency.isBlank())
+                .findFirst()
+                .orElse(ExchangeRates.LOCAL_CURRENCY);
+        if (ExchangeRates.LOCAL_CURRENCY.equals(quoteCurrency)) {
+            return new LiveCostConversion(quoteCurrency, 1.0);
+        }
+        Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
+        Double sellRate = sellRates == null ? null : sellRates.get(quoteCurrency);
+        if (sellRate == null) {
+            return new LiveCostConversion(quoteCurrency, 1.0);
+        }
+        return new LiveCostConversion(ExchangeRates.LOCAL_CURRENCY, sellRate);
     }
 
     public void processPending(String storeId, String deliveryId) {
@@ -216,9 +239,10 @@ public class SupplierPurchaseService {
         form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
     }
 
-    private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote) {
+    private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote,
+                                                     double sellRate) {
         int availableQty = quote != null ? quote.availableQuantity() : 0;
-        double livePrice = quote != null ? quote.netPrice() : 0;
+        double livePrice = quote != null ? quote.netPrice() * sellRate : 0;
         return new PurchaseValidation.Line(item.getName(), sku, item.getEan(), item.getMfn(),
                 item.getRequestedQty(), availableQty, item.getUnitCost(), livePrice);
     }
