@@ -86,6 +86,10 @@
                     <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
                     <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
                 </div>
+
+                <div class="notification is-info is-light"
+                     th:if="${deliveryAddressError == null and deliveryAddresses != null and #lists.isEmpty(deliveryAddresses)}"
+                     th:text="#{deliveries.purchase.confirm.addressFromSupplier}">Ships to the address held at the supplier.</div>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
