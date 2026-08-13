@@ -54,7 +54,11 @@ public class SupplierPurchaseService {
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
-            SupplierProvider supplierProvider = getProvider(storeId, provider);
+            Store store = storesRepository.findById(storeId);
+            if (store == null || !store.isOwnSupplier(provider)) {
+                return false;
+            }
+            SupplierProvider supplierProvider = supplierProviderFactory.get(store, provider);
             return supplierProvider != null && supplierProvider.supportsOrdering();
         } catch (Exception e) {
             return false;

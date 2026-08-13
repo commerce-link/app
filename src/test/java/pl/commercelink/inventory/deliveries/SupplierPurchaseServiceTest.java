@@ -28,7 +28,10 @@ import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
@@ -88,9 +91,36 @@ class SupplierPurchaseServiceTest {
 
     @BeforeEach
     void setUp() {
+        connectSupplier(ConnectionMode.OWN);
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
         lenient().when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
         lenient().when(supplierSkuResolver.forStore(anyString(), anyString())).thenReturn((ean, mfn) -> null);
+    }
+
+    private void connectSupplier(ConnectionMode mode) {
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setSupplierConnections(List.of(new StoreSupplierConnection(PROVIDER, mode)));
+        store.setFulfilmentConfiguration(fulfilment);
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsConnectedGlobally() {
+        // given
+        connectSupplier(ConnectionMode.GLOBAL);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+        verifyNoInteractions(supplierProviderFactory);
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
+        // given
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+        verifyNoInteractions(supplierProviderFactory);
     }
 
     @Test
