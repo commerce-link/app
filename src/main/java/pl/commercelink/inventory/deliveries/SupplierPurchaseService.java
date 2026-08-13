@@ -238,6 +238,14 @@ public class SupplierPurchaseService {
         return OperationResult.success(delivery.getDeliveryId());
     }
 
+    public PurchaseValidation validatePending(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isAwaitingApproval()) {
+            throw new IllegalStateException("Delivery " + deliveryId + " is not awaiting approval");
+        }
+        return validate(storeId, readPendingForm(delivery), delivery.getPurchaseRef());
+    }
+
     private Delivery findAwaitingApproval(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (delivery == null || !delivery.isAwaitingApproval()) {

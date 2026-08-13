@@ -638,6 +638,21 @@ public class DeliveriesController {
         return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
     }
 
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String validatePendingApproval(@PathVariable("storeId") String storeId,
+                                          @PathVariable("deliveryId") String deliveryId,
+                                          Model model, Locale locale) {
+        try {
+            model.addAttribute("validation", supplierPurchaseService.validatePending(storeId, deliveryId));
+        } catch (Exception e) {
+            model.addAttribute("validationError",
+                    messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
+                            + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+        }
+        return "deliveryPurchaseConfirmation :: validationResult";
+    }
+
     @GetMapping("/dashboard/deliveries/details")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public String showDeliveryDetails(@RequestParam String deliveryId, Model model) {

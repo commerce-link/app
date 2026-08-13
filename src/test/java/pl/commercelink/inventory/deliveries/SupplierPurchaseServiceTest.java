@@ -834,6 +834,29 @@ class SupplierPurchaseServiceTest {
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 
+    @Test
+    void revalidatesThePendingFormAgainstTheSupplierAtApprovalTime() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierSkuResolver.forStore(STORE_ID, PROVIDER))
+                .thenReturn((ean, mfn) -> "SKU-1");
+        when(globalSupplierProvider.checkAvailability(anyList()))
+                .thenReturn(List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+
+        // when
+        PurchaseValidation validation = service.validatePending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertTrue(validation.fullyAvailable());
+        assertEquals(1, validation.lines().size());
+        assertEquals(9.5, validation.lines().get(0).liveUnitCost());
+        verify(globalSupplierProvider).checkAvailability(anyList());
+    }
+
     private Delivery awaitingApprovalDelivery() throws Exception {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
