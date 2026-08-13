@@ -88,6 +88,15 @@ class SearchablePickerFragmentTest {
     }
 
     @Test
+    void pushesTheLabelAndTheChevronToOppositeEdgesLikeTheCategoryPicker() {
+        // when
+        String html = renderScript(ADDRESSES);
+
+        // then
+        assertThat(html).contains("justify-content: space-between");
+    }
+
+    @Test
     void handsEveryOptionToTheScriptSoFilteringHappensWithoutARoundTrip() {
         // when
         String html = renderScript(ADDRESSES);
