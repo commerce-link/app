@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -37,6 +38,7 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -78,6 +80,8 @@ class SupplierPurchaseServiceTest {
     private SupplierSkuResolver supplierSkuResolver;
     @Mock
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    @Mock
+    private ExchangeRates exchangeRates;
     @Spy
     private ObjectMapper objectMapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -546,6 +550,56 @@ class SupplierPurchaseServiceTest {
         delivery.setPurchaseRef(purchaseRef);
         delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
         return delivery;
+    }
+
+    @Test
+    void validateConvertsLiveQuoteToLocalCurrencyUsingSellRate() {
+        // given
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("EUR", 4.34));
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 434.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 100.0, "EUR")));
+
+        // when
+        PurchaseValidation validation = service.validate(STORE_ID, form);
+
+        // then
+        assertEquals("PLN", validation.currency());
+        assertEquals(434.0, validation.lines().getFirst().liveUnitCost(), 0.001);
+        assertEquals(0.0, validation.lines().getFirst().getPriceDelta(), 0.001);
+        assertEquals(868.0, validation.totalNet(), 0.001);
+    }
+
+    @Test
+    void validateKeepsSupplierCurrencyWhenSellRateUnavailable() {
+        // given
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 434.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 100.0, "EUR")));
+
+        // when
+        PurchaseValidation validation = service.validate(STORE_ID, form);
+
+        // then
+        assertEquals("EUR", validation.currency());
+        assertEquals(100.0, validation.lines().getFirst().liveUnitCost(), 0.001);
+    }
+
+    @Test
+    void validateDoesNotTouchExchangeRatesForLocalCurrencyQuotes() {
+        // given
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 110.0, "PLN")));
+
+        // when
+        PurchaseValidation validation = service.validate(STORE_ID, form);
+
+        // then
+        assertEquals("PLN", validation.currency());
+        assertEquals(110.0, validation.lines().getFirst().liveUnitCost(), 0.001);
+        verifyNoInteractions(exchangeRates);
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {

@@ -9,12 +9,17 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +40,10 @@ class StoreSupplierFeedServiceTest {
         Store store = new Store();
         store.setStoreId(id);
         return store;
+    }
+
+    private ProviderField requiredField() {
+        return new ProviderField("apiKey", "API key", ProviderField.FieldType.PASSWORD, true, null);
     }
 
     @Test
@@ -92,6 +101,79 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         // then
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+    }
+
+    @Test
+    void throwsWhenRequiredConfigurationNotReadable() {
+        // given
+        Store store = storeWithId("store-1");
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of(requiredField()));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
+        when(supplierProviderFactory.loadConfiguration(store, "Wortmann")).thenReturn(Map.of());
+
+        // when / then
+        assertThrows(SupplierConfigurationNotReadyException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
+        verify(supplierProviderFactory, never()).get(any(), anyString());
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+    }
+
+    @Test
+    void downloadsWhenRequiredConfigurationReadable() throws Exception {
+        // given
+        Store store = storeWithId("store-1");
+        byte[] data = "rows".getBytes();
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of(requiredField()));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
+        when(supplierProviderFactory.loadConfiguration(store, "Wortmann")).thenReturn(Map.of("apiKey", "secret"));
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+    }
+
+    @Test
+    void doesNotCheckConfigurationWhenNoRequiredFields() throws Exception {
+        // given
+        Store store = storeWithId("store-1");
+        byte[] data = "rows".getBytes();
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of());
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+    }
+
+    @Test
+    void doesNotCheckConfigurationWhenDescriptorUnknown() throws Exception {
+        // given
+        Store store = storeWithId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(null);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 }

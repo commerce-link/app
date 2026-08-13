@@ -166,6 +166,29 @@ class OrdersControllerTest {
     }
 
     @Test
+    @DisplayName("updateShipments keeps a shipment that only carries a manually entered collection point")
+    void updateShipmentsKeepsShipmentWithCollectionPointOnly() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment dispatched = new Shipment(ShipmentType.Courier);
+        dispatched.setCarrier("DPD");
+        dispatched.setTrackingNo("TRACK-1");
+        dispatched.setShippedAt(LocalDateTime.now());
+        Shipment pointOnly = new Shipment(ShipmentType.PickupPoint);
+        pointOnly.setCollectionPointCode("KRA01M");
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(dispatched, pointOnly));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        assertThat(existingOrder.getShipments()).hasSize(2);
+        assertThat(existingOrder.getShipments().get(1).getCollectionPointCode()).isEqualTo("KRA01M");
+    }
+
+    @Test
     @DisplayName("updateShipments does not publish ShipmentCreated when no shipment has shipping data")
     void updateShipmentsSkipsPublishWhenShippingDataAbsent() {
         // given
