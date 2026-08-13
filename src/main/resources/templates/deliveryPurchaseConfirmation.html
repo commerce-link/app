@@ -75,6 +75,21 @@
                   th:object="${form}" method="post"
                   onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
+
+                <input type="hidden" id="delivery-address-blocked" th:if="${deliveryAddressError}"/>
+                <div class="notification is-danger" th:if="${deliveryAddressError}">
+                    <span th:text="#{deliveries.purchase.confirm.addressUnavailable}">Could not fetch delivery addresses.</span>
+                    <span th:text="' (' + ${deliveryAddressError} + ')'"></span>
+                </div>
+
+                <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
+                    <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
+                    <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
+                </div>
+
+                <div class="notification is-info is-light"
+                     th:if="${deliveryAddressError == null and deliveryAddresses != null and #lists.isEmpty(deliveryAddresses)}"
+                     th:text="#{deliveries.purchase.confirm.addressFromSupplier}">Ships to the address held at the supplier.</div>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
@@ -113,11 +128,21 @@
             </form>
 
             <script th:inline="none">
+                let validationPassed = false;
+
+                function refreshSubmitState() {
+                    const submit = document.getElementById('purchase-confirm-submit');
+                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                    const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
+                    const addressChosen = !address || address.value !== '';
+                    submit.disabled = addressBlocked || !validationPassed || !addressChosen;
+                }
+
                 function loadValidation() {
                     const form = document.getElementById('purchase-confirm-form');
                     const area = document.getElementById('validation-area');
-                    const submit = document.getElementById('purchase-confirm-submit');
-                    submit.disabled = true;
+                    validationPassed = false;
+                    refreshSubmitState();
                     area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
                     fetch(form.dataset.validateUrl, {method: 'POST', body: new URLSearchParams(new FormData(form))})
                         .then(function (response) {
@@ -129,14 +154,26 @@
                         .then(function (html) {
                             area.innerHTML = html;
                             const result = area.querySelector('[data-fully-available]');
-                            submit.disabled = !(result && result.dataset.fullyAvailable === 'true');
+                            validationPassed = !!(result && result.dataset.fullyAvailable === 'true');
+                            refreshSubmitState();
                         })
                         .catch(function () {
                             area.innerHTML = document.getElementById('validation-error-template').innerHTML;
+                            validationPassed = false;
+                            refreshSubmitState();
                         });
                 }
-                document.addEventListener('DOMContentLoaded', loadValidation);
+                document.addEventListener('DOMContentLoaded', function () {
+                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                    if (address) {
+                        address.addEventListener('change', refreshSubmitState);
+                    }
+                    loadValidation();
+                });
             </script>
+
+            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}"
+                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
 
             <template id="validation-spinner-template">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

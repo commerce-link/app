@@ -453,6 +453,11 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isOwnSupplier(String supplier) {
+        return getOwnSupplierNames().stream().anyMatch(supplier::equalsIgnoreCase);
+    }
+
+    @DynamoDBIgnore
     public List<String> getGlobalSupplierNames() {
         return supplierNamesByMode(ConnectionMode.GLOBAL);
     }

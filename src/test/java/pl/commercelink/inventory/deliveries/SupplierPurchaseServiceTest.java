@@ -20,6 +20,7 @@ import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
@@ -28,7 +29,10 @@ import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
@@ -91,9 +95,36 @@ class SupplierPurchaseServiceTest {
 
     @BeforeEach
     void setUp() {
+        connectSupplier(ConnectionMode.OWN);
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
         lenient().when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
         lenient().when(supplierSkuResolver.forStore(anyString(), anyString())).thenReturn((ean, mfn) -> null);
+    }
+
+    private void connectSupplier(ConnectionMode mode) {
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setSupplierConnections(List.of(new StoreSupplierConnection(PROVIDER, mode)));
+        store.setFulfilmentConfiguration(fulfilment);
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsConnectedGlobally() {
+        // given
+        connectSupplier(ConnectionMode.GLOBAL);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+        verifyNoInteractions(supplierProviderFactory);
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
+        // given
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+        verifyNoInteractions(supplierProviderFactory);
     }
 
     @Test
@@ -103,6 +134,70 @@ class SupplierPurchaseServiceTest {
 
         // when / then
         assertTrue(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void deliveryAddressesComeFromTheProvider() {
+        // given
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
+                new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+
+        // when
+        List<SupplierDeliveryAddress> addresses = service.deliveryAddresses(STORE_ID, PROVIDER);
+
+        // then
+        assertEquals(1, addresses.size());
+        assertEquals("17200617", addresses.getFirst().id());
+    }
+
+    @Test
+    void deliveryAddressesAreEmptyWhenProviderDoesNotNeedOne() {
+        // when / then
+        assertTrue(service.deliveryAddresses(STORE_ID, PROVIDER).isEmpty());
+        verify(supplierProvider, never()).deliveryAddresses();
+    }
+
+    @Test
+    void deliveryAddressFailureIsNotSwallowed() {
+        // given
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenThrow(new SupplierOrderException("403 Forbidden"));
+
+        // when / then
+        assertThrows(SupplierOrderException.class, () -> service.deliveryAddresses(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void purchaseRefusedWhenRequiredDeliveryAddressMissing() {
+        // given
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.address", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void purchaseAcceptedWhenDeliveryAddressChosen() {
+        // given
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setDeliveryAddressId("17200617");
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(deliveriesRepository).save(any());
     }
 
     @Test
@@ -333,6 +428,31 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<List<SupplierOrderLine>> captor = ArgumentCaptor.forClass(List.class);
         verify(supplierProvider).checkAvailability(captor.capture());
         assertEquals("101", captor.getValue().getFirst().sku());
+    }
+
+    @Test
+    void processPendingCarriesTheChosenDeliveryAddressThroughTheQueue() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setDeliveryAddressId("17200617");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "PO-1", 220.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).placeOrder(captor.capture());
+        assertEquals("17200617", captor.getValue().deliveryAddressId());
     }
 
     @Test

@@ -24,8 +24,10 @@ import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -493,7 +495,29 @@ public class DeliveriesController {
         model.addAttribute("form", form);
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        addDeliveryAddresses(storeId, provider, form, model);
         return "deliveryPurchaseConfirmation";
+    }
+
+    private void addDeliveryAddresses(String storeId, String provider, DeliveryCreationForm form, Model model) {
+        try {
+            List<SupplierDeliveryAddress> addresses = supplierPurchaseService.deliveryAddresses(storeId, provider);
+            model.addAttribute("deliveryAddresses", addresses);
+            model.addAttribute("deliveryAddressOptions", addresses.stream()
+                    .map(address -> new PickerOption(address.id(), address.label()))
+                    .toList());
+            if (addresses.size() == 1) {
+                form.setDeliveryAddressId(addresses.getFirst().id());
+            }
+            addresses.stream()
+                    .filter(address -> address.id().equals(form.getDeliveryAddressId()))
+                    .findFirst()
+                    .ifPresent(address -> model.addAttribute("deliveryAddressLabel", address.label()));
+        } catch (Exception e) {
+            model.addAttribute("deliveryAddresses", List.of());
+            model.addAttribute("deliveryAddressOptions", List.of());
+            model.addAttribute("deliveryAddressError", e.getMessage());
+        }
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/purchase/validate")
@@ -567,6 +591,7 @@ public class DeliveriesController {
             model.addAttribute("purchaseRef", purchaseRef);
             model.addAttribute("isSuperAdmin", isSuperAdmin());
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
+            addDeliveryAddresses(storeId, provider, form, model);
             return "deliveryPurchaseConfirmation";
         }
 
