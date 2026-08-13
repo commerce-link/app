@@ -647,6 +647,22 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void submitPurchaseFailsClosedWhenTheStoreCannotBeResolved() {
+        // given
+        when(storesRepository.findById("missing-store")).thenReturn(null);
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase("missing-store", form, "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.failed", result.getMessage());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
+    }
+
+    @Test
     void submitPurchaseIsIdempotentPerPurchaseRef() {
         // given
         Delivery existing = new Delivery();
@@ -739,6 +755,8 @@ class SupplierPurchaseServiceTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
         when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
         Delivery delivery = awaitingApprovalDelivery();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
@@ -787,6 +805,90 @@ class SupplierPurchaseServiceTest {
         // then
         assertFalse(result.isSuccess());
         verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approvalIsRefusedWhenAvailabilityHasBecomePartial() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 0, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approvalSucceedsWhenFullyAvailable() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
+        verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+    }
+
+    @Test
+    void approvalFailsClosedWhenTheAvailabilityRecheckThrows() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.checkAvailability(anyList()))
+                .thenThrow(new SupplierOrderException("503 Service Unavailable"));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approvalIsRefusedWhenTheStoreHasSwitchedTheConnectionToOwnSinceSubmission() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.OWN);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+        verifyNoInteractions(globalSupplierProviderFactory);
     }
 
     @Test

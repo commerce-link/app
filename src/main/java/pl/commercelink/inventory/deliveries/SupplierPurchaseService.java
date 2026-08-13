@@ -199,6 +199,9 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        if (!requiresApproval(storeId, delivery.getProvider())) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
 
         SupplierProvider supplierProvider = getProvider(storeId, delivery.getProvider());
         if (supplierProvider == null) {
@@ -210,6 +213,20 @@ public class SupplierPurchaseService {
 
         DeliveryCreationForm form = readPendingForm(delivery);
         form.setDeliveryAddressId(deliveryAddressId);
+
+        PurchaseValidation validation;
+        try {
+            validation = validate(storeId, form, delivery.getPurchaseRef());
+        } catch (Exception e) {
+            System.err.println("[SupplierPurchase] availability re-check failed for store " + storeId
+                    + ", delivery " + deliveryId + ": " + e.getMessage());
+            e.printStackTrace();
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+        if (!validation.fullyAvailable()) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+
         try {
             delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
         } catch (JsonProcessingException e) {
@@ -270,7 +287,10 @@ public class SupplierPurchaseService {
         }
 
         Store store = storesRepository.findById(storeId);
-        boolean requiresApproval = store != null && store.isGlobalSupplier(form.getProvider());
+        if (store == null) {
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+        boolean requiresApproval = store.isGlobalSupplier(form.getProvider());
 
         if (!requiresApproval && isDeliveryAddressMissing(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
