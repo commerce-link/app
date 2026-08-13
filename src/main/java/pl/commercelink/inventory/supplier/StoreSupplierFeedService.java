@@ -3,7 +3,9 @@ package pl.commercelink.inventory.supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
+import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -20,11 +22,22 @@ public class StoreSupplierFeedService {
         if (store == null) {
             return;
         }
+        requireReadableConfiguration(store, supplierName);
         SupplierProvider supplier = supplierProviderFactory.get(store, supplierName);
         if (supplier == null) {
             return;
         }
         supplier.download().ifPresent(feedData ->
                 storeFeedRepository.store(storeId, supplierName, feedData.data(), feedData.extension()));
+    }
+
+    private void requireReadableConfiguration(Store store, String supplierName) {
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(supplierName);
+        if (descriptor == null || descriptor.configurationFields().stream().noneMatch(ProviderField::required)) {
+            return;
+        }
+        if (supplierProviderFactory.loadConfiguration(store, supplierName).isEmpty()) {
+            throw new SupplierConfigurationNotReadyException(store.getStoreId(), supplierName);
+        }
     }
 }
