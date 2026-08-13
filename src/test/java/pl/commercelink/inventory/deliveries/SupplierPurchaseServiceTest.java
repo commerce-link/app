@@ -732,6 +732,86 @@ class SupplierPurchaseServiceTest {
                         || method.getName().equals("setManaged")));
     }
 
+    @Test
+    void approvalWritesTheChosenAddressIntoThePendingFormAndQueuesTheOrder() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
+        assertTrue(delivery.getPendingOrderForm().contains("17200617"));
+        verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+    }
+
+    @Test
+    void approvalIsRefusedWhenTheSupplierRequiresAnAddressAndNoneWasChosen() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "  ");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.address", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approvalIsRefusedForADeliveryThatIsNotAwaitingApproval() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void rejectionStoresTheReasonAndPublishesNothing() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DeliveryOrderStatus.REJECTED, delivery.getOrderStatus());
+        assertEquals("Cena wzrosla o 20%", delivery.getRejectionReason());
+        verify(deliveriesRepository).save(delivery);
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    private Delivery awaitingApprovalDelivery() throws Exception {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        delivery.setPurchaseRef("ref-1");
+        delivery.setPendingOrderForm(objectMapper.writeValueAsString(formWithOneOrderableItem()));
+        return delivery;
+    }
+
     private DeliveryCreationForm formWithOneOrderableItem() {
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setStoreId(STORE_ID);
