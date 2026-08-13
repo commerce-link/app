@@ -603,11 +603,9 @@ public class DeliveriesController {
         }
 
         String deliveryId = result.getPayload().deliveryId();
-        String awaiting = result.getPayload().awaitingApproval() ? "&awaitingApproval=true" : "";
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s%s",
-                        storeId, deliveryId, awaiting)
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId + awaiting;
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approve")
