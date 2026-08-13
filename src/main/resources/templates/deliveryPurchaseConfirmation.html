@@ -84,17 +84,7 @@
 
                 <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
                     <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select id="delivery-address-select" th:field="*{deliveryAddressId}"
-                                    onchange="refreshSubmitState()">
-                                <option th:if="${#lists.size(deliveryAddresses) > 1}" value=""
-                                        th:text="#{deliveries.purchase.confirm.addressPlaceholder}">Choose an address</option>
-                                <option th:each="address : ${deliveryAddresses}"
-                                        th:value="${address.id()}" th:text="${address.label()}"></option>
-                            </select>
-                        </div>
-                    </div>
+                    <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
                 </div>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
@@ -138,9 +128,9 @@
 
                 function refreshSubmitState() {
                     const submit = document.getElementById('purchase-confirm-submit');
-                    const select = document.getElementById('delivery-address-select');
+                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                     const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
-                    const addressChosen = !select || select.value !== '';
+                    const addressChosen = !address || address.value !== '';
                     submit.disabled = addressBlocked || !validationPassed || !addressChosen;
                 }
 
@@ -169,8 +159,17 @@
                             refreshSubmitState();
                         });
                 }
-                document.addEventListener('DOMContentLoaded', loadValidation);
+                document.addEventListener('DOMContentLoaded', function () {
+                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                    if (address) {
+                        address.addEventListener('change', refreshSubmitState);
+                    }
+                    loadValidation();
+                });
             </script>
+
+            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}"
+                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
 
             <template id="validation-spinner-template">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

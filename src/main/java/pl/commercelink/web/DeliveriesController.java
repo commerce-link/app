@@ -24,6 +24,7 @@ import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
@@ -502,11 +503,19 @@ public class DeliveriesController {
         try {
             List<SupplierDeliveryAddress> addresses = supplierPurchaseService.deliveryAddresses(storeId, provider);
             model.addAttribute("deliveryAddresses", addresses);
+            model.addAttribute("deliveryAddressOptions", addresses.stream()
+                    .map(address -> new PickerOption(address.id(), address.label()))
+                    .toList());
             if (addresses.size() == 1) {
                 form.setDeliveryAddressId(addresses.getFirst().id());
             }
+            addresses.stream()
+                    .filter(address -> address.id().equals(form.getDeliveryAddressId()))
+                    .findFirst()
+                    .ifPresent(address -> model.addAttribute("deliveryAddressLabel", address.label()));
         } catch (Exception e) {
             model.addAttribute("deliveryAddresses", List.of());
+            model.addAttribute("deliveryAddressOptions", List.of());
             model.addAttribute("deliveryAddressError", e.getMessage());
         }
     }
