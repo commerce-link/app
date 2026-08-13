@@ -549,7 +549,6 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        lenient().when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
         when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithOneOrderableItem();
 
@@ -591,7 +590,6 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        lenient().when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
         when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithOneOrderableItem();
         form.setDeliveryAddressId(null);
