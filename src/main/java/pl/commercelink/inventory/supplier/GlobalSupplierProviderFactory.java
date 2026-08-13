@@ -15,10 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Builds a supplier provider from the platform-wide secret named after the supplier itself
- * (no {storeId}- prefix), used for GLOBAL connections where the store holds no credentials.
- */
 @Service
 @RequiredArgsConstructor
 public class GlobalSupplierProviderFactory {

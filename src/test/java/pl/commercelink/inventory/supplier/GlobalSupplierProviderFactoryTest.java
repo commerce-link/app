@@ -1,6 +1,10 @@
 package pl.commercelink.inventory.supplier;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -15,23 +19,29 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class GlobalSupplierProviderFactoryTest {
 
     private static final List<ProviderField> TOKEN_FIELD =
             List.of(new ProviderField("token", "API Token", ProviderField.FieldType.PASSWORD, true, ""));
 
+    @Mock
+    private SupplierProviderFactory supplierProviderFactory;
+
+    @Mock
+    private SecretsManager secrets;
+
     @Test
     void buildsProviderFromJsonGlobalSecret() {
         // given
         CapturingDescriptor descriptor = new CapturingDescriptor(TOKEN_FIELD, AuthConfig.None.INSTANCE);
-        SecretsManager secrets = mock(SecretsManager.class);
+        when(supplierProviderFactory.getDescriptor("Stub")).thenReturn(descriptor);
         when(secrets.getSecret("Stub")).thenReturn("{\"token\":\"abc\"}");
 
         // when
-        Optional<SupplierProvider> provider = factoryFor(descriptor, secrets).get("Stub");
+        Optional<SupplierProvider> provider = factory().get("Stub");
 
         // then
         assertThat(provider).isPresent();
@@ -42,11 +52,11 @@ class GlobalSupplierProviderFactoryTest {
     void assignsBareStringSecretToTheFirstConfigurationField() {
         // given
         CapturingDescriptor descriptor = new CapturingDescriptor(TOKEN_FIELD, AuthConfig.None.INSTANCE);
-        SecretsManager secrets = mock(SecretsManager.class);
+        when(supplierProviderFactory.getDescriptor("Stub")).thenReturn(descriptor);
         when(secrets.getSecret("Stub")).thenReturn("raw-token");
 
         // when
-        Optional<SupplierProvider> provider = factoryFor(descriptor, secrets).get("Stub");
+        Optional<SupplierProvider> provider = factory().get("Stub");
 
         // then
         assertThat(provider).isPresent();
@@ -55,14 +65,8 @@ class GlobalSupplierProviderFactoryTest {
 
     @Test
     void returnsEmptyForUnknownSupplier() {
-        // given
-        SupplierProviderFactory supplierProviderFactory = mock(SupplierProviderFactory.class);
-        SecretsManager secrets = mock(SecretsManager.class);
-        when(supplierProviderFactory.getDescriptor("Ghost")).thenReturn(null);
-
         // when
-        Optional<SupplierProvider> provider =
-                new GlobalSupplierProviderFactory(supplierProviderFactory, secrets).get("Ghost");
+        Optional<SupplierProvider> provider = factory().get("Ghost");
 
         // then
         assertThat(provider).isEmpty();
@@ -73,30 +77,42 @@ class GlobalSupplierProviderFactoryTest {
         // given
         CapturingDescriptor descriptor = new CapturingDescriptor(List.of(),
                 AuthConfig.OAuth2.of("https://api.example.com", "/auth", "/refresh", 3600));
-        SecretsManager secrets = mock(SecretsManager.class);
+        when(supplierProviderFactory.getDescriptor("Stub")).thenReturn(descriptor);
 
         // when
-        Optional<SupplierProvider> provider = factoryFor(descriptor, secrets).get("Stub");
+        Optional<SupplierProvider> provider = factory().get("Stub");
 
         // then
         assertThat(provider).isEmpty();
     }
 
     @Test
+    void propagatesExceptionWhenSecretIsMissing() {
+        // given
+        CapturingDescriptor descriptor = new CapturingDescriptor(TOKEN_FIELD, AuthConfig.None.INSTANCE);
+        when(supplierProviderFactory.getDescriptor("Stub")).thenReturn(descriptor);
+        when(secrets.getSecret("Stub")).thenThrow(new RuntimeException("no secret found"));
+
+        // when / then
+        assertThatThrownBy(() -> factory().get("Stub"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("no secret found");
+    }
+
+    @Test
     void failsLoudlyOnMalformedJsonSecret() {
         // given
         CapturingDescriptor descriptor = new CapturingDescriptor(TOKEN_FIELD, AuthConfig.None.INSTANCE);
-        SecretsManager secrets = mock(SecretsManager.class);
+        when(supplierProviderFactory.getDescriptor("Stub")).thenReturn(descriptor);
         when(secrets.getSecret("Stub")).thenReturn("{not-valid-json");
 
         // when / then
-        assertThatThrownBy(() -> factoryFor(descriptor, secrets).get("Stub"))
-                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> factory().get("Stub"))
+                .isInstanceOf(RuntimeException.class)
+                .hasCauseInstanceOf(JsonProcessingException.class);
     }
 
-    private GlobalSupplierProviderFactory factoryFor(CapturingDescriptor descriptor, SecretsManager secrets) {
-        SupplierProviderFactory supplierProviderFactory = mock(SupplierProviderFactory.class);
-        when(supplierProviderFactory.getDescriptor(descriptor.name())).thenReturn(descriptor);
+    private GlobalSupplierProviderFactory factory() {
         return new GlobalSupplierProviderFactory(supplierProviderFactory, secrets);
     }
 
