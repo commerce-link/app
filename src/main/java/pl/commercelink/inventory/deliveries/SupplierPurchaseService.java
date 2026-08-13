@@ -67,6 +67,11 @@ public class SupplierPurchaseService {
         }
     }
 
+    public boolean requiresApproval(String storeId, String provider) {
+        Store store = storesRepository.findById(storeId);
+        return store != null && store.isGlobalSupplier(provider);
+    }
+
     public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
         SupplierProvider supplierProvider = getProvider(storeId, provider);
         if (supplierProvider == null || !supplierProvider.requiresDeliveryAddress()) {

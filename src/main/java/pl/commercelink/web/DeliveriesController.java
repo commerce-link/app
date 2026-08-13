@@ -500,6 +500,10 @@ public class DeliveriesController {
     }
 
     private void addDeliveryAddresses(String storeId, String provider, DeliveryCreationForm form, Model model) {
+        if (supplierPurchaseService.requiresApproval(storeId, provider)) {
+            model.addAttribute("requiresApproval", true);
+            return;
+        }
         try {
             List<SupplierDeliveryAddress> addresses = supplierPurchaseService.deliveryAddresses(storeId, provider);
             model.addAttribute("deliveryAddresses", addresses);
@@ -595,9 +599,39 @@ public class DeliveriesController {
         }
 
         String deliveryId = result.getPayload().deliveryId();
+        String awaiting = result.getPayload().awaitingApproval() ? "&awaitingApproval=true" : "";
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s%s",
+                        storeId, deliveryId, awaiting)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId + awaiting;
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approve")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String approvePurchase(@PathVariable("storeId") String storeId,
+                                  @PathVariable("deliveryId") String deliveryId,
+                                  @RequestParam(value = "deliveryAddressId", required = false) String deliveryAddressId,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId);
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/reject")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String rejectPurchase(@PathVariable("storeId") String storeId,
+                                 @PathVariable("deliveryId") String deliveryId,
+                                 @RequestParam(value = "reason", required = false) String reason,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.reject(storeId, deliveryId, reason);
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
     }
 
     @GetMapping("/dashboard/deliveries/details")
@@ -618,6 +652,9 @@ public class DeliveriesController {
                 storeId, delivery.getProvider(), deliveryId);
 
         model.addAttribute("delivery", delivery);
+        if (delivery.isAwaitingApproval() && isSuperAdmin()) {
+            addApprovalAddresses(storeId, delivery, model);
+        }
         model.addAttribute("allocationsForm", new DeliveryAllocationsForm(
                 delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(), delivery.getAllocations()));
         model.addAttribute("mergeTargetDeliveries", mergeTargetDeliveries);
@@ -627,6 +664,21 @@ public class DeliveriesController {
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         return "deliveryDetails";
+    }
+
+    private void addApprovalAddresses(String storeId, Delivery delivery, Model model) {
+        try {
+            List<SupplierDeliveryAddress> addresses =
+                    supplierPurchaseService.deliveryAddressesForDelivery(storeId, delivery.getDeliveryId());
+            model.addAttribute("approvalAddresses", addresses);
+            model.addAttribute("approvalAddressOptions", addresses.stream()
+                    .map(address -> new PickerOption(address.id(), address.label()))
+                    .toList());
+        } catch (Exception e) {
+            model.addAttribute("approvalAddresses", List.of());
+            model.addAttribute("approvalAddressOptions", List.of());
+            model.addAttribute("approvalAddressError", e.getMessage());
+        }
     }
 
     @PostMapping("/dashboard/deliveries/details")
