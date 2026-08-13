@@ -15,7 +15,6 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -84,7 +83,7 @@ class DeliveryCreationServiceTest {
         form.getItems().add(item);
 
         // when
-        String deliveryId = service.run(STORE_ID, form, true);
+        String deliveryId = service.run(STORE_ID, form);
 
         // then
         assertNotNull(deliveryId);
@@ -93,7 +92,6 @@ class DeliveryCreationServiceTest {
         Delivery saved = deliveryCaptor.getValue();
         assertEquals(deliveryId, saved.getDeliveryId());
         assertEquals("ELKO-2", saved.getExternalDeliveryId());
-        assertTrue(saved.isManaged());
         assertEquals(165.0, saved.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq(deliveryId), any(), eq(form.getItems()));
         verify(warehouseAllocationsManager).commit(STORE_ID, deliveryId, form.getProvider(), form.getItems());

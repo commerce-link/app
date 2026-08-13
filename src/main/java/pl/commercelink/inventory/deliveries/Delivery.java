@@ -85,8 +85,6 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "documents")
     private List<Document> documents = new LinkedList<>();
 
-    @DynamoDBAttribute(attributeName = "managed")
-    private boolean managed;
     @DynamoDBAttribute(attributeName = "invoiced")
     private boolean invoiced;
     @DynamoDBAttribute(attributeName = "synced")
@@ -549,14 +547,6 @@ public class Delivery {
 
     public void setEvents(List<Event> events) {
         this.events = events;
-    }
-
-    public boolean isManaged() {
-        return managed;
-    }
-
-    public void setManaged(boolean managed) {
-        this.managed = managed;
     }
 
     public List<Document> getDocuments() {

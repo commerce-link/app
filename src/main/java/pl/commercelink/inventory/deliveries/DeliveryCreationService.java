@@ -27,11 +27,11 @@ public class DeliveryCreationService {
     @Autowired
     private ExchangeRates exchangeRates;
 
-    public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+    public String run(String storeId, DeliveryCreationForm form) {
         prepareForm(storeId, form);
 
         if (form.hasDeliveryDetails()) {
-            var delivery = createDelivery(storeId, form, isSuperAdmin);
+            var delivery = createDelivery(storeId, form);
             finalizeDelivery(storeId, delivery, form);
             return delivery.getDeliveryId();
         }
@@ -83,7 +83,7 @@ public class DeliveryCreationService {
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
-    private Delivery createDelivery(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+    private Delivery createDelivery(String storeId, DeliveryCreationForm form) {
         var delivery = new Delivery(
                 storeId,
                 form.getExternalDeliveryId(),
@@ -94,7 +94,6 @@ public class DeliveryCreationService {
                 form.getPaymentTerms(),
                 form.getTax()
         );
-        delivery.setManaged(isSuperAdmin);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }

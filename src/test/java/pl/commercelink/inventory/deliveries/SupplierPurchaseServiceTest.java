@@ -190,7 +190,7 @@ class SupplierPurchaseServiceTest {
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
 
         // when
-        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1");
 
         // then
         assertFalse(result.isSuccess());
@@ -208,7 +208,7 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
 
         // when
-        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
@@ -553,7 +553,7 @@ class SupplierPurchaseServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
@@ -579,7 +579,7 @@ class SupplierPurchaseServiceTest {
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
 
         // then
         assertFalse(result.isSuccess());
@@ -598,7 +598,7 @@ class SupplierPurchaseServiceTest {
         form.setProvider("Acme");
 
         // when
-        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1", false);
+        OperationResult<String> result = service.enqueuePurchase("store-1", form, "ref-1");
 
         // then
         assertTrue(result.isSuccess());
@@ -664,6 +664,14 @@ class SupplierPurchaseServiceTest {
         assertEquals("PLN", validation.currency());
         assertEquals(110.0, validation.lines().getFirst().liveUnitCost(), 0.001);
         verifyNoInteractions(exchangeRates);
+    }
+
+    @Test
+    void doesNotExposeAManagedFlagOnDeliveries() {
+        // given / when / then
+        assertTrue(java.util.Arrays.stream(Delivery.class.getDeclaredMethods())
+                .noneMatch(method -> method.getName().equals("isManaged")
+                        || method.getName().equals("setManaged")));
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {

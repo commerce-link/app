@@ -453,7 +453,7 @@ public class DeliveriesController {
     private String processDelivery(String storeId, DeliveryCreationForm form) {
         form.setStoreId(storeId);
 
-        String createdDeliveryId = deliveryCreationService.run(storeId, form, isSuperAdmin());
+        String createdDeliveryId = deliveryCreationService.run(storeId, form);
 
         if (createdDeliveryId != null) {
             return isSuperAdmin()
@@ -583,8 +583,7 @@ public class DeliveriesController {
 
         form.setStoreId(storeId);
         form.setProvider(provider);
-        OperationResult<String> result = supplierPurchaseService.enqueuePurchase(
-                storeId, form, purchaseRef, isSuperAdmin());
+        OperationResult<String> result = supplierPurchaseService.enqueuePurchase(storeId, form, purchaseRef);
 
         if (!result.isSuccess()) {
             model.addAttribute("form", form);

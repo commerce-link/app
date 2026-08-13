@@ -188,7 +188,7 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
-                                                   String purchaseRef, boolean isSuperAdmin) {
+                                                   String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
             return OperationResult.failure("deliveries.purchase.error.availability");
@@ -203,7 +203,6 @@ public class SupplierPurchaseService {
         }
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
-        delivery.setManaged(isSuperAdmin);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         try {
