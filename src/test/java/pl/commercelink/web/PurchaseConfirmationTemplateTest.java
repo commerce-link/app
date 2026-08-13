@@ -21,12 +21,20 @@ class PurchaseConfirmationTemplateTest {
     void keepsTheElementIdsThePageScriptLooksUp() throws Exception {
         // when
         String html = template();
+        String script = html.substring(html.indexOf("<script th:inline=\"none\">"), html.indexOf("</script>"));
 
         // then
         assertThat(html).contains("id=\"address-modal\"");
+        assertThat(script).contains("'address-modal'");
+
         assertThat(html).contains("id=\"address-confirm\"");
+        assertThat(script).contains("'address-confirm'");
+
         assertThat(html).contains("id=\"purchase-confirm-submit\"");
+        assertThat(script).contains("'purchase-confirm-submit'");
+
         assertThat(html).contains("data-address-cancel");
+        assertThat(script).contains("data-address-cancel");
     }
 
     @Test
