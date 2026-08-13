@@ -212,8 +212,9 @@
                 });
             </script>
 
-            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}"
-                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
+            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
+                <th:block th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
+            </th:block>
 
             <template id="validation-spinner-template">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

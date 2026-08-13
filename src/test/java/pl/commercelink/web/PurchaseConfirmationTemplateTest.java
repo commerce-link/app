@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -12,9 +14,27 @@ class PurchaseConfirmationTemplateTest {
 
     private static final Path TEMPLATE =
             Path.of("src/main/resources/templates/deliveryPurchaseConfirmation.html");
+    private static final Path DETAILS_TEMPLATE =
+            Path.of("src/main/resources/templates/deliveryDetails.html");
+    private static final Pattern OPENING_TAG = Pattern.compile("<[a-zA-Z0-9:]+\\s[^>]*?>", Pattern.DOTALL);
 
     private String template() throws Exception {
         return Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+    }
+
+    private String detailsTemplate() throws Exception {
+        return Files.readString(DETAILS_TEMPLATE, StandardCharsets.UTF_8);
+    }
+
+    private boolean hasElementWithBothThIfAndThReplace(String html) {
+        Matcher matcher = OPENING_TAG.matcher(html);
+        while (matcher.find()) {
+            String tag = matcher.group();
+            if (tag.contains("th:if") && tag.contains("th:replace")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test
@@ -57,5 +77,16 @@ class PurchaseConfirmationTemplateTest {
         // then
         assertThat(html).contains("deliveries.purchase.confirm.submitForApproval");
         assertThat(html).contains("requiresApproval");
+    }
+
+    @Test
+    void pickerScriptGuardIsNeverCombinedWithThReplaceOnTheSameElement() throws Exception {
+        // when
+        String purchaseConfirmationHtml = template();
+        String detailsHtml = detailsTemplate();
+
+        // then
+        assertThat(hasElementWithBothThIfAndThReplace(purchaseConfirmationHtml)).isFalse();
+        assertThat(hasElementWithBothThIfAndThReplace(detailsHtml)).isFalse();
     }
 }

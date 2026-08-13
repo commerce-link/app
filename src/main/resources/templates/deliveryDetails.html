@@ -689,8 +689,9 @@
         }
     </script>
 
-            <th:block th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}"
-                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${approvalAddressOptions})}"></th:block>
+            <th:block th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}">
+                <th:block th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${approvalAddressOptions})}"></th:block>
+            </th:block>
 
         </div>
     </section>
