@@ -115,9 +115,12 @@ public class DeliveriesController {
             @RequestParam(required = false, defaultValue = "false") boolean showArchived,
             @RequestParam(required = false, defaultValue = "false") boolean showWithoutInvoice,
             @RequestParam(required = false, defaultValue = "false") boolean showWithoutSync,
+            @RequestParam(required = false, defaultValue = "false") boolean showAwaitingApproval,
             @RequestParam(required = false, defaultValue = "1") int page,
             Model model) {
-        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider, orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync);
+        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider,
+                orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
+                showAwaitingApproval);
 
         List<Delivery> paginatedDeliveries;
         if (isSuperAdmin()) {
@@ -135,6 +138,7 @@ public class DeliveriesController {
         searchParams.put("showArchived", showArchived);
         searchParams.put("showWithoutInvoice", showWithoutInvoice);
         searchParams.put("showWithoutSync", showWithoutSync);
+        searchParams.put("showAwaitingApproval", showAwaitingApproval);
 
         model.addAttribute("deliveries", paginatedDeliveries.subList(0, Math.min(paginatedDeliveries.size(), DELIVERY_PAGE_SIZE)));
         model.addAttribute("currentPage", page);

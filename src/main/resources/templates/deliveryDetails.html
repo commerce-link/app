@@ -119,6 +119,48 @@
                             </div>
                         </div>
                     </form>
+
+                    <div class="notification is-warning is-light" th:if="${delivery.awaitingApproval and !isSuperAdmin}"
+                         th:text="#{deliveries.purchase.submitted.approval}">Awaiting platform administrator.</div>
+
+                    <div class="box" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                        <h3 class="title is-5" th:text="#{deliveries.approval.title}">Realisation request</h3>
+
+                        <div class="notification is-danger" th:if="${approvalAddressError}">
+                            <span th:text="#{deliveries.purchase.confirm.addressUnavailable}"></span>
+                            <span th:text="' (' + ${approvalAddressError} + ')'"></span>
+                        </div>
+
+                        <div class="notification is-info is-light"
+                             th:if="${approvalAddressError == null and approvalAddresses != null and #lists.isEmpty(approvalAddresses)}"
+                             th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></div>
+
+                        <form th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approve(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                              method="post">
+                            <div class="field" th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}">
+                                <label class="label" th:text="#{deliveries.purchase.confirm.address}"></label>
+                                <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', null, null, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
+                            </div>
+                            <button type="submit" class="button is-primary" th:disabled="${approvalAddressError != null}"
+                                    th:text="#{deliveries.approval.approve}">Approve and order</button>
+                        </form>
+
+                        <form class="mt-4"
+                              th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/reject(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                              method="post">
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.approval.reason}"></label>
+                                <input class="input" type="text" name="reason"/>
+                            </div>
+                            <button type="submit" class="button is-danger is-light"
+                                    th:text="#{deliveries.approval.reject}">Reject</button>
+                        </form>
+                    </div>
+
+                    <div class="notification is-danger is-light" th:if="${delivery.orderRejected}">
+                        <p th:text="#{deliveries.approval.rejectedBy}"></p>
+                        <p th:if="${delivery.rejectionReason}" th:text="${delivery.rejectionReason}"></p>
+                    </div>
                 </div>
 
                 <div class="column is-half">
@@ -591,6 +633,9 @@
             form.submit();
         }
     </script>
+
+            <th:block th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}"
+                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${approvalAddressOptions})}"></th:block>
 
         </div>
     </section>

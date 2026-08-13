@@ -64,6 +64,11 @@
                                 <input type="checkbox" name="showWithoutSync" value="true" th:checked="${searchParams.showWithoutSync}">
                                 <span th:text="#{deliveries.show.withoutSync}"></span>
                             </label>
+                            <label class="checkbox ml-4" th:if="${isSuperAdmin}">
+                                <input type="checkbox" name="showAwaitingApproval" value="true"
+                                       th:checked="${searchParams['showAwaitingApproval']}"/>
+                                <span th:text="#{deliveries.filter.awaitingApproval}"></span>
+                            </label>
                         </div>
                     </div>
 
@@ -100,6 +105,10 @@
                                    th:text="${delivery.shortenedDeliveryId}"></a>
                                 <span class="tag is-warning ml-1" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
                                 <span class="tag is-danger ml-1" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
+                                <span class="tag is-warning ml-1" th:if="${delivery.awaitingApproval}"
+                                      th:text="#{deliveries.status.awaitingApproval}"></span>
+                                <span class="tag is-dark ml-1" th:if="${delivery.orderRejected}"
+                                      th:text="#{deliveries.status.rejected}"></span>
                             </td>
                             <td th:text="${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>

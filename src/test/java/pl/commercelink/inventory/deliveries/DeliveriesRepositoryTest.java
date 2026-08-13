@@ -49,7 +49,7 @@ class DeliveriesRepositoryTest {
         List<Delivery> deliveries = Arrays.asList(later, pending, earlier);
         when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
         when(paginatedQueryList.iterator()).thenReturn(deliveries.iterator());
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false);
 
         // when
         List<Delivery> result = deliveriesRepository.searchActiveDeliveries("store-1", filter, 1, 25);

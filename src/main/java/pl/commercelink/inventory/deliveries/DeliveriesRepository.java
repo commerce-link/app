@@ -181,6 +181,11 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
             appendFilter(filterExpression, "(attribute_not_exists(synced) OR synced = :false)");
         }
 
+        if (filter.isAwaitingApproval()) {
+            eav.put(":awaitingApproval", new AttributeValue().withS(DeliveryOrderStatus.AWAITING_APPROVAL.name()));
+            appendFilter(filterExpression, "orderStatus = :awaitingApproval");
+        }
+
         return new QueryAndFilterExpressions(keyConditionExpression, filterExpression.toString(), eav);
     }
 
