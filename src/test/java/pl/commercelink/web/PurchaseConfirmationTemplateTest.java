@@ -26,6 +26,40 @@ class PurchaseConfirmationTemplateTest {
         return Files.readString(DETAILS_TEMPLATE, StandardCharsets.UTF_8);
     }
 
+    @Test
+    void rendersTheConfirmButtonDisabledUntilAnAddressIsChosen() throws Exception {
+        // given
+        String html = template();
+
+        // when
+        String confirmTag = openingTagOf(html, "id=\"address-confirm\"");
+
+        // then
+        assertThat(confirmTag).contains("disabled");
+        assertThat(confirmTag).contains("deliveryAddressId");
+        assertThat(html).contains("refreshAddressConfirmState");
+    }
+
+    @Test
+    void givesTheAddressModalEnoughRoomForTheOptionList() throws Exception {
+        // given
+        String html = template();
+
+        // then
+        assertThat(html).contains("#address-modal .modal-card-body");
+        assertThat(html).contains("min-height");
+    }
+
+    private String openingTagOf(String html, String marker) {
+        Matcher matcher = OPENING_TAG.matcher(html);
+        while (matcher.find()) {
+            if (matcher.group().contains(marker)) {
+                return matcher.group();
+            }
+        }
+        return "";
+    }
+
     private boolean hasElementWithBothThIfAndThReplace(String html) {
         Matcher matcher = OPENING_TAG.matcher(html);
         while (matcher.find()) {

@@ -128,12 +128,32 @@
                         </section>
                         <footer class="modal-card-foot">
                             <button type="submit" class="button is-primary" id="address-confirm"
+                                    th:attr="disabled=${#strings.isEmpty(form.deliveryAddressId)} ? 'disabled' : null"
                                     th:text="#{deliveries.purchase.confirm.addressConfirm}">Confirm</button>
                             <button type="button" class="button" data-address-cancel
                                     th:text="#{deliveries.purchase.confirm.addressCancel}">Close</button>
                         </footer>
                     </div>
                 </div>
+
+                <style>
+                    #address-modal .modal-card {
+                        max-width: 42rem;
+                        width: calc(100vw - 3rem);
+                    }
+
+                    #address-modal .modal-card-body {
+                        min-height: 28rem;
+                    }
+
+                    #address-modal .searchable-picker .dropdown-menu {
+                        min-width: 100%;
+                    }
+
+                    #address-modal .searchable-picker [data-picker-list] {
+                        max-height: 18rem;
+                    }
+                </style>
 
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
@@ -153,6 +173,14 @@
                     submit.disabled = addressBlocked || !validationPassed;
                 }
 
+                function refreshAddressConfirmState() {
+                    const confirm = document.getElementById('address-confirm');
+                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                    if (confirm) {
+                        confirm.disabled = !address || address.value === '';
+                    }
+                }
+
                 function openAddressModal(event) {
                     const modal = document.getElementById('address-modal');
                     if (!modal) {
@@ -160,6 +188,11 @@
                     }
                     event.preventDefault();
                     modal.classList.add('is-active');
+                    refreshAddressConfirmState();
+                    const trigger = modal.querySelector('[data-picker-trigger]');
+                    if (trigger && !modal.querySelector('[data-searchable-picker]').classList.contains('is-active')) {
+                        trigger.click();
+                    }
                 }
 
                 function closeAddressModal() {
@@ -201,12 +234,16 @@
                         submit.addEventListener('click', openAddressModal);
                         Array.from(modal.querySelectorAll('[data-address-cancel]'))
                             .forEach(function (element) { element.addEventListener('click', closeAddressModal); });
+                        const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                        if (address) {
+                            address.addEventListener('change', refreshAddressConfirmState);
+                        }
                         document.getElementById('address-confirm').addEventListener('click', function (event) {
-                            const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                             if (!address || address.value === '') {
                                 event.preventDefault();
                             }
                         });
+                        refreshAddressConfirmState();
                     }
                     loadValidation();
                 });
