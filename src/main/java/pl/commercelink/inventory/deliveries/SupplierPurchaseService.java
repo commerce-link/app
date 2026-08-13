@@ -7,6 +7,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
+import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
@@ -44,6 +45,7 @@ public class SupplierPurchaseService {
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
 
     private final SupplierProviderFactory supplierProviderFactory;
+    private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
     private final StoresRepository storesRepository;
     private final DeliveryCreationService deliveryCreationService;
     private final DeliveriesRepository deliveriesRepository;
@@ -56,11 +58,7 @@ public class SupplierPurchaseService {
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
-            Store store = storesRepository.findById(storeId);
-            if (store == null || !store.isOwnSupplier(provider)) {
-                return false;
-            }
-            SupplierProvider supplierProvider = supplierProviderFactory.get(store, provider);
+            SupplierProvider supplierProvider = getProvider(storeId, provider);
             return supplierProvider != null && supplierProvider.supportsOrdering();
         } catch (Exception e) {
             return false;
@@ -272,6 +270,15 @@ public class SupplierPurchaseService {
 
     private SupplierProvider getProvider(String storeId, String provider) {
         Store store = storesRepository.findById(storeId);
-        return supplierProviderFactory.get(store, provider);
+        if (store == null) {
+            return null;
+        }
+        if (store.isOwnSupplier(provider)) {
+            return supplierProviderFactory.get(store, provider);
+        }
+        if (store.isGlobalSupplier(provider)) {
+            return globalSupplierProviderFactory.get(provider).orElse(null);
+        }
+        return null;
     }
 }

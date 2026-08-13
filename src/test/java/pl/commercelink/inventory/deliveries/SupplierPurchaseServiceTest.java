@@ -14,6 +14,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
+import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
@@ -82,6 +83,10 @@ class SupplierPurchaseServiceTest {
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     @Mock
     private ExchangeRates exchangeRates;
+    @Mock
+    private GlobalSupplierProviderFactory globalSupplierProviderFactory;
+    @Mock
+    private SupplierProvider globalSupplierProvider;
     @Spy
     private ObjectMapper objectMapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -105,6 +110,16 @@ class SupplierPurchaseServiceTest {
         FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
         fulfilment.setSupplierConnections(List.of(new StoreSupplierConnection(PROVIDER, mode)));
         store.setFulfilmentConfiguration(fulfilment);
+    }
+
+    private Store storeWithConnection(String provider, ConnectionMode mode) {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        FulfilmentConfiguration configuration = new FulfilmentConfiguration();
+        configuration.setSupplierConnections(List.of(
+                new StoreSupplierConnection(provider, mode, true, true)));
+        store.setFulfilmentConfiguration(configuration);
+        return store;
     }
 
     @Test
@@ -213,6 +228,55 @@ class SupplierPurchaseServiceTest {
     void orderingUnavailableWhenFactoryThrows() {
         // given
         when(supplierProviderFactory.get(store, PROVIDER)).thenThrow(new RuntimeException("no credentials"));
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void ordersThroughTheGlobalProviderWhenTheConnectionIsGlobal() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.supportsOrdering()).thenReturn(true);
+
+        // when
+        boolean available = service.isOrderingAvailable(STORE_ID, PROVIDER);
+
+        // then
+        assertTrue(available);
+        verifyNoInteractions(supplierProviderFactory);
+    }
+
+    @Test
+    void refusesOrderingWhenTheGlobalSecretCarriesNoOrderingCredentials() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.supportsOrdering()).thenReturn(false);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void refusesOrderingWhenNoGlobalSecretExists() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.empty());
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void refusesOrderingForManualConnections() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.MANUAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
