@@ -41,13 +41,14 @@ class PurchaseConfirmationTemplateTest {
     }
 
     @Test
-    void givesTheAddressModalEnoughRoomForTheOptionList() throws Exception {
+    void boundsTheOptionListHeightSoTheModalNeverGrowsWithTheAddressCount() throws Exception {
         // given
         String html = template();
 
         // then
-        assertThat(html).contains("#address-modal .modal-card-body");
-        assertThat(html).contains("min-height");
+        assertThat(html).contains("#address-options");
+        assertThat(html).contains("max-height");
+        assertThat(html).contains("overflow-y: auto");
     }
 
     private String openingTagOf(String html, String marker) {
@@ -92,15 +93,16 @@ class PurchaseConfirmationTemplateTest {
     }
 
     @Test
-    void rendersTheAddressPickerOnlyInsideTheModal() throws Exception {
+    void offersTheAddressesAsAnAlwaysVisibleListInsideTheModal() throws Exception {
         // when
         String html = template();
 
         // then
         int modalStart = html.indexOf("id=\"address-modal\"");
-        int pickerAt = html.indexOf("searchable-picker :: picker(");
-        assertThat(pickerAt).isGreaterThan(modalStart);
-        assertThat(html.indexOf("searchable-picker :: picker(", pickerAt + 1)).isEqualTo(-1);
+        int optionsAt = html.indexOf("id=\"address-options\"");
+        assertThat(optionsAt).isGreaterThan(modalStart);
+        assertThat(html).contains("type=\"radio\" name=\"deliveryAddressId\"");
+        assertThat(html).doesNotContain("searchable-picker :: picker(");
     }
 
     @Test

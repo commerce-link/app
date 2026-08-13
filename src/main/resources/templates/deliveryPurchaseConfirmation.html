@@ -124,7 +124,22 @@
                             <p class="modal-card-title" th:text="#{deliveries.purchase.confirm.addressModalTitle}">Choose a delivery address</p>
                         </header>
                         <section class="modal-card-body">
-                            <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
+                            <div class="field" th:if="${#lists.size(deliveryAddresses) > 6}">
+                                <div class="control has-icons-left">
+                                    <input class="input" type="search" id="address-filter" autocomplete="off"
+                                           th:placeholder="#{picker.filter}">
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="address-options">
+                                <label class="address-option" th:each="option : ${deliveryAddressOptions}">
+                                    <input type="radio" name="deliveryAddressId" th:value="${option.value}"
+                                           th:checked="${option.value == form.deliveryAddressId}">
+                                    <span th:text="${option.label}">Address</span>
+                                </label>
+                            </div>
                         </section>
                         <footer class="modal-card-foot">
                             <button type="submit" class="button is-primary" id="address-confirm"
@@ -138,20 +153,40 @@
 
                 <style>
                     #address-modal .modal-card {
-                        max-width: 42rem;
+                        max-width: 38rem;
                         width: calc(100vw - 3rem);
                     }
 
-                    #address-modal .modal-card-body {
-                        min-height: 28rem;
+                    #address-options {
+                        max-height: 22rem;
+                        overflow-y: auto;
                     }
 
-                    #address-modal .searchable-picker .dropdown-menu {
-                        min-width: 100%;
+                    .address-option {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 0.75rem;
+                        padding: 0.75rem 1rem;
+                        border: 1px solid #dbdbdb;
+                        border-radius: 6px;
+                        cursor: pointer;
                     }
 
-                    #address-modal .searchable-picker [data-picker-list] {
-                        max-height: 18rem;
+                    .address-option + .address-option {
+                        margin-top: 0.5rem;
+                    }
+
+                    .address-option:hover {
+                        background-color: #f5f7ff;
+                    }
+
+                    .address-option:has(input:checked) {
+                        border-color: #3273dc;
+                        background-color: #eef3ff;
+                    }
+
+                    .address-option.is-hidden {
+                        display: none;
                     }
                 </style>
 
@@ -173,12 +208,25 @@
                     submit.disabled = addressBlocked || !validationPassed;
                 }
 
+                function selectedAddress() {
+                    return document.querySelector('#address-options input[name="deliveryAddressId"]:checked');
+                }
+
                 function refreshAddressConfirmState() {
                     const confirm = document.getElementById('address-confirm');
-                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                     if (confirm) {
-                        confirm.disabled = !address || address.value === '';
+                        confirm.disabled = selectedAddress() === null;
                     }
+                }
+
+                function filterAddressOptions() {
+                    const filter = document.getElementById('address-filter');
+                    const query = filter ? filter.value.trim().toLowerCase() : '';
+                    Array.from(document.querySelectorAll('#address-options .address-option'))
+                        .forEach(function (option) {
+                            const label = option.textContent.trim().toLowerCase();
+                            option.classList.toggle('is-hidden', query !== '' && label.indexOf(query) === -1);
+                        });
                 }
 
                 function openAddressModal(event) {
@@ -189,10 +237,6 @@
                     event.preventDefault();
                     modal.classList.add('is-active');
                     refreshAddressConfirmState();
-                    const trigger = modal.querySelector('[data-picker-trigger]');
-                    if (trigger && !modal.querySelector('[data-searchable-picker]').classList.contains('is-active')) {
-                        trigger.click();
-                    }
                 }
 
                 function closeAddressModal() {
@@ -234,12 +278,14 @@
                         submit.addEventListener('click', openAddressModal);
                         Array.from(modal.querySelectorAll('[data-address-cancel]'))
                             .forEach(function (element) { element.addEventListener('click', closeAddressModal); });
-                        const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
-                        if (address) {
-                            address.addEventListener('change', refreshAddressConfirmState);
+                        Array.from(modal.querySelectorAll('#address-options input[name="deliveryAddressId"]'))
+                            .forEach(function (radio) { radio.addEventListener('change', refreshAddressConfirmState); });
+                        const filter = document.getElementById('address-filter');
+                        if (filter) {
+                            filter.addEventListener('input', filterAddressOptions);
                         }
                         document.getElementById('address-confirm').addEventListener('click', function (event) {
-                            if (!address || address.value === '') {
+                            if (selectedAddress() === null) {
                                 event.preventDefault();
                             }
                         });
@@ -248,10 +294,6 @@
                     loadValidation();
                 });
             </script>
-
-            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
-                <th:block th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
-            </th:block>
 
             <template id="validation-spinner-template">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
