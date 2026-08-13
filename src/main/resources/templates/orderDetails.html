@@ -1059,6 +1059,7 @@
                                     <th th:text="#{order.shipment.type}"></th>
                                     <th th:text="#{order.shipment.tracking.no}"></th>
                                     <th th:text="#{order.shipment.carrier}"></th>
+                                    <th th:text="#{order.collection.point}"></th>
                                     <th th:text="#{order.shipment.tracking.url}"></th>
                                     <th th:text="#{order.shipment.shipped.at}"></th>
                                     <th th:text="#{order.shipment.delivered.at}"></th>
@@ -1079,6 +1080,9 @@
                                     </td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingNo}"></td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].carrier}"></td>
+                                    <td><input class="input" data-collection-point
+                                               th:field="*{shipments[__${i.index}__].collectionPointCode}"
+                                               th:disabled="${shipment.type == null or shipment.type.name() != 'PickupPoint'}"></td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingUrl}" type="url"></td>
                                     <td>
                                         <input class="input"
@@ -1095,7 +1099,7 @@
                                 </tr>
 
                                 <tr th:if="${#lists.isEmpty(order.shipments)}">
-                                    <td colspan="6" class="has-text-centered has-text-grey">-</td>
+                                    <td colspan="7" class="has-text-centered has-text-grey">-</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -1475,6 +1479,12 @@
 
         <td>
             <input class="input"
+                   data-collection-point
+                   name="shipments[${index}].collectionPointCode"/>
+        </td>
+
+        <td>
+            <input class="input"
                    type="url"
                    name="shipments[${index}].trackingUrl"/>
         </td>
@@ -1493,7 +1503,26 @@
     `;
 
             tbody.appendChild(row);
+            syncCollectionPointCell(row);
         }
+
+        function syncCollectionPointCell(row) {
+            const type = row.querySelector('select[name$=".type"]');
+            const point = row.querySelector('[data-collection-point]');
+            if (!type || !point) return;
+            point.disabled = type.value !== 'PickupPoint';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const tbody = document.getElementById('editShipmentsBody');
+            if (!tbody) return;
+            tbody.querySelectorAll('tr').forEach(syncCollectionPointCell);
+            tbody.addEventListener('change', function (event) {
+                if (event.target.matches('select[name$=".type"]')) {
+                    syncCollectionPointCell(event.target.closest('tr'));
+                }
+            });
+        });
 
         function addEmptyPaymentRow() {
             const tbody = document.getElementById('editPaymentsBody');

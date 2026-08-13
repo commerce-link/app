@@ -118,6 +118,11 @@ public class Shipment {
     }
 
     @DynamoDBIgnore
+    public boolean isDeliveredToCollectionPoint() {
+        return isNotEmpty(collectionPointCode);
+    }
+
+    @DynamoDBIgnore
     public boolean hasShippingData() {
         return isCarrierShipment() && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
     }
