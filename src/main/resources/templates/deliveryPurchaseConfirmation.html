@@ -82,11 +82,6 @@
                     <span th:text="' (' + ${deliveryAddressError} + ')'"></span>
                 </div>
 
-                <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
-                    <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
-                    <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
-                </div>
-
                 <div class="notification is-info is-light"
                      th:if="${deliveryAddressError == null and deliveryAddresses != null and #lists.isEmpty(deliveryAddresses)}"
                      th:text="#{deliveries.purchase.confirm.addressFromSupplier}">Ships to the address held at the supplier.</div>
@@ -118,9 +113,31 @@
                     </th:block>
                 </th:block>
 
+                <div class="notification is-info is-light" th:if="${requiresApproval}"
+                     th:text="#{deliveries.purchase.confirm.approvalNote}">Handled by the platform administrator.</div>
+
+                <div class="modal" id="address-modal"
+                     th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
+                    <div class="modal-background" data-address-cancel></div>
+                    <div class="modal-card">
+                        <header class="modal-card-head">
+                            <p class="modal-card-title" th:text="#{deliveries.purchase.confirm.addressModalTitle}">Choose a delivery address</p>
+                        </header>
+                        <section class="modal-card-body">
+                            <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-primary" id="address-confirm"
+                                    th:text="#{deliveries.purchase.confirm.addressConfirm}">Confirm</button>
+                            <button type="button" class="button" data-address-cancel
+                                    th:text="#{deliveries.purchase.confirm.addressCancel}">Close</button>
+                        </footer>
+                    </div>
+                </div>
+
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
-                            th:text="#{deliveries.purchase.confirm.submit}">Place order</button>
+                            th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{deliveries.purchase.confirm.submit}">Place order</button>
                     <a class="button"
                        th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}(provider=${form.provider})}"
                        th:text="#{deliveries.purchase.confirm.back}">Back</a>
@@ -132,10 +149,24 @@
 
                 function refreshSubmitState() {
                     const submit = document.getElementById('purchase-confirm-submit');
-                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                     const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
-                    const addressChosen = !address || address.value !== '';
-                    submit.disabled = addressBlocked || !validationPassed || !addressChosen;
+                    submit.disabled = addressBlocked || !validationPassed;
+                }
+
+                function openAddressModal(event) {
+                    const modal = document.getElementById('address-modal');
+                    if (!modal) {
+                        return;
+                    }
+                    event.preventDefault();
+                    modal.classList.add('is-active');
+                }
+
+                function closeAddressModal() {
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        modal.classList.remove('is-active');
+                    }
                 }
 
                 function loadValidation() {
@@ -164,9 +195,18 @@
                         });
                 }
                 document.addEventListener('DOMContentLoaded', function () {
-                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
-                    if (address) {
-                        address.addEventListener('change', refreshSubmitState);
+                    const submit = document.getElementById('purchase-confirm-submit');
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        submit.addEventListener('click', openAddressModal);
+                        Array.from(modal.querySelectorAll('[data-address-cancel]'))
+                            .forEach(function (element) { element.addEventListener('click', closeAddressModal); });
+                        document.getElementById('address-confirm').addEventListener('click', function (event) {
+                            const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
+                            if (!address || address.value === '') {
+                                event.preventDefault();
+                            }
+                        });
                     }
                     loadValidation();
                 });
