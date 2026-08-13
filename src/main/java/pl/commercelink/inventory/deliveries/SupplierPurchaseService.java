@@ -239,8 +239,8 @@ public class SupplierPurchaseService {
     }
 
     public PurchaseValidation validatePending(String storeId, String deliveryId) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isAwaitingApproval()) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null) {
             throw new IllegalStateException("Delivery " + deliveryId + " is not awaiting approval");
         }
         return validate(storeId, readPendingForm(delivery), delivery.getPurchaseRef());

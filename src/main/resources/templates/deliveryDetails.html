@@ -126,6 +126,8 @@
                     <div class="box" th:if="${delivery.awaitingApproval and isSuperAdmin}">
                         <h3 class="title is-5" th:text="#{deliveries.approval.title}">Realisation request</h3>
 
+                        <input type="hidden" id="approval-address-blocked" th:if="${approvalAddressError}"/>
+
                         <div id="approval-validation-area"
                              th:attr="data-validate-url=@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}">
                             <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability...</p>
@@ -163,13 +165,24 @@
                         </form>
 
                         <script th:inline="none">
-                            document.addEventListener('DOMContentLoaded', function () {
-                                const area = document.getElementById('approval-validation-area');
+                            let approvalValidationPassed = false;
+
+                            function refreshApprovalSubmitState() {
                                 const approve = document.getElementById('approval-approve-button');
-                                if (!area || !approve) {
+                                if (!approve) {
                                     return;
                                 }
-                                approve.disabled = true;
+                                const addressBlocked = document.getElementById('approval-address-blocked') !== null;
+                                approve.disabled = addressBlocked || !approvalValidationPassed;
+                            }
+
+                            function loadValidation() {
+                                const area = document.getElementById('approval-validation-area');
+                                if (!area) {
+                                    return;
+                                }
+                                approvalValidationPassed = false;
+                                refreshApprovalSubmitState();
                                 fetch(area.dataset.validateUrl, {method: 'POST'})
                                     .then(function (response) {
                                         if (!response.ok) {
@@ -180,11 +193,21 @@
                                     .then(function (html) {
                                         area.innerHTML = html;
                                         const result = area.querySelector('[data-fully-available]');
-                                        approve.disabled = !(result && result.dataset.fullyAvailable === 'true');
+                                        approvalValidationPassed = !!(result && result.dataset.fullyAvailable === 'true');
+                                        refreshApprovalSubmitState();
                                     })
                                     .catch(function () {
-                                        approve.disabled = true;
+                                        approvalValidationPassed = false;
+                                        refreshApprovalSubmitState();
                                     });
+                            }
+
+                            document.addEventListener('DOMContentLoaded', function () {
+                                if (!document.getElementById('approval-approve-button')) {
+                                    return;
+                                }
+                                refreshApprovalSubmitState();
+                                loadValidation();
                             });
                         </script>
                     </div>
