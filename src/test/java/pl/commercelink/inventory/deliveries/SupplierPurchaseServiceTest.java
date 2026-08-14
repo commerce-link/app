@@ -606,15 +606,18 @@ class SupplierPurchaseServiceTest {
 
     @Test
     void deliveryAddressChoicesComeFromStoreBookWhenSupplierAcceptsInlineAddress() {
+        // given
         when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(false);
         when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
         store.getShippingDetails().add(storeAddress("addr-1", "Magazyn ACME"));
         store.getShippingDetails().add(new ShippingDetails()); // not properly filled -> excluded
 
+        // when
         SupplierPurchaseService.DeliveryAddressChoices choices =
                 service.deliveryAddressChoices(STORE_ID, PROVIDER);
 
+        // then
         assertFalse(choices.required());
         assertEquals(1, choices.options().size());
         assertEquals("addr-1", choices.options().getFirst().id());
@@ -622,21 +625,24 @@ class SupplierPurchaseServiceTest {
 
     @Test
     void deliveryAddressChoicesStayRequiredForSupplierListSuppliers() {
+        // given
         when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.deliveryAddresses()).thenReturn(
                 List.of(new SupplierDeliveryAddress("7", "Prosta 1", "Warszawa", "00-001", "PL")));
 
+        // when
         SupplierPurchaseService.DeliveryAddressChoices choices =
                 service.deliveryAddressChoices(STORE_ID, PROVIDER);
 
+        // then
         assertTrue(choices.required());
         assertEquals("7", choices.options().getFirst().id());
     }
 
     @Test
     void processPendingSendsChosenStoreAddressInline() throws Exception {
-        // Same arrangement as processPendingPlacesOrderAndCompletesDelivery, plus an address choice.
+        // given: same arrangement as processPendingPlacesOrderAndCompletesDelivery, plus an address choice
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         form.setDeliveryAddressId("addr-1");
         Delivery delivery = pendingDelivery(form, "ref-1");
@@ -650,20 +656,31 @@ class SupplierPurchaseServiceTest {
                 PROVIDER, SupplierType.Distributor, 5, "PL",
                 new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
-        store.getShippingDetails().add(storeAddress("addr-1", "Magazyn ACME"));
+        ShippingDetails fixture = storeAddress("addr-1", "Magazyn ACME");
+        store.getShippingDetails().add(fixture);
 
+        // when
         service.processPending(STORE_ID, DELIVERY_ID);
 
+        // then
         ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
         verify(supplierProvider).placeOrder(captor.capture());
         assertNull(captor.getValue().deliveryAddressId());
-        assertEquals("Prosta 1", captor.getValue().shippingAddress().streetAndNumber());
-        assertEquals("PL", captor.getValue().shippingAddress().country());
+        SupplierShippingAddress shippingAddress = captor.getValue().shippingAddress();
+        assertEquals(fixture.getCompanyName(), shippingAddress.company());
+        assertEquals(fixture.getName(), shippingAddress.firstName());
+        assertEquals(fixture.getSurname(), shippingAddress.lastName());
+        assertEquals(fixture.getStreetAndNumber(), shippingAddress.streetAndNumber());
+        assertEquals(fixture.getPostalCode(), shippingAddress.postalCode());
+        assertEquals(fixture.getCity(), shippingAddress.city());
+        assertEquals(fixture.getCountry(), shippingAddress.country());
+        assertEquals(fixture.getPhone(), shippingAddress.phone());
+        assertEquals(fixture.getEmail(), shippingAddress.email());
     }
 
     @Test
     void processPendingFailsWhenChosenStoreAddressVanished() throws Exception {
-        // Same arrangement, but the store book does NOT contain the chosen id.
+        // given: same arrangement, but the store book does NOT contain the chosen id
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         form.setDeliveryAddressId("gone");
         Delivery delivery = pendingDelivery(form, "ref-1");
@@ -672,9 +689,33 @@ class SupplierPurchaseServiceTest {
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
         when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
 
+        // when
         service.processPending(STORE_ID, DELIVERY_ID);
 
-        // The delivery flips to FAILED instead of silently ordering to the account address.
+        // then: the delivery flips to FAILED instead of silently ordering to the account address
+        verify(supplierProvider, never()).placeOrder(any());
+        assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void processPendingFailsWhenStoreAddressCountryIsFreeText() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("addr-1");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+        ShippingDetails freeTextCountry = storeAddress("addr-1", "Magazyn ACME");
+        freeTextCountry.setCountry("Polska");
+        store.getShippingDetails().add(freeTextCountry);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
         verify(supplierProvider, never()).placeOrder(any());
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         verify(deliveriesRepository).save(delivery);
@@ -682,12 +723,51 @@ class SupplierPurchaseServiceTest {
 
     @Test
     void enqueueRejectsUnknownStoreAddress() throws Exception {
+        // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         form.setDeliveryAddressId("gone");
         when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
 
+        // when
         OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
 
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.address", result.getMessage());
+    }
+
+    @Test
+    void enqueueRejectsImproperlyFilledStoreAddress() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("addr-1");
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+        ShippingDetails blankStreet = storeAddress("addr-1", "Magazyn ACME");
+        blankStreet.setStreetAndNumber("");
+        store.getShippingDetails().add(blankStreet);
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.address", result.getMessage());
+    }
+
+    @Test
+    void enqueueRejectsStoreAddressWithFreeTextCountry() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("addr-1");
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+        ShippingDetails freeTextCountry = storeAddress("addr-1", "Magazyn ACME");
+        freeTextCountry.setCountry("Polska");
+        store.getShippingDetails().add(freeTextCountry);
+
+        // when
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+
+        // then
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.error.address", result.getMessage());
     }
@@ -696,6 +776,8 @@ class SupplierPurchaseServiceTest {
         ShippingDetails details = new ShippingDetails();
         details.setId(id);
         details.setCompanyName(company);
+        details.setName("Jan");
+        details.setSurname("Kowalski");
         details.setStreetAndNumber("Prosta 1");
         details.setPostalCode("00-001");
         details.setCity("Warszawa");

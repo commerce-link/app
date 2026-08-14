@@ -221,7 +221,12 @@ public class SupplierPurchaseService {
             ShippingDetails details = findStoreAddress(storeId, form.getDeliveryAddressId())
                     .orElseThrow(() -> new SupplierOrderException(
                             "Chosen delivery address no longer exists in the store address book"));
-            return new SupplierPurchaseRequest(purchaseRef, lines, null, toShippingAddress(details));
+            try {
+                return new SupplierPurchaseRequest(purchaseRef, lines, null, toShippingAddress(details));
+            } catch (IllegalArgumentException e) {
+                throw new SupplierOrderException(
+                        "Chosen delivery address is not usable for supplier ordering: " + e.getMessage(), e);
+            }
         }
         return new SupplierPurchaseRequest(purchaseRef, lines, form.getDeliveryAddressId());
     }
@@ -251,7 +256,7 @@ public class SupplierPurchaseService {
         if (isDeliveryAddressMissing(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
-        if (isChosenStoreAddressUnknown(storeId, form)) {
+        if (isChosenStoreAddressUnusable(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
@@ -326,13 +331,22 @@ public class SupplierPurchaseService {
                 && StringUtils.isBlank(form.getDeliveryAddressId());
     }
 
-    private boolean isChosenStoreAddressUnknown(String storeId, DeliveryCreationForm form) {
+    private boolean isChosenStoreAddressUnusable(String storeId, DeliveryCreationForm form) {
         SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
         if (supplierProvider == null || !supplierProvider.acceptsShippingAddress()
                 || StringUtils.isBlank(form.getDeliveryAddressId())) {
             return false;
         }
-        return findStoreAddress(storeId, form.getDeliveryAddressId()).isEmpty();
+        Optional<ShippingDetails> details = findStoreAddress(storeId, form.getDeliveryAddressId());
+        if (details.isEmpty() || !details.get().isProperlyFilled()) {
+            return true;
+        }
+        try {
+            toShippingAddress(details.get());
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
     }
 
     private SupplierProvider getProvider(String storeId, String provider) {
