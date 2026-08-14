@@ -94,17 +94,27 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void detailsPageShowsTheRejectionReasonInsideTheDeliveryBoxNotBelowIt() throws Exception {
+    void detailsPageShowsTheFailureReasonAsALabelledFieldLikeEveryOtherField() throws Exception {
         // when
         String html = details();
         int editFormEnd = html.indexOf("</form>");
 
         // then
-        assertThat(html.indexOf("deliveries.approval.rejectedBy")).isBetween(0, editFormEnd);
+        assertThat(html.indexOf("#{general.reason}")).isBetween(0, editFormEnd);
         assertThat(html.indexOf("delivery.rejectionReason")).isBetween(0, editFormEnd);
-        assertThat(html.indexOf("deliveries.purchase.submitted.approval")).isBetween(0, editFormEnd);
+        assertThat(html.indexOf("delivery.orderErrorMessage")).isBetween(0, editFormEnd);
         assertThat(html).doesNotContain("notification is-danger is-light");
         assertThat(html).doesNotContain("notification is-warning is-light");
+    }
+
+    @Test
+    void detailsPageLetsTheStatusTagSpeakForItselfWithoutAProseRestatement() throws Exception {
+        // when
+        String html = details();
+
+        // then
+        assertThat(html).doesNotContain("deliveries.purchase.submitted.approval");
+        assertThat(html).doesNotContain("deliveries.approval.rejectedBy");
     }
 
     @Test
@@ -112,6 +122,13 @@ class ApprovalScreenTemplateTest {
         // then
         assertThat(hasElementWithBothThIfAndThReplace(approval())).isFalse();
         assertThat(hasElementWithBothThIfAndThReplace(details())).isFalse();
+    }
+
+    @Test
+    void localVariablesAreNeverDeclaredOnTheSameElementThatGuardsOnThem() throws Exception {
+        // then
+        assertThat(hasElementWithBothThIfAndThWith(approval())).isFalse();
+        assertThat(hasElementWithBothThIfAndThWith(details())).isFalse();
     }
 
     private String openingTagOf(String html, String marker) {
@@ -122,6 +139,17 @@ class ApprovalScreenTemplateTest {
             }
         }
         return "";
+    }
+
+    private boolean hasElementWithBothThIfAndThWith(String html) {
+        Matcher matcher = OPENING_TAG.matcher(html);
+        while (matcher.find()) {
+            String tag = matcher.group();
+            if (tag.contains("th:if") && tag.contains("th:with")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasElementWithBothThIfAndThReplace(String html) {

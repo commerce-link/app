@@ -57,14 +57,15 @@
                                 <span class="tag ml-1 is-dark" th:if="${delivery.orderRejected}"
                                       th:text="#{deliveries.status.rejected}"></span>
                             </div>
-                            <p class="has-text-danger" th:if="${delivery.orderFailed}" th:text="${delivery.orderErrorMessage}"></p>
-                            <p class="has-text-warning-dark" th:if="${delivery.awaitingApproval and !isSuperAdmin}"
-                               th:text="#{deliveries.purchase.submitted.approval}"></p>
-                            <p class="has-text-danger" th:if="${delivery.orderRejected}"
-                               th:text="#{deliveries.approval.rejectedBy}"></p>
-                            <p class="has-text-danger" th:if="${delivery.orderRejected and !#strings.isEmpty(delivery.rejectionReason)}"
-                               th:text="${delivery.rejectionReason}"></p>
                         </div>
+                        <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : (${delivery.orderRejected} ? ${delivery.rejectionReason} : null)">
+                            <div class="field" th:if="${!#strings.isEmpty(orderIssueReason)}">
+                                <label class="label" th:text="#{general.reason}"></label>
+                                <div class="control">
+                                    <span th:text="${orderIssueReason}"></span>
+                                </div>
+                            </div>
+                        </th:block>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.cost}"></label>
                             <div class="control">
