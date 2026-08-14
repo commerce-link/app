@@ -77,6 +77,7 @@
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
 
                 <input type="hidden" id="delivery-address-blocked" th:if="${deliveryAddressError}"/>
+                <input type="hidden" id="delivery-address-required" th:if="${deliveryAddressRequired}"/>
                 <div class="notification is-danger" th:if="${deliveryAddressError}">
                     <span th:text="#{deliveries.purchase.confirm.addressUnavailable}">Could not fetch delivery addresses.</span>
                     <span th:text="' (' + ${deliveryAddressError} + ')'"></span>
@@ -137,7 +138,8 @@
                     const submit = document.getElementById('purchase-confirm-submit');
                     const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                     const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
-                    const addressChosen = !address || address.value !== '';
+                    const addressRequired = document.getElementById('delivery-address-required') !== null;
+                    const addressChosen = !address || !addressRequired || address.value !== '';
                     submit.disabled = addressBlocked || !validationPassed || !addressChosen;
                 }
 
