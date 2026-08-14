@@ -15,9 +15,12 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
@@ -102,6 +105,9 @@ public class DeliveriesController {
 
     @Autowired
     private SupplierPurchaseService supplierPurchaseService;
+
+    @Autowired
+    private StoresRepository storesRepository;
 
     private static final int DELIVERY_PAGE_SIZE = 25;
 
@@ -622,6 +628,7 @@ public class DeliveriesController {
         }
         model.addAttribute("delivery", delivery);
         addApprovalAddresses(storeId, delivery, model);
+        addSuggestedAddress(storeId, model);
         return "deliveryApproval";
     }
 
@@ -720,6 +727,18 @@ public class DeliveriesController {
             model.addAttribute("approvalAddressOptions", List.of());
             model.addAttribute("approvalAddressError", e.getMessage());
         }
+    }
+
+    private void addSuggestedAddress(String storeId, Model model) {
+        Store store = storesRepository.findById(storeId);
+        ShippingDetails storeDefault = store == null ? null : store.getDefaultShippingDetails();
+        model.addAttribute("suggestedAddress", storeDefault);
+
+        @SuppressWarnings("unchecked")
+        List<SupplierDeliveryAddress> addresses =
+                (List<SupplierDeliveryAddress>) model.getAttribute("approvalAddresses");
+        model.addAttribute("suggestedAddressId",
+                SuggestedDeliveryAddress.match(storeDefault, addresses).orElse(null));
     }
 
     @PostMapping("/dashboard/deliveries/details")

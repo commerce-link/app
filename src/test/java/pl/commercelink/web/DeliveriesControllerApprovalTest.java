@@ -16,11 +16,15 @@ import pl.commercelink.inventory.deliveries.DeliveriesQueryService;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -53,6 +57,9 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private DeliveriesRepository deliveriesRepository;
+
+    @Mock
+    private StoresRepository storesRepository;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -289,5 +296,57 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo(
                 "redirect:/dashboard/store/" + STORE_ID + "/deliveries/" + DELIVERY_ID + "/approval");
+    }
+
+    @Test
+    void approvalScreenPreselectsTheSupplierAddressMatchingTheStoreDefault() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
+                .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+
+        ShippingDetails storeDefault = new ShippingDetails();
+        storeDefault.setStreetAndNumber("Łobzowska 22/1");
+        storeDefault.setPostalCode("31140");
+        Store store = new Store();
+        store.setShippingDetails(new ArrayList<>(List.of(storeDefault)));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(model.getAttribute("suggestedAddressId")).isEqualTo("17200617");
+        assertThat(model.getAttribute("suggestedAddress")).isSameAs(storeDefault);
+    }
+
+    @Test
+    void approvalScreenSuggestsNothingWhenTheStoreHasNoDefaultAddress() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
+                .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(model.getAttribute("suggestedAddressId")).isNull();
+        assertThat(model.getAttribute("suggestedAddress")).isNull();
     }
 }

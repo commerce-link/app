@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="addressModal(fieldName, options, selectedId, showFilter)" class="modal" id="address-modal">
+<div th:fragment="addressModal(fieldName, options, selectedId, showFilter, showSuggestedTag)" class="modal" id="address-modal">
     <div class="modal-background" data-address-cancel></div>
     <div class="modal-card">
         <header class="modal-card-head">
@@ -23,6 +23,9 @@
                     <input type="radio" th:name="${fieldName}" th:value="${option.value}"
                            th:checked="${option.value == selectedId}">
                     <span th:text="${option.label}">Address</span>
+                    <span class="tag is-info is-light ml-2"
+                          th:if="${showSuggestedTag and option.value == selectedId}"
+                          th:text="#{deliveries.approval.suggestedAddress.tag}">Suggested</span>
                 </label>
             </div>
         </section>

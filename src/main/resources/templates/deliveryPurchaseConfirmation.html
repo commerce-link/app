@@ -117,7 +117,7 @@
                      th:text="#{deliveries.purchase.confirm.approvalNote}">Handled by the platform administrator.</div>
 
                 <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
-                    <div th:replace="~{fragments/address-modal :: addressModal('deliveryAddressId', ${deliveryAddressOptions}, ${form.deliveryAddressId}, ${#lists.size(deliveryAddresses) > 6})}"></div>
+                    <div th:replace="~{fragments/address-modal :: addressModal('deliveryAddressId', ${deliveryAddressOptions}, ${form.deliveryAddressId}, ${#lists.size(deliveryAddresses) > 6}, false)}"></div>
                 </th:block>
 
                 <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
