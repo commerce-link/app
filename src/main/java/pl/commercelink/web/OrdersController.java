@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.shipping.CarrierDictionary;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -51,9 +52,15 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import pl.commercelink.stores.IntegrationType;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 @Controller
 public class OrdersController extends BaseController {
+
+    @Autowired
+    private CarrierDictionary carrierDictionary;
 
     @Autowired
     private Inventory inventory;
@@ -335,6 +342,8 @@ public class OrdersController extends BaseController {
                 .findFirst()
                 .orElse(null));
         model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("shipmentCarrierNames", shipmentCarrierNames(order, store));
+        model.addAttribute("carrierOptions", carrierOptions(order, store));
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || isSuperAdmin());
@@ -826,6 +835,35 @@ public class OrdersController extends BaseController {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
         return view;
+    }
+
+    private Map<String, String> carrierOptions(Order order, Store store) {
+        String shippingProvider = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        String marketplace = order.isMarketplaceOrder() ? order.getSource().getName() : shippingProvider;
+        Map<String, String> options = new LinkedHashMap<>(carrierDictionary.options(marketplace, shippingProvider));
+        if (options.isEmpty()) {
+            carrierDictionary.options(shippingProvider, marketplace).keySet()
+                    .forEach(carrier -> options.put(carrier, carrier));
+        }
+        if (options.isEmpty()) {
+            return options;
+        }
+        order.getShipments().stream()
+                .map(Shipment::getCarrier)
+                .filter(StringUtils::isNotBlank)
+                .filter(carrier -> !options.containsKey(carrier))
+                .forEach(carrier -> options.put(carrier,
+                        carrierDictionary.translate(marketplace, shippingProvider, carrier).orElse(carrier)));
+        return options;
+    }
+
+    private List<String> shipmentCarrierNames(Order order, Store store) {
+        String shippingProvider = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        String marketplace = order.isMarketplaceOrder() ? order.getSource().getName() : shippingProvider;
+        return order.getShipments().stream()
+                .map(shipment -> carrierDictionary.translate(marketplace, shippingProvider, shipment.getCarrier())
+                        .orElseGet(shipment::getCarrier))
+                .collect(Collectors.toList());
     }
 
     private List<String> shipmentDataSnapshot(Order order) {

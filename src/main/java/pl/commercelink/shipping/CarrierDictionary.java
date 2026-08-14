@@ -62,6 +62,10 @@ public class CarrierDictionary {
                 .findFirst();
     }
 
+    public Map<String, String> options(String source, String target) {
+        return codesFor(source, target);
+    }
+
     private Map<String, String> codesFor(String source, String target) {
         return carriers.entrySet().stream()
                 .filter(entry -> entry.getKey().equalsIgnoreCase(source))
