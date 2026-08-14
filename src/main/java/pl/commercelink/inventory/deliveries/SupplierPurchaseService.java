@@ -18,6 +18,8 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.inventory.supplier.api.SupplierShippingAddress;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
@@ -67,12 +69,39 @@ public class SupplierPurchaseService {
         }
     }
 
-    public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
+    public record DeliveryAddressChoices(boolean required, List<SupplierDeliveryAddress> options) {
+    }
+
+    public DeliveryAddressChoices deliveryAddressChoices(String storeId, String provider) {
         SupplierProvider supplierProvider = getProvider(storeId, provider);
-        if (supplierProvider == null || !supplierProvider.requiresDeliveryAddress()) {
+        if (supplierProvider == null) {
+            return new DeliveryAddressChoices(false, List.of());
+        }
+        if (supplierProvider.requiresDeliveryAddress()) {
+            return new DeliveryAddressChoices(true, supplierProvider.deliveryAddresses());
+        }
+        if (supplierProvider.acceptsShippingAddress()) {
+            return new DeliveryAddressChoices(false, storeAddressOptions(storeId));
+        }
+        return new DeliveryAddressChoices(false, List.of());
+    }
+
+    public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
+        return deliveryAddressChoices(storeId, provider).options();
+    }
+
+    private List<SupplierDeliveryAddress> storeAddressOptions(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || store.getShippingDetails() == null) {
             return List.of();
         }
-        return supplierProvider.deliveryAddresses();
+        return store.getShippingDetails().stream()
+                .filter(details -> StringUtils.isNotBlank(details.getId()))
+                .filter(ShippingDetails::isProperlyFilled)
+                .map(details -> new SupplierDeliveryAddress(details.getId(),
+                        details.getDisplayName() + ", " + details.getStreetAndNumber(),
+                        details.getCity(), details.getPostalCode(), details.getCountry()))
+                .toList();
     }
 
     public void mergeSuggestedItems(DeliveryCreationForm form) {
@@ -163,9 +192,9 @@ public class SupplierPurchaseService {
                 throw new SupplierOrderException("No orderable lines in pending purchase");
             }
 
-            SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
-                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                            form.getDeliveryAddressId()));
+            SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
+            SupplierOrderResult orderResult = supplierProvider.placeOrder(
+                    purchaseRequest(storeId, supplierProvider, delivery.getPurchaseRef(), lines, form));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
                 throw new SupplierOrderException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
@@ -189,6 +218,34 @@ public class SupplierPurchaseService {
         }
     }
 
+    private SupplierPurchaseRequest purchaseRequest(String storeId, SupplierProvider provider,
+                                                    String purchaseRef, List<SupplierOrderLine> lines,
+                                                    DeliveryCreationForm form) {
+        if (provider.acceptsShippingAddress() && StringUtils.isNotBlank(form.getDeliveryAddressId())) {
+            ShippingDetails details = findStoreAddress(storeId, form.getDeliveryAddressId())
+                    .orElseThrow(() -> new SupplierOrderException(
+                            "Chosen delivery address no longer exists in the store address book"));
+            return new SupplierPurchaseRequest(purchaseRef, lines, null, toShippingAddress(details));
+        }
+        return new SupplierPurchaseRequest(purchaseRef, lines, form.getDeliveryAddressId());
+    }
+
+    private Optional<ShippingDetails> findStoreAddress(String storeId, String addressId) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || store.getShippingDetails() == null) {
+            return Optional.empty();
+        }
+        return store.getShippingDetails().stream()
+                .filter(details -> addressId.equals(details.getId()))
+                .findFirst();
+    }
+
+    private static SupplierShippingAddress toShippingAddress(ShippingDetails details) {
+        return new SupplierShippingAddress(details.getCompanyName(), details.getName(), details.getSurname(),
+                details.getStreetAndNumber(), details.getPostalCode(), details.getCity(),
+                details.getCountry(), details.getPhone(), details.getEmail());
+    }
+
     public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
                                                    String purchaseRef, boolean isSuperAdmin) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
@@ -196,6 +253,9 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
         if (isDeliveryAddressMissing(storeId, form)) {
+            return OperationResult.failure("deliveries.purchase.error.address");
+        }
+        if (isChosenStoreAddressUnknown(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
@@ -268,6 +328,15 @@ public class SupplierPurchaseService {
         SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
         return supplierProvider != null && supplierProvider.requiresDeliveryAddress()
                 && StringUtils.isBlank(form.getDeliveryAddressId());
+    }
+
+    private boolean isChosenStoreAddressUnknown(String storeId, DeliveryCreationForm form) {
+        SupplierProvider supplierProvider = getProvider(storeId, form.getProvider());
+        if (supplierProvider == null || !supplierProvider.acceptsShippingAddress()
+                || StringUtils.isBlank(form.getDeliveryAddressId())) {
+            return false;
+        }
+        return findStoreAddress(storeId, form.getDeliveryAddressId()).isEmpty();
     }
 
     private SupplierProvider getProvider(String storeId, String provider) {

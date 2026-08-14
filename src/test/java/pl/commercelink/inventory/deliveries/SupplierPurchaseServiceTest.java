@@ -27,7 +27,9 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.inventory.supplier.api.SupplierShippingAddress;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -600,6 +602,107 @@ class SupplierPurchaseServiceTest {
         assertEquals("PLN", validation.currency());
         assertEquals(110.0, validation.lines().getFirst().liveUnitCost(), 0.001);
         verifyNoInteractions(exchangeRates);
+    }
+
+    @Test
+    void deliveryAddressChoicesComeFromStoreBookWhenSupplierAcceptsInlineAddress() {
+        when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(false);
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+        store.getShippingDetails().add(storeAddress("addr-1", "Magazyn ACME"));
+        store.getShippingDetails().add(new ShippingDetails()); // not properly filled -> excluded
+
+        SupplierPurchaseService.DeliveryAddressChoices choices =
+                service.deliveryAddressChoices(STORE_ID, PROVIDER);
+
+        assertFalse(choices.required());
+        assertEquals(1, choices.options().size());
+        assertEquals("addr-1", choices.options().getFirst().id());
+    }
+
+    @Test
+    void deliveryAddressChoicesStayRequiredForSupplierListSuppliers() {
+        when(supplierProviderFactory.get(store, PROVIDER)).thenReturn(supplierProvider);
+        when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(supplierProvider.deliveryAddresses()).thenReturn(
+                List.of(new SupplierDeliveryAddress("7", "Prosta 1", "Warszawa", "00-001", "PL")));
+
+        SupplierPurchaseService.DeliveryAddressChoices choices =
+                service.deliveryAddressChoices(STORE_ID, PROVIDER);
+
+        assertTrue(choices.required());
+        assertEquals("7", choices.options().getFirst().id());
+    }
+
+    @Test
+    void processPendingSendsChosenStoreAddressInline() throws Exception {
+        // Same arrangement as processPendingPlacesOrderAndCompletesDelivery, plus an address choice.
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("addr-1");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN"))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        store.getShippingDetails().add(storeAddress("addr-1", "Magazyn ACME"));
+
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).placeOrder(captor.capture());
+        assertNull(captor.getValue().deliveryAddressId());
+        assertEquals("Prosta 1", captor.getValue().shippingAddress().streetAndNumber());
+        assertEquals("PL", captor.getValue().shippingAddress().country());
+    }
+
+    @Test
+    void processPendingFailsWhenChosenStoreAddressVanished() throws Exception {
+        // Same arrangement, but the store book does NOT contain the chosen id.
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("gone");
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // The delivery flips to FAILED instead of silently ordering to the account address.
+        verify(supplierProvider, never()).placeOrder(any());
+        assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void enqueueRejectsUnknownStoreAddress() throws Exception {
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        form.setDeliveryAddressId("gone");
+        when(supplierProvider.acceptsShippingAddress()).thenReturn(true);
+
+        OperationResult<String> result = service.enqueuePurchase(STORE_ID, form, "ref-1", false);
+
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.address", result.getMessage());
+    }
+
+    private static ShippingDetails storeAddress(String id, String company) {
+        ShippingDetails details = new ShippingDetails();
+        details.setId(id);
+        details.setCompanyName(company);
+        details.setStreetAndNumber("Prosta 1");
+        details.setPostalCode("00-001");
+        details.setCity("Warszawa");
+        details.setCountry("PL");
+        details.setEmail("magazyn@acme.pl");
+        details.setPhone("+48123456789");
+        return details;
     }
 
     private DeliveryCreationForm formWithItem(String ean, String mfn, int requestedQty, double unitCost) {
