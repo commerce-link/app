@@ -467,7 +467,7 @@ public class DeliveriesController {
 
         if (createdDeliveryId != null) {
             return isSuperAdmin()
-                    ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, createdDeliveryId)
+                    ? storeDeliveryDetailsRedirect(storeId, createdDeliveryId)
                     : "redirect:/dashboard/deliveries/details?deliveryId=" + createdDeliveryId;
         }
 
@@ -610,7 +610,7 @@ public class DeliveriesController {
 
         String deliveryId = result.getPayload().deliveryId();
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                ? storeDeliveryDetailsRedirect(storeId, deliveryId)
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
@@ -624,7 +624,7 @@ public class DeliveriesController {
             if (model.containsAttribute("errorMessage")) {
                 redirectAttributes.addFlashAttribute("errorMessage", model.getAttribute("errorMessage"));
             }
-            return approvalRedirectToDetails(storeId, deliveryId);
+            return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
         addApprovalAddresses(storeId, delivery, model);
@@ -632,7 +632,7 @@ public class DeliveriesController {
         return "deliveryApproval";
     }
 
-    private String approvalRedirectToDetails(String storeId, String deliveryId) {
+    private String storeDeliveryDetailsRedirect(String storeId, String deliveryId) {
         return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
     }
 
@@ -652,7 +652,7 @@ public class DeliveriesController {
                     messageSource.getMessage(result.getMessage(), null, locale));
             return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return approvalRedirectToDetails(storeId, deliveryId);
+        return storeDeliveryDetailsRedirect(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/reject")
@@ -667,7 +667,7 @@ public class DeliveriesController {
                     messageSource.getMessage(result.getMessage(), null, locale));
             return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return approvalRedirectToDetails(storeId, deliveryId);
+        return storeDeliveryDetailsRedirect(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")
