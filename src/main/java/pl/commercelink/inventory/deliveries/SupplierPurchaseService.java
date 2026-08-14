@@ -86,10 +86,6 @@ public class SupplierPurchaseService {
         return new DeliveryAddressChoices(false, List.of());
     }
 
-    public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
-        return deliveryAddressChoices(storeId, provider).options();
-    }
-
     private List<SupplierDeliveryAddress> storeAddressOptions(String storeId) {
         Store store = storesRepository.findById(storeId);
         if (store == null || store.getShippingDetails() == null) {

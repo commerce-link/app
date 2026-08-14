@@ -146,7 +146,7 @@ class SupplierPurchaseServiceTest {
                 new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
 
         // when
-        List<SupplierDeliveryAddress> addresses = service.deliveryAddresses(STORE_ID, PROVIDER);
+        List<SupplierDeliveryAddress> addresses = service.deliveryAddressChoices(STORE_ID, PROVIDER).options();
 
         // then
         assertEquals(1, addresses.size());
@@ -156,7 +156,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void deliveryAddressesAreEmptyWhenProviderDoesNotNeedOne() {
         // when / then
-        assertTrue(service.deliveryAddresses(STORE_ID, PROVIDER).isEmpty());
+        assertTrue(service.deliveryAddressChoices(STORE_ID, PROVIDER).options().isEmpty());
         verify(supplierProvider, never()).deliveryAddresses();
     }
 
@@ -167,7 +167,7 @@ class SupplierPurchaseServiceTest {
         when(supplierProvider.deliveryAddresses()).thenThrow(new SupplierOrderException("403 Forbidden"));
 
         // when / then
-        assertThrows(SupplierOrderException.class, () -> service.deliveryAddresses(STORE_ID, PROVIDER));
+        assertThrows(SupplierOrderException.class, () -> service.deliveryAddressChoices(STORE_ID, PROVIDER));
     }
 
     @Test

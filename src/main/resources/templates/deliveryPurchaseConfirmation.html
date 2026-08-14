@@ -85,6 +85,9 @@
                 <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
                     <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
                     <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
+                    <p class="help"
+                       th:if="${deliveryAddressRequired == false}"
+                       th:text="#{deliveries.purchase.confirm.addressOptional}">Leave the supplier account address in place or pick a saved store address.</p>
                 </div>
 
                 <div class="notification is-info is-light"

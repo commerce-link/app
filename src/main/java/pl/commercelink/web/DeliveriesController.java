@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -20,14 +21,13 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.dtos.DeliveryAddressPicker;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
-import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -501,15 +501,17 @@ public class DeliveriesController {
 
     private void addDeliveryAddresses(String storeId, String provider, DeliveryCreationForm form, Model model) {
         try {
-            List<SupplierDeliveryAddress> addresses = supplierPurchaseService.deliveryAddresses(storeId, provider);
-            model.addAttribute("deliveryAddresses", addresses);
-            model.addAttribute("deliveryAddressOptions", addresses.stream()
-                    .map(address -> new PickerOption(address.id(), address.label()))
-                    .toList());
-            if (addresses.size() == 1) {
-                form.setDeliveryAddressId(addresses.getFirst().id());
+            DeliveryAddressPicker picker = DeliveryAddressPicker.of(
+                    supplierPurchaseService.deliveryAddressChoices(storeId, provider),
+                    messageSource.getMessage("deliveries.purchase.confirm.accountAddressOption",
+                            null, LocaleContextHolder.getLocale()));
+            model.addAttribute("deliveryAddresses", picker.addresses());
+            model.addAttribute("deliveryAddressOptions", picker.options());
+            model.addAttribute("deliveryAddressRequired", picker.required());
+            if (picker.required() && picker.addresses().size() == 1) {
+                form.setDeliveryAddressId(picker.addresses().getFirst().id());
             }
-            addresses.stream()
+            picker.addresses().stream()
                     .filter(address -> address.id().equals(form.getDeliveryAddressId()))
                     .findFirst()
                     .ifPresent(address -> model.addAttribute("deliveryAddressLabel", address.label()));
