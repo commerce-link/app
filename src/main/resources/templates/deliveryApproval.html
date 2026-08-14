@@ -1,0 +1,176 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{deliveries.approval.screen.title}">Request realisation</h1>
+            <h2 class="subtitle" th:text="${delivery.provider} + ' — ' + ${delivery.shortenedDeliveryId}">Supplier</h2>
+
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <div id="approval-validation-area" class="mb-6"
+                 th:attr="data-validate-url=@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}">
+                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
+                <progress class="progress is-small is-primary" max="100"></progress>
+            </div>
+
+            <input type="hidden" id="approval-address-blocked" th:if="${approvalAddressError}"/>
+
+            <div class="notification is-danger" th:if="${approvalAddressError}">
+                <span th:text="#{deliveries.purchase.confirm.addressUnavailable}"></span>
+                <span th:text="' (' + ${approvalAddressError} + ')'"></span>
+            </div>
+
+            <div class="notification is-info is-light"
+                 th:if="${approvalAddressError == null and approvalAddresses != null and #lists.isEmpty(approvalAddresses)}"
+                 th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></div>
+
+            <form id="approval-approve-form" method="post"
+                  th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approve(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                  onsubmit="document.getElementById('approval-approve-button').disabled = true;">
+
+                <th:block th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}">
+                    <div th:replace="~{fragments/address-modal :: addressModal('deliveryAddressId', ${approvalAddressOptions}, ${suggestedAddressId}, ${#lists.size(approvalAddresses) > 6})}"></div>
+                </th:block>
+
+                <div class="buttons">
+                    <button type="submit" id="approval-approve-button" class="button is-primary" disabled
+                            th:text="#{deliveries.approval.realize}">Order at supplier</button>
+                    <a class="button"
+                       th:href="@{/dashboard/store/{storeId}/deliveries/details(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                       th:text="#{deliveries.approval.back}">Back to delivery</a>
+                </div>
+            </form>
+
+            <div class="box mt-5">
+                <h3 class="title is-6" th:text="#{deliveries.approval.reject}">Reject</h3>
+                <form method="post"
+                      th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/reject(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}">
+                    <div class="field">
+                        <label class="label" th:text="#{deliveries.approval.reason}"></label>
+                        <input class="input" type="text" name="reason"/>
+                    </div>
+                    <button type="submit" class="button is-danger is-light"
+                            th:text="#{deliveries.approval.reject}">Reject</button>
+                </form>
+            </div>
+
+            <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
+
+            <script th:inline="none">
+                let approvalValidationPassed = false;
+
+                function selectedAddressId() {
+                    const checked = document.querySelector('#address-options input[type="radio"]:checked');
+                    return checked ? checked.value : '';
+                }
+
+                function addressRequired() {
+                    return document.getElementById('address-options') !== null;
+                }
+
+                function refreshApprovalSubmitState() {
+                    const approve = document.getElementById('approval-approve-button');
+                    if (!approve) {
+                        return;
+                    }
+                    const addressBlocked = document.getElementById('approval-address-blocked') !== null;
+                    const addressMissing = addressRequired() && selectedAddressId() === '';
+                    approve.disabled = addressBlocked || addressMissing || !approvalValidationPassed;
+
+                    const confirm = document.getElementById('address-confirm');
+                    if (confirm) {
+                        confirm.disabled = selectedAddressId() === '';
+                    }
+                }
+
+                function loadValidation() {
+                    const area = document.getElementById('approval-validation-area');
+                    if (!area) {
+                        return;
+                    }
+                    approvalValidationPassed = false;
+                    refreshApprovalSubmitState();
+                    fetch(area.dataset.validateUrl, {method: 'POST'})
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status);
+                            }
+                            return response.text();
+                        })
+                        .then(function (html) {
+                            area.innerHTML = html;
+                            const result = area.querySelector('[data-fully-available]');
+                            approvalValidationPassed = !!(result && result.dataset.fullyAvailable === 'true');
+                            refreshApprovalSubmitState();
+                        })
+                        .catch(function () {
+                            approvalValidationPassed = false;
+                            refreshApprovalSubmitState();
+                        });
+                }
+
+                function openAddressModal() {
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        modal.classList.add('is-active');
+                    }
+                }
+
+                function closeAddressModal() {
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        modal.classList.remove('is-active');
+                    }
+                }
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    const approve = document.getElementById('approval-approve-button');
+                    if (!approve) {
+                        return;
+                    }
+
+                    document.querySelectorAll('#address-options input[type="radio"]').forEach(function (radio) {
+                        radio.addEventListener('change', refreshApprovalSubmitState);
+                    });
+
+                    document.querySelectorAll('[data-address-cancel]').forEach(function (element) {
+                        element.addEventListener('click', closeAddressModal);
+                    });
+
+                    const filter = document.getElementById('address-filter');
+                    if (filter) {
+                        filter.addEventListener('input', function () {
+                            const needle = filter.value.toLowerCase();
+                            document.querySelectorAll('.address-option').forEach(function (option) {
+                                const matches = option.textContent.toLowerCase().indexOf(needle) !== -1;
+                                option.classList.toggle('is-hidden', !matches);
+                            });
+                        });
+                    }
+
+                    if (addressRequired()) {
+                        approve.addEventListener('click', function (event) {
+                            if (!document.getElementById('address-modal').classList.contains('is-active')) {
+                                event.preventDefault();
+                                openAddressModal();
+                            }
+                        });
+                    }
+
+                    refreshApprovalSubmitState();
+                    loadValidation();
+                });
+            </script>
+
+        </div>
+    </section>
+</div>
+
+</body>
+</html>

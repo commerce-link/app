@@ -74,7 +74,7 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void approvalFailureAddsFlashErrorMessageAndStillRedirectsToDetails() {
+    void approvalFailureAddsFlashErrorMessageAndRedirectsToTheRealisationScreen() {
         // given
         when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, null))
                 .thenReturn(OperationResult.failure("deliveries.approval.error.state"));
@@ -86,7 +86,7 @@ class DeliveriesControllerApprovalTest {
                 redirectAttributes, Locale.ENGLISH);
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/delivery-1/approval");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Delivery is no longer awaiting approval");
     }
 
@@ -107,7 +107,7 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void rejectionFailureAddsFlashErrorMessageAndStillRedirectsToDetails() {
+    void rejectionFailureAddsFlashErrorMessageAndRedirectsToTheRealisationScreen() {
         // given
         when(supplierPurchaseService.reject(STORE_ID, DELIVERY_ID, "reason"))
                 .thenReturn(OperationResult.failure("deliveries.approval.error.state"));
@@ -119,7 +119,7 @@ class DeliveriesControllerApprovalTest {
                 redirectAttributes, Locale.ENGLISH);
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/delivery-1/approval");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Delivery is no longer awaiting approval");
     }
 
@@ -172,15 +172,12 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void deliveryDetailsExposesApprovalAddressesForSuperAdminWhenAwaitingApproval() {
+    void deliveryDetailsNoLongerExposesApprovalAddressesForSuperAdmin() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
         Model model = new ConcurrentModel();
-        SupplierDeliveryAddress address = new SupplierDeliveryAddress("addr-1", "Street 1", "Warsaw", "00-001", "PL");
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, delivery.getDeliveryId()))
-                .thenReturn(List.of(address));
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
@@ -190,9 +187,9 @@ class DeliveriesControllerApprovalTest {
 
             // then
             assertThat(view).isEqualTo("deliveryDetails");
-            assertThat(model.getAttribute("approvalAddresses")).isEqualTo(List.of(address));
-            assertThat(model.getAttribute("approvalAddressOptions"))
-                    .isEqualTo(List.of(new PickerOption("addr-1", address.label())));
+            assertThat(model.containsAttribute("approvalAddresses")).isFalse();
+            assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
+            verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
     }
 
@@ -217,5 +214,60 @@ class DeliveriesControllerApprovalTest {
             assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
+    }
+
+    @Test
+    void approvalScreenRendersForADeliveryAwaitingApproval() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
+                .thenReturn(List.of(new SupplierDeliveryAddress("1", "ul. Testowa 1", "Kraków", "31-140", "PL")));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(model.getAttribute("delivery")).isSameAs(delivery);
+        assertThat((List<?>) model.getAttribute("approvalAddresses")).hasSize(1);
+    }
+
+    @Test
+    void approvalScreenRedirectsToDetailsWhenTheDeliveryIsNotAwaitingApproval() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model);
+
+        // then
+        assertThat(view).isEqualTo(
+                "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+        verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+    }
+
+    @Test
+    void failedApprovalReturnsToTheRealisationScreen() {
+        // given
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "1"))
+                .thenReturn(OperationResult.failure("deliveries.purchase.error.availability"));
+
+        // when
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "1", redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo(
+                "redirect:/dashboard/store/" + STORE_ID + "/deliveries/" + DELIVERY_ID + "/approval");
     }
 }

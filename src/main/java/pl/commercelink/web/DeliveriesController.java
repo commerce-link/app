@@ -608,6 +608,28 @@ public class DeliveriesController {
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
+    @GetMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String showApprovalScreen(@PathVariable("storeId") String storeId,
+                                     @PathVariable("deliveryId") String deliveryId,
+                                     Model model) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isAwaitingApproval()) {
+            return approvalRedirectToDetails(storeId, deliveryId);
+        }
+        model.addAttribute("delivery", delivery);
+        addApprovalAddresses(storeId, delivery, model);
+        return "deliveryApproval";
+    }
+
+    private String approvalRedirectToDetails(String storeId, String deliveryId) {
+        return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
+    }
+
+    private String approvalRedirectToScreen(String storeId, String deliveryId) {
+        return String.format("redirect:/dashboard/store/%s/deliveries/%s/approval", storeId, deliveryId);
+    }
+
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approve")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String approvePurchase(@PathVariable("storeId") String storeId,
@@ -618,8 +640,9 @@ public class DeliveriesController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
+            return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
+        return approvalRedirectToDetails(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/reject")
@@ -632,8 +655,9 @@ public class DeliveriesController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
+            return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId);
+        return approvalRedirectToDetails(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")
@@ -669,9 +693,6 @@ public class DeliveriesController {
                 storeId, delivery.getProvider(), deliveryId);
 
         model.addAttribute("delivery", delivery);
-        if (delivery.isAwaitingApproval() && isSuperAdmin()) {
-            addApprovalAddresses(storeId, delivery, model);
-        }
         model.addAttribute("allocationsForm", new DeliveryAllocationsForm(
                 delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(), delivery.getAllocations()));
         model.addAttribute("mergeTargetDeliveries", mergeTargetDeliveries);

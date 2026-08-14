@@ -123,100 +123,16 @@
                             <div class="control">
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
+                            <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                                <a class="button is-link"
+                                   th:href="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                                   th:text="#{deliveries.approval.realize}">Order at supplier</a>
+                            </div>
                         </div>
                     </form>
 
                     <div class="notification is-warning is-light" th:if="${delivery.awaitingApproval and !isSuperAdmin}"
                          th:text="#{deliveries.purchase.submitted.approval}">Awaiting platform administrator.</div>
-
-                    <div class="box" th:if="${delivery.awaitingApproval and isSuperAdmin}">
-                        <h3 class="title is-5" th:text="#{deliveries.approval.title}">Realisation request</h3>
-
-                        <input type="hidden" id="approval-address-blocked" th:if="${approvalAddressError}"/>
-
-                        <div id="approval-validation-area"
-                             th:attr="data-validate-url=@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}">
-                            <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability...</p>
-                            <progress class="progress is-small is-primary" max="100"></progress>
-                        </div>
-
-                        <div class="notification is-danger" th:if="${approvalAddressError}">
-                            <span th:text="#{deliveries.purchase.confirm.addressUnavailable}"></span>
-                            <span th:text="' (' + ${approvalAddressError} + ')'"></span>
-                        </div>
-
-                        <div class="notification is-info is-light"
-                             th:if="${approvalAddressError == null and approvalAddresses != null and #lists.isEmpty(approvalAddresses)}"
-                             th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></div>
-
-                        <form th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approve(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
-                              method="post">
-                            <div class="field" th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}">
-                                <label class="label" th:text="#{deliveries.purchase.confirm.address}"></label>
-                                <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', null, null, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
-                            </div>
-                            <button type="submit" id="approval-approve-button" class="button is-primary" th:disabled="${approvalAddressError != null}"
-                                    th:text="#{deliveries.approval.approve}">Approve and order</button>
-                        </form>
-
-                        <form class="mt-4"
-                              th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/reject(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
-                              method="post">
-                            <div class="field">
-                                <label class="label" th:text="#{deliveries.approval.reason}"></label>
-                                <input class="input" type="text" name="reason"/>
-                            </div>
-                            <button type="submit" class="button is-danger is-light"
-                                    th:text="#{deliveries.approval.reject}">Reject</button>
-                        </form>
-
-                        <script th:inline="none">
-                            let approvalValidationPassed = false;
-
-                            function refreshApprovalSubmitState() {
-                                const approve = document.getElementById('approval-approve-button');
-                                if (!approve) {
-                                    return;
-                                }
-                                const addressBlocked = document.getElementById('approval-address-blocked') !== null;
-                                approve.disabled = addressBlocked || !approvalValidationPassed;
-                            }
-
-                            function loadValidation() {
-                                const area = document.getElementById('approval-validation-area');
-                                if (!area) {
-                                    return;
-                                }
-                                approvalValidationPassed = false;
-                                refreshApprovalSubmitState();
-                                fetch(area.dataset.validateUrl, {method: 'POST'})
-                                    .then(function (response) {
-                                        if (!response.ok) {
-                                            throw new Error('HTTP ' + response.status);
-                                        }
-                                        return response.text();
-                                    })
-                                    .then(function (html) {
-                                        area.innerHTML = html;
-                                        const result = area.querySelector('[data-fully-available]');
-                                        approvalValidationPassed = !!(result && result.dataset.fullyAvailable === 'true');
-                                        refreshApprovalSubmitState();
-                                    })
-                                    .catch(function () {
-                                        approvalValidationPassed = false;
-                                        refreshApprovalSubmitState();
-                                    });
-                            }
-
-                            document.addEventListener('DOMContentLoaded', function () {
-                                if (!document.getElementById('approval-approve-button')) {
-                                    return;
-                                }
-                                refreshApprovalSubmitState();
-                                loadValidation();
-                            });
-                        </script>
-                    </div>
 
                     <div class="notification is-danger is-light" th:if="${delivery.orderRejected}">
                         <p th:text="#{deliveries.approval.rejectedBy}"></p>
@@ -694,10 +610,6 @@
             form.submit();
         }
     </script>
-
-            <th:block th:if="${approvalAddresses != null and !#lists.isEmpty(approvalAddresses)}">
-                <th:block th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${approvalAddressOptions})}"></th:block>
-            </th:block>
 
         </div>
     </section>
