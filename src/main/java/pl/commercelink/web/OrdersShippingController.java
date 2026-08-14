@@ -56,15 +56,9 @@ public class OrdersShippingController extends AbstractShippingController {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
         String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         return order.firstShipment()
-                .map(shipment -> new DeliveryTarget(sourceOf(order, shipment, shippingProvider), shipment.getCarrier(),
+                .map(shipment -> new DeliveryTarget(shippingProvider, shipment.getCarrier(),
                         shipment.getCollectionPointCode()))
                 .orElseGet(() -> new DeliveryTarget(null, null, null));
-    }
-
-    private static String sourceOf(Order order, Shipment shipment, String shippingProvider) {
-        return shipment.hasShippingData() || !order.isMarketplaceOrder()
-                ? shippingProvider
-                : order.getSource().getName();
     }
 
     @Override

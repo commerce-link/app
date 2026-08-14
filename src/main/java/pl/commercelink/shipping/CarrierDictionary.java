@@ -7,8 +7,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @ConfigurationProperties(prefix = "shipping")
@@ -62,8 +65,10 @@ public class CarrierDictionary {
                 .findFirst();
     }
 
-    public Map<String, String> options(String source, String target) {
-        return codesFor(source, target);
+    public Set<String> namesUsedBy(String system) {
+        return carriers.keySet().stream()
+                .flatMap(source -> codesFor(source, system).values().stream())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private Map<String, String> codesFor(String source, String target) {

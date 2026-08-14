@@ -13,7 +13,9 @@ import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.starter.util.CountryCodeConverter;
+import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
@@ -28,6 +30,9 @@ public class MarketplaceOrderImporter {
 
     @Autowired
     private OrdersManager ordersManager;
+
+    @Autowired
+    private CarrierDictionary carrierDictionary;
 
     public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
@@ -74,7 +79,7 @@ public class MarketplaceOrderImporter {
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(marketplaceOrder.shippingCarrier());
+                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shippingCarrier()));
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.pickupPoint());
         if (collectionPointCode != null) {
@@ -88,6 +93,12 @@ public class MarketplaceOrderImporter {
                 .collect(Collectors.toList());
 
         ordersManager.saveWithFulfilment(order, orderItems);
+    }
+
+    String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {
+        return carrierDictionary
+                .translate(marketplaceName, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), shippingCarrier)
+                .orElse(shippingCarrier);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {
