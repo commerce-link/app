@@ -24,6 +24,7 @@
                 <tr th:each="order : ${orders}">
                     <td>
                         <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.shortenedOrderId}"></a>
+                        <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="'ext: ' + ${order.externalOrderId}"></p>
                     </td>
                     <td th:text="${order.billingDetails?.email}"></td>
                     <td th:text="${order.source?.type ?: '-'}"></td>
