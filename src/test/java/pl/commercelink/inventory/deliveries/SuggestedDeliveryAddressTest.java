@@ -101,6 +101,17 @@ class SuggestedDeliveryAddressTest {
     }
 
     @Test
+    void doesNotMatchDifferentBuildingsThatCollapseUnderPunctuationRemoval() {
+        // given
+        ShippingDetails storeDefault = storeAddress("Kwiatowa 1/2", "31-140");
+        List<SupplierDeliveryAddress> supplier = List.of(
+                supplierAddress("1", "Kwiatowa 12", "31-140"));
+
+        // when / then
+        assertThat(SuggestedDeliveryAddress.match(storeDefault, supplier)).isEmpty();
+    }
+
+    @Test
     void suggestsNothingWhenTheSupplierHasNoAddresses() {
         // given
         ShippingDetails storeDefault = storeAddress("ul. Łobzowska 22/1", "31-140");

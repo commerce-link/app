@@ -39,7 +39,7 @@ public final class SuggestedDeliveryAddress {
             return "";
         }
         String withoutPrefix = STREET_PREFIX.matcher(value.trim()).replaceFirst("");
-        return withoutPrefix.toLowerCase().replaceAll("[^\\p{L}\\p{N}]", "");
+        return withoutPrefix.toLowerCase().replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
     }
 
     private static String normalisePostalCode(String value) {
