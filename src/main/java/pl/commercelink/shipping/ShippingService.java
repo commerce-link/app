@@ -37,7 +37,7 @@ public class ShippingService {
         ShipmentRequest request = ShipmentRequest.builder()
                 .pickup(toShipmentAddress(pickupAddress))
                 .sender(toShipmentAddress(senderAddress))
-                .receiver(toShipmentAddress(form.getShippingDetails()))
+                .receiver(toReceiverAddress(form.getShippingDetails(), deliveryTarget.pointCode()))
                 .parcels(toParcels(form.getCompleteParcels()))
                 .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
                 .options(new ShipmentOptions(
@@ -72,7 +72,7 @@ public class ShippingService {
         ShipmentRequest request = ShipmentRequest.builder()
                 .pickup(toShipmentAddress(pickupAddress))
                 .sender(toShipmentAddress(senderAddress))
-                .receiver(toShipmentAddress(form.getShippingDetails()))
+                .receiver(toReceiverAddress(form.getShippingDetails(), deliveryTarget.pointCode()))
                 .parcels(toParcels(form.getCompleteParcels()))
                 .carrierId(form.getServiceId())
                 .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
@@ -132,6 +132,22 @@ public class ShippingService {
         } catch (ShippingException e) {
             return OperationResult.failure(e.getMessage());
         }
+    }
+
+    static ShipmentAddress toReceiverAddress(ShippingDetails details, String pointCode) {
+        if (pointCode == null) {
+            return toShipmentAddress(details);
+        }
+        return new ShipmentAddress(
+                details.getFullName(),
+                details.isCompanyAddress() ? details.getCompanyName() : null,
+                null,
+                null,
+                null,
+                details.getCountry(),
+                details.getEmail(),
+                details.getPhone()
+        );
     }
 
     private static ShipmentAddress toShipmentAddress(ShippingDetails details) {

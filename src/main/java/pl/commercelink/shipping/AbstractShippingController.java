@@ -97,9 +97,13 @@ public abstract class AbstractShippingController {
     }
 
     protected String renderShippingForm(Store store, ShippingForm shippingForm, List<ShippingDetails> shippingDetailsList, Model model) {
+        if (shippingForm.getShippingDetails() == null && !shippingDetailsList.isEmpty()) {
+            shippingForm.setShippingDetails(shippingDetailsList.get(0));
+        }
         model.addAttribute("shippingForm", shippingForm);
         model.addAttribute("shippingEntityId", shippingForm.getShippingEntityId());
         model.addAttribute("shippingDetailsList", shippingDetailsList);
+        model.addAttribute("deliveryPointCode", resolveDeliveryTarget(shippingForm).pointCode());
         model.addAttribute("pickUpAddresses", store.getPickUpAddresses());
         model.addAttribute("packageTemplates", store.getPackageTemplates());
 
