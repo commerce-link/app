@@ -50,6 +50,40 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="box">
+                    <h2 class="subtitle" th:text="#{shipping.details}"></h2>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{bank.default}"></th>
+                            <th th:text="#{order.address.company}"></th>
+                            <th th:text="#{order.address.street}"></th>
+                            <th th:text="#{order.address.postal}"></th>
+                            <th th:text="#{order.address.city}"></th>
+                            <th th:text="#{order.address.country}"></th>
+                            <th th:text="#{order.address.email}"></th>
+                            <th th:text="#{order.address.phone}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="ship, stat : *{store.shippingDetails}">
+                            <td style="text-align:center;">
+                                <input type="radio" name="defaultShippingDetailIndex" th:value="${stat.index}" th:checked="${ship._default}"/>
+                            </td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].companyName}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].streetAndNumber}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].postalCode}" pattern="^\d{2}-\d{3}$" th:title="#{shipping.postalCode.invalid}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].city}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].country}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].email}"/></td>
+                            <td><input class="input" th:field="*{store.shippingDetails[__${stat.index}__].phone}" pattern="[0-9+ ]{9,15}" th:title="#{shipping.phone.invalid}"/></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
             </form>
 
             <div class="box">
