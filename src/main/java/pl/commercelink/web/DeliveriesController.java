@@ -120,7 +120,7 @@ public class DeliveriesController {
             Model model) {
         DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider,
                 orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
-                showAwaitingApproval);
+                showAwaitingApproval, isSuperAdmin());
 
         List<Delivery> paginatedDeliveries;
         if (isSuperAdmin()) {

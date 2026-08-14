@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
+import pl.commercelink.stores.ConnectionMode;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -184,6 +185,11 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         if (filter.isAwaitingApproval()) {
             eav.put(":awaitingApproval", new AttributeValue().withS(DeliveryOrderStatus.AWAITING_APPROVAL.name()));
             appendFilter(filterExpression, "orderStatus = :awaitingApproval");
+        }
+
+        if (filter.isGlobalOnly()) {
+            eav.put(":globalMode", new AttributeValue().withS(ConnectionMode.GLOBAL.name()));
+            appendFilter(filterExpression, "connectionMode = :globalMode");
         }
 
         return new QueryAndFilterExpressions(keyConditionExpression, filterExpression.toString(), eav);
