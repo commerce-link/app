@@ -18,7 +18,8 @@ class PurchaseConfirmationTemplateTest {
             Path.of("src/main/resources/templates/deliveryDetails.html");
     private static final Path MODAL_FRAGMENT =
             Path.of("src/main/resources/templates/fragments/address-modal.html");
-    private static final Pattern OPENING_TAG = Pattern.compile("<[a-zA-Z0-9:]+\\s[^>]*?>", Pattern.DOTALL);
+    private static final Pattern OPENING_TAG =
+            Pattern.compile("<[a-zA-Z0-9:]+(?:\\s+[a-zA-Z0-9:_.-]+(?:=\"[^\"]*\")?)*\\s*/?>", Pattern.DOTALL);
 
     private String template() throws Exception {
         return Files.readString(TEMPLATE, StandardCharsets.UTF_8);
@@ -120,6 +121,19 @@ class PurchaseConfirmationTemplateTest {
         // then
         assertThat(html).contains("deliveries.purchase.confirm.submitForApproval");
         assertThat(html).contains("requiresApproval");
+    }
+
+    @Test
+    void guardsAddressPreselectionAgainstTwoNullsMatchingEachOther() throws Exception {
+        // when
+        String html = modalFragment();
+        String radioTag = openingTagOf(html, "th:checked");
+        int suggestedTagAt = html.indexOf("deliveries.approval.suggestedAddress.tag");
+        String suggestedTagLine = html.substring(html.lastIndexOf('<', suggestedTagAt), html.indexOf('>', suggestedTagAt) + 1);
+
+        // then
+        assertThat(radioTag).contains("selectedId != null and option.value == selectedId");
+        assertThat(suggestedTagLine).contains("selectedId != null and option.value == selectedId");
     }
 
     @Test

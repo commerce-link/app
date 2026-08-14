@@ -21,10 +21,10 @@
             <div id="address-options">
                 <label class="address-option" th:each="option : ${options}">
                     <input type="radio" th:name="${fieldName}" th:value="${option.value}"
-                           th:checked="${option.value == selectedId}">
+                           th:checked="${selectedId != null and option.value == selectedId}">
                     <span th:text="${option.label}">Address</span>
                     <span class="tag is-info is-light ml-2"
-                          th:if="${showSuggestedTag and option.value == selectedId}"
+                          th:if="${showSuggestedTag and selectedId != null and option.value == selectedId}"
                           th:text="#{deliveries.approval.suggestedAddress.tag}">Suggested</span>
                 </label>
             </div>
