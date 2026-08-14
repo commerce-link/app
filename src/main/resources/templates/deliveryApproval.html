@@ -11,8 +11,6 @@
             <h1 class="title" th:text="#{deliveries.approval.screen.title}">Request realisation</h1>
             <h2 class="subtitle" th:text="${delivery.provider} + ' — ' + ${delivery.shortenedDeliveryId}">Supplier</h2>
 
-            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
-
             <div id="approval-validation-area" class="mb-6"
                  th:attr="data-validate-url=@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
@@ -80,8 +78,7 @@
                         return;
                     }
                     const addressBlocked = document.getElementById('approval-address-blocked') !== null;
-                    const addressMissing = addressRequired() && selectedAddressId() === '';
-                    approve.disabled = addressBlocked || addressMissing || !approvalValidationPassed;
+                    approve.disabled = addressBlocked || !approvalValidationPassed;
 
                     const confirm = document.getElementById('address-confirm');
                     if (confirm) {

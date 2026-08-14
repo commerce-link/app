@@ -230,7 +230,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
 
         // then
         assertThat(view).isEqualTo("deliveryApproval");
@@ -249,12 +249,32 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
 
         // then
         assertThat(view).isEqualTo(
                 "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
         verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+    }
+
+    @Test
+    void approvalScreenReflashesTheErrorMessageWhenBouncingBackToDetails() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Model model = new ConcurrentModel();
+        model.addAttribute("errorMessage", "Delivery is no longer awaiting approval");
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo(
+                "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Delivery is no longer awaiting approval");
     }
 
     @Test

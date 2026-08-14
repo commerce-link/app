@@ -55,6 +55,8 @@ class ApprovalScreenTemplateTest {
         assertThat(approveTag).contains("disabled");
         assertThat(html).contains("refreshApprovalSubmitState");
         assertThat(html).contains("approvalValidationPassed");
+        assertThat(html).contains("approve.disabled = addressBlocked || !approvalValidationPassed;");
+        assertThat(html).doesNotContain("addressMissing");
     }
 
     @Test

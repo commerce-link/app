@@ -612,9 +612,12 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String showApprovalScreen(@PathVariable("storeId") String storeId,
                                      @PathVariable("deliveryId") String deliveryId,
-                                     Model model) {
+                                     Model model, RedirectAttributes redirectAttributes) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (delivery == null || !delivery.isAwaitingApproval()) {
+            if (model.containsAttribute("errorMessage")) {
+                redirectAttributes.addFlashAttribute("errorMessage", model.getAttribute("errorMessage"));
+            }
             return approvalRedirectToDetails(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
