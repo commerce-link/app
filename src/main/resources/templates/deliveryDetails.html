@@ -52,8 +52,18 @@
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
+                                      th:text="#{deliveries.status.awaitingApproval}"></span>
+                                <span class="tag ml-1 is-dark" th:if="${delivery.orderRejected}"
+                                      th:text="#{deliveries.status.rejected}"></span>
                             </div>
                             <p class="has-text-danger" th:if="${delivery.orderFailed}" th:text="${delivery.orderErrorMessage}"></p>
+                            <p class="has-text-warning-dark" th:if="${delivery.awaitingApproval and !isSuperAdmin}"
+                               th:text="#{deliveries.purchase.submitted.approval}"></p>
+                            <p class="has-text-danger" th:if="${delivery.orderRejected}"
+                               th:text="#{deliveries.approval.rejectedBy}"></p>
+                            <p class="has-text-danger" th:if="${delivery.orderRejected and !#strings.isEmpty(delivery.rejectionReason)}"
+                               th:text="${delivery.rejectionReason}"></p>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.cost}"></label>
@@ -130,14 +140,6 @@
                             </div>
                         </div>
                     </form>
-
-                    <div class="notification is-warning is-light" th:if="${delivery.awaitingApproval and !isSuperAdmin}"
-                         th:text="#{deliveries.purchase.submitted.approval}">Awaiting platform administrator.</div>
-
-                    <div class="notification is-danger is-light" th:if="${delivery.orderRejected}">
-                        <p th:text="#{deliveries.approval.rejectedBy}"></p>
-                        <p th:if="${delivery.rejectionReason}" th:text="${delivery.rejectionReason}"></p>
-                    </div>
                 </div>
 
                 <div class="column is-half">

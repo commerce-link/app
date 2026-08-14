@@ -82,6 +82,32 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
+    void detailsPageShowsApprovalStateAsAStatusTagLikeEveryOtherOrderState() throws Exception {
+        // when
+        String html = details();
+        int statuses = html.indexOf("#{deliveries.statuses}");
+        int editFormEnd = html.indexOf("</form>");
+
+        // then
+        assertThat(html.indexOf("deliveries.status.awaitingApproval")).isBetween(statuses, editFormEnd);
+        assertThat(html.indexOf("deliveries.status.rejected")).isBetween(statuses, editFormEnd);
+    }
+
+    @Test
+    void detailsPageShowsTheRejectionReasonInsideTheDeliveryBoxNotBelowIt() throws Exception {
+        // when
+        String html = details();
+        int editFormEnd = html.indexOf("</form>");
+
+        // then
+        assertThat(html.indexOf("deliveries.approval.rejectedBy")).isBetween(0, editFormEnd);
+        assertThat(html.indexOf("delivery.rejectionReason")).isBetween(0, editFormEnd);
+        assertThat(html.indexOf("deliveries.purchase.submitted.approval")).isBetween(0, editFormEnd);
+        assertThat(html).doesNotContain("notification is-danger is-light");
+        assertThat(html).doesNotContain("notification is-warning is-light");
+    }
+
+    @Test
     void guardsAreNeverCombinedWithThReplaceOnTheSameElement() throws Exception {
         // then
         assertThat(hasElementWithBothThIfAndThReplace(approval())).isFalse();
