@@ -473,6 +473,11 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isManualSupplier(String supplier) {
+        return getManualSupplierNames().stream().anyMatch(supplier::equalsIgnoreCase);
+    }
+
+    @DynamoDBIgnore
     public List<String> getOwnAndManualSupplierNames() {
         return supplierNamesMatching(connection ->
                 connection.getMode() == ConnectionMode.OWN || connection.getMode() == ConnectionMode.MANUAL);

@@ -13,6 +13,7 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
+import pl.commercelink.stores.ConnectionMode;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -66,6 +67,10 @@ public class Delivery {
     private String pendingOrderForm;
     @DynamoDBAttribute(attributeName = "deliveryAddress")
     private String deliveryAddress;
+
+    @DynamoDBAttribute(attributeName = "connectionMode")
+    @DynamoDBTypeConvertedEnum
+    private ConnectionMode connectionMode;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -450,6 +455,14 @@ public class Delivery {
 
     public void setDeliveryAddress(String deliveryAddress) {
         this.deliveryAddress = deliveryAddress;
+    }
+
+    public ConnectionMode getConnectionMode() {
+        return connectionMode;
+    }
+
+    public void setConnectionMode(ConnectionMode connectionMode) {
+        this.connectionMode = connectionMode;
     }
 
     @DynamoDBIgnore
