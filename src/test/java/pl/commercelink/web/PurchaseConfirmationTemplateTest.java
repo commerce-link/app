@@ -16,6 +16,8 @@ class PurchaseConfirmationTemplateTest {
             Path.of("src/main/resources/templates/deliveryPurchaseConfirmation.html");
     private static final Path DETAILS_TEMPLATE =
             Path.of("src/main/resources/templates/deliveryDetails.html");
+    private static final Path MODAL_FRAGMENT =
+            Path.of("src/main/resources/templates/fragments/address-modal.html");
     private static final Pattern OPENING_TAG = Pattern.compile("<[a-zA-Z0-9:]+\\s[^>]*?>", Pattern.DOTALL);
 
     private String template() throws Exception {
@@ -26,24 +28,28 @@ class PurchaseConfirmationTemplateTest {
         return Files.readString(DETAILS_TEMPLATE, StandardCharsets.UTF_8);
     }
 
+    private String modalFragment() throws Exception {
+        return Files.readString(MODAL_FRAGMENT, StandardCharsets.UTF_8);
+    }
+
     @Test
     void rendersTheConfirmButtonDisabledUntilAnAddressIsChosen() throws Exception {
         // given
-        String html = template();
+        String html = modalFragment();
 
         // when
         String confirmTag = openingTagOf(html, "id=\"address-confirm\"");
 
         // then
         assertThat(confirmTag).contains("disabled");
-        assertThat(confirmTag).contains("deliveryAddressId");
-        assertThat(html).contains("refreshAddressConfirmState");
+        assertThat(confirmTag).contains("selectedId");
+        assertThat(template()).contains("refreshAddressConfirmState");
     }
 
     @Test
     void boundsTheOptionListHeightSoTheModalNeverGrowsWithTheAddressCount() throws Exception {
         // given
-        String html = template();
+        String html = modalFragment();
 
         // then
         assertThat(html).contains("#address-options");
@@ -76,32 +82,33 @@ class PurchaseConfirmationTemplateTest {
     void keepsTheElementIdsThePageScriptLooksUp() throws Exception {
         // when
         String html = template();
+        String fragmentHtml = modalFragment();
         String script = html.substring(html.indexOf("<script th:inline=\"none\">"), html.indexOf("</script>"));
 
         // then
-        assertThat(html).contains("id=\"address-modal\"");
+        assertThat(fragmentHtml).contains("id=\"address-modal\"");
         assertThat(script).contains("'address-modal'");
 
-        assertThat(html).contains("id=\"address-confirm\"");
+        assertThat(fragmentHtml).contains("id=\"address-confirm\"");
         assertThat(script).contains("'address-confirm'");
 
         assertThat(html).contains("id=\"purchase-confirm-submit\"");
         assertThat(script).contains("'purchase-confirm-submit'");
 
-        assertThat(html).contains("data-address-cancel");
+        assertThat(fragmentHtml).contains("data-address-cancel");
         assertThat(script).contains("data-address-cancel");
     }
 
     @Test
     void offersTheAddressesAsAnAlwaysVisibleListInsideTheModal() throws Exception {
         // when
-        String html = template();
+        String html = modalFragment();
 
         // then
         int modalStart = html.indexOf("id=\"address-modal\"");
         int optionsAt = html.indexOf("id=\"address-options\"");
         assertThat(optionsAt).isGreaterThan(modalStart);
-        assertThat(html).contains("type=\"radio\" name=\"deliveryAddressId\"");
+        assertThat(html).contains("type=\"radio\" th:name=\"${fieldName}\"");
         assertThat(html).doesNotContain("searchable-picker :: picker(");
     }
 

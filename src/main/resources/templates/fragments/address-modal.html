@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="addressModal(fieldName, options, selectedId, showFilter)" class="modal" id="address-modal">
+    <div class="modal-background" data-address-cancel></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title" th:text="#{deliveries.purchase.confirm.addressModalTitle}">Choose a delivery address</p>
+        </header>
+        <section class="modal-card-body">
+            <div class="field" th:if="${showFilter}">
+                <div class="control has-icons-left">
+                    <input class="input" type="search" id="address-filter" autocomplete="off"
+                           th:placeholder="#{picker.filter}">
+                    <span class="icon is-small is-left">
+                        <i class="fas fa-search"></i>
+                    </span>
+                </div>
+            </div>
+            <div id="address-options">
+                <label class="address-option" th:each="option : ${options}">
+                    <input type="radio" th:name="${fieldName}" th:value="${option.value}"
+                           th:checked="${option.value == selectedId}">
+                    <span th:text="${option.label}">Address</span>
+                </label>
+            </div>
+        </section>
+        <footer class="modal-card-foot">
+            <button type="submit" class="button is-primary" id="address-confirm"
+                    th:attr="disabled=${#strings.isEmpty(selectedId)} ? 'disabled' : null"
+                    th:text="#{deliveries.purchase.confirm.addressConfirm}">Confirm</button>
+            <button type="button" class="button" data-address-cancel
+                    th:text="#{deliveries.purchase.confirm.addressCancel}">Close</button>
+        </footer>
+    </div>
+</div>
+
+<th:block th:fragment="addressModalStyle">
+    <style>
+        #address-modal .modal-card {
+            max-width: 38rem;
+            width: calc(100vw - 3rem);
+        }
+
+        #address-options {
+            max-height: 22rem;
+            overflow-y: auto;
+        }
+
+        .address-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid #dbdbdb;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .address-option + .address-option {
+            margin-top: 0.5rem;
+        }
+
+        .address-option:hover {
+            background-color: #f5f7ff;
+        }
+
+        .address-option:has(input:checked) {
+            border-color: #3273dc;
+            background-color: #eef3ff;
+        }
+
+        .address-option.is-hidden {
+            display: none;
+        }
+    </style>
+</th:block>
+
+</body>
+</html>
