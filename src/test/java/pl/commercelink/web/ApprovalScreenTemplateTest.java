@@ -14,7 +14,8 @@ class ApprovalScreenTemplateTest {
 
     private static final Path APPROVAL = Path.of("src/main/resources/templates/deliveryApproval.html");
     private static final Path DETAILS = Path.of("src/main/resources/templates/deliveryDetails.html");
-    private static final Pattern OPENING_TAG = Pattern.compile("<[a-zA-Z0-9:]+\\s[^>]*?>", Pattern.DOTALL);
+    private static final Pattern OPENING_TAG =
+            Pattern.compile("<[a-zA-Z0-9:]+(?:\\s+[a-zA-Z0-9:_.-]+(?:=\"[^\"]*\")?)*\\s*/?>", Pattern.DOTALL);
 
     private String approval() throws Exception {
         return Files.readString(APPROVAL, StandardCharsets.UTF_8);
