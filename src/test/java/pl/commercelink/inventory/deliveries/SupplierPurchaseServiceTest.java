@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
@@ -87,6 +88,8 @@ class SupplierPurchaseServiceTest {
     private GlobalSupplierProviderFactory globalSupplierProviderFactory;
     @Mock
     private SupplierProvider globalSupplierProvider;
+    @Mock
+    private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Spy
     private ObjectMapper objectMapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -1115,5 +1118,23 @@ class SupplierPurchaseServiceTest {
         item.setUnitCost(unitCost);
         form.getItems().add(item);
         return form;
+    }
+
+    @Test
+    void stampsTheGlobalConnectionModeOnADeliveryRaisedForApproval() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.GLOBAL);
+        DeliveryCreationForm form = formWithOneOrderableItem();
+
+        // when
+        service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
     }
 }

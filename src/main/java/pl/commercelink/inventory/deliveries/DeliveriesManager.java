@@ -95,6 +95,7 @@ public class DeliveriesManager {
                 source.getPaymentTerms(),
                 source.getTax()
         );
+        target.setConnectionMode(source.getConnectionMode());
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
     }

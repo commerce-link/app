@@ -7,17 +7,21 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryCreationServiceTest {
@@ -33,6 +37,8 @@ class DeliveryCreationServiceTest {
     private WarehouseAllocationsManager warehouseAllocationsManager;
     @Mock
     private ExchangeRates exchangeRates;
+    @Mock
+    private SupplierConnectionModeResolver supplierConnectionModeResolver;
 
     @InjectMocks
     private DeliveryCreationService service;
@@ -95,5 +101,28 @@ class DeliveryCreationServiceTest {
         assertEquals(165.0, saved.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq(deliveryId), any(), eq(form.getItems()));
         verify(warehouseAllocationsManager).commit(STORE_ID, deliveryId, form.getProvider(), form.getItems());
+    }
+
+    @Test
+    void stampsTheResolvedConnectionModeOnAManuallyCreatedDelivery() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setExternalDeliveryId("ELKO-3");
+        form.setProvider(PROVIDER);
+        form.setEstimatedDeliveryAt(LocalDate.now());
+        form.setShippingCost(10.0);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(1);
+        item.setUnitCost(50.0);
+        form.getItems().add(item);
+        when(supplierConnectionModeResolver.resolve(STORE_ID, PROVIDER)).thenReturn(ConnectionMode.OWN);
+
+        // when
+        service.run(STORE_ID, form);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertThat(saved.getValue().getConnectionMode()).isEqualTo(ConnectionMode.OWN);
     }
 }

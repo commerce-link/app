@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
@@ -57,6 +58,7 @@ public class SupplierPurchaseService {
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
+    private final SupplierConnectionModeResolver supplierConnectionModeResolver;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -319,6 +321,7 @@ public class SupplierPurchaseService {
         }
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);

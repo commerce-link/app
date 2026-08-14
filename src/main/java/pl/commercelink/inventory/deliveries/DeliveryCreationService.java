@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
@@ -26,6 +27,8 @@ public class DeliveryCreationService {
     private WarehouseAllocationsManager warehouseAllocationsManager;
     @Autowired
     private ExchangeRates exchangeRates;
+    @Autowired
+    private SupplierConnectionModeResolver supplierConnectionModeResolver;
 
     public String run(String storeId, DeliveryCreationForm form) {
         prepareForm(storeId, form);
@@ -94,6 +97,7 @@ public class DeliveryCreationService {
                 form.getPaymentTerms(),
                 form.getTax()
         );
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(storeId, form.getProvider()));
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }
