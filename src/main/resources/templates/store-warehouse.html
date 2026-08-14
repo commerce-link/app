@@ -39,16 +39,6 @@
                             <span th:text="#{store.warehouse.configuration.documentation.enabled}"></span>
                         </label>
                     </div>
-
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                    th:text="#{general.save}"></button>
-                        </div>
-                        <div class="control">
-                            <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="box">
@@ -83,6 +73,16 @@
                         </tbody>
                     </table>
 
+                </div>
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
+                                th:text="#{general.save}"></button>
+                    </div>
+                    <div class="control">
+                        <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                    </div>
                 </div>
             </form>
 
