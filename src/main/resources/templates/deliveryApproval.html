@@ -67,6 +67,7 @@
             </div>
 
             <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
+            <th:block th:replace="~{fragments/address-modal :: addressModalScript}"></th:block>
 
             <script th:inline="none">
                 let approvalValidationPassed = false;
@@ -124,6 +125,7 @@
                     const modal = document.getElementById('address-modal');
                     if (modal) {
                         modal.classList.add('is-active');
+                        scrollAddressOptionsToSelection();
                     }
                 }
 

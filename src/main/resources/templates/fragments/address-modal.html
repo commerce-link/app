@@ -47,6 +47,7 @@
         }
 
         #address-options {
+            position: relative;
             max-height: 22rem;
             overflow-y: auto;
         }
@@ -78,6 +79,24 @@
             display: none;
         }
     </style>
+</th:block>
+
+<th:block th:fragment="addressModalScript">
+    <script th:inline="none">
+        function scrollAddressOptionsToSelection() {
+            const options = document.getElementById('address-options');
+            const checked = options && options.querySelector('input[type="radio"]:checked');
+            if (!checked) {
+                return;
+            }
+            const option = checked.closest('.address-option');
+            if (!option) {
+                return;
+            }
+            options.scrollTop = Math.max(0,
+                option.offsetTop - (options.clientHeight - option.offsetHeight) / 2);
+        }
+    </script>
 </th:block>
 
 </body>

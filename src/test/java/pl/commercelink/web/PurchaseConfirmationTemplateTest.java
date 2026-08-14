@@ -114,6 +114,19 @@ class PurchaseConfirmationTemplateTest {
     }
 
     @Test
+    void scrollsTheOptionListToThePreselectedAddressWhenTheModalOpens() throws Exception {
+        // when
+        String fragment = modalFragment();
+        String html = template();
+
+        // then
+        assertThat(fragment).contains("function scrollAddressOptionsToSelection()");
+        assertThat(fragment).contains("position: relative");
+        assertThat(html).contains("addressModalScript");
+        assertThat(html).contains("scrollAddressOptionsToSelection();");
+    }
+
+    @Test
     void labelsTheSubmitButtonDifferentlyWhenApprovalIsRequired() throws Exception {
         // when
         String html = template();

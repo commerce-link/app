@@ -118,6 +118,16 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
+    void realisationScreenScrollsTheOptionListToThePreselectedAddress() throws Exception {
+        // when
+        String html = approval();
+
+        // then
+        assertThat(html).contains("addressModalScript");
+        assertThat(html).contains("scrollAddressOptionsToSelection();");
+    }
+
+    @Test
     void guardsAreNeverCombinedWithThReplaceOnTheSameElement() throws Exception {
         // then
         assertThat(hasElementWithBothThIfAndThReplace(approval())).isFalse();

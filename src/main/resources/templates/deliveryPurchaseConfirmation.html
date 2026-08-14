@@ -121,6 +121,7 @@
                 </th:block>
 
                 <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
+                <th:block th:replace="~{fragments/address-modal :: addressModalScript}"></th:block>
 
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
@@ -168,6 +169,7 @@
                     }
                     event.preventDefault();
                     modal.classList.add('is-active');
+                    scrollAddressOptionsToSelection();
                     refreshAddressConfirmState();
                 }
 
