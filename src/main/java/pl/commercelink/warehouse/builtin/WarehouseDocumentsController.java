@@ -35,6 +35,9 @@ class WarehouseDocumentsController {
     private WarehouseDocumentMfnHistoryService warehouseDocumentMfnHistoryService;
 
     @Autowired
+    private WarehouseDocumentSearchService warehouseDocumentSearchService;
+
+    @Autowired
     private StoresRepository storesRepository;
 
     @Autowired
@@ -47,10 +50,12 @@ class WarehouseDocumentsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) String warehouseId,
+            @RequestParam(required = false) String ean,
+            @RequestParam(required = false) String mfn,
             @RequestParam(required = false, defaultValue = "1") int page,
             Model model
     ) {
-        return showDocumentsList(getStoreId(), type, dateFrom, dateTo, warehouseId, page, model);
+        return showDocumentsList(getStoreId(), type, dateFrom, dateTo, warehouseId, ean, mfn, page, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/warehouse-documents")
@@ -61,14 +66,16 @@ class WarehouseDocumentsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) String warehouseId,
+            @RequestParam(required = false) String ean,
+            @RequestParam(required = false) String mfn,
             @RequestParam(required = false, defaultValue = "1") int page,
             Model model
     ) {
-        return showDocumentsList(storeId, type, dateFrom, dateTo, warehouseId, page, model);
+        return showDocumentsList(storeId, type, dateFrom, dateTo, warehouseId, ean, mfn, page, model);
     }
 
     private String showDocumentsList(String storeId, String type, LocalDate dateFrom, LocalDate dateTo,
-                                     String warehouseId, int page, Model model) {
+                                     String warehouseId, String ean, String mfn, int page, Model model) {
         Store store = storesRepository.findById(storeId);
 
         if (!store.hasDocumentsGenerationEnabled()) {
@@ -83,9 +90,11 @@ class WarehouseDocumentsController {
         DocumentType documentType = (type != null && !type.trim().isEmpty()) ? DocumentType.valueOf(type) : null;
         LocalDateTime from = dateFrom != null ? dateFrom.atStartOfDay() : null;
         LocalDateTime to = dateTo != null ? dateTo.atTime(LocalTime.MAX) : null;
+        String eanQuery = ean != null ? ean.trim() : null;
+        String mfnQuery = mfn != null ? mfn.trim() : null;
 
-        List<WarehouseDocument> pagedDocuments = warehouseDocumentRepository.search(
-                storeId, documentType, from, to, warehouseId, page, PAGE_SIZE + 1);
+        List<WarehouseDocument> pagedDocuments = warehouseDocumentSearchService.search(
+                storeId, documentType, from, to, warehouseId, eanQuery, mfnQuery, page, PAGE_SIZE + 1);
 
         boolean hasNextPage = pagedDocuments.size() > PAGE_SIZE;
         if (hasNextPage) {
@@ -100,6 +109,8 @@ class WarehouseDocumentsController {
         searchParams.put("dateFrom", dateFrom);
         searchParams.put("dateTo", dateTo);
         searchParams.put("warehouseId", warehouseId);
+        searchParams.put("ean", ean);
+        searchParams.put("mfn", mfn);
 
         model.addAttribute("documents", pagedDocuments);
         model.addAttribute("documentTypes", getWarehouseDocumentTypes());
