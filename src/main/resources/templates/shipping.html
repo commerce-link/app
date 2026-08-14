@@ -45,7 +45,7 @@
             </div>
         </div>
 
-        <div id="manualShippingDetails" class="box field" style="width: 50%;">
+        <div id="manualShippingDetails" class="field">
             <input type="hidden" id="input-name" th:field="*{shippingDetails.name}">
             <input type="hidden" id="input-surname" th:field="*{shippingDetails.surname}">
             <input type="hidden" id="input-company" th:field="*{shippingDetails.companyName}">
@@ -56,50 +56,30 @@
             <input type="hidden" id="input-email" th:field="*{shippingDetails.email}">
             <input type="hidden" id="input-phone" th:field="*{shippingDetails.phone}">
 
-            <table class="table is-fullwidth is-narrow">
-                <tbody>
-                <tr th:if="${deliveryPointCode != null}">
-                    <th th:text="#{order.collection.point}"></th>
-                    <td th:text="${deliveryPointCode}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{person.name}"></th>
-                    <td id="view-name" th:text="*{shippingDetails.name}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{person.surname}"></th>
-                    <td id="view-surname" th:text="*{shippingDetails.surname}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{order.address.company}"></th>
-                    <td id="view-company" th:text="*{shippingDetails.companyName}"></td>
-                </tr>
-                <tr th:if="${deliveryPointCode == null}">
-                    <th th:text="#{address.street}"></th>
-                    <td id="view-street" th:text="*{shippingDetails.streetAndNumber}"></td>
-                </tr>
-                <tr th:if="${deliveryPointCode == null}">
-                    <th th:text="#{address.postal.code}"></th>
-                    <td id="view-postal" th:text="*{shippingDetails.postalCode}"></td>
-                </tr>
-                <tr th:if="${deliveryPointCode == null}">
-                    <th th:text="#{address.city}"></th>
-                    <td id="view-city" th:text="*{shippingDetails.city}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{address.country}"></th>
-                    <td id="view-country" th:text="*{shippingDetails.country}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{person.email}"></th>
-                    <td id="view-email" th:text="*{shippingDetails.email}"></td>
-                </tr>
-                <tr>
-                    <th th:text="#{person.phone}"></th>
-                    <td id="view-phone" th:text="*{shippingDetails.phone}"></td>
-                </tr>
-                </tbody>
-            </table>
+            <label class="label"
+                   th:text="(${deliveryPointCode != null} ? #{shipping.collection.address} : #{shipping.delivery.address}) + ':'"></label>
+
+            <p th:if="${deliveryPointCode != null}">
+                <strong th:text="#{shipping.parcel.locker} + ':'"></strong>
+                <span th:text="${deliveryPointCode}"></span>
+            </p>
+
+            <p class="mt-3">
+                <span id="view-name" th:text="*{shippingDetails.name}"></span>
+                <span id="view-surname" th:text="*{shippingDetails.surname}"></span>
+            </p>
+            <p id="view-company" th:text="*{shippingDetails.companyName}"></p>
+            <p th:if="${deliveryPointCode == null}" id="view-street" th:text="*{shippingDetails.streetAndNumber}"></p>
+            <p th:if="${deliveryPointCode == null}">
+                <span id="view-postal" th:text="*{shippingDetails.postalCode}"></span>
+                <span id="view-city" th:text="*{shippingDetails.city}"></span>
+            </p>
+            <p id="view-country" th:text="*{shippingDetails.country}"></p>
+            <p id="view-email" th:text="*{shippingDetails.email}"></p>
+            <p>
+                <strong th:text="#{person.phone} + ':'"></strong>
+                <span id="view-phone" th:text="*{shippingDetails.phone}"></span>
+            </p>
         </div>
 
         <div class="field">
