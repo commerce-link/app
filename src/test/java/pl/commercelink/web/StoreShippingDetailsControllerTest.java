@@ -114,7 +114,29 @@ class StoreShippingDetailsControllerTest {
             ArgumentCaptor<Store> saved = ArgumentCaptor.forClass(Store.class);
             verify(storesRepository).save(saved.capture());
             assertThat(saved.getValue().getShippingDetails()).hasSize(1);
-            assertThat(saved.getValue().getDefaultShippingDetails()).isNotNull();
+            assertThat(saved.getValue().getDefaultShippingDetails().getCompanyName()).isEqualTo("Sklep");
+        }
+    }
+
+    @Test
+    void defaultFlagFollowsTheChosenIndexAmongSeveralValidAddresses() {
+        // given
+        Store existing = existingStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(existing);
+        StoreForm form = formWith(
+                List.of(address("Sklep A", "ul. Pierwsza 1"), address("Sklep B", "ul. Druga 2")), 1);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            storeController.updateStoreWarehouse(form, Locale.ENGLISH, redirectAttributes);
+
+            // then
+            ArgumentCaptor<Store> saved = ArgumentCaptor.forClass(Store.class);
+            verify(storesRepository).save(saved.capture());
+            assertThat(saved.getValue().getDefaultShippingDetails().getStreetAndNumber()).isEqualTo("ul. Druga 2");
+            assertThat(saved.getValue().getShippingDetails().get(0).is_default()).isFalse();
         }
     }
 
