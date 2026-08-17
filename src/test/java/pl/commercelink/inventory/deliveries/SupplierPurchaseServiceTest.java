@@ -426,7 +426,7 @@ class SupplierPurchaseServiceTest {
         service.processPending(STORE_ID, DELIVERY_ID);
 
         // then
-        verify(deliveryCreationService, never()).releaseAllocations(any(), any(), any());
+        verify(deliveryCreationService, never()).releaseAllocations(any(), any());
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("No Elko code found for EAN 4006381333931", delivery.getOrderErrorMessage());
         verify(deliveriesRepository).save(delivery);
@@ -1109,11 +1109,11 @@ class SupplierPurchaseServiceTest {
         service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
 
         // then
-        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), eq(delivery), any(DeliveryCreationForm.class));
+        verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
     }
 
     @Test
-    void rejectionStoresTheReasonAndPublishesNothing() throws Exception {
+    void rejectReleasesAllocationsAndDeletesTheDelivery() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
@@ -1123,9 +1123,9 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        assertEquals(DeliveryOrderStatus.REJECTED, delivery.getOrderStatus());
-        assertEquals("Cena wzrosla o 20%", delivery.getRejectionReason());
-        verify(deliveriesRepository).save(delivery);
+        verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
+        verify(deliveriesRepository).delete(delivery);
+        verify(deliveriesRepository, never()).save(delivery);
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 

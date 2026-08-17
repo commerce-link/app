@@ -7,6 +7,9 @@
 <div layout:fragment="content">
     <section class="section">
         <div class="container">
+            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="notification is-danger is-light" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
             <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
                 <h1 class="mb-0" th:text="#{deliveries.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
@@ -107,8 +110,6 @@
                                 <span class="tag is-danger ml-1" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag is-warning ml-1" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
-                                <span class="tag is-dark ml-1" th:if="${delivery.orderRejected}"
-                                      th:text="#{deliveries.status.rejected}"></span>
                             </td>
                             <td th:text="${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>

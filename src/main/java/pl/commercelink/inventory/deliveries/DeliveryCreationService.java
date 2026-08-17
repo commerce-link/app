@@ -50,9 +50,9 @@ public class DeliveryCreationService {
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
-    public void releaseAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
-        delivery.decreaseTotalCost(allocationsCost(form));
+    public void releaseAllocations(String storeId, Delivery delivery) {
+        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
+        warehouseAllocationsManager.release(storeId, delivery.getDeliveryId());
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {

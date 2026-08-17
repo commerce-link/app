@@ -43,7 +43,6 @@ public class SupplierPurchaseService {
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
-    private static final String PURCHASE_REJECTED_EVENT = "DELIVERY_PURCHASE_REJECTED";
 
     private final SupplierProviderFactory supplierProviderFactory;
     private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
@@ -259,11 +258,8 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
-        deliveryCreationService.releaseAllocations(storeId, delivery, rebuildForm(storeId, delivery));
-        delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
-        delivery.setRejectionReason(reason);
-        delivery.addEvent(new Event(EventType.action, PURCHASE_REJECTED_EVENT, LocalDateTime.now()));
-        deliveriesRepository.save(delivery);
+        deliveryCreationService.releaseAllocations(storeId, delivery);
+        deliveriesRepository.delete(delivery);
         return OperationResult.success(delivery.getDeliveryId());
     }
 

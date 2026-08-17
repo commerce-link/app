@@ -667,7 +667,9 @@ public class DeliveriesController {
                     messageSource.getMessage(result.getMessage(), null, locale));
             return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return storeDeliveryDetailsRedirect(storeId, deliveryId);
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("deliveries.approval.rejected.success", null, locale));
+        return "redirect:/dashboard/deliveries";
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")

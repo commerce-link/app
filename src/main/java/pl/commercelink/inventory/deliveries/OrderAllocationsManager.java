@@ -68,20 +68,14 @@ public class OrderAllocationsManager {
         }
     }
 
-    public void release(String storeId, String deliveryId, String provider, List<DeliveryItem> items) {
-        Map<String, List<String>> itemIdsByOrderId = new HashMap<>();
+    public void release(String storeId, String deliveryId, String provider) {
+        Map<String, List<String>> itemIdsByOrderId = orderItemsRepository.findByDeliveryId(deliveryId)
+                .stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId,
+                        Collectors.mapping(OrderItem::getItemId, Collectors.toList())));
 
-        for (DeliveryItem item : items) {
-            for (Allocation allocation : item.getSelectedAllocations(AllocationType.Order)) {
-                itemIdsByOrderId
-                        .computeIfAbsent(allocation.getKey().getOrderId(), k -> new ArrayList<>())
-                        .add(allocation.getKey().getItemId());
-            }
-        }
-
-        for (String orderId : itemIdsByOrderId.keySet()) {
-            ordersManager.returnOrderItemsToSupplierAllocation(storeId, orderId, deliveryId, provider, itemIdsByOrderId.get(orderId));
-        }
+        itemIdsByOrderId.forEach((orderId, itemIds) ->
+                ordersManager.returnOrderItemsToSupplierAllocation(storeId, orderId, deliveryId, provider, itemIds));
     }
 
     public boolean updateFulfilment(String storeId, String provider, String orderId, String itemId, String ean, String mfn, double unitCost) {

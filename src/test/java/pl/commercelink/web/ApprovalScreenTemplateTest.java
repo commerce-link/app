@@ -90,7 +90,6 @@ class ApprovalScreenTemplateTest {
 
         // then
         assertThat(html.indexOf("deliveries.status.awaitingApproval")).isBetween(statuses, editFormEnd);
-        assertThat(html.indexOf("deliveries.status.rejected")).isBetween(statuses, editFormEnd);
     }
 
     @Test
@@ -101,8 +100,8 @@ class ApprovalScreenTemplateTest {
 
         // then
         assertThat(html.indexOf("#{general.reason}")).isBetween(0, editFormEnd);
-        assertThat(html.indexOf("delivery.rejectionReason")).isBetween(0, editFormEnd);
         assertThat(html.indexOf("delivery.orderErrorMessage")).isBetween(0, editFormEnd);
+        assertThat(html).doesNotContain("delivery.rejectionReason");
         assertThat(html).doesNotContain("notification is-danger is-light");
         assertThat(html).doesNotContain("notification is-warning is-light");
     }

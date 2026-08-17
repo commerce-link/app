@@ -98,22 +98,18 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
-    void releaseAllocationsHandsTheOrderAllocationsBackToTheSupplier() {
+    void releaseAllocationsHandsBothAllocationGroupsBackToTheSupplierAndTheWarehouse() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(2);
-        item.setUnitCost(90.0);
-        form.getItems().add(item);
+        delivery.setProvider(PROVIDER);
 
         // when
-        service.releaseAllocations(STORE_ID, delivery, form);
+        service.releaseAllocations(STORE_ID, delivery);
 
         // then
-        verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER, form.getItems());
+        verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER);
+        verify(warehouseAllocationsManager).release(STORE_ID, "delivery-1");
     }
 
     @Test

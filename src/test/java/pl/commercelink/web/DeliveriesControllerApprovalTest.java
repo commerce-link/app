@@ -98,18 +98,22 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void rejectingRedirectsBackToTheStoreScopedDeliveryDetails() {
+    void rejectingRedirectsToTheDeliveriesListWithASuccessMessage() {
         // given
         when(supplierPurchaseService.reject(STORE_ID, DELIVERY_ID, "out of stock"))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.approval.rejected.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Zgłoszenie odrzucone. Pozycje wróciły do puli dostawcy, dostawa została usunięta.");
 
         // when
         String view = deliveriesController.rejectPurchase(STORE_ID, DELIVERY_ID, "out of stock",
                 redirectAttributes, Locale.forLanguageTag("pl"));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries");
         verify(supplierPurchaseService).reject(eq(STORE_ID), eq(DELIVERY_ID), eq("out of stock"));
+        verify(redirectAttributes).addFlashAttribute("successMessage",
+                "Zgłoszenie odrzucone. Pozycje wróciły do puli dostawcy, dostawa została usunięta.");
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
 
