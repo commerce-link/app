@@ -90,6 +90,8 @@ class SupplierPurchaseServiceTest {
     private SupplierProvider globalSupplierProvider;
     @Mock
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
+    @Mock
+    private DeliveriesQueryService deliveriesQueryService;
     @Spy
     private ObjectMapper objectMapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -377,6 +379,49 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void processPendingRebuildsOrderLinesFromClaimedAllocations() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery pending = pendingDelivery(form, "ref-1");
+        pending.setDeliveryAddressId("addr-7");
+
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, "item-1", "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setName("Product EAN-1");
+        allocation.setEan("EAN-1");
+        allocation.setMfn("MFN-1");
+        allocation.setUnitCost(100.0);
+        allocation.setQty(2);
+
+        Delivery withAllocations = new Delivery();
+        withAllocations.setDeliveryId(DELIVERY_ID);
+        withAllocations.setProvider(PROVIDER);
+        withAllocations.setItems(DeliveryItem.groupAndUnify(List.of(allocation)));
+
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(pending);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        ArgumentCaptor<SupplierPurchaseRequest> request = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).placeOrder(request.capture());
+        assertEquals(1, request.getValue().lines().size());
+        assertEquals(2, request.getValue().lines().getFirst().quantity());
+        assertEquals("addr-7", request.getValue().deliveryAddressId());
+    }
+
+    @Test
     void processPendingMarksDeliveryFailedOnSupplierOrderException() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -502,8 +547,8 @@ class SupplierPurchaseServiceTest {
     void processPendingCarriesTheChosenDeliveryAddressThroughTheQueue() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
-        form.setDeliveryAddressId("17200617");
         Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setDeliveryAddressId("17200617");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("4006381333931", "MFN-A", 10, 110.0, "PLN")));
@@ -706,8 +751,8 @@ class SupplierPurchaseServiceTest {
     void processPendingRecordsTheResolvedAddressLabelWhenTheSupplierListsTheChosenAddress() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
-        form.setDeliveryAddressId("17200617");
         Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setDeliveryAddressId("17200617");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
@@ -732,8 +777,8 @@ class SupplierPurchaseServiceTest {
     void processPendingFallsBackToTheRawIdWhenTheSupplierNoLongerListsTheChosenAddress() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
-        form.setDeliveryAddressId("99999999");
         Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setDeliveryAddressId("99999999");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
@@ -758,8 +803,8 @@ class SupplierPurchaseServiceTest {
     void processPendingFallsBackToTheRawIdWhenAddressLookupThrowsAndTheOrderStillCompletes() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
-        form.setDeliveryAddressId("17200617");
         Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setDeliveryAddressId("17200617");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.deliveryAddresses()).thenThrow(new RuntimeException("503 Service Unavailable"));
@@ -806,8 +851,8 @@ class SupplierPurchaseServiceTest {
     void processPendingRecordsTheAttemptedAddressEvenWhenThePurchaseFails() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
-        form.setDeliveryAddressId("17200617");
         Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setDeliveryAddressId("17200617");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.deliveryAddresses()).thenReturn(List.of(
@@ -830,8 +875,32 @@ class SupplierPurchaseServiceTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
+        delivery.setProvider(form.getProvider());
         delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
+        lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenReturn(deliveryWithAllocations(form, DELIVERY_ID));
         return delivery;
+    }
+
+    private Delivery deliveryWithAllocations(DeliveryCreationForm form, String deliveryId) {
+        List<Allocation> allocations = form.getItems().stream()
+                .map(item -> {
+                    Allocation allocation = new Allocation();
+                    allocation.setKey(new AllocationKey(null, java.util.UUID.randomUUID().toString(), "Warehouse"));
+                    allocation.setType(AllocationType.Warehouse);
+                    allocation.setName(item.getName());
+                    allocation.setEan(item.getEan());
+                    allocation.setMfn(item.getMfn());
+                    allocation.setUnitCost(item.getUnitCost());
+                    allocation.setQty(item.getRequestedQty());
+                    return allocation;
+                })
+                .toList();
+        Delivery withAllocations = new Delivery();
+        withAllocations.setDeliveryId(deliveryId);
+        withAllocations.setProvider(form.getProvider());
+        withAllocations.setItems(DeliveryItem.groupAndUnify(allocations));
+        return withAllocations;
     }
 
     @Test
@@ -893,7 +962,7 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void approvalWritesTheChosenAddressIntoThePendingFormAndQueuesTheOrder() throws Exception {
+    void approvalNoLongerWritesIntoThePendingOrderFormButStillQueuesTheOrder() throws Exception {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -902,6 +971,7 @@ class SupplierPurchaseServiceTest {
         when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
         Delivery delivery = awaitingApprovalDelivery();
+        String originalPendingOrderForm = delivery.getPendingOrderForm();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -910,9 +980,8 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
-        DeliveryCreationForm persistedForm = objectMapper.readValue(
-                delivery.getPendingOrderForm(), DeliveryCreationForm.class);
-        assertEquals("17200617", persistedForm.getDeliveryAddressId());
+        assertEquals(originalPendingOrderForm, delivery.getPendingOrderForm());
+        assertEquals("17200617", delivery.getDeliveryAddressId());
         verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
     }
 
@@ -1180,9 +1249,12 @@ class SupplierPurchaseServiceTest {
 
     private Delivery awaitingApprovalDelivery() throws Exception {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
         delivery.setPurchaseRef("ref-1");
         delivery.setPendingOrderForm(objectMapper.writeValueAsString(formWithOneOrderableItem()));
+        lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenReturn(deliveryWithAllocations(formWithOneOrderableItem(), DELIVERY_ID));
         return delivery;
     }
 

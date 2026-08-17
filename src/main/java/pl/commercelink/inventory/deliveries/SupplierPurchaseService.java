@@ -59,6 +59,7 @@ public class SupplierPurchaseService {
     private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
+    private final DeliveriesQueryService deliveriesQueryService;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -160,7 +161,7 @@ public class SupplierPurchaseService {
             return;
         }
 
-        DeliveryCreationForm form = readPendingForm(delivery);
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
         delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
@@ -229,7 +230,7 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
-        DeliveryCreationForm form = readPendingForm(delivery);
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
         form.setDeliveryAddressId(deliveryAddressId);
         delivery.setDeliveryAddressId(deliveryAddressId);
 
@@ -244,12 +245,6 @@ public class SupplierPurchaseService {
         }
         if (!validation.fullyAvailable()) {
             return OperationResult.failure("deliveries.purchase.error.availability");
-        }
-
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            return OperationResult.failure("deliveries.purchase.error.failed");
         }
 
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
@@ -280,7 +275,19 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             throw new IllegalStateException("Delivery " + deliveryId + " is not awaiting approval");
         }
-        return validate(storeId, readPendingForm(delivery), delivery.getPurchaseRef());
+        return validate(storeId, rebuildForm(storeId, delivery), delivery.getPurchaseRef());
+    }
+
+    private DeliveryCreationForm rebuildForm(String storeId, Delivery delivery) {
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, delivery.getDeliveryId());
+        withAllocations.getItems().forEach(item -> item.setRequestedQty(item.getOrderedQty()));
+
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setStoreId(storeId);
+        form.setProvider(delivery.getProvider());
+        form.setDeliveryAddressId(delivery.getDeliveryAddressId());
+        form.getItems().addAll(withAllocations.getItems());
+        return form;
     }
 
     private Delivery findAwaitingApproval(String storeId, String deliveryId) {
