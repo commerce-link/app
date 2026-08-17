@@ -109,6 +109,8 @@
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
                                 <span class="tag is-dark ml-1" th:if="${delivery.orderRejected}"
                                       th:text="#{deliveries.status.rejected}"></span>
+                                <span class="tag is-info ml-1" th:if="${delivery.dropship}"
+                                      th:text="#{deliveries.dropship.badge}"></span>
                             </td>
                             <td th:text="${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>

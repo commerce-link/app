@@ -627,8 +627,10 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
-        addApprovalAddresses(storeId, delivery, model);
-        addSuggestedAddress(storeId, model);
+        if (!delivery.isDropship()) {
+            addApprovalAddresses(storeId, delivery, model);
+            addSuggestedAddress(storeId, model);
+        }
         return "deliveryApproval";
     }
 

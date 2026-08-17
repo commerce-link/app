@@ -28,12 +28,18 @@
                  th:if="${approvalAddressError == null and approvalAddresses != null and #lists.isEmpty(approvalAddresses)}"
                  th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></div>
 
-            <div class="notification is-info is-light" th:if="${suggestedAddress != null}">
+            <div class="notification is-info is-light" th:if="${delivery.dropship}">
+                <strong th:text="#{deliveries.dropship.badge}">Dropshipping</strong> &mdash;
+                <span th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</span>:
+                <span th:text="${delivery.deliveryAddress}"></span>
+            </div>
+
+            <div class="notification is-info is-light" th:if="${!delivery.dropship and suggestedAddress != null}">
                 <strong th:text="#{deliveries.approval.suggestedAddress}">Store default shipping address</strong>:
                 <span th:text="${suggestedAddress.streetAndNumber} + ', ' + ${suggestedAddress.postalCode} + ' ' + ${suggestedAddress.city}"></span>
             </div>
 
-            <div class="notification is-light" th:if="${suggestedAddress == null}"
+            <div class="notification is-light" th:if="${!delivery.dropship and suggestedAddress == null}"
                  th:text="#{deliveries.approval.suggestedAddress.none}"></div>
 
             <form id="approval-approve-form" method="post"
