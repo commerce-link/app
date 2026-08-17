@@ -63,7 +63,6 @@ public class DeliveryCreationService {
         delivery.setPaymentTerms(form.getPaymentTerms());
         delivery.setTax(form.getTax());
         delivery.setOrderStatus(null);
-        delivery.setPendingOrderForm(null);
 
         deliveriesRepository.save(delivery);
         warehouseAllocationsManager.updateUnitCosts(storeId, delivery.getDeliveryId(),

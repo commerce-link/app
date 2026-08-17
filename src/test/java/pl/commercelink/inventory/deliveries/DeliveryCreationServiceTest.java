@@ -51,7 +51,6 @@ class DeliveryCreationServiceTest {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        delivery.setPendingOrderForm("{\"provider\":\"Elko\"}");
 
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setExternalDeliveryId("ELKO-1");
@@ -70,7 +69,6 @@ class DeliveryCreationServiceTest {
         // then
         assertEquals("ELKO-1", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
-        assertNull(delivery.getPendingOrderForm());
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());

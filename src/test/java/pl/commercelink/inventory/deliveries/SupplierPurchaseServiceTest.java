@@ -1,16 +1,11 @@
 package pl.commercelink.inventory.deliveries;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
@@ -92,11 +87,6 @@ class SupplierPurchaseServiceTest {
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
-    @Spy
-    private ObjectMapper objectMapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .build();
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -668,16 +658,10 @@ class SupplierPurchaseServiceTest {
         verify(deliveriesRepository).save(saved.capture());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         assertEquals("ref-1", saved.getValue().getPurchaseRef());
-        assertNotNull(saved.getValue().getPendingOrderForm());
         verify(supplierPurchaseEventPublisher).publish(argThat(request ->
                 request.getPurchaseRef().equals("ref-1")
                         && request.getDeliveryId().equals(saved.getValue().getDeliveryId())));
         assertEquals(saved.getValue().getDeliveryId(), result.getPayload().deliveryId());
-        DeliveryCreationForm rehydrated = objectMapper.readValue(
-                saved.getValue().getPendingOrderForm(), DeliveryCreationForm.class);
-        assertEquals(form.getItems().get(0).getEan(), rehydrated.getItems().get(0).getEan());
-        assertEquals(form.getItems().get(0).getRequestedQty(), rehydrated.getItems().get(0).getRequestedQty());
-        assertEquals(form.getEstimatedDeliveryAt(), rehydrated.getEstimatedDeliveryAt());
     }
 
     @Test
@@ -876,7 +860,6 @@ class SupplierPurchaseServiceTest {
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         delivery.setProvider(form.getProvider());
-        delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
         lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
                 .thenReturn(deliveryWithAllocations(form, DELIVERY_ID));
         return delivery;
@@ -959,30 +942,6 @@ class SupplierPurchaseServiceTest {
         assertTrue(java.util.Arrays.stream(Delivery.class.getDeclaredMethods())
                 .noneMatch(method -> method.getName().equals("isManaged")
                         || method.getName().equals("setManaged")));
-    }
-
-    @Test
-    void approvalNoLongerWritesIntoThePendingOrderFormButStillQueuesTheOrder() throws Exception {
-        // given
-        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
-        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
-        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
-                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
-        Delivery delivery = awaitingApprovalDelivery();
-        String originalPendingOrderForm = delivery.getPendingOrderForm();
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-
-        // when
-        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
-
-        // then
-        assertTrue(result.isSuccess());
-        assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
-        assertEquals(originalPendingOrderForm, delivery.getPendingOrderForm());
-        assertEquals("17200617", delivery.getDeliveryAddressId());
-        verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
     }
 
     @Test
@@ -1154,32 +1113,6 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void requestedItemsListsWhatWasOrderedOnADeliveryThatGaveItsAllocationsBack() throws Exception {
-        // given
-        Delivery delivery = awaitingApprovalDelivery();
-        delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
-
-        // when
-        List<DeliveryItem> items = service.requestedItems(delivery);
-
-        // then
-        assertEquals(1, items.size());
-        assertEquals("5900000000001", items.getFirst().getEan());
-    }
-
-    @Test
-    void requestedItemsIsEmptyForADeliveryThatNeverCarriedAPurchaseForm() {
-        // given
-        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
-
-        // when
-        List<DeliveryItem> items = service.requestedItems(delivery);
-
-        // then
-        assertTrue(items.isEmpty());
-    }
-
-    @Test
     void rejectionStoresTheReasonAndPublishesNothing() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();
@@ -1252,7 +1185,6 @@ class SupplierPurchaseServiceTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
         delivery.setPurchaseRef("ref-1");
-        delivery.setPendingOrderForm(objectMapper.writeValueAsString(formWithOneOrderableItem()));
         lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
                 .thenReturn(deliveryWithAllocations(formWithOneOrderableItem(), DELIVERY_ID));
         return delivery;

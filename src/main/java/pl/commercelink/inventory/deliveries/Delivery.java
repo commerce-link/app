@@ -63,8 +63,6 @@ public class Delivery {
     private String rejectionReason;
     @DynamoDBAttribute(attributeName = "purchaseRef")
     private String purchaseRef;
-    @DynamoDBAttribute(attributeName = "pendingOrderForm")
-    private String pendingOrderForm;
     @DynamoDBAttribute(attributeName = "deliveryAddress")
     private String deliveryAddress;
     @DynamoDBAttribute(attributeName = "deliveryAddressId")
@@ -441,14 +439,6 @@ public class Delivery {
 
     public void setPurchaseRef(String purchaseRef) {
         this.purchaseRef = purchaseRef;
-    }
-
-    public String getPendingOrderForm() {
-        return pendingOrderForm;
-    }
-
-    public void setPendingOrderForm(String pendingOrderForm) {
-        this.pendingOrderForm = pendingOrderForm;
     }
 
     public String getDeliveryAddress() {

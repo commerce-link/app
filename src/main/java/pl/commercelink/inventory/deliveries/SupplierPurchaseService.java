@@ -1,7 +1,5 @@
 package pl.commercelink.inventory.deliveries;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -56,7 +54,6 @@ public class SupplierPurchaseService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
-    private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -262,7 +259,7 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
-        deliveryCreationService.releaseAllocations(storeId, delivery, readPendingForm(delivery));
+        deliveryCreationService.releaseAllocations(storeId, delivery, rebuildForm(storeId, delivery));
         delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
         delivery.setRejectionReason(reason);
         delivery.addEvent(new Event(EventType.action, PURCHASE_REJECTED_EVENT, LocalDateTime.now()));
@@ -298,23 +295,6 @@ public class SupplierPurchaseService {
         return delivery;
     }
 
-    public List<DeliveryItem> requestedItems(Delivery delivery) {
-        if (delivery == null || StringUtils.isBlank(delivery.getPendingOrderForm())) {
-            return List.of();
-        }
-        return readPendingForm(delivery).getItems().stream()
-                .filter(item -> item.getRequestedQty() > 0)
-                .toList();
-    }
-
-    private DeliveryCreationForm readPendingForm(Delivery delivery) {
-        try {
-            return objectMapper.readValue(delivery.getPendingOrderForm(), DeliveryCreationForm.class);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Unreadable pending order form on delivery " + delivery.getDeliveryId(), e);
-        }
-    }
-
     public OperationResult<PurchaseSubmission> submitPurchase(String storeId, DeliveryCreationForm form,
                                                               String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
@@ -346,14 +326,6 @@ public class SupplierPurchaseService {
         delivery.setPurchaseRef(purchaseRef);
         delivery.setDeliveryAddressId(form.getDeliveryAddressId());
         deliveryCreationService.claimAllocations(storeId, delivery, form);
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            System.err.println("[SupplierPurchase] failed to serialize pending order form for store " + storeId
-                    + ", ref " + purchaseRef + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
