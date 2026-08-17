@@ -107,10 +107,10 @@ public class WarehouseAllocationsManager {
         warehouseRepository.delete(warehouseItem);
     }
 
-    public void release(String storeId, String deliveryId) {
+    public void release(String storeId, String deliveryId, String provider) {
         for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
                 List.of(FulfilmentStatus.Ordered))) {
-            item.returnToAllocationPool();
+            item.returnToAllocationPool(provider);
             warehouseRepository.save(item);
         }
     }

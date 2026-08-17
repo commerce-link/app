@@ -52,7 +52,7 @@ public class DeliveryCreationService {
 
     public void releaseAllocations(String storeId, Delivery delivery) {
         orderAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
-        warehouseAllocationsManager.release(storeId, delivery.getDeliveryId());
+        warehouseAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {

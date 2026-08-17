@@ -109,7 +109,7 @@ class DeliveryCreationServiceTest {
 
         // then
         verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER);
-        verify(warehouseAllocationsManager).release(STORE_ID, "delivery-1");
+        verify(warehouseAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER);
     }
 
     @Test

@@ -114,11 +114,11 @@ class WarehouseAllocationsManagerTest {
                 .thenReturn(List.of(claimed));
 
         // when
-        warehouseAllocationsManager.release(STORE_ID, "delivery-1");
+        warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
 
         // then
         assertThat(claimed.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
-        assertThat(claimed.getDeliveryId()).isNull();
+        assertThat(claimed.getDeliveryId()).isEqualTo("Acme");
         assertThat(claimed.getQty()).isEqualTo(4);
         verify(warehouseRepository).save(claimed);
     }
@@ -135,7 +135,7 @@ class WarehouseAllocationsManagerTest {
                 .thenReturn(List.of());
 
         // when
-        warehouseAllocationsManager.release(STORE_ID, "delivery-1");
+        warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
 
         // then
         assertThat(delivered.getStatus()).isEqualTo(FulfilmentStatus.Delivered);

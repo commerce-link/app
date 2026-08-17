@@ -81,9 +81,9 @@ public class WarehouseItem extends Item {
     }
 
     @DynamoDBIgnore
-    public void returnToAllocationPool() {
+    public void returnToAllocationPool(String provider) {
         this.setStatus(FulfilmentStatus.Allocation);
-        this.setDeliveryId(null);
+        this.setDeliveryId(provider);
     }
 
     @DynamoDBIgnore
