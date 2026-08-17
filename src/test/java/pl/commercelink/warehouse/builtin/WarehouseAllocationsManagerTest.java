@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -101,21 +99,22 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("release returns all delivery warehouse items to the allocation pool")
     void releaseReturnsAllDeliveryWarehouseItemsToAllocationPool() {
         // given
         WarehouseItem claimed = new WarehouseItem();
         claimed.setStatus(FulfilmentStatus.Ordered);
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(4);
-        when(warehouseRepository.findByDeliveryId("store-1", "delivery-1")).thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        warehouseAllocationsManager.release("store-1", "delivery-1");
+        warehouseAllocationsManager.release(STORE_ID, "delivery-1");
 
         // then
-        assertEquals(FulfilmentStatus.Allocation, claimed.getStatus());
-        assertNull(claimed.getDeliveryId());
-        assertEquals(4, claimed.getQty());
+        assertThat(claimed.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(claimed.getDeliveryId()).isNull();
+        assertThat(claimed.getQty()).isEqualTo(4);
         verify(warehouseRepository).save(claimed);
     }
 
@@ -126,10 +125,10 @@ class WarehouseAllocationsManagerTest {
         WarehouseItem claimed = new WarehouseItem();
         claimed.setManufacturerCode("MFN-1");
         claimed.setCost(10.0);
-        when(warehouseRepository.findByDeliveryId("store-1", "delivery-1")).thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        warehouseAllocationsManager.updateUnitCosts("store-1", "delivery-1", Map.of("MFN-1", 8.5));
+        warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
 
         // then
         assertThat(claimed.getCost()).isEqualTo(8.5);
@@ -143,10 +142,10 @@ class WarehouseAllocationsManagerTest {
         WarehouseItem claimed = new WarehouseItem();
         claimed.setManufacturerCode("MFN-2");
         claimed.setCost(10.0);
-        when(warehouseRepository.findByDeliveryId("store-1", "delivery-1")).thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        warehouseAllocationsManager.updateUnitCosts("store-1", "delivery-1", Map.of("MFN-1", 8.5));
+        warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
 
         // then
         assertThat(claimed.getCost()).isEqualTo(10.0);
