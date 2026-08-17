@@ -195,7 +195,8 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            String view = deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, model);
+            String view = deliveriesController.showDeliveryDetailsForSuperAdmin(
+                    STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("deliveryDetails");
@@ -218,7 +219,7 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("deliveryDetails");
@@ -226,6 +227,44 @@ class DeliveriesControllerApprovalTest {
             assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
+    }
+
+    @Test
+    void showDeliveryDetailsRedirectsToListWhenDeliveryIsGone() {
+        // given
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(null);
+        when(messageSource.getMessage(eq("deliveries.error.notFound"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery does not exist or has been removed.");
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries");
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "This delivery does not exist or has been removed.");
+        }
+    }
+
+    @Test
+    void showDeliveryDetailsForSuperAdminRedirectsToListWhenDeliveryIsGone() {
+        // given
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(null);
+        when(messageSource.getMessage(eq("deliveries.error.notFound"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawa nie istnieje lub została usunięta.");
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showDeliveryDetailsForSuperAdmin(
+                STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawa nie istnieje lub została usunięta.");
     }
 
     @Test

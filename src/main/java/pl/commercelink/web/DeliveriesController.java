@@ -722,18 +722,26 @@ public class DeliveriesController {
 
     @GetMapping("/dashboard/deliveries/details")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public String showDeliveryDetails(@RequestParam String deliveryId, Model model) {
-        return showDeliveryDetails(getStoreId(), deliveryId, model);
+    public String showDeliveryDetails(@RequestParam String deliveryId, Model model,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        return showDeliveryDetails(getStoreId(), deliveryId, model, redirectAttributes, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/deliveries/details")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String showDeliveryDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId, Model model) {
-        return showDeliveryDetails(storeId, deliveryId, model);
+    public String showDeliveryDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId,
+                                                   Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        return showDeliveryDetails(storeId, deliveryId, model, redirectAttributes, locale);
     }
 
-    private String showDeliveryDetails(String storeId, String deliveryId, Model model) {
+    private String showDeliveryDetails(String storeId, String deliveryId, Model model,
+                                       RedirectAttributes redirectAttributes, Locale locale) {
         var delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (delivery == null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.error.notFound", null, locale));
+            return "redirect:/dashboard/deliveries";
+        }
         var mergeTargetDeliveries = deliveriesRepository.findPendingDeliveriesByProvider(
                 storeId, delivery.getProvider(), deliveryId);
 
