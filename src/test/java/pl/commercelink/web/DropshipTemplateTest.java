@@ -57,10 +57,24 @@ class DropshipTemplateTest {
 
         // then
         assertThat(html).contains("${dropshipCandidates}");
-        assertThat(html).contains("deliveries.preview.dropship.send");
-        assertThat(html).contains("deliveries.preview.dropship.multiSupplier");
-        assertThat(html).contains("dropshipAvailability.get(candidate.provider)");
+        assertThat(html).contains("deliveries.dropship.badge");
+        assertThat(html).contains("deliveries.preview.create");
         assertThat(html).contains("/dropship");
+    }
+
+    @Test
+    void createScreenMirrorsTheWarehouseCreateScreen() throws Exception {
+        // when
+        String html = read("dropshipCreate.html");
+
+        // then
+        assertThat(html).contains("orders.dropship.create.title");
+        assertThat(html).contains("orders.dropship.confirm.consignee");
+        assertThat(html).contains("dropship/create");
+        assertThat(html).contains("dropship/purchase");
+        assertThat(html).contains("deliveries.purchase.button");
+        assertThat(html).contains("general.save");
+        assertThat(html).contains("allocations[__${allocStat.index}__].key.orderId");
     }
 
     @Test

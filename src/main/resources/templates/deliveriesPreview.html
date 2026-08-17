@@ -30,15 +30,10 @@
                     </div>
                     <div class="level-right">
                         <div class="level-item">
-                            <span class="tag is-warning" th:if="${candidate.multiSupplier}"
-                                  th:text="#{deliveries.preview.dropship.multiSupplier}">Split across suppliers</span>
-                            <span class="tag is-light" th:if="${!candidate.multiSupplier and !dropshipAvailability.get(candidate.provider)}"
-                                  th:text="#{orders.dropship.error.unsupported}">Supplier does not support dropshipping</span>
-                            <a th:if="${!candidate.multiSupplier and dropshipAvailability.get(candidate.provider)}"
-                               th:href="${isSuperAdmin}
+                            <a th:href="${isSuperAdmin}
                                     ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship(storeId=${storeId}, orderId=${candidate.orderId})}
                                     : @{/dashboard/orders/{orderId}/dropship(orderId=${candidate.orderId})}"
-                               class="button is-primary" th:text="#{deliveries.preview.dropship.send}">Ship to customer</a>
+                               class="button is-primary" th:text="#{deliveries.preview.create}">Create Delivery</a>
                         </div>
                     </div>
                 </div>

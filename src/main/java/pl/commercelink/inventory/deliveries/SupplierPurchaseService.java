@@ -453,6 +453,37 @@ public class SupplierPurchaseService {
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }
 
+    public OperationResult<String> createManualDropship(String storeId, Order order, DeliveryCreationForm form) {
+        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            return OperationResult.failure("orders.dropship.error.fulfilmentType");
+        }
+        if (!order.hasShippingDetails()) {
+            return OperationResult.failure("orders.dropship.error.address");
+        }
+        boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
+        if (!hasOrderableItems) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+
+        Delivery delivery = new Delivery(storeId, form.getExternalDeliveryId(), form.getProvider(),
+                form.getEstimatedDeliveryAt(), form.getShippingCost(), form.getPaymentCost(),
+                form.getPaymentTerms(), form.getTax());
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setDropshipOrderId(order.getOrderId());
+        delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
+        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
+        deliveryCreationService.claimAllocations(storeId, delivery, form);
+
+        deliveriesRepository.save(delivery);
+        dropshipOrderCompletion.markSuppliedByDropship(storeId, order.getOrderId(), delivery.getDeliveryId());
+
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
     private SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines) {
         Order order = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
         if (order == null || !order.hasShippingDetails()) {

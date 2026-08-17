@@ -45,6 +45,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -373,6 +374,48 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         verify(supplierProvider, never()).placeDropshipOrder(any());
         verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), same(delivery), any());
+    }
+
+    @Test
+    void createManualDropshipCreatesASettledDeliveryAndMarksItemsSupplied() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.setExternalDeliveryId("PHONE-123");
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+
+        // when
+        OperationResult<String> result = service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        Delivery delivery = saved.getValue();
+        assertEquals(ORDER_ID, delivery.getDropshipOrderId());
+        assertEquals("PHONE-123", delivery.getExternalDeliveryId());
+        assertNull(delivery.getOrderStatus());
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
+        verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, delivery.getDeliveryId());
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
+        verify(supplierProvider, never()).placeDropshipOrder(any());
+    }
+
+    @Test
+    void createManualDropshipRejectsWarehouseFulfilmentOrder() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        Order order = directToConsumerOrder();
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+
+        // when
+        OperationResult<String> result = service.createManualDropship(
+                STORE_ID, order, formWithItem("EAN-1", "MFN-1", 2, 100.0));
+
+        // then
+        assertFalse(result.isSuccess());
+        verify(deliveriesRepository, never()).save(any());
+        verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
     }
 
     @Test

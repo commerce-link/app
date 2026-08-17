@@ -10,6 +10,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,6 +22,8 @@ class DeliveriesPlanningServiceTest {
     private OrderAllocationsManager orderAllocationsManager;
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Mock
+    private SupplierPurchaseService supplierPurchaseService;
 
     @InjectMocks
     private DeliveriesPlanningService service;
@@ -42,8 +45,9 @@ class DeliveriesPlanningServiceTest {
     }
 
     @Test
-    void directToConsumerAllocationsAreKeptOutOfSupplierBatches() {
+    void dropshipCandidatesAreKeptOutOfSupplierBatches() {
         // given
+        when(supplierPurchaseService.isDropshipAvailable(STORE_ID, "Acme")).thenReturn(true);
         when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
                 allocation("order-1", "1", "Acme", false),
                 allocation("order-2", "2", "Acme", true)));
@@ -61,6 +65,7 @@ class DeliveriesPlanningServiceTest {
     @Test
     void dropshipCandidatesGroupDirectToConsumerAllocationsPerOrder() {
         // given
+        when(supplierPurchaseService.isDropshipAvailable(STORE_ID, "Acme")).thenReturn(true);
         when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
                 allocation("order-1", "1", "Acme", false),
                 allocation("order-2", "2", "Acme", true),
@@ -77,22 +82,43 @@ class DeliveriesPlanningServiceTest {
         assertThat(first.provider()).isEqualTo("Acme");
         assertThat(first.customer()).isEqualTo("customer");
         assertThat(first.items()).hasSize(2);
-        assertThat(first.multiSupplier()).isFalse();
     }
 
     @Test
-    void dropshipCandidateSpanningTwoSuppliersIsFlaggedAsMultiSupplier() {
+    void directToConsumerOrderAtASupplierWithoutDropshipFallsBackToTheBatch() {
         // given
+        when(supplierPurchaseService.isDropshipAvailable(STORE_ID, "AcmeB")).thenReturn(false);
         when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
-                allocation("order-2", "2", "Acme", true),
-                allocation("order-2", "3", "Elko", true)));
+                allocation("order-2", "2", "AcmeB", true)));
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
 
         // when
         List<DropshipCandidate> candidates = service.dropshipCandidates(STORE_ID);
+        List<Delivery> deliveries = service.run(STORE_ID);
 
         // then
-        assertThat(candidates).hasSize(2);
-        assertThat(candidates).allMatch(DropshipCandidate::multiSupplier);
+        assertThat(candidates).isEmpty();
+        assertThat(deliveries).hasSize(1);
+        assertThat(deliveries.getFirst().getProvider()).isEqualTo("AcmeB");
+        assertThat(deliveries.getFirst().getAllocations()).hasSize(1);
+    }
+
+    @Test
+    void directToConsumerOrderSplitAcrossSuppliersFallsBackToTheBatches() {
+        // given
+        lenient().when(supplierPurchaseService.isDropshipAvailable(STORE_ID, "Acme")).thenReturn(true);
+        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+                allocation("order-2", "2", "Acme", true),
+                allocation("order-2", "3", "Elko", true)));
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+
+        // when
+        List<DropshipCandidate> candidates = service.dropshipCandidates(STORE_ID);
+        List<Delivery> deliveries = service.run(STORE_ID);
+
+        // then
+        assertThat(candidates).isEmpty();
+        assertThat(deliveries).hasSize(2);
     }
 
     @Test

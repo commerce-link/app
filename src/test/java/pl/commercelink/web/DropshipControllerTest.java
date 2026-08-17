@@ -58,6 +58,8 @@ class DropshipControllerTest {
     private DeliveryTaxResolver deliveryTaxResolver;
     @Mock
     private MessageSource messageSource;
+    @Mock
+    private org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes;
 
     @InjectMocks
     private DropshipController controller;
@@ -97,7 +99,7 @@ class DropshipControllerTest {
     }
 
     @Test
-    void confirmationScreenBuildsTheFormFromTheOrdersAllocations() {
+    void createScreenBuildsTheFormFromTheOrdersAllocations() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -111,11 +113,11 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipConfirmation(ORDER_ID, model);
+            view = controller.dropshipCreate(ORDER_ID, model);
         }
 
         // then
-        assertThat(view).isEqualTo("dropshipConfirmation");
+        assertThat(view).isEqualTo("dropshipCreate");
         DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
         assertThat(form.getProvider()).isEqualTo(PROVIDER);
         assertThat(form.getItems()).hasSize(1);
@@ -123,11 +125,57 @@ class DropshipControllerTest {
         assertThat(item.getRequestedQty()).isEqualTo(2);
         assertThat(item.getAllocations()).allMatch(allocation -> allocation.isSelected());
         assertThat(model.getAttribute("consignee")).isSameAs(order.getShippingDetails());
-        assertThat(model.getAttribute("purchaseRef")).isNotNull();
     }
 
     @Test
-    void confirmationScreenRedirectsBackWhenTheOrderIsNotEligible() {
+    void purchasePostShowsTheConfirmationWithAFreshPurchaseRef() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.dropshipPurchase(ORDER_ID, form, model);
+        }
+
+        // then
+        assertThat(view).isEqualTo("dropshipConfirmation");
+        assertThat(model.getAttribute("purchaseRef")).isNotNull();
+        assertThat(model.getAttribute("form")).isSameAs(form);
+    }
+
+    @Test
+    void manualCreateRedirectsToTheCreatedDelivery() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        when(supplierPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
+                .thenReturn(OperationResult.success("delivery-7"));
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-7");
+    }
+
+    @Test
+    void createScreenRedirectsBackWhenTheOrderIsNotEligible() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -138,7 +186,7 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipConfirmation(ORDER_ID, new ConcurrentModel());
+            view = controller.dropshipCreate(ORDER_ID, new ConcurrentModel());
         }
 
         // then

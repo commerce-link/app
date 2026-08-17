@@ -353,16 +353,9 @@ public class DeliveriesController {
 
     private String showDeliveriesPreview(String storeId, Model model) {
         var deliveries = deliveriesPlanningService.run(storeId);
-        var dropshipCandidates = deliveriesPlanningService.dropshipCandidates(storeId);
-        Map<String, Boolean> dropshipAvailability = dropshipCandidates.stream()
-                .map(DropshipCandidate::provider)
-                .distinct()
-                .collect(Collectors.toMap(Function.identity(),
-                        provider -> supplierPurchaseService.isDropshipAvailable(storeId, provider)));
 
         model.addAttribute("deliveries", deliveries);
-        model.addAttribute("dropshipCandidates", dropshipCandidates);
-        model.addAttribute("dropshipAvailability", dropshipAvailability);
+        model.addAttribute("dropshipCandidates", deliveriesPlanningService.dropshipCandidates(storeId));
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 

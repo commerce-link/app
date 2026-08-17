@@ -1,0 +1,121 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title">
+                <span th:text="#{orders.dropship.create.title}">Create dropship delivery</span>
+            </h1>
+            <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
+
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <div class="box">
+                <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
+                <p>
+                    <strong th:text="${consignee.displayName}">Jan Kowalski</strong> &middot;
+                    <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
+                       th:text="#{deliveries.preview.dropship.order} + ' ' + ${order.orderId}">Order</a><br/>
+                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span>,
+                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
+                    <span th:text="${consignee.phone}">+48601234567</span> &middot;
+                    <span th:text="${consignee.email}">jan@example.com</span>
+                </p>
+            </div>
+
+            <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/create(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/create(orderId=${order.orderId})}"
+                  th:object="${form}" method="post" id="dropshipCreateForm">
+
+                <input type="hidden" th:field="*{storeId}"/>
+                <input type="hidden" th:field="*{provider}"/>
+
+                <div class="box mb-5">
+                    <div class="columns is-vcentered mb-2">
+                        <div class="column is-3">
+                            <label class="label" th:text="#{general.delivery.id}">Order No</label>
+                            <input class="input" type="text" th:field="*{externalDeliveryId}"/>
+                        </div>
+                        <div class="column is-3">
+                            <label class="label" th:text="#{deliveries.estimated.delivery}">Est. Delivery</label>
+                            <input class="input" type="date" th:field="*{estimatedDeliveryAt}"/>
+                        </div>
+                        <div class="column is-3">
+                            <label class="label" th:text="#{deliveries.shippingCost}">Shipping</label>
+                            <input class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
+                        </div>
+                        <div class="column is-3">
+                            <label class="label" th:text="#{deliveries.tax}">VAT</label>
+                            <input class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
+                        </div>
+                    </div>
+                    <div class="columns is-vcentered">
+                        <div class="column">
+                            <p class="help" th:text="#{orders.dropship.create.manualNote}">Saving records a dropship arranged outside the system.</p>
+                        </div>
+                        <div class="column is-flex is-align-items-center is-justify-content-flex-end">
+                            <button type="submit" class="button" th:text="#{general.save}">Save</button>
+                            <button type="submit" class="button is-primary ml-2" id="dropship-purchase-button"
+                                    formnovalidate
+                                    th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase(orderId=${order.orderId})}"
+                                    th:text="#{deliveries.purchase.button}">Order at supplier</button>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="table is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{general.name}">Name</th>
+                        <th th:text="#{deliveries.orderedQty}">Qty</th>
+                        <th th:text="#{general.ean}">EAN</th>
+                        <th th:text="#{general.manufacturer.code}">MFN</th>
+                        <th th:text="#{general.net.cost}">Unit Cost</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item, itemStat : *{items}">
+                        <td>
+                            <span th:text="${item.name}"></span>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].unitCost}"/>
+                            <th:block th:each="allocation, allocStat : ${item.allocations}">
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"/>
+                            </th:block>
+                        </td>
+                        <td th:text="${item.requestedQty}"></td>
+                        <td th:text="${item.ean}"></td>
+                        <td th:text="${item.mfn}"></td>
+                        <td th:text="${#numbers.formatDecimal(item.unitCost, 1, 2)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <a class="button"
+                   th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/preview(storeId=${form.storeId})} : @{/dashboard/deliveries/preview}"
+                   th:text="#{deliveries.purchase.confirm.back}">Back</a>
+            </form>
+        </div>
+    </section>
+
+</div>
+</body>
+</html>
