@@ -72,6 +72,9 @@ public class Delivery {
     @DynamoDBTypeConvertedEnum
     private ConnectionMode connectionMode;
 
+    @DynamoDBAttribute(attributeName = "dropshipOrderId")
+    private String dropshipOrderId;
+
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
     @DynamoDBAttribute(attributeName = "paymentCost")
@@ -483,6 +486,19 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isOrderRejected() {
         return orderStatus == DeliveryOrderStatus.REJECTED;
+    }
+
+    public String getDropshipOrderId() {
+        return dropshipOrderId;
+    }
+
+    public void setDropshipOrderId(String dropshipOrderId) {
+        this.dropshipOrderId = dropshipOrderId;
+    }
+
+    @DynamoDBIgnore
+    public boolean isDropship() {
+        return dropshipOrderId != null && !dropshipOrderId.isBlank();
     }
 
     public boolean isPaid() {
