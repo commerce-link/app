@@ -1147,6 +1147,25 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void approvalIsRefusedWhenTheDeliveryHasAlreadyBeenReceived() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any(Delivery.class));
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
     void approvalIsRefusedWhenTheDeliveryDoesNotExist() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);

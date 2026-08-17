@@ -218,6 +218,9 @@ public class SupplierPurchaseService {
         if (!requiresApproval(storeId, delivery.getProvider())) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        if (delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
 
         SupplierProvider supplierProvider = getProvider(storeId, delivery.getProvider());
         if (supplierProvider == null) {
