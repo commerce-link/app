@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.shipping.CarrierDictionary;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -51,9 +52,13 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import pl.commercelink.stores.IntegrationType;
 
 @Controller
 public class OrdersController extends BaseController {
+
+    @Autowired
+    private CarrierDictionary carrierDictionary;
 
     @Autowired
     private Inventory inventory;
@@ -335,6 +340,7 @@ public class OrdersController extends BaseController {
                 .findFirst()
                 .orElse(null));
         model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("carrierOptions", carrierOptions(order, store));
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || isSuperAdmin());
@@ -826,6 +832,19 @@ public class OrdersController extends BaseController {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
         return view;
+    }
+
+    private List<String> carrierOptions(Order order, Store store) {
+        Set<String> options = new LinkedHashSet<>(
+                carrierDictionary.namesUsedBy(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)));
+        if (options.isEmpty()) {
+            return List.of();
+        }
+        order.getShipments().stream()
+                .map(Shipment::getCarrier)
+                .filter(StringUtils::isNotBlank)
+                .forEach(options::add);
+        return List.copyOf(options);
     }
 
     private List<String> shipmentDataSnapshot(Order order) {

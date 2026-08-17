@@ -2,8 +2,10 @@ package pl.commercelink.shipping;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -66,6 +68,41 @@ class CarrierDictionaryTest {
         assertTrue(dictionary.describes("furgonetka", "Ceneo", "InPost", "1"));
         assertFalse(dictionary.describes("furgonetka", "Ceneo", "InPost", "3"));
         assertFalse(dictionary.describes("furgonetka", "Ceneo", "InPost", null));
+    }
+
+    @Test
+    void collectsEveryCarrierNameKnownToTheShippingProvider() {
+        // when / then
+        assertEquals(Set.of("InPost", "Orlen", "Zabka"), dictionary.namesUsedBy("furgonetka"));
+    }
+
+    @Test
+    void mergesNamesComingFromDifferentMarketplaces() {
+        // given
+        CarrierDictionary overlapping = new CarrierDictionary();
+        overlapping.setCarriers(Map.of(
+                "Allegro", Map.of("furgonetka", "{\"Paczkomat\":\"InPost\",\"InPost\":\"InPost\"}"),
+                "Morele", Map.of("furgonetka", "{\"2\":\"InPost\"}")));
+
+        // when / then
+        assertEquals(Set.of("InPost"), overlapping.namesUsedBy("furgonetka"));
+    }
+
+    @Test
+    void keepsTheOrderInWhichCarriersAreConfigured() {
+        // given
+        CarrierDictionary ordered = new CarrierDictionary();
+        ordered.setCarriers(Map.of(
+                "Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\",\"4\":\"Orlen\"}")));
+
+        // when / then
+        assertEquals(List.of("InPost", "Zabka", "Orlen"), List.copyOf(ordered.namesUsedBy("furgonetka")));
+    }
+
+    @Test
+    void hasNoNamesForAShippingProviderNobodyMapsTo() {
+        // when / then
+        assertEquals(Set.of(), dictionary.namesUsedBy("apaczka"));
     }
 
     @Test
