@@ -110,6 +110,17 @@ public class WarehouseAllocationsManager {
     public void release(String storeId, String deliveryId, String provider) {
         for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
                 List.of(FulfilmentStatus.Ordered))) {
+            int delta = item.getPurchaseClaimQty();
+            if (delta > 0 && delta >= item.getQty()) {
+                warehouseRepository.delete(item);
+                continue;
+            }
+            item.setQty(item.getQty() - delta);
+            if (item.getQty() <= 0) {
+                warehouseRepository.delete(item);
+                continue;
+            }
+            item.setPurchaseClaimQty(0);
             item.returnToAllocationPool(provider);
             warehouseRepository.save(item);
         }
@@ -149,6 +160,7 @@ public class WarehouseAllocationsManager {
             return;
         }
         warehouseItem.markAsOrdered(deliveryId, unitCost);
+        warehouseItem.setPurchaseClaimQty(qtyAdjustment);
         if (qtyAdjustment != 0) {
             int newQty = warehouseItem.getQty() + qtyAdjustment;
             if (newQty > 0) {
@@ -165,6 +177,7 @@ public class WarehouseAllocationsManager {
     private void createNewWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
         WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
         warehouseItem.markAsOrdered(deliveryId, item.getUnitCost());
+        warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
         warehouseRepository.save(warehouseItem);
     }
 }
