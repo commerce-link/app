@@ -26,14 +26,15 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void offersBothApprovalOutcomesOnOneScreen() throws Exception {
+    void offersOnlyTheRealisationOutcomeOnTheApprovalScreen() throws Exception {
         // when
         String html = approval();
 
         // then
         assertThat(html).contains("deliveries.approval.realize");
-        assertThat(html).contains("deliveries.approval.reject");
-        assertThat(html).contains("name=\"reason\"");
+        assertThat(html).doesNotContain("deliveries.approval.reject");
+        assertThat(html).doesNotContain("name=\"reason\"");
+        assertThat(html).doesNotContain("/reject");
     }
 
     @Test
@@ -135,6 +136,37 @@ class ApprovalScreenTemplateTest {
         // then
         assertThat(html).contains("addressModalScript");
         assertThat(html).contains("scrollAddressOptionsToSelection();");
+    }
+
+    @Test
+    void detailsPageOffersARejectModalPostingToTheRejectRoute() throws Exception {
+        // when
+        String html = details();
+
+        // then
+        assertThat(html).contains("id=\"rejectPurchaseModal\"");
+        assertThat(html).contains("/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject");
+        assertThat(html).contains("<textarea class=\"textarea\" name=\"reason\">");
+    }
+
+    @Test
+    void detailsPageShowsTheRejectButtonBeforeTheRealiseButton() throws Exception {
+        // when
+        String html = details();
+
+        // then
+        assertThat(html.indexOf("id=\"reject-purchase-button\""))
+                .isLessThan(html.indexOf("deliveries.approval.realize"));
+    }
+
+    @Test
+    void approvalScreenNoLongerCarriesTheRejectForm() throws Exception {
+        // when
+        String html = approval();
+
+        // then
+        assertThat(html).doesNotContain("/reject");
+        assertThat(html).doesNotContain("name=\"reason\"");
     }
 
     @Test

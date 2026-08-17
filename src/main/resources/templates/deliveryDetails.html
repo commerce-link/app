@@ -136,6 +136,11 @@
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
                             <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                                <button type="button" id="reject-purchase-button" class="button is-danger"
+                                        onclick="toggleRejectModal(true)"
+                                        th:text="#{deliveries.approval.reject}">Reject</button>
+                            </div>
+                            <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
                                 <a class="button is-link"
                                    th:href="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
                                    th:text="#{deliveries.approval.realize}">Order at supplier</a>
@@ -424,6 +429,30 @@
                 </div>
             </div>
 
+            <div id="rejectPurchaseModal" class="modal" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                <div class="modal-background" onclick="toggleRejectModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.approval.reject}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleRejectModal(false)"></button>
+                    </header>
+                    <form th:action="@{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject|}" method="post">
+                        <section class="modal-card-body">
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.approval.reason}"></label>
+                                <div class="control">
+                                    <textarea class="textarea" name="reason"></textarea>
+                                </div>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-danger" th:text="#{deliveries.approval.reject}">Reject</button>
+                            <button type="button" class="button" onclick="toggleRejectModal(false)" th:text="#{deliveries.approval.reject.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
             <div id="confirmActionModal" class="modal">
                 <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
                 <div class="modal-card">
@@ -472,6 +501,12 @@
 
         function toggleEditItemQtyModal(show) {
             document.getElementById('editItemQtyModal').classList.toggle('is-active', show);
+        }
+
+        function toggleRejectModal(show) {
+            const modal = document.getElementById('rejectPurchaseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
         }
 
         function openEditItemQtyModal(button) {
