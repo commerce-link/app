@@ -400,8 +400,8 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setConnectionMode(ConnectionMode.GLOBAL);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.forLanguageTag("pl"))))
-                .thenReturn("Tej dostawy nie mozna powtorzyc.");
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
@@ -412,7 +412,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(supplierPurchaseService, never()).retry(any(), any());
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "Tej dostawy nie mozna powtorzyc.");
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
         }
     }
 

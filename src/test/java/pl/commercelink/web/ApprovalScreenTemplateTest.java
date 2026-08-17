@@ -72,6 +72,17 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
+    void detailsPageHidesTheRetryButtonOnceTheDeliveryHasBeenReceived() throws Exception {
+        // when
+        String html = details();
+        String retryFormTag = openingTagOf(html, "purchase/retry");
+
+        // then
+        assertThat(retryFormTag).contains("!delivery.hasBeenReceived()");
+        assertThat(retryFormTag).contains("delivery.documents.isEmpty()");
+    }
+
+    @Test
     void detailsPageLinksToTheRealisationScreenNextToSave() throws Exception {
         // when
         String html = details();

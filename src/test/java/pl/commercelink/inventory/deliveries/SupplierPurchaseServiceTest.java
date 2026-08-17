@@ -1130,6 +1130,23 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void rejectionIsRefusedWhenTheDeliveryHasAlreadyBeenReceived() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
+        verify(deliveryCreationService, never()).releaseAllocations(any(), any());
+        verify(deliveriesRepository, never()).delete(any(Delivery.class));
+    }
+
+    @Test
     void approvalIsRefusedWhenTheDeliveryDoesNotExist() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
@@ -1256,6 +1273,39 @@ class SupplierPurchaseServiceTest {
         // then
         assertFalse(result.isSuccess());
         verify(supplierPurchaseEventPublisher, never()).publish(any());
+    }
+
+    @Test
+    void retryRefusesDeliveryThatHasAlreadyBeenReceived() {
+        // given
+        Delivery failed = new Delivery();
+        failed.setDeliveryId(DELIVERY_ID);
+        failed.setOrderStatus(DeliveryOrderStatus.FAILED);
+        failed.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, failed.getDeliveryId())).thenReturn(failed);
+
+        // when
+        OperationResult<String> result = service.retry(STORE_ID, failed.getDeliveryId());
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.retry.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
+    }
+
+    @Test
+    void retryRefusesWhenTheDeliveryDoesNotExist() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
+
+        // when
+        OperationResult<String> result = service.retry(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.retry.error.state", result.getMessage());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 
     @Test

@@ -108,7 +108,8 @@ public class WarehouseAllocationsManager {
     }
 
     public void release(String storeId, String deliveryId) {
-        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
+                List.of(FulfilmentStatus.Ordered))) {
             item.returnToAllocationPool();
             warehouseRepository.save(item);
         }

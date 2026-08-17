@@ -256,7 +256,8 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> retry(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderFailed()) {
+        if (delivery == null || !delivery.isOrderFailed()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.purchase.retry.error.state");
         }
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
@@ -270,7 +271,7 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
         Delivery delivery = findAwaitingApproval(storeId, deliveryId);
-        if (delivery == null) {
+        if (delivery == null || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
         deliveryCreationService.releaseAllocations(storeId, delivery);

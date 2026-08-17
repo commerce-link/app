@@ -143,7 +143,7 @@
                         </div>
                     </form>
                     <form method="post"
-                          th:if="${delivery.orderFailed and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
+                          th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
                         <button type="submit" class="button is-warning is-small" th:text="#{deliveries.purchase.retry.button}"></button>

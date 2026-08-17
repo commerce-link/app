@@ -99,14 +99,15 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("release returns all delivery warehouse items to the allocation pool")
+    @DisplayName("release returns all Ordered delivery warehouse items to the allocation pool")
     void releaseReturnsAllDeliveryWarehouseItemsToAllocationPool() {
         // given
         WarehouseItem claimed = new WarehouseItem();
         claimed.setStatus(FulfilmentStatus.Ordered);
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(4);
-        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of(claimed));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1");
@@ -116,6 +117,26 @@ class WarehouseAllocationsManagerTest {
         assertThat(claimed.getDeliveryId()).isNull();
         assertThat(claimed.getQty()).isEqualTo(4);
         verify(warehouseRepository).save(claimed);
+    }
+
+    @Test
+    @DisplayName("release leaves a Delivered item untouched")
+    void releaseLeavesADeliveredItemUntouched() {
+        // given
+        WarehouseItem delivered = new WarehouseItem();
+        delivered.setStatus(FulfilmentStatus.Delivered);
+        delivered.setDeliveryId("delivery-1");
+        delivered.setQty(4);
+        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of());
+
+        // when
+        warehouseAllocationsManager.release(STORE_ID, "delivery-1");
+
+        // then
+        assertThat(delivered.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(delivered.getDeliveryId()).isEqualTo("delivery-1");
+        verify(warehouseRepository, never()).save(any());
     }
 
     @Test

@@ -680,7 +680,7 @@ public class DeliveriesController {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.purchase.retry.error.state", null, locale));
+                    messageSource.getMessage("deliveries.purchase.retry.error.global", null, locale));
             return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
         }
         return handleRetry(getStoreId(), deliveryId,
