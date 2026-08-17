@@ -1218,6 +1218,47 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void retryRepublishesFailedPurchaseWithSamePurchaseRef() {
+        // given
+        Delivery failed = new Delivery();
+        failed.setDeliveryId(DELIVERY_ID);
+        failed.setOrderStatus(DeliveryOrderStatus.FAILED);
+        failed.setOrderErrorMessage("boom");
+        failed.setProvider(PROVIDER);
+        failed.setPurchaseRef("ref-1");
+        when(deliveriesRepository.findById(STORE_ID, failed.getDeliveryId())).thenReturn(failed);
+
+        // when
+        OperationResult<String> result = service.retry(STORE_ID, failed.getDeliveryId());
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, failed.getOrderStatus());
+        assertNull(failed.getOrderErrorMessage());
+        verify(deliveriesRepository).save(failed);
+        ArgumentCaptor<SupplierPurchaseEventRequest> event = ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        assertEquals("ref-1", event.getValue().getPurchaseRef());
+        assertEquals(failed.getDeliveryId(), event.getValue().getDeliveryId());
+    }
+
+    @Test
+    void retryRefusesDeliveryThatDidNotFail() {
+        // given
+        Delivery pending = new Delivery();
+        pending.setDeliveryId(DELIVERY_ID);
+        pending.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, pending.getDeliveryId())).thenReturn(pending);
+
+        // when
+        OperationResult<String> result = service.retry(STORE_ID, pending.getDeliveryId());
+
+        // then
+        assertFalse(result.isSuccess());
+        verify(supplierPurchaseEventPublisher, never()).publish(any());
+    }
+
+    @Test
     void stampsTheGlobalConnectionModeOnADeliveryRaisedForApproval() {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);

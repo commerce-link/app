@@ -19,6 +19,7 @@ import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
@@ -329,6 +330,105 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(model.getAttribute("suggestedAddressId")).isEqualTo("17200617");
         assertThat(model.getAttribute("suggestedAddress")).isSameAs(storeDefault);
+    }
+
+    @Test
+    void retryPurchaseRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.retry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.retryPurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).retry(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void retryPurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Tej dostawy nie mozna powtorzyc.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.retryPurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).retry(any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Tej dostawy nie mozna powtorzyc.");
+        }
+    }
+
+    @Test
+    void retryPurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.retry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.retryPurchase(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+        }
+    }
+
+    @Test
+    void retryPurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.retry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.retryPurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).retry(STORE_ID, DELIVERY_ID);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void retryPurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.retry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        // when
+        String view = deliveriesController.retryPurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
     }
 
     @Test

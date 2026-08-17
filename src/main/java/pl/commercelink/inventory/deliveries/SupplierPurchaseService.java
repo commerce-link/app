@@ -43,6 +43,7 @@ public class SupplierPurchaseService {
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
+    private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
 
     private final SupplierProviderFactory supplierProviderFactory;
     private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
@@ -250,6 +251,20 @@ public class SupplierPurchaseService {
         supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
                 storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
 
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> retry(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderFailed()) {
+            return OperationResult.failure("deliveries.purchase.retry.error.state");
+        }
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
         return OperationResult.success(delivery.getDeliveryId());
     }
 

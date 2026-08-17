@@ -11,6 +11,9 @@
 
             <h2 th:text="#{deliveries.action.edit.delivery.link}"></h2>
 
+            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
             <div class="columns">
                 <div class="column is-half">
                     <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box">
@@ -138,6 +141,12 @@
                                    th:text="#{deliveries.approval.realize}">Order at supplier</a>
                             </div>
                         </div>
+                    </form>
+                    <form method="post"
+                          th:if="${delivery.orderFailed and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
+                          th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
+                        <button type="submit" class="button is-warning is-small" th:text="#{deliveries.purchase.retry.button}"></button>
                     </form>
                 </div>
 

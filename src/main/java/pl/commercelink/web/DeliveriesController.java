@@ -19,6 +19,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
@@ -670,6 +671,38 @@ public class DeliveriesController {
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("deliveries.approval.rejected.success", null, locale));
         return "redirect:/dashboard/deliveries";
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/retry")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String retryPurchase(@PathVariable("deliveryId") String deliveryId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.purchase.retry.error.state", null, locale));
+            return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        }
+        return handleRetry(getStoreId(), deliveryId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/retry")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String retryPurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                             @PathVariable("deliveryId") String deliveryId,
+                                             RedirectAttributes redirectAttributes, Locale locale) {
+        return handleRetry(storeId, deliveryId, storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleRetry(String storeId, String deliveryId, String redirect,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.retry(storeId, deliveryId);
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")
