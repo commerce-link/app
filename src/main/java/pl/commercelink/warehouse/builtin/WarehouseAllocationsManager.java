@@ -108,7 +108,7 @@ public class WarehouseAllocationsManager {
 
     public void release(String storeId, String deliveryId) {
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
-            item.markAsInAllocation();
+            item.returnToAllocationPool();
             warehouseRepository.save(item);
         }
     }

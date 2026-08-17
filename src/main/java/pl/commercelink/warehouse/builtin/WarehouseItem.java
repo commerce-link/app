@@ -81,7 +81,7 @@ public class WarehouseItem extends Item {
     }
 
     @DynamoDBIgnore
-    public void markAsInAllocation() {
+    public void returnToAllocationPool() {
         this.setStatus(FulfilmentStatus.Allocation);
         this.setDeliveryId(null);
     }
