@@ -54,6 +54,15 @@ public class DeliveryCreationService {
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        applyPendingResult(delivery, form);
+        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+    }
+
+    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        applyPendingResult(delivery, form);
+    }
+
+    private void applyPendingResult(Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         delivery.setShippingCost(form.getShippingCost());
@@ -64,7 +73,6 @@ public class DeliveryCreationService {
         delivery.setPendingOrderForm(null);
 
         deliveriesRepository.save(delivery);
-        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
     private void prepareForm(String storeId, DeliveryCreationForm form) {

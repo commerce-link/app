@@ -12,6 +12,8 @@ import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierConsignee;
+import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
@@ -20,8 +22,12 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -36,6 +42,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.IntStream;
 
 @Component
@@ -59,11 +66,22 @@ public class SupplierPurchaseService {
     private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
+    private final OrdersRepository ordersRepository;
+    private final DropshipOrderCompletion dropshipOrderCompletion;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
             SupplierProvider supplierProvider = getProvider(storeId, provider);
             return supplierProvider != null && supplierProvider.supportsOrdering();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isDropshipAvailable(String storeId, String provider) {
+        try {
+            SupplierProvider supplierProvider = getProvider(storeId, provider);
+            return supplierProvider != null && supplierProvider.supportsDropshipping();
         } catch (Exception e) {
             return false;
         }
@@ -161,7 +179,9 @@ public class SupplierPurchaseService {
         }
 
         DeliveryCreationForm form = readPendingForm(delivery);
-        delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
+        if (!delivery.isDropship()) {
+            delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
+        }
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
             List<SupplierOrderLine> lines = validation.lines().stream()
@@ -171,9 +191,11 @@ public class SupplierPurchaseService {
                 throw new SupplierOrderException("No orderable lines in pending purchase");
             }
 
-            SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
-                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                            form.getDeliveryAddressId()));
+            SupplierOrderResult orderResult = delivery.isDropship()
+                    ? placeDropshipOrder(storeId, delivery, lines)
+                    : getProvider(storeId, form.getProvider())
+                            .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
+                                    form.getDeliveryAddressId()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
                 throw new SupplierOrderException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
@@ -181,7 +203,13 @@ public class SupplierPurchaseService {
 
             applyOrderResult(form, validation, orderResult);
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-            deliveryCreationService.completePending(storeId, delivery, form);
+            if (delivery.isDropship()) {
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
+                dropshipOrderCompletion.markSuppliedByDropship(storeId, delivery.getDropshipOrderId(),
+                        delivery.getDeliveryId());
+            } else {
+                deliveryCreationService.completePending(storeId, delivery, form);
+            }
         } catch (SupplierOrderException e) {
             deliveryCreationService.releaseAllocations(storeId, delivery, form);
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
@@ -226,12 +254,15 @@ public class SupplierPurchaseService {
         if (supplierProvider == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
-        if (supplierProvider.requiresDeliveryAddress() && StringUtils.isBlank(deliveryAddressId)) {
+        if (!delivery.isDropship() && supplierProvider.requiresDeliveryAddress()
+                && StringUtils.isBlank(deliveryAddressId)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
         DeliveryCreationForm form = readPendingForm(delivery);
-        form.setDeliveryAddressId(deliveryAddressId);
+        if (!delivery.isDropship()) {
+            form.setDeliveryAddressId(deliveryAddressId);
+        }
 
         PurchaseValidation validation;
         try {
@@ -356,6 +387,101 @@ public class SupplierPurchaseService {
         }
 
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
+    }
+
+    public OperationResult<PurchaseSubmission> submitDropship(String storeId, Order order,
+                                                              DeliveryCreationForm form, String purchaseRef) {
+        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            return OperationResult.failure("orders.dropship.error.fulfilmentType");
+        }
+        if (!order.hasShippingDetails()) {
+            return OperationResult.failure("orders.dropship.error.address");
+        }
+        if (!isDropshipAvailable(storeId, form.getProvider())) {
+            return OperationResult.failure("orders.dropship.error.unsupported");
+        }
+
+        boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
+        if (!hasOrderableItems) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+        boolean requiresApproval = store.isGlobalSupplier(form.getProvider());
+
+        Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
+        if (existing.isPresent()) {
+            return OperationResult.success(
+                    new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
+        }
+
+        Delivery delivery = new Delivery(storeId, null, form.getProvider());
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setDropshipOrderId(order.getOrderId());
+        delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
+        delivery.setOrderStatus(requiresApproval
+                ? DeliveryOrderStatus.AWAITING_APPROVAL
+                : DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setPurchaseRef(purchaseRef);
+        deliveryCreationService.claimAllocations(storeId, delivery, form);
+        try {
+            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
+        } catch (JsonProcessingException e) {
+            System.err.println("[SupplierPurchase] failed to serialize pending dropship form for store " + storeId
+                    + ", ref " + purchaseRef + ": " + e.getMessage());
+            e.printStackTrace();
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
+
+        deliveriesRepository.save(delivery);
+
+        if (!requiresApproval) {
+            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+        }
+
+        return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
+    }
+
+    private SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines) {
+        Order order = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
+        if (order == null || !order.hasShippingDetails()) {
+            throw new SupplierOrderException("Order " + delivery.getDropshipOrderId()
+                    + " has no complete shipping details for a dropship purchase");
+        }
+        SupplierConsignee consignee;
+        try {
+            consignee = toConsignee(order.getShippingDetails());
+        } catch (IllegalArgumentException e) {
+            throw new SupplierOrderException(e.getMessage());
+        }
+        return getProvider(storeId, delivery.getProvider()).placeDropshipOrder(
+                new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
+                        "CommerceLink " + delivery.getPurchaseRef()));
+    }
+
+    static SupplierConsignee toConsignee(ShippingDetails details) {
+        return new SupplierConsignee(
+                StringUtils.trimToNull(details.getCompanyName()),
+                StringUtils.trimToNull(details.getName()),
+                StringUtils.trimToNull(details.getSurname()),
+                details.getStreetAndNumber(),
+                details.getPostalCode(),
+                details.getCity(),
+                details.getCountry(),
+                details.getPhone(),
+                details.getEmail());
+    }
+
+    private static String consigneeLabel(ShippingDetails details) {
+        return Stream.of(details.getDisplayName(), details.getStreetAndNumber(),
+                        StringUtils.trim(StringUtils.joinWith(" ", details.getPostalCode(), details.getCity())))
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.joining(", "));
     }
 
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,
