@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,16 +66,35 @@ class DropshipTemplateTest {
     @Test
     void createScreenMirrorsTheWarehouseCreateScreen() throws Exception {
         // when
+        String dropship = read("dropshipCreate.html");
+        String warehouse = read("deliveryCreate.html");
+
+        // then
+        assertThat(dropship).contains("deliveries.create.title");
+        assertThat(dropship).contains("orders.dropship.confirm.consignee");
+        assertThat(dropship).contains("dropship/create");
+        assertThat(dropship).contains("dropship/purchase");
+        assertThat(dropship).contains("deliveries.purchase.button");
+        assertThat(dropship).contains("general.save");
+        assertThat(dropship).contains("allocations[__${allocStat.index}__].key.orderId");
+        for (String sharedField : List.of("*{sourceCurrency}", "*{shippingCost}", "*{paymentCost}",
+                "*{paymentTerms}", "*{tax}", "*{removeUnselected}", "*{externalDeliveryId}",
+                "*{estimatedDeliveryAt}", "deliveries.create.include", "deliveries.create.netValue")) {
+            assertThat(dropship).contains(sharedField);
+            assertThat(warehouse).contains(sharedField);
+        }
+    }
+
+    @Test
+    void createScreenDoesNotLetTheOrderedQuantityGrow() throws Exception {
+        // when
         String html = read("dropshipCreate.html");
 
         // then
-        assertThat(html).contains("orders.dropship.create.title");
-        assertThat(html).contains("orders.dropship.confirm.consignee");
-        assertThat(html).contains("dropship/create");
-        assertThat(html).contains("dropship/purchase");
-        assertThat(html).contains("deliveries.purchase.button");
-        assertThat(html).contains("general.save");
-        assertThat(html).contains("allocations[__${allocStat.index}__].key.orderId");
+        assertThat(html).doesNotContain("deliveries.create.qtyIncrease.note");
+        assertThat(html).doesNotContain("warehouseAdjustment");
+        assertThat(html).doesNotContain("deliveries.minQty");
+        assertThat(html).contains("type=\"hidden\" th:field=\"*{items[__${itemStat.index}__].requestedQty}\"");
     }
 
     @Test

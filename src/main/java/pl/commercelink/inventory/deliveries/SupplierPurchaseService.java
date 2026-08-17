@@ -469,14 +469,19 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.failed");
         }
 
-        Delivery delivery = new Delivery(storeId, form.getExternalDeliveryId(), form.getProvider(),
-                form.getEstimatedDeliveryAt(), form.getShippingCost(), form.getPaymentCost(),
-                form.getPaymentTerms(), form.getTax());
+        Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
         delivery.setDropshipOrderId(order.getOrderId());
         delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
         deliveryCreationService.claimAllocations(storeId, delivery, form);
+
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
+        delivery.setShippingCost(form.getShippingCost());
+        delivery.setPaymentCost(form.getPaymentCost());
+        delivery.setPaymentTerms(form.getPaymentTerms());
+        delivery.setTax(form.getTax());
 
         deliveriesRepository.save(delivery);
         dropshipOrderCompletion.markSuppliedByDropship(storeId, order.getOrderId(), delivery.getDeliveryId());

@@ -39,6 +39,13 @@
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{tax}"/>
+                <input type="hidden" th:field="*{sourceCurrency}"/>
+                <input type="hidden" th:field="*{removeUnselected}"/>
+                <input type="hidden" th:field="*{externalDeliveryId}"/>
+                <input type="hidden" th:field="*{estimatedDeliveryAt}"/>
+                <input type="hidden" th:field="*{shippingCost}"/>
+                <input type="hidden" th:field="*{paymentCost}"/>
+                <input type="hidden" th:field="*{paymentTerms}"/>
 
                 <th:block th:each="item, itemStat : *{items}">
                     <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>

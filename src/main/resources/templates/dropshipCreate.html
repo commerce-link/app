@@ -8,58 +8,89 @@
 
     <section class="section">
         <div class="container">
-            <h1 class="title">
-                <span th:text="#{orders.dropship.create.title}">Create dropship delivery</span>
-            </h1>
-            <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
+            <div class="level">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h1>
+                            <span th:text="#{deliveries.create.title}">Create Delivery</span>
+                            <span th:text="' - ' + ${form.provider}"></span>
+                        </h1>
+                    </div>
+                </div>
+            </div>
+
+            <div class="notification is-info is-light">
+                <strong th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</strong>:
+                <span th:text="${consignee.displayName}">Jan Kowalski</span>,
+                <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span>,
+                <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span>
+                &middot; <span th:text="${consignee.phone}">+48601234567</span>
+                &middot; <span th:text="${consignee.email}">jan@example.com</span>
+                &middot; <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
+                            th:text="#{deliveries.preview.dropship.order} + ' ' + ${order.orderId}">Order</a>
+            </div>
 
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
-            <div class="box">
-                <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
-                <p>
-                    <strong th:text="${consignee.displayName}">Jan Kowalski</strong> &middot;
-                    <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
-                       th:text="#{deliveries.preview.dropship.order} + ' ' + ${order.orderId}">Order</a><br/>
-                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span>,
-                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
-                    <span th:text="${consignee.phone}">+48601234567</span> &middot;
-                    <span th:text="${consignee.email}">jan@example.com</span>
-                </p>
-            </div>
-
             <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/create(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/create(orderId=${order.orderId})}"
-                  th:object="${form}" method="post" id="dropshipCreateForm">
+                  th:object="${form}" method="post" id="deliveryCreateForm">
 
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
 
+                <!-- Delivery Details -->
                 <div class="box mb-5">
                     <div class="columns is-vcentered mb-2">
-                        <div class="column is-3">
+                        <div class="column is-2">
                             <label class="label" th:text="#{general.delivery.id}">Order No</label>
                             <input class="input" type="text" th:field="*{externalDeliveryId}"/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.estimated.delivery}">Est. Delivery</label>
                             <input class="input" type="date" th:field="*{estimatedDeliveryAt}"/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-1">
+                            <label class="label" th:text="#{general.currency}">Currency</label>
+                            <div class="select is-fullwidth">
+                                <select th:field="*{sourceCurrency}">
+                                    <option value="PLN">PLN</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-2">
                             <label class="label" th:text="#{deliveries.shippingCost}">Shipping</label>
                             <input class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
                         </div>
-                        <div class="column is-3">
+                        <div class="column is-2">
+                            <label class="label" th:text="#{deliveries.paymentCost}">Payment</label>
+                            <input class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
+                        </div>
+                        <div class="column is-1">
                             <label class="label" th:text="#{deliveries.tax}">VAT</label>
                             <input class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
+                        </div>
+                        <div class="column is-2">
+                            <label class="label" th:text="#{deliveries.paymentTerms}">Terms</label>
+                            <input class="input" type="number" th:field="*{paymentTerms}" required/>
                         </div>
                     </div>
                     <div class="columns is-vcentered">
                         <div class="column">
-                            <p class="help" th:text="#{orders.dropship.create.manualNote}">Saving records a dropship arranged outside the system.</p>
+                            <label class="checkbox">
+                                <input type="checkbox" th:field="*{removeUnselected}"/>
+                                <span th:text="#{deliveries.create.removeUnselected}">Remove unselected</span>
+                            </label>
                         </div>
                         <div class="column is-flex is-align-items-center is-justify-content-flex-end">
-                            <button type="submit" class="button" th:text="#{general.save}">Save</button>
-                            <button type="submit" class="button is-primary ml-2" id="dropship-purchase-button"
+                            <span class="mr-4">
+                                <span th:text="#{deliveries.create.netValue}">Products net value</span>:
+                                <strong id="deliveryNetValue">0.00</strong>
+                                <strong id="deliveryNetCurrency">PLN</strong>
+                            </span>
+                            <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
+                            <button type="submit" class="button is-link ml-2" id="purchase-order-button"
                                     formnovalidate
                                     th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase(orderId=${order.orderId})}"
                                     th:text="#{deliveries.purchase.button}">Order at supplier</button>
@@ -67,54 +98,123 @@
                     </div>
                 </div>
 
-                <table class="table is-fullwidth is-striped">
-                    <thead>
-                    <tr>
-                        <th th:text="#{general.name}">Name</th>
-                        <th th:text="#{deliveries.orderedQty}">Qty</th>
-                        <th th:text="#{general.ean}">EAN</th>
-                        <th th:text="#{general.manufacturer.code}">MFN</th>
-                        <th th:text="#{general.net.cost}">Unit Cost</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="item, itemStat : *{items}">
-                        <td>
-                            <span th:text="${item.name}"></span>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"/>
-                            <input type="hidden" th:field="*{items[__${itemStat.index}__].unitCost}"/>
-                            <th:block th:each="allocation, allocStat : ${item.allocations}">
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
-                                <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"/>
-                            </th:block>
-                        </td>
-                        <td th:text="${item.requestedQty}"></td>
-                        <td th:text="${item.ean}"></td>
-                        <td th:text="${item.mfn}"></td>
-                        <td th:text="${#numbers.formatDecimal(item.unitCost, 1, 2)}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+                <!-- Products List - Full Width -->
+                <div th:each="item, itemStat : *{items}" class="box mb-4">
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"
+                           th:id="'requestedQty-' + ${itemStat.index}"/>
 
-                <a class="button"
-                   th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/preview(storeId=${form.storeId})} : @{/dashboard/deliveries/preview}"
-                   th:text="#{deliveries.purchase.confirm.back}">Back</a>
+                    <div class="columns is-vcentered mb-2">
+                        <div class="column">
+                            <p class="has-text-weight-semibold mb-0">
+                                <span th:text="${item.name}">Product Name</span>
+                            </p>
+                            <p class="has-text-grey">
+                                <span th:text="#{general.ean}">EAN</span>: <span th:text="${item.ean}"></span>
+                                &nbsp;|&nbsp;
+                                <span th:text="#{general.manufacturer.code}">MFN</span>: <span th:text="${item.mfn}"></span>
+                            </p>
+                        </div>
+                        <div class="column is-narrow has-text-centered">
+                            <label class="label mb-1" th:text="#{deliveries.requestedQty}">Requested Qty</label>
+                            <span class="tag is-light is-medium"
+                                  th:id="'requestedQtyLabel-' + ${itemStat.index}"
+                                  th:text="${item.requestedQty}"></span>
+                        </div>
+                        <div class="column is-narrow has-text-centered">
+                            <label class="label mb-1" th:text="#{general.net.cost}">Unit Cost</label>
+                            <input class="input" type="number" style="width: 120px;"
+                                   th:field="*{items[__${itemStat.index}__].unitCost}"
+                                   step="0.01" min="0"/>
+                        </div>
+                    </div>
+
+                    <table class="table is-fullwidth is-narrow">
+                        <thead>
+                        <tr>
+                            <th style="width: 60px;" th:text="#{deliveries.create.include}">Include</th>
+                            <th th:text="#{deliveries.source}">Source</th>
+                            <th style="width: 80px;" th:text="#{general.quantity}">Qty</th>
+                            <th style="width: 100px;" th:text="#{deliveries.allocation.type}">Type</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="allocation, allocStat : ${item.allocations}">
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
+                            <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
+
+                            <td>
+                                <input type="checkbox"
+                                       th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"
+                                       th:data-item="${itemStat.index}"
+                                       th:data-qty="${allocation.qty}"
+                                       onchange="updateDropshipQty(this.dataset.item)"/>
+                            </td>
+                            <td>
+                                <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.name}" target="_blank"></a>
+                            </td>
+                            <td th:text="${allocation.qty}"></td>
+                            <td>
+                                <span class="tag" th:classappend="${allocation.type.name() == 'Order'} ? 'is-info' : 'is-warning'"
+                                      th:text="${allocation.type}"></span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
             </form>
+
         </div>
     </section>
+
+    <script>
+        function updateDropshipQty(itemIndex) {
+            let qty = 0;
+            document.querySelectorAll('input[type="checkbox"][data-item="' + itemIndex + '"]:checked')
+                .forEach(function (checkbox) { qty += parseInt(checkbox.dataset.qty) || 0; });
+            document.getElementById('requestedQty-' + itemIndex).value = qty;
+            document.getElementById('requestedQtyLabel-' + itemIndex).textContent = qty;
+            updateDeliveryNetValue();
+        }
+
+        function updateDeliveryNetValue() {
+            let total = 0;
+            let totalQty = 0;
+            document.querySelectorAll('input[name$=".requestedQty"]').forEach(qtyInput => {
+                const qty = parseInt(qtyInput.value) || 0;
+                if (qty <= 0) return;
+                totalQty += qty;
+                const costInput = document.querySelector('input[name="' + qtyInput.name.replace('.requestedQty', '.unitCost') + '"]');
+                total += qty * (costInput ? parseFloat(costInput.value) || 0 : 0);
+            });
+            document.getElementById('deliveryNetValue').textContent = total.toFixed(2);
+            const purchaseButton = document.getElementById('purchase-order-button');
+            if (purchaseButton) {
+                purchaseButton.disabled = totalQty === 0;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('deliveryCreateForm').addEventListener('input', updateDeliveryNetValue);
+            const currencySelect = document.querySelector('select[name="sourceCurrency"]');
+            const currencyLabel = document.getElementById('deliveryNetCurrency');
+            const syncCurrency = function () { currencyLabel.textContent = currencySelect.value; };
+            currencySelect.addEventListener('change', syncCurrency);
+            syncCurrency();
+            updateDeliveryNetValue();
+        });
+    </script>
 
 </div>
 </body>
