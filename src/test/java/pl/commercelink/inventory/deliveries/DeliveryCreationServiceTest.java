@@ -13,6 +13,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,7 +46,7 @@ class DeliveryCreationServiceTest {
     private DeliveryCreationService service;
 
     @Test
-    void completePendingFillsDeliveryAndCommitsAllocations() {
+    void completePendingUpdatesWarehouseCostsInsteadOfRecommitting() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
@@ -58,8 +59,9 @@ class DeliveryCreationServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.now());
         form.setShippingCost(15.0);
         DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(2);
-        item.setUnitCost(90.0);
+        item.setMfn("MFN-1");
+        item.setRequestedQty(1);
+        item.setUnitCost(8.5);
         form.getItems().add(item);
 
         // when
@@ -71,7 +73,8 @@ class DeliveryCreationServiceTest {
         assertNull(delivery.getPendingOrderForm());
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(warehouseAllocationsManager).commit(STORE_ID, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager).updateUnitCosts(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
     }
 
     @Test
@@ -93,6 +96,7 @@ class DeliveryCreationServiceTest {
         // then
         assertEquals(180.0, delivery.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq("delivery-1"), any(), eq(form.getItems()));
+        verify(warehouseAllocationsManager).commit(STORE_ID, "delivery-1", PROVIDER, form.getItems());
     }
 
     @Test
