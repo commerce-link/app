@@ -1,0 +1,127 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="section">
+        <div class="container">
+            <h1 class="title" th:text="#{orders.dropship.confirm.title}">Dropship order confirmation</h1>
+            <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
+
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <div class="box">
+                <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
+                <p>
+                    <strong th:text="${consignee.displayName}">Jan Kowalski</strong><br/>
+                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
+                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
+                    <span th:text="${consignee.phone}">+48601234567</span> &middot;
+                    <span th:text="${consignee.email}">jan@example.com</span>
+                </p>
+            </div>
+
+            <div id="validation-area" class="mb-6">
+                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
+                <progress class="progress is-small is-primary" max="100"></progress>
+            </div>
+
+            <form id="purchase-confirm-form"
+                  th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/confirm(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/confirm(orderId=${order.orderId})}"
+                  th:attr="data-validate-url=${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/validate(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/validate(orderId=${order.orderId})}"
+                  th:object="${form}" method="post"
+                  onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
+                <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
+
+                <input type="hidden" th:field="*{storeId}"/>
+                <input type="hidden" th:field="*{provider}"/>
+                <input type="hidden" th:field="*{tax}"/>
+
+                <th:block th:each="item, itemStat : *{items}">
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"/>
+                    <input type="hidden" th:field="*{items[__${itemStat.index}__].unitCost}"/>
+                    <th:block th:each="allocation, allocStat : ${item.allocations}">
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
+                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"/>
+                    </th:block>
+                </th:block>
+
+                <div class="notification is-info is-light" th:if="${requiresApproval}"
+                     th:text="#{deliveries.purchase.confirm.approvalNote}">Handled by the platform administrator.</div>
+
+                <div class="buttons">
+                    <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
+                            th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}">Forward to supplier</button>
+                    <a class="button"
+                       th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
+                       th:text="#{deliveries.purchase.confirm.back}">Back</a>
+                </div>
+            </form>
+
+            <script th:inline="none">
+                let validationPassed = false;
+
+                function refreshSubmitState() {
+                    document.getElementById('purchase-confirm-submit').disabled = !validationPassed;
+                }
+
+                function loadValidation() {
+                    const form = document.getElementById('purchase-confirm-form');
+                    const area = document.getElementById('validation-area');
+                    validationPassed = false;
+                    refreshSubmitState();
+                    area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
+                    fetch(form.dataset.validateUrl, {method: 'POST', body: new URLSearchParams(new FormData(form))})
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status);
+                            }
+                            return response.text();
+                        })
+                        .then(function (html) {
+                            area.innerHTML = html;
+                            const result = area.querySelector('[data-fully-available]');
+                            validationPassed = !!(result && result.dataset.fullyAvailable === 'true');
+                            refreshSubmitState();
+                        })
+                        .catch(function () {
+                            area.innerHTML = document.getElementById('validation-error-template').innerHTML;
+                            validationPassed = false;
+                            refreshSubmitState();
+                        });
+                }
+                document.addEventListener('DOMContentLoaded', loadValidation);
+            </script>
+
+            <template id="validation-spinner-template">
+                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
+                <progress class="progress is-small is-primary" max="100"></progress>
+            </template>
+            <template id="validation-error-template">
+                <div class="notification is-danger">
+                    <span th:text="#{deliveries.purchase.confirm.checkFailed}">Failed to fetch availability from the supplier.</span>
+                    <a href="javascript:void(0)" onclick="loadValidation()" th:text="#{deliveries.purchase.confirm.retry}">Retry</a>
+                </div>
+            </template>
+        </div>
+    </section>
+
+</div>
+</body>
+</html>
