@@ -51,14 +51,26 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void orderDetailsOffersTheDropshipActionWhenEligible() throws Exception {
+    void deliveriesPlanningOffersTheDropshipEntryPerDirectToConsumerOrder() throws Exception {
+        // when
+        String html = read("deliveriesPreview.html");
+
+        // then
+        assertThat(html).contains("${dropshipCandidates}");
+        assertThat(html).contains("deliveries.preview.dropship.send");
+        assertThat(html).contains("deliveries.preview.dropship.multiSupplier");
+        assertThat(html).contains("dropshipAvailability.get(candidate.provider)");
+        assertThat(html).contains("/dropship");
+    }
+
+    @Test
+    void orderDetailsNoLongerCarriesTheDropshipAction() throws Exception {
         // when
         String html = read("orderDetails.html");
 
         // then
-        assertThat(html).contains("${dropshipProvider != null}");
-        assertThat(html).contains("order.action.dropship");
-        assertThat(html).contains("/dropship");
+        assertThat(html).doesNotContain("order.action.dropship");
+        assertThat(html).doesNotContain("dropshipProvider");
     }
 
     @Test

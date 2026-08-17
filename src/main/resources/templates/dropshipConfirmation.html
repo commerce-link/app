@@ -69,7 +69,7 @@
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
                             th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}">Forward to supplier</button>
                     <a class="button"
-                       th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
+                       th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/preview(storeId=${form.storeId})} : @{/dashboard/deliveries/preview}"
                        th:text="#{deliveries.purchase.confirm.back}">Back</a>
                 </div>
             </form>

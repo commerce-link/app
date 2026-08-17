@@ -1359,10 +1359,6 @@
             <a class="button is-link ml-2" th:href="${isSuperAdmin} ? '/dashboard/store/' + ${order.storeId} + '/orders/' + ${order.orderId} + '/card' : '/dashboard/orders/' + ${order.orderId} + '/card'"
                th:text="#{order.action.card}">
             </a>
-            <a class="button is-primary ml-2" th:if="${dropshipProvider != null}"
-               th:href="${isSuperAdmin} ? '/dashboard/store/' + ${order.storeId} + '/orders/' + ${order.orderId} + '/dropship' : '/dashboard/orders/' + ${order.orderId} + '/dropship'"
-               th:text="#{order.action.dropship} + ' (' + ${dropshipProvider} + ')'">
-            </a>
             <form th:if="${canDeleteOrder}" method="post" th:action="@{/dashboard/orders/{orderId}/delete(orderId=${order.orderId})}" class="ml-2"
                   onsubmit="return confirm('Czy na pewno chcesz usunąć to zamówienie?');">
                 <button class="button is-danger" type="submit" th:text="#{order.action.delete}"></button>

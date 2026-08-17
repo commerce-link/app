@@ -18,7 +18,6 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.deliveries.DropshipEligibility;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
@@ -91,9 +90,6 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private BasketOrderImporter basketOrderImporter;
-
-    @Autowired
-    private DropshipEligibility dropshipEligibility;
 
     @Autowired
     private PosOrderCreator posOrderCreator;
@@ -352,8 +348,6 @@ public class OrdersController extends BaseController {
         model.addAttribute("isInvoiced", order.isInvoiced());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
-        model.addAttribute("dropshipProvider",
-                dropshipEligibility.eligibleProvider(order, orderItems).orElse(null));
 
         model.addAttribute("catalogs", catalogs);
 

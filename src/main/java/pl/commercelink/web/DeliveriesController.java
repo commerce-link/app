@@ -33,7 +33,10 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
+import pl.commercelink.inventory.deliveries.DropshipCandidate;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -350,8 +353,16 @@ public class DeliveriesController {
 
     private String showDeliveriesPreview(String storeId, Model model) {
         var deliveries = deliveriesPlanningService.run(storeId);
+        var dropshipCandidates = deliveriesPlanningService.dropshipCandidates(storeId);
+        Map<String, Boolean> dropshipAvailability = dropshipCandidates.stream()
+                .map(DropshipCandidate::provider)
+                .distinct()
+                .collect(Collectors.toMap(Function.identity(),
+                        provider -> supplierPurchaseService.isDropshipAvailable(storeId, provider)));
 
         model.addAttribute("deliveries", deliveries);
+        model.addAttribute("dropshipCandidates", dropshipCandidates);
+        model.addAttribute("dropshipAvailability", dropshipAvailability);
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
