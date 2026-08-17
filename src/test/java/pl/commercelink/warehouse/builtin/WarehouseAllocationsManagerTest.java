@@ -178,6 +178,37 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("commit marks a warehouse item still in Allocation as Ordered, applies the qty adjustment and saves")
+    void commitMarksAWarehouseItemStillInAllocationAsOrderedAppliesQtyAdjustmentAndSaves() {
+        // given
+        WarehouseItem claimable = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        claimable.setQty(1);
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(claimable);
+
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, ITEM_ID, "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setQty(2);
+        allocation.setSelected(true);
+
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("OLD-MFN");
+        item.setUnitCost(55.5);
+        item.setRequestedQty(5);
+        item.setAllocations(List.of(allocation));
+
+        // when
+        warehouseAllocationsManager.commit(STORE_ID, "new-delivery", PROVIDER, List.of(item));
+
+        // then
+        assertThat(claimable.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(claimable.getDeliveryId()).isEqualTo("new-delivery");
+        assertThat(claimable.getCost()).isEqualTo(55.5);
+        assertThat(claimable.getQty()).isEqualTo(4);
+        verify(warehouseRepository).save(claimable);
+    }
+
+    @Test
     @DisplayName("commit does not re-mark or resave a warehouse item that is no longer claimable")
     void commitSkipsWarehouseItemNoLongerInAllocationState() {
         // given

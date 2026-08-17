@@ -526,6 +526,75 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void backEndpointForSuperAdminReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, "item-1", "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setMfn("MFN-1");
+        allocation.setName("Product 1");
+        allocation.setQty(1);
+        delivery.setAllocations(List.of(allocation));
+
+        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(delivery);
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(0.23);
+        when(restockSuggestionService.suggestForDelivery(eq(STORE_ID), eq(PROVIDER), any(Set.class))).thenReturn(List.of());
+
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem postedItem = new DeliveryItem();
+        postedItem.setMfn("MFN-1");
+        postedItem.setRequestedQty(7);
+        postedItem.setUnitCost(42.0);
+        posted.setItems(List.of(postedItem));
+
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.backFromPurchaseConfirmationForSuperAdmin(STORE_ID, PROVIDER, posted, model);
+
+        // then
+        assertThat(view).isEqualTo("deliveryCreate");
+        DeliveryCreationForm resultForm = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(resultForm.getItems().get(0).getRequestedQty()).isEqualTo(7);
+    }
+
+    @Test
+    void createDeliveryFormRedirectsToPreviewWhenThePlanningServiceHasNothingToOffer() {
+        // given
+        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(null);
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.createDeliveryForm(PROVIDER, model);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
+        }
+    }
+
+    @Test
+    void backEndpointRedirectsToPreviewWhenThePlanningServiceHasNothingToOffer() {
+        // given
+        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(null);
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.backFromPurchaseConfirmation(PROVIDER, posted, model);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
+        }
+    }
+
+    @Test
     void approvalScreenSuggestsNothingWhenTheStoreHasNoDefaultAddress() {
         // given
         Delivery delivery = new Delivery();
