@@ -43,6 +43,8 @@ class DropshipOrderCompletionTest {
         OrderItem item = new OrderItem();
         item.setDeliveryId(deliveryId);
         item.setStatus(status);
+        item.setEan("5900000000001");
+        item.setManufacturerCode("MFN-1");
         return item;
     }
 
