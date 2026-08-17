@@ -291,6 +291,15 @@ public class SupplierPurchaseService {
         return delivery;
     }
 
+    public List<DeliveryItem> requestedItems(Delivery delivery) {
+        if (delivery == null || StringUtils.isBlank(delivery.getPendingOrderForm())) {
+            return List.of();
+        }
+        return readPendingForm(delivery).getItems().stream()
+                .filter(item -> item.getRequestedQty() > 0)
+                .toList();
+    }
+
     private DeliveryCreationForm readPendingForm(Delivery delivery) {
         try {
             return objectMapper.readValue(delivery.getPendingOrderForm(), DeliveryCreationForm.class);

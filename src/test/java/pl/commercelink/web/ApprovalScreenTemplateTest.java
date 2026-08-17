@@ -37,6 +37,17 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
+    void detailsScreenStillShowsWhatWasOrderedAfterTheAllocationsWentBack() throws Exception {
+        // when
+        String html = details();
+
+        // then
+        assertThat(html).contains("${requestedItems}");
+        assertThat(html).contains("deliveries.requestedItems.title");
+        assertThat(html).contains("deliveries.requestedItems.note");
+    }
+
+    @Test
     void reusesTheSharedAddressModalFragment() throws Exception {
         // when
         String html = approval();

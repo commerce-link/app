@@ -244,6 +244,34 @@
                 </table>
             </div>
 
+            <th:block th:if="${not #lists.isEmpty(requestedItems)}">
+                <h2 th:text="#{deliveries.requestedItems.title}"></h2>
+
+                <div class="box">
+                    <p class="help mb-3" th:text="#{deliveries.requestedItems.note}"></p>
+                    <table class="table is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.name}"></th>
+                            <th th:text="#{deliveries.purchase.confirm.requested}"></th>
+                            <th th:text="#{general.ean}"></th>
+                            <th th:text="#{general.manufacturer.code}"></th>
+                            <th th:text="#{general.net.cost}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${requestedItems}">
+                            <td th:text="${item.name}"></td>
+                            <td th:text="${item.requestedQty}"></td>
+                            <td th:text="${item.ean}"></td>
+                            <td th:text="${item.mfn}"></td>
+                            <td th:text="${item.unitCost}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </th:block>
+
             <h2 th:text="#{deliveries.allocations}"></h2>
 
             <form id="allocationsForm" th:action="@{/dashboard/deliveries/allocations}" th:object="${allocationsForm}" method="post" class="box"

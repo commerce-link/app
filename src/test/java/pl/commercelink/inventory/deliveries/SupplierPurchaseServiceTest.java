@@ -1048,6 +1048,32 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void requestedItemsListsWhatWasOrderedOnADeliveryThatGaveItsAllocationsBack() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
+
+        // when
+        List<DeliveryItem> items = service.requestedItems(delivery);
+
+        // then
+        assertEquals(1, items.size());
+        assertEquals("5900000000001", items.getFirst().getEan());
+    }
+
+    @Test
+    void requestedItemsIsEmptyForADeliveryThatNeverCarriedAPurchaseForm() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+
+        // when
+        List<DeliveryItem> items = service.requestedItems(delivery);
+
+        // then
+        assertTrue(items.isEmpty());
+    }
+
+    @Test
     void rejectionStoresTheReasonAndPublishesNothing() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();

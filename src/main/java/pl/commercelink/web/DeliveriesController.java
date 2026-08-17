@@ -711,6 +711,9 @@ public class DeliveriesController {
         model.addAttribute("supplierRegistry", supplierRegistry);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
+        model.addAttribute("requestedItems", delivery.getAllocations().isEmpty()
+                ? supplierPurchaseService.requestedItems(delivery)
+                : List.of());
         return "deliveryDetails";
     }
 
