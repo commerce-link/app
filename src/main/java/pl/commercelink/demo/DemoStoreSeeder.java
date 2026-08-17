@@ -133,7 +133,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         fulfilment.setCanUseGlobalSuppliers(true);
         fulfilment.setSupplierConnections(List.of(
                 new StoreSupplierConnection(ACME, ConnectionMode.GLOBAL),
-                new StoreSupplierConnection(ACME_B, ConnectionMode.GLOBAL)));
+                new StoreSupplierConnection(ACME_B, ConnectionMode.OWN)));
         fulfilment.setEnabledCategories(List.of(ENABLED_CATEGORY_GROUP));
         store.setFulfilmentConfiguration(fulfilment);
 

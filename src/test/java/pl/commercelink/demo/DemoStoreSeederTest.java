@@ -35,7 +35,8 @@ class DemoStoreSeederTest {
         assertEquals("Sklep demo", store.getName());
         assertSame(metadata, store.getDemo());
         assertTrue(store.canUseGlobalSuppliers());
-        assertEquals(List.of("Acme", "AcmeB"), store.getGlobalSupplierNames());
+        assertEquals(List.of("Acme"), store.getGlobalSupplierNames());
+        assertEquals(List.of("AcmeB"), store.getOwnSupplierNames());
         assertEquals("MAG-abc123def4", store.getWarehouseConfiguration().getWarehouseId());
         assertEquals("KC-abc123def4", store.getWarehouseConfiguration().getCostCenterId());
         assertEquals(2, store.getCheckoutConfiguration().getDeliveryOptions().size());

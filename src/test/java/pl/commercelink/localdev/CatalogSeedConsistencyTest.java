@@ -22,6 +22,7 @@ class CatalogSeedConsistencyTest {
 
     private static final String ACME_FEED = "/local-init/s3/feeds/acme-feed.csv";
     private static final String ACME_B_FEED = "/local-init/s3/feeds/acmeb-feed.csv";
+    private static final String ACME_B_STORE_FEED = "/local-init/s3/stores/uma2dqukxr/supplier-feeds/acmeb-feed.csv";
     private static final String PRICELIST = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String FEED_HEADER = "ean;mfn;brand;name;category;price;currency;qty";
 
@@ -30,6 +31,12 @@ class CatalogSeedConsistencyTest {
             "Displays", "Keyboards", "Mice", "MousePads", "Headphones", "Microphones", "Webcams", "Speakers", "Laptops");
 
     private final List<CatalogSeedRow> rows = CatalogSeed.load();
+
+    @Test
+    void acmeBSellsTheSameProductsWhetherConnectedGloballyOrAsAStoreOwnedFeed() {
+        // given / when / then
+        assertThat(readLines(ACME_B_STORE_FEED)).isEqualTo(readLines(ACME_B_FEED));
+    }
 
     @Test
     void loadReturnsExactlyOneRowPerSourceLine() {
