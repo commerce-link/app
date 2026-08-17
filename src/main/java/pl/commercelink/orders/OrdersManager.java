@@ -134,6 +134,18 @@ public class OrdersManager {
         }, o -> o.updateEstimatedAssemblyAt(estimatedDeliveryAt));
     }
 
+    public void returnOrderItemsToSupplierAllocation(String storeId, String orderId, String deliveryId,
+                                                    String provider, Collection<String> orderItemIds) {
+        execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
+            if (deliveryId.equals(orderItem.getDeliveryId())
+                    && orderItem.hasOneOfTheStatuses(FulfilmentStatus.Ordered)) {
+                orderItem.setDeliveryId(provider);
+                orderItem.markAsInAllocation();
+                orderItemsRepository.save(orderItem);
+            }
+        });
+    }
+
     public Result moveItemsToAllocation(String storeId, String orderId, List<String> orderItemIds) {
         return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
             if (orderItem.isReadyForAllocation()) {

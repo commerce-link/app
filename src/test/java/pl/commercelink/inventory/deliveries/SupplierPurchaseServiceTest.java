@@ -1018,6 +1018,36 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void globalSubmissionClaimsItsAllocationsSoTheyCannotBeOrderedTwice() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithOneOrderableItem();
+
+        // when
+        service.submitPurchase(STORE_ID, form, "ref-claim");
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocations(STORE_ID, saved.getValue(), form);
+    }
+
+    @Test
+    void rejectionReturnsTheAllocationsToTheSupplier() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
+
+        // then
+        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), eq(delivery), any(DeliveryCreationForm.class));
+    }
+
+    @Test
     void rejectionStoresTheReasonAndPublishesNothing() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();

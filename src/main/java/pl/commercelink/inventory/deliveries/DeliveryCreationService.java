@@ -42,9 +42,18 @@ public class DeliveryCreationService {
         return null;
     }
 
-    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+    public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
+        delivery.increaseTotalCost(allocationsCost(form));
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+    }
 
+    public void releaseAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        delivery.decreaseTotalCost(allocationsCost(form));
+    }
+
+    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         delivery.setShippingCost(form.getShippingCost());
@@ -54,7 +63,8 @@ public class DeliveryCreationService {
         delivery.setOrderStatus(null);
         delivery.setPendingOrderForm(null);
 
-        finalizeDelivery(storeId, delivery, form);
+        deliveriesRepository.save(delivery);
+        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
     private void prepareForm(String storeId, DeliveryCreationForm form) {
@@ -74,11 +84,14 @@ public class DeliveryCreationService {
         }
     }
 
-    private void finalizeDelivery(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        double allocationsCost = form.getItems().stream()
+    private double allocationsCost(DeliveryCreationForm form) {
+        return form.getItems().stream()
                 .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
                 .sum();
-        delivery.increaseTotalCost(allocationsCost);
+    }
+
+    private void finalizeDelivery(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        delivery.increaseTotalCost(allocationsCost(form));
 
         deliveriesRepository.save(delivery);
 

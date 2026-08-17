@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,10 +69,49 @@ class DeliveryCreationServiceTest {
         assertEquals("ELKO-1", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         assertNull(delivery.getPendingOrderForm());
-        assertEquals(180.0, delivery.getTotalCost());
         verify(deliveriesRepository).save(delivery);
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), eq(form.getItems()));
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager).commit(STORE_ID, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+    }
+
+    @Test
+    void claimAllocationsTakesOwnershipOfTheOrderAllocationsAndTheirCost() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId("delivery-1");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        form.setEstimatedDeliveryAt(LocalDate.now());
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(2);
+        item.setUnitCost(90.0);
+        form.getItems().add(item);
+
+        // when
+        service.claimAllocations(STORE_ID, delivery, form);
+
+        // then
+        assertEquals(180.0, delivery.getTotalCost());
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq("delivery-1"), any(), eq(form.getItems()));
+    }
+
+    @Test
+    void releaseAllocationsHandsTheOrderAllocationsBackToTheSupplier() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId("delivery-1");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(2);
+        item.setUnitCost(90.0);
+        form.getItems().add(item);
+
+        // when
+        service.releaseAllocations(STORE_ID, delivery, form);
+
+        // then
+        verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER, form.getItems());
     }
 
     @Test

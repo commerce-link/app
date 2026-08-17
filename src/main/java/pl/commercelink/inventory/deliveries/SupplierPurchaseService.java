@@ -183,6 +183,7 @@ public class SupplierPurchaseService {
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             deliveryCreationService.completePending(storeId, delivery, form);
         } catch (SupplierOrderException e) {
+            deliveryCreationService.releaseAllocations(storeId, delivery, form);
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery);
@@ -266,6 +267,7 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        deliveryCreationService.releaseAllocations(storeId, delivery, readPendingForm(delivery));
         delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
         delivery.setRejectionReason(reason);
         delivery.addEvent(new Event(EventType.action, PURCHASE_REJECTED_EVENT, LocalDateTime.now()));
@@ -326,6 +328,7 @@ public class SupplierPurchaseService {
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
+        deliveryCreationService.claimAllocations(storeId, delivery, form);
         try {
             delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
         } catch (JsonProcessingException e) {
