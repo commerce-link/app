@@ -11,6 +11,7 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.orders.FulfilmentStatus;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -116,6 +117,40 @@ class WarehouseAllocationsManagerTest {
         assertNull(claimed.getDeliveryId());
         assertEquals(4, claimed.getQty());
         verify(warehouseRepository).save(claimed);
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts applies confirmed prices to items matched by manufacturer code")
+    void updateUnitCostsAppliesConfirmedPricesByMfn() {
+        // given
+        WarehouseItem claimed = new WarehouseItem();
+        claimed.setManufacturerCode("MFN-1");
+        claimed.setCost(10.0);
+        when(warehouseRepository.findByDeliveryId("store-1", "delivery-1")).thenReturn(List.of(claimed));
+
+        // when
+        warehouseAllocationsManager.updateUnitCosts("store-1", "delivery-1", Map.of("MFN-1", 8.5));
+
+        // then
+        assertThat(claimed.getCost()).isEqualTo(8.5);
+        verify(warehouseRepository).save(claimed);
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts skips items without a confirmed price")
+    void updateUnitCostsSkipsItemsWithoutConfirmedPrice() {
+        // given
+        WarehouseItem claimed = new WarehouseItem();
+        claimed.setManufacturerCode("MFN-2");
+        claimed.setCost(10.0);
+        when(warehouseRepository.findByDeliveryId("store-1", "delivery-1")).thenReturn(List.of(claimed));
+
+        // when
+        warehouseAllocationsManager.updateUnitCosts("store-1", "delivery-1", Map.of("MFN-1", 8.5));
+
+        // then
+        assertThat(claimed.getCost()).isEqualTo(10.0);
+        verify(warehouseRepository, never()).save(any());
     }
 
     private WarehouseItem warehouseItemInStatus(FulfilmentStatus status) {

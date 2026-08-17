@@ -9,6 +9,7 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentItem;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -110,6 +111,16 @@ public class WarehouseAllocationsManager {
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
             item.returnToAllocationPool();
             warehouseRepository.save(item);
+        }
+    }
+
+    public void updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByMfn) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            Double confirmed = unitCostsByMfn.get(item.getManufacturerCode());
+            if (confirmed != null && confirmed != item.getCost()) {
+                item.setCost(confirmed);
+                warehouseRepository.save(item);
+            }
         }
     }
 
