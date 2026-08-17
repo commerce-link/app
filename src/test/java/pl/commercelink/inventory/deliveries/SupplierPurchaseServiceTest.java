@@ -636,6 +636,23 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void submitPurchaseStoresDeliveryAddressIdOnDelivery() {
+        // given
+        when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setProvider("Acme");
+        form.setDeliveryAddressId("addr-7");
+
+        // when
+        service.submitPurchase("store-1", form, "ref-1");
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals("addr-7", saved.getValue().getDeliveryAddressId());
+    }
+
+    @Test
     void submitPurchaseRejectsFormWithNoOrderableItems() {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
@@ -897,6 +914,25 @@ class SupplierPurchaseServiceTest {
                 delivery.getPendingOrderForm(), DeliveryCreationForm.class);
         assertEquals("17200617", persistedForm.getDeliveryAddressId());
         verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+    }
+
+    @Test
+    void approveStoresChosenDeliveryAddressIdOnDelivery() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(globalSupplierProviderFactory.get(PROVIDER)).thenReturn(Optional.of(globalSupplierProvider));
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.approve(STORE_ID, DELIVERY_ID, "addr-9");
+
+        // then
+        assertEquals("addr-9", delivery.getDeliveryAddressId());
     }
 
     @Test

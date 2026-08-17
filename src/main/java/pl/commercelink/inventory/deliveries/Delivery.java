@@ -67,6 +67,8 @@ public class Delivery {
     private String pendingOrderForm;
     @DynamoDBAttribute(attributeName = "deliveryAddress")
     private String deliveryAddress;
+    @DynamoDBAttribute(attributeName = "deliveryAddressId")
+    private String deliveryAddressId;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
@@ -455,6 +457,14 @@ public class Delivery {
 
     public void setDeliveryAddress(String deliveryAddress) {
         this.deliveryAddress = deliveryAddress;
+    }
+
+    public String getDeliveryAddressId() {
+        return deliveryAddressId;
+    }
+
+    public void setDeliveryAddressId(String deliveryAddressId) {
+        this.deliveryAddressId = deliveryAddressId;
     }
 
     public ConnectionMode getConnectionMode() {

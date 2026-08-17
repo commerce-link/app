@@ -231,6 +231,7 @@ public class SupplierPurchaseService {
 
         DeliveryCreationForm form = readPendingForm(delivery);
         form.setDeliveryAddressId(deliveryAddressId);
+        delivery.setDeliveryAddressId(deliveryAddressId);
 
         PurchaseValidation validation;
         try {
@@ -336,6 +337,7 @@ public class SupplierPurchaseService {
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
+        delivery.setDeliveryAddressId(form.getDeliveryAddressId());
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         try {
             delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
