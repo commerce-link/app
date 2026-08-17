@@ -263,9 +263,14 @@ public class DemoStoreSeeder implements StoreSeeder {
         orderedItem.setStatus(FulfilmentStatus.Ordered);
         itemsByOrderId.put(third.getOrderId(), List.of(orderedItem));
 
+        Order fourth = demoOrder(storeId, ownerEmail, "Maria", "Zielinska", "demo-order-004");
+        itemsByOrderId.put(fourth.getOrderId(), List.of(
+                allocationItem(fourth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+
         orders.add(first);
         orders.add(second);
         orders.add(third);
+        orders.add(fourth);
         orders.forEach(order -> order.setTotalPrice(itemsByOrderId.get(order.getOrderId()).stream()
                 .mapToDouble(OrderItem::getTotalPrice).sum()));
         first.setPayments(new ArrayList<>(List.of(
@@ -273,6 +278,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         second.setPayments(new ArrayList<>(List.of(
                 Payment.bankTransfer("DEMO-PAY-002", "Anna Nowak", second.getTotalPrice()))));
         return new DemoOrders(orders, itemsByOrderId, delivery);
+    }
+
+    private static CatalogSeedRow acmeBExclusiveRow(List<CatalogSeedRow> catalogRows) {
+        return catalogRows.stream()
+                .filter(row -> row.soldBy(ACME_B) && !row.soldBy(ACME))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No catalog row sold only by " + ACME_B));
     }
 
     private static Order demoOrder(String storeId, String ownerEmail, String name, String surname, String orderId) {
