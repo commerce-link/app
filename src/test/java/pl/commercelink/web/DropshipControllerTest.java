@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -149,6 +150,8 @@ class DropshipControllerTest {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         when(supplierPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
@@ -167,10 +170,56 @@ class DropshipControllerTest {
     }
 
     @Test
+    void confirmRejectsAStaleFormWhoseAllocationMovedElsewhere() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(supplierPurchaseService, never()).submitDropship(any(), any(), any(), any());
+    }
+
+    @Test
+    void confirmRejectsAFormNamingADifferentProviderThanTheAllocation() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of("Elko"));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(supplierPurchaseService, never()).submitDropship(any(), any(), any(), any());
+    }
+
+    @Test
     void failedSubmissionReturnsToTheConfirmationWithTheError() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         when(supplierPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))

@@ -37,6 +37,7 @@ import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -204,9 +205,9 @@ public class SupplierPurchaseService {
             applyOrderResult(form, validation, orderResult);
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             if (delivery.isDropship()) {
-                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
                 dropshipOrderCompletion.markSuppliedByDropship(storeId, delivery.getDropshipOrderId(),
                         delivery.getDeliveryId());
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);
             }
@@ -397,6 +398,11 @@ public class SupplierPurchaseService {
         if (!order.hasShippingDetails()) {
             return OperationResult.failure("orders.dropship.error.address");
         }
+        try {
+            toConsignee(order.getShippingDetails());
+        } catch (IllegalArgumentException e) {
+            return OperationResult.failure("orders.dropship.error.address");
+        }
         if (!isDropshipAvailable(storeId, form.getProvider())) {
             return OperationResult.failure("orders.dropship.error.unsupported");
         }
@@ -472,7 +478,7 @@ public class SupplierPurchaseService {
                 details.getStreetAndNumber(),
                 details.getPostalCode(),
                 details.getCity(),
-                details.getCountry(),
+                StringUtils.upperCase(StringUtils.trimToNull(details.getCountry()), Locale.ROOT),
                 details.getPhone(),
                 details.getEmail());
     }

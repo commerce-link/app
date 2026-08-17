@@ -22,6 +22,8 @@ public class DropshipOrderCompletion {
     public void markSuppliedByDropship(String storeId, String orderId, String deliveryId) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
+            System.err.println("[Dropship] order " + orderId + " not found in store " + storeId
+                    + " after placing dropship delivery " + deliveryId + " - items were not marked as delivered");
             return;
         }
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);

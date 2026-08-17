@@ -333,6 +333,59 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         verify(supplierProvider, never()).placeDropshipOrder(any());
         verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
+        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), same(delivery), any());
+    }
+
+    @Test
+    void submitDropshipRejectsAConsigneeTheSupplierContractWouldRefuse() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        Order order = directToConsumerOrder();
+        order.getShippingDetails().setSurname(null);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(
+                STORE_ID, order, formWithItem("EAN-1", "MFN-1", 2, 100.0), "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("orders.dropship.error.address", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void processPendingFailsDropshipDeliveryWhenTheConsigneeTurnedInvalid() throws Exception {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        Order order = directToConsumerOrder();
+        order.getShippingDetails().setSurname(null);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
+        verify(supplierProvider, never()).placeDropshipOrder(any());
+        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), same(delivery), any());
+    }
+
+    @Test
+    void toConsigneeNormalizesTheCountryCase() {
+        // given
+        ShippingDetails details = shippingDetails();
+        details.setCountry("pl");
+
+        // when
+        SupplierConsignee consignee = SupplierPurchaseService.toConsignee(details);
+
+        // then
+        assertEquals("PL", consignee.country());
     }
 
     @Test

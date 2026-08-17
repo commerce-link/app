@@ -165,4 +165,26 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(saved.capture());
         assertThat(saved.getValue().getConnectionMode()).isEqualTo(ConnectionMode.OWN);
     }
+
+    @Test
+    void completeDropshipPendingDoesNotTouchWarehouseAllocations() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId("delivery-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setPendingOrderForm("{\"provider\":\"Acme\"}");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setExternalDeliveryId("ACME-DS-1");
+        form.setProvider("Acme");
+
+        // when
+        service.completeDropshipPending(STORE_ID, delivery, form);
+
+        // then
+        assertEquals("ACME-DS-1", delivery.getExternalDeliveryId());
+        assertNull(delivery.getOrderStatus());
+        assertNull(delivery.getPendingOrderForm());
+        verify(deliveriesRepository).save(delivery);
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
 }

@@ -146,6 +146,11 @@ public class DropshipController extends BaseController {
         if (order == null) {
             return orderDetailsRedirect(storeId, orderId);
         }
+        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
+        Optional<String> provider = dropshipEligibility.eligibleProvider(order, orderItems);
+        if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
+            return orderDetailsRedirect(storeId, orderId);
+        }
         form.setStoreId(storeId);
         OperationResult<PurchaseSubmission> result =
                 supplierPurchaseService.submitDropship(storeId, order, form, purchaseRef);
