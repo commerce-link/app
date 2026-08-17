@@ -106,6 +106,13 @@ public class WarehouseAllocationsManager {
         warehouseRepository.delete(warehouseItem);
     }
 
+    public void release(String storeId, String deliveryId) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            item.markAsInAllocation();
+            warehouseRepository.save(item);
+        }
+    }
+
     private WarehouseItem createWarehouseItemFromFulfilmentItem(String storeId, FulfilmentItem item) {
         return warehouseItemFactory.create(storeId, item);
     }

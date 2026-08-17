@@ -81,6 +81,12 @@ public class WarehouseItem extends Item {
     }
 
     @DynamoDBIgnore
+    public void markAsInAllocation() {
+        this.setStatus(FulfilmentStatus.Allocation);
+        this.setDeliveryId(null);
+    }
+
+    @DynamoDBIgnore
     public void markAsInRMA() {
         this.setStatus(FulfilmentStatus.InRMA);
     }
