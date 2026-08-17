@@ -45,10 +45,14 @@
                 </div>
             </form>
 
+            <form id="bulkAddForm" method="get" th:action="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-new(catalogId=${catalogId}, categoryId=${categoryId})}">
             <div class="table-container">
                 <table class="table is-narrow is-hoverable is-fullwidth is-striped">
                     <thead>
                     <tr>
+                        <th>
+                            <input type="checkbox" id="selectAllRecommendations" onclick="toggleAllRecommendations(this)"/>
+                        </th>
                         <th th:text="#{product.name}"></th>
                         <th th:text="#{product.brand}"></th>
                         <th th:text="#{product.ean}"></th>
@@ -62,6 +66,9 @@
                     </thead>
                     <tbody>
                     <tr th:each="recommendation : ${productRecommendations}">
+                        <td>
+                            <input type="checkbox" name="eans" class="recommendation-checkbox" th:value="${recommendation.ean}"/>
+                        </td>
                         <td class="wrap-text" th:text="${recommendation.name}"></td>
                         <td th:text="${recommendation.brand}"></td>
                         <td th:text="${recommendation.ean}"></td>
@@ -89,10 +96,36 @@
                     </tbody>
                 </table>
             </div>
+
+            <div class="field">
+                <div class="control">
+                    <button class="button is-primary" type="submit"
+                            th:disabled="${#lists.isEmpty(productRecommendations)}"
+                            onclick="return confirmBulkAdd()"
+                            th:text="#{catalog.category.product.bulk.add}">
+                    </button>
+                </div>
+            </div>
+            </form>
         </div>
 
         <div th:replace="~{fragments/pagination :: pagination(@{/dashboard/catalogs/{catalogId}/category/{categoryId}/recommendations(catalogId=${catalogId}, categoryId=${categoryId})}, ${currentPage}, ${hasNextPage}, ${paginationParams})}"></div>
     </div>
+
+    <script th:inline="javascript">
+        function toggleAllRecommendations(source) {
+            document.querySelectorAll('.recommendation-checkbox').forEach(checkbox => checkbox.checked = source.checked);
+        }
+
+        function confirmBulkAdd() {
+            if (document.querySelectorAll('.recommendation-checkbox:checked').length === 0) {
+                const selectionMessage = /*[[#{product.bulk.select.confirm}]]*/ 'You must select at least one item!';
+                alert(selectionMessage);
+                return false;
+            }
+            return true;
+        }
+    </script>
 
 </div>
 
