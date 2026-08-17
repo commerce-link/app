@@ -2,58 +2,34 @@ package pl.commercelink.marketplace;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarketplaceOfferSnapshotTest {
 
     @Test
-    void csvHeadersIncludePimIdPriceQtyAndRemovalAttempts() {
-        assertThat(MarketplaceOfferSnapshot.csvHeaders())
-                .containsExactly("pimId", "price", "qty", "removalAttempts");
+    void publishedSnapshotCarriesZeroedReasonAndIsNotPendingRemoval() {
+        // when
+        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.published(
+                "pim-1", 1999L, 0L, MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD.name());
+
+        // then
+        assertEquals(0, snapshot.removalAttempts());
+        assertFalse(snapshot.pendingRemoval());
+        assertEquals("QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD", snapshot.quantityZeroedReason());
     }
 
     @Test
-    void asStringArraySerializesAllFourFieldsInOrder() {
-        MarketplaceOfferSnapshot snapshot = new MarketplaceOfferSnapshot("pim-1", 12345L, 7L, 2);
+    void pendingRemovalSnapshotHasZeroQuantityAndIsFlagged() {
+        // when
+        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.pendingRemoval("pim-1", 1999L, 2);
 
-        assertThat(snapshot.asStringArray())
-                .containsExactly("pim-1", "12345", "7", "2");
-    }
-
-    @Test
-    void fromStringArrayParsesFourColumnCurrentFormat() {
-        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.fromStringArray(
-                new String[]{"pim-1", "12345", "7", "2"}
-        );
-
-        assertThat(snapshot.getPimId()).isEqualTo("pim-1");
-        assertThat(snapshot.getPrice()).isEqualTo(12345L);
-        assertThat(snapshot.getQty()).isEqualTo(7L);
-        assertThat(snapshot.getRemovalAttempts()).isEqualTo(2);
-    }
-
-    @Test
-    void fromStringArrayParsesLegacyThreeColumnFormatWithoutRemovalAttempts() {
-        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.fromStringArray(
-                new String[]{"pim-1", "12345", "7"}
-        );
-
-        assertThat(snapshot.getPimId()).isEqualTo("pim-1");
-        assertThat(snapshot.getPrice()).isEqualTo(12345L);
-        assertThat(snapshot.getQty()).isEqualTo(7L);
-        assertThat(snapshot.getRemovalAttempts()).isEqualTo(0);
-    }
-
-    @Test
-    void fromStringArrayThrowsOnTwoColumnInput() {
-        assertThatThrownBy(() -> MarketplaceOfferSnapshot.fromStringArray(new String[]{"pim-1", "12345"}))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void fromStringArrayThrowsOnFiveColumnInput() {
-        assertThatThrownBy(() -> MarketplaceOfferSnapshot.fromStringArray(new String[]{"a", "b", "c", "d", "e"}))
-                .isInstanceOf(IllegalArgumentException.class);
+        // then
+        assertEquals(0L, snapshot.quantity());
+        assertEquals(2, snapshot.removalAttempts());
+        assertTrue(snapshot.pendingRemoval());
+        assertNull(snapshot.quantityZeroedReason());
     }
 }

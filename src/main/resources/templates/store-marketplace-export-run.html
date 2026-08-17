@@ -1,0 +1,132 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'">
+
+            <h1 class="title is-4" th:text="#{store.marketplaces.exports.run.title}"></h1>
+
+            <div class="box mb-5">
+                <div class="columns is-multiline">
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.date}"></p>
+                        <p class="title is-6" th:text="${runId}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.status}"></p>
+                        <p class="title is-6">
+                            <span class="tag is-success" th:if="${run.wasSuccessful()}" th:text="${run.status()}"></span>
+                            <span class="tag is-danger" th:unless="${run.wasSuccessful()}" th:text="${run.status()}"></span>
+                        </p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.marketplace}"></p>
+                        <p class="title is-6" th:text="${marketplace}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.catalog}"></p>
+                        <p class="title is-6" th:text="${catalogId}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.pricelist}"></p>
+                        <p class="title is-6" th:text="${run.pricelistId()} ?: '-'"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.provider.called}"></p>
+                        <p class="title is-6" th:text="${run.providerCalled()} ? #{general.yes} : #{general.no}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.offers.count}"></p>
+                        <p class="title is-6" th:text="${run.offersOrEmpty().size()}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.excluded.count}"></p>
+                        <p class="title is-6" th:text="${run.excludedOrEmpty().size()}"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box mb-5" th:if="${run.failure() != null}">
+                <h2 class="title is-6 has-text-danger" th:text="#{store.marketplaces.exports.failure}"></h2>
+                <pre><code th:text="${#strings.listJoin(run.failure(), '&#10;')}"></code></pre>
+            </div>
+
+            <div class="box mb-5">
+                <h2 class="title is-6" th:text="#{store.marketplaces.exports.excluded.title}"></h2>
+
+                <div class="table-container" th:if="${!run.excludedOrEmpty().isEmpty()}">
+                    <table class="table is-fullwidth is-narrow is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{store.marketplaces.exports.reason}"></th>
+                            <th th:text="#{store.marketplaces.exports.category}"></th>
+                            <th th:text="#{store.marketplaces.exports.product}"></th>
+                            <th th:text="#{store.marketplaces.exports.detail}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${run.excludedOrEmpty()}">
+                            <td th:text="${reasonLabels.getOrDefault(item.reason(), item.reason())}"></td>
+                            <td th:text="${item.categoryName()} ?: '-'"></td>
+                            <td>
+                                <span th:if="${item.name() != null}" th:text="${item.name()}"></span>
+                                <span th:if="${item.name() == null}" class="has-text-grey">&mdash;</span>
+                                <br/>
+                                <small class="has-text-grey" th:if="${item.pimId() != null}" th:text="${item.pimId()}"></small>
+                                <small class="has-text-grey" th:if="${item.ean() != null}" th:text="' / ' + ${item.ean()}"></small>
+                            </td>
+                            <td>
+                                <small th:if="${item.detail() != null and item.detail().minWarehouseQuantity() > 0}"
+                                       th:text="#{store.marketplaces.exports.detail.warehouse(
+                                            ${item.detail().warehouseQuantity()}, ${item.detail().minWarehouseQuantity()})}"></small>
+                                <small th:if="${item.detail() != null and item.detail().minWarehouseQuantity() == 0}"
+                                       th:text="#{store.marketplaces.exports.detail.distributors(
+                                            ${item.detail().totalQuantity()}, ${item.detail().minTotalQuantity()},
+                                            ${item.detail().distributorsWithMinQuantity()}, ${item.detail().minNumOfDistributors()},
+                                            ${item.detail().minQuantityPerDistributor()})}"></small>
+                                <span th:if="${item.detail() == null}" class="has-text-grey">&mdash;</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p th:if="${run.excludedOrEmpty().isEmpty()}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.excluded.empty}"></p>
+            </div>
+
+            <div class="box mb-5">
+                <h2 class="title is-6" th:text="#{store.marketplaces.exports.raw}"></h2>
+
+                <div class="table-container" th:if="${raw != null}">
+                    <pre><code th:text="${raw}"></code></pre>
+                </div>
+
+                <p th:if="${rawTooLarge}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.raw.too.large}"></p>
+
+                <div class="field mt-4">
+                    <div class="control">
+                        <a th:href="@{${basePath + '/marketplaces/exports/' + marketplace + '/' + catalogId + '/' + runId + '/file'}}"
+                           target="_blank" class="button is-small is-light"
+                           th:text="#{store.marketplaces.exports.open.raw}"></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="control">
+                    <a th:href="@{${basePath + '/marketplaces'}}" class="button is-light"
+                       th:text="#{general.back}"></a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>
