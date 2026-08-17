@@ -183,7 +183,6 @@ public class SupplierPurchaseService {
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             deliveryCreationService.completePending(storeId, delivery, form);
         } catch (SupplierOrderException e) {
-            deliveryCreationService.releaseAllocations(storeId, delivery, form);
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery);
