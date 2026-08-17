@@ -65,6 +65,34 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
+    void limitsTheExcludedTableAndAnnouncesTheRealTotalWhenThereAreTooManyRows() {
+        // given
+        WebContext context = runDetailsContext(documentWithExcludedProducts(620));
+
+        // when
+        String html = templateEngine().process("store-marketplace-export-run", context);
+
+        // then
+        assertThat(countRows(html)).isEqualTo(500);
+        assertThat(html).contains("Pokazano 500 z 620 pozycji");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void rendersEveryExcludedRowWithoutTheTruncationNoticeWhenBelowTheLimit() {
+        // given
+        WebContext context = runDetailsContext(documentWithExcludedProducts(12));
+
+        // when
+        String html = templateEngine().process("store-marketplace-export-run", context);
+
+        // then
+        assertThat(countRows(html)).isEqualTo(12);
+        assertThat(html).doesNotContain("Pokazano");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
     void rendersRunHistoryTableOnTheMarketplacesPage() {
         // given
         WebContext context = webContext();
@@ -120,6 +148,35 @@ class MarketplaceExportHistoryTemplateTest {
         return stringTemplateEngine().process(template, context);
     }
 
+    private WebContext runDetailsContext(MarketplaceExportRunDocument document) {
+        WebContext context = webContext();
+        context.setVariable("run", document);
+        context.setVariable("reasonLabels", Map.of());
+        context.setVariable("marketplace", "allegro");
+        context.setVariable("catalogId", "catalog-1");
+        context.setVariable("runId", RUN_ID);
+        context.setVariable("storeId", "store-1");
+        context.setVariable("isSuperAdmin", false);
+        context.setVariable("rawTooLarge", false);
+        context.setVariable("raw", null);
+        return context;
+    }
+
+    private int countRows(String html) {
+        return html.split("<tr", -1).length - 2;
+    }
+
+    private MarketplaceExportRunDocument documentWithExcludedProducts(int count) {
+        MarketplaceExportRun run = new MarketplaceExportRun("store-1", "allegro", "catalog-1", "pricelist-1");
+        run.providerCalled(true);
+        for (int index = 0; index < count; index++) {
+            run.excludeProduct(category(), product("pim-" + index),
+                    MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS,
+                    MarketplaceExportThresholds.distributors(3L, 3, 1L, 2, 2));
+        }
+        return run.toDocument(RUN_ID, Instant.parse("2026-08-13T01:31:05Z"));
+    }
+
     private MarketplaceExportRunDocument failedDocument() {
         MarketplaceExportRun run = new MarketplaceExportRun("store-1", "allegro", "catalog-1", "pricelist-1");
         run.providerCalled(true);
@@ -140,7 +197,11 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     private Product product() {
-        return new Product("category-1", "pim-B", "EAN-B", "MFN-B", "Brand", "Label", "Name-B", "default");
+        return product("pim-B");
+    }
+
+    private Product product(String pimId) {
+        return new Product("category-1", pimId, "EAN-B", "MFN-B", "Brand", "Label", "Name-B", "default");
     }
 
     private TemplateEngine templateEngine() {

@@ -55,7 +55,7 @@
                 <pre><code th:text="${#strings.listJoin(run.failure(), '&#10;')}"></code></pre>
             </div>
 
-            <div class="box mb-5">
+            <div class="box mb-5" th:with="rowLimit=500">
                 <h2 class="title is-6" th:text="#{store.marketplaces.exports.excluded.title}"></h2>
 
                 <div class="table-container" th:if="${!run.excludedOrEmpty().isEmpty()}">
@@ -69,7 +69,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="item : ${run.excludedOrEmpty()}">
+                        <tr th:each="item, iteration : ${run.excludedOrEmpty()}" th:if="${iteration.index < rowLimit}">
                             <td th:text="${reasonLabels.getOrDefault(item.reason(), item.reason())}"></td>
                             <td th:text="${item.categoryName()} ?: '-'"></td>
                             <td>
@@ -94,6 +94,9 @@
                         </tbody>
                     </table>
                 </div>
+
+                <p th:if="${run.excludedOrEmpty().size() > rowLimit}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.excluded.truncated(${rowLimit}, ${run.excludedOrEmpty().size()})}"></p>
 
                 <p th:if="${run.excludedOrEmpty().isEmpty()}" class="has-text-grey"
                    th:text="#{store.marketplaces.exports.excluded.empty}"></p>
