@@ -145,6 +145,9 @@ public class WarehouseAllocationsManager {
 
     private void updateExistingWarehouseItem(String storeId, String deliveryId, Allocation allocation, double unitCost, int qtyAdjustment) {
         WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
+        if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
+            return;
+        }
         warehouseItem.markAsOrdered(deliveryId, unitCost);
         if (qtyAdjustment != 0) {
             int newQty = warehouseItem.getQty() + qtyAdjustment;

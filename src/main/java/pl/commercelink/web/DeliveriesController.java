@@ -375,6 +375,14 @@ public class DeliveriesController {
     }
 
     private String showCreateDeliveryForm(String storeId, String provider, Model model) {
+        return showCreateDeliveryForm(storeId, provider, model, null);
+    }
+
+    private String backToCreateDeliveryForm(String storeId, String provider, DeliveryCreationForm posted, Model model) {
+        return showCreateDeliveryForm(storeId, provider, model, posted);
+    }
+
+    private String showCreateDeliveryForm(String storeId, String provider, Model model, DeliveryCreationForm posted) {
         var delivery = deliveriesPlanningService.run(storeId, provider);
 
         if (delivery == null) {
@@ -383,6 +391,20 @@ public class DeliveriesController {
                     : "redirect:/dashboard/deliveries/preview";
         }
 
+        DeliveryCreationForm form = buildDeliveryCreationForm(storeId, provider, delivery);
+        if (posted != null) {
+            form.applyUserSelections(posted);
+        }
+
+        model.addAttribute("form", form);
+        model.addAttribute("delivery", delivery);
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
+
+        return "deliveryCreate";
+    }
+
+    private DeliveryCreationForm buildDeliveryCreationForm(String storeId, String provider, Delivery delivery) {
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setStoreId(storeId);
         form.setProvider(provider);
@@ -405,12 +427,7 @@ public class DeliveriesController {
                 .map(SuggestedDeliveryItem::from)
                 .collect(Collectors.toList()));
 
-        model.addAttribute("form", form);
-        model.addAttribute("delivery", delivery);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
-
-        return "deliveryCreate";
+        return form;
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/updateFulfilment")
@@ -475,6 +492,21 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
                 : "redirect:/dashboard/deliveries/preview";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/back")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String backFromPurchaseConfirmation(@PathVariable("provider") String provider,
+                                               @ModelAttribute DeliveryCreationForm form, Model model) {
+        return backToCreateDeliveryForm(getStoreId(), provider, form, model);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/back")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String backFromPurchaseConfirmationForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                             @PathVariable("provider") String provider,
+                                                             @ModelAttribute DeliveryCreationForm form, Model model) {
+        return backToCreateDeliveryForm(storeId, provider, form, model);
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/purchase")

@@ -8,6 +8,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.deliveries.Allocation;
+import pl.commercelink.inventory.deliveries.AllocationKey;
+import pl.commercelink.inventory.deliveries.AllocationType;
+import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 
 import java.util.List;
@@ -171,6 +175,36 @@ class WarehouseAllocationsManagerTest {
         // then
         assertThat(claimed.getCost()).isEqualTo(10.0);
         verify(warehouseRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("commit does not re-mark or resave a warehouse item that is no longer claimable")
+    void commitSkipsWarehouseItemNoLongerInAllocationState() {
+        // given
+        WarehouseItem alreadyOrdered = warehouseItemInStatus(FulfilmentStatus.Ordered);
+        alreadyOrdered.setDeliveryId("existing-delivery");
+        alreadyOrdered.setQty(2);
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(alreadyOrdered);
+
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, ITEM_ID, "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setQty(2);
+        allocation.setSelected(true);
+
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("OLD-MFN");
+        item.setUnitCost(99.0);
+        item.setRequestedQty(2);
+        item.setAllocations(List.of(allocation));
+
+        // when
+        warehouseAllocationsManager.commit(STORE_ID, "new-delivery", PROVIDER, List.of(item));
+
+        // then
+        verify(warehouseRepository, never()).save(any());
+        assertThat(alreadyOrdered.getQty()).isEqualTo(2);
+        assertThat(alreadyOrdered.getDeliveryId()).isEqualTo("existing-delivery");
     }
 
     private WarehouseItem warehouseItemInStatus(FulfilmentStatus status) {

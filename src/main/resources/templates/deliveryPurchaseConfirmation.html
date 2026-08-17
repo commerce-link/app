@@ -126,9 +126,9 @@
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
                             th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{deliveries.purchase.confirm.submit}">Place order</button>
-                    <a class="button"
-                       th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}(provider=${form.provider})}"
-                       th:text="#{deliveries.purchase.confirm.back}">Back</a>
+                    <button type="submit" class="button" formnovalidate
+                            th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/back(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/back(provider=${form.provider})}"
+                            th:text="#{deliveries.purchase.confirm.back}">Back</button>
                 </div>
             </form>
 

@@ -10,10 +10,16 @@ import org.springframework.context.MessageSource;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.inventory.deliveries.Allocation;
+import pl.commercelink.inventory.deliveries.AllocationKey;
+import pl.commercelink.inventory.deliveries.AllocationType;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
+import pl.commercelink.inventory.deliveries.DeliveriesPlanningService;
 import pl.commercelink.inventory.deliveries.DeliveriesQueryService;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.orders.ShippingDetails;
@@ -22,12 +28,14 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,6 +69,15 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private StoresRepository storesRepository;
+
+    @Mock
+    private DeliveriesPlanningService deliveriesPlanningService;
+
+    @Mock
+    private RestockSuggestionService restockSuggestionService;
+
+    @Mock
+    private DeliveryTaxResolver deliveryTaxResolver;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -468,6 +485,44 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+    }
+
+    @Test
+    void backEndpointReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, "item-1", "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setMfn("MFN-1");
+        allocation.setName("Product 1");
+        allocation.setQty(1);
+        delivery.setAllocations(List.of(allocation));
+
+        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(delivery);
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(0.23);
+        when(restockSuggestionService.suggestForDelivery(eq(STORE_ID), eq(PROVIDER), any(Set.class))).thenReturn(List.of());
+
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem postedItem = new DeliveryItem();
+        postedItem.setMfn("MFN-1");
+        postedItem.setRequestedQty(7);
+        postedItem.setUnitCost(42.0);
+        posted.setItems(List.of(postedItem));
+
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.backFromPurchaseConfirmation(PROVIDER, posted, model);
+
+            // then
+            assertThat(view).isEqualTo("deliveryCreate");
+            DeliveryCreationForm resultForm = (DeliveryCreationForm) model.getAttribute("form");
+            assertThat(resultForm.getItems().get(0).getRequestedQty()).isEqualTo(7);
+        }
     }
 
     @Test
