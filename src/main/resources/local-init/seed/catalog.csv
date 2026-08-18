@@ -1,16 +1,15 @@
 pimId;ean;mfn;brand;label;name;category;priceGross;qty;estDeliveryDays;lowest30dPrice;supplier;inWarehouse;inCatalog;pimCategoryId
-local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;AMD ClearEdge;AMD ClearEdge Pro X3D;CPU;1299;20;1;1299;Acme,AcmeB;true;true;989
-local-seed-0002;5900000000002;MZ-V8V1T0BW;Samsung;Samsung 980;Samsung 980 NVMe 1TB;Storage;299;50;1;319;Acme,AcmeB;true;true;1563
-local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch DDR5;G.Skill TwinMatch 32GB DDR5 Kit;Memory;459;50;1;479;Acme,AcmeB;true;true;911
-local-seed-0004;5900000000004;100-100001015BOX;AMD;Ryzen 5 7600;AMD Ryzen 5 7600;CPU;899;30;1;949;Acme;true;true;989
-local-seed-0005;5900000000005;DUAL-RTX4070-O12G;ASUS;Dual RTX 4070;ASUS Dual GeForce RTX 4070 12GB;GPU;2699;15;2;2799;Acme,AcmeB;true;true;170
-local-seed-0006;5900000000006;RX7800XT-16G;Sapphire;Pulse RX 7800 XT;Sapphire Pulse Radeon RX 7800 XT 16GB;GPU;2399;10;2;2499;AcmeB;false;true;170
-local-seed-0007;5900000000007;RTX4090-GAMING-24G;MSI;RTX 4090 Gaming;MSI GeForce RTX 4090 Gaming X Trio 24GB;GPU;9499;4;3;9799;Acme;false;true;170
-local-seed-0008;5900000000008;100-100000910WOF;AMD;Ryzen 7 7800X3D;AMD Ryzen 7 7800X3D;CPU;1799;18;1;1899;Acme,AcmeB;true;true;989
-local-seed-0009;5900000000009;BX8071514600KF;Intel;Core i5-14600KF;Intel Core i5-14600KF;CPU;1149;22;1;1199;Acme;false;true;989
-local-seed-0010;5900000000010;BX8071514900K;Intel;Core i9-14900K;Intel Core i9-14900K;CPU;2599;8;1;2699;AcmeB;false;true;989
-local-seed-0011;5900000000011;NH-D15;Noctua;NH-D15;Noctua NH-D15 CPU Cooler;Cooler;449;40;1;459;Acme,AcmeB;true;true;921
-local-seed-0012;5900000000012;ML360R-RGB;Cooler Master;MasterLiquid 360R;Cooler Master MasterLiquid ML360R RGB;Cooler;559;16;2;599;Acme;false;true;921
+local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;ClearEdge Pro X3D;AMD ClearEdge Pro X3D;CPU;2269;20;1;2409;Acme;true;true;989
+local-seed-0002;5900000000002;MFN-VALUE-01;NVIDIA;ValueKing RTX Ultra;NVIDIA ValueKing RTX Ultra;GPU;5519;10;1;5859;Acme,AcmeB;true;true;170
+local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch 32GB DDR5 Kit;G.Skill TwinMatch 32GB DDR5 Kit;Memory;649;50;1;689;Acme;true;true;911
+local-seed-0004;5900000000004;MFN-NECK-01;MSI;NeckAndNeck Z790;MSI NeckAndNeck Z790;Motherboard;1559;15;1;1659;Acme,AcmeB;true;true;164
+local-seed-0005;5900000000005;MFN-PHANT-01;Corsair;PhantomStock 850W Gold;Corsair PhantomStock 850W Gold;PSU;779;22;2;829;Acme;true;true;963
+local-seed-0006;5900000000006;MFN-MIRAGE-01;Samsung;MirageDrive 2TB NVMe;Samsung MirageDrive 2TB NVMe;Storage;919;35;2;979;AcmeB;false;true;1563
+local-seed-0008;5900000000008;MFN-FINAL-01;NZXT;FinalUnit ATX Mid;NZXT FinalUnit ATX Mid;Case;819;30;1;869;AcmeB;true;true;237
+local-seed-0009;5900000000009;MFN-PENNY-01;Arctic;PennyWise 120mm PWM;Arctic PennyWise 120mm PWM;Fan;169;60;1;179;Acme,AcmeB;false;true;1571
+local-seed-0010;5900000000010;MFN-TIDE-01;LG;HighTide 27in 165Hz IPS;LG HighTide 27in 165Hz IPS;Displays;1979;12;1;2099;Acme,AcmeB;false;true;222
+local-seed-0011;5900000000011;MFN-FOREX-01;Logitech;ForeignExchange TKL;Logitech ForeignExchange TKL;Keyboards;709;25;1;759;Acme,AcmeB;true;true;194
+local-seed-0012;5900000000012;MFN-PILE-01;Razer;StockPile Wireless Pro;Razer StockPile Wireless Pro;Mice;849;3;2;899;Acme,AcmeB;false;true;195
 local-seed-0013;5900000000013;PA120-SE;Thermalright;Peerless Assassin 120;Thermalright Peerless Assassin 120 SE;Cooler;179;60;1;189;AcmeB;false;true;921
 local-seed-0014;5900000000014;B650-TOMAHAWK-WIFI;MSI;MAG B650 Tomahawk;MSI MAG B650 Tomahawk WiFi;Motherboard;899;20;1;949;Acme,AcmeB;true;true;164
 local-seed-0015;5900000000015;ROG-STRIX-Z790-E;ASUS;ROG Strix Z790-E;ASUS ROG Strix Z790-E Gaming WiFi;Motherboard;1899;9;2;1999;Acme;false;true;164
@@ -153,3 +152,19 @@ local-seed-0151;5900000000151;R1280T;Edifier;R1280T;Edifier R1280T 2.0;Speakers;
 local-seed-0152;5900000000152;82XF004YPB;Lenovo;IdeaPad Slim 5;Lenovo IdeaPad Slim 5 14 Ryzen 5;Laptops;2799;10;2;2899;Acme,AcmeB;false;false;151
 local-seed-0153;5900000000153;X1504ZA-BQ456;ASUS;VivoBook 15;ASUS VivoBook 15 i5;Laptops;2399;12;1;2499;Acme;false;false;151
 local-seed-0154;5900000000154;85A08EA;HP;255 G10;HP 255 G10 Ryzen 5;Laptops;2199;15;1;2299;AcmeB;false;false;151
+local-seed-9011;5901000000001;MFN-SOLO-01;SteelSeries;SoloRun Arctis Pro;SteelSeries SoloRun Arctis Pro;Headphones;1839;10;2;1949;Acme;false;true;1637
+local-seed-9012;5901000000002;MFN-LONE-01;Blue;LoneWolf XLR Studio;Blue LoneWolf XLR Studio;Microphones;989;18;2;1049;Acme;false;true;935
+local-seed-9013;5901000000003;MFN-SING-01;Logitech;Singular 4K Stream;Logitech Singular 4K Stream;Webcams;569;25;2;609;Acme;false;true;577
+local-seed-9014;5902000000001;MFN-ONLY-01;SteelSeries;OnlyHere QcK XXL;SteelSeries OnlyHere QcK XXL;MousePads;219;40;2;239;AcmeB;false;true;204
+local-seed-9015;5902000000002;MFN-EXCL-01;Edifier;Exclusive R1280DBs;Edifier Exclusive R1280DBs;Speakers;639;18;2;679;AcmeB;false;true;1081
+local-seed-9016;5902000000003;MFN-UNIQ-01;Lenovo;UniqueBook 15 Pro;Lenovo UniqueBook 15 Pro;Laptops;6089;6;2;6459;AcmeB;false;true;151
+local-seed-9001;5903000000002;MZ-V8V1T0BW;Samsung;Samsung 980;Samsung 980 NVMe 1TB;Storage;299;50;1;319;Acme,AcmeB;false;false;1563
+local-seed-9002;5903000000004;100-100001015BOX;AMD;Ryzen 5 7600;AMD Ryzen 5 7600;CPU;899;30;1;949;Acme;false;false;989
+local-seed-9003;5903000000005;DUAL-RTX4070-O12G;ASUS;Dual RTX 4070;ASUS Dual GeForce RTX 4070 12GB;GPU;2699;15;2;2799;Acme,AcmeB;false;false;170
+local-seed-9004;5903000000006;RX7800XT-16G;Sapphire;Pulse RX 7800 XT;Sapphire Pulse Radeon RX 7800 XT 16GB;GPU;2399;10;2;2499;AcmeB;false;false;170
+local-seed-9005;5903000000007;RTX4090-GAMING-24G;MSI;RTX 4090 Gaming;MSI GeForce RTX 4090 Gaming X Trio 24GB;GPU;9499;4;3;9799;Acme;false;false;170
+local-seed-9006;5903000000008;100-100000910WOF;AMD;Ryzen 7 7800X3D;AMD Ryzen 7 7800X3D;CPU;1799;18;1;1899;Acme,AcmeB;false;false;989
+local-seed-9007;5903000000009;BX8071514600KF;Intel;Core i5-14600KF;Intel Core i5-14600KF;CPU;1149;22;1;1199;Acme;false;false;989
+local-seed-9008;5903000000010;BX8071514900K;Intel;Core i9-14900K;Intel Core i9-14900K;CPU;2599;8;1;2699;AcmeB;false;false;989
+local-seed-9009;5903000000011;NH-D15;Noctua;NH-D15;Noctua NH-D15 CPU Cooler;Cooler;449;40;1;459;Acme,AcmeB;false;false;921
+local-seed-9010;5903000000012;ML360R-RGB;Cooler Master;MasterLiquid 360R;Cooler Master MasterLiquid ML360R RGB;Cooler;559;16;2;599;Acme;false;false;921

@@ -1,16 +1,15 @@
 PimId;EAN;Mfn;Brand;Label;Name;Category;Price;Qty;Estimated Delivery Days;Lowest 30 Days Price;Service
-local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;AMD ClearEdge;AMD ClearEdge Pro X3D;CPU;1299;20;1;1299;false
-local-seed-0002;5900000000002;MZ-V8V1T0BW;Samsung;Samsung 980;Samsung 980 NVMe 1TB;Storage;299;50;1;319;false
-local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch DDR5;G.Skill TwinMatch 32GB DDR5 Kit;Memory;459;50;1;479;false
-local-seed-0004;5900000000004;100-100001015BOX;AMD;Ryzen 5 7600;AMD Ryzen 5 7600;CPU;899;30;1;949;false
-local-seed-0005;5900000000005;DUAL-RTX4070-O12G;ASUS;Dual RTX 4070;ASUS Dual GeForce RTX 4070 12GB;GPU;2699;15;2;2799;false
-local-seed-0006;5900000000006;RX7800XT-16G;Sapphire;Pulse RX 7800 XT;Sapphire Pulse Radeon RX 7800 XT 16GB;GPU;2399;10;2;2499;false
-local-seed-0007;5900000000007;RTX4090-GAMING-24G;MSI;RTX 4090 Gaming;MSI GeForce RTX 4090 Gaming X Trio 24GB;GPU;9499;4;3;9799;false
-local-seed-0008;5900000000008;100-100000910WOF;AMD;Ryzen 7 7800X3D;AMD Ryzen 7 7800X3D;CPU;1799;18;1;1899;false
-local-seed-0009;5900000000009;BX8071514600KF;Intel;Core i5-14600KF;Intel Core i5-14600KF;CPU;1149;22;1;1199;false
-local-seed-0010;5900000000010;BX8071514900K;Intel;Core i9-14900K;Intel Core i9-14900K;CPU;2599;8;1;2699;false
-local-seed-0011;5900000000011;NH-D15;Noctua;NH-D15;Noctua NH-D15 CPU Cooler;Cooler;449;40;1;459;false
-local-seed-0012;5900000000012;ML360R-RGB;Cooler Master;MasterLiquid 360R;Cooler Master MasterLiquid ML360R RGB;Cooler;559;16;2;599;false
+local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;ClearEdge Pro X3D;AMD ClearEdge Pro X3D;CPU;2269;20;1;2409;false
+local-seed-0002;5900000000002;MFN-VALUE-01;NVIDIA;ValueKing RTX Ultra;NVIDIA ValueKing RTX Ultra;GPU;5519;10;1;5859;false
+local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch 32GB DDR5 Kit;G.Skill TwinMatch 32GB DDR5 Kit;Memory;649;50;1;689;false
+local-seed-0004;5900000000004;MFN-NECK-01;MSI;NeckAndNeck Z790;MSI NeckAndNeck Z790;Motherboard;1559;15;1;1659;false
+local-seed-0005;5900000000005;MFN-PHANT-01;Corsair;PhantomStock 850W Gold;Corsair PhantomStock 850W Gold;PSU;779;22;2;829;false
+local-seed-0006;5900000000006;MFN-MIRAGE-01;Samsung;MirageDrive 2TB NVMe;Samsung MirageDrive 2TB NVMe;Storage;919;35;2;979;false
+local-seed-0008;5900000000008;MFN-FINAL-01;NZXT;FinalUnit ATX Mid;NZXT FinalUnit ATX Mid;Case;819;30;1;869;false
+local-seed-0009;5900000000009;MFN-PENNY-01;Arctic;PennyWise 120mm PWM;Arctic PennyWise 120mm PWM;Fan;169;60;1;179;false
+local-seed-0010;5900000000010;MFN-TIDE-01;LG;HighTide 27in 165Hz IPS;LG HighTide 27in 165Hz IPS;Displays;1979;12;1;2099;false
+local-seed-0011;5900000000011;MFN-FOREX-01;Logitech;ForeignExchange TKL;Logitech ForeignExchange TKL;Keyboards;709;25;1;759;false
+local-seed-0012;5900000000012;MFN-PILE-01;Razer;StockPile Wireless Pro;Razer StockPile Wireless Pro;Mice;849;3;2;899;false
 local-seed-0013;5900000000013;PA120-SE;Thermalright;Peerless Assassin 120;Thermalright Peerless Assassin 120 SE;Cooler;179;60;1;189;false
 local-seed-0014;5900000000014;B650-TOMAHAWK-WIFI;MSI;MAG B650 Tomahawk;MSI MAG B650 Tomahawk WiFi;Motherboard;899;20;1;949;false
 local-seed-0015;5900000000015;ROG-STRIX-Z790-E;ASUS;ROG Strix Z790-E;ASUS ROG Strix Z790-E Gaming WiFi;Motherboard;1899;9;2;1999;false
@@ -99,3 +98,9 @@ local-seed-0097;5900000000097;EDIFIER-R1280T;Edifier;R1280T;Edifier R1280T 2.0 B
 local-seed-0098;5900000000098;STEELSERIES-QCK-H;SteelSeries;QcK Heavy;SteelSeries QcK Heavy Large Mousepad;MousePads;129;50;1;139;false
 local-seed-0099;5900000000099;SANDISK-EXTREME-128;SanDisk;Extreme 128GB;SanDisk Extreme microSDXC 128GB;Storage;129;90;1;139;false
 local-seed-0100;5900000000100;LOGI-MX-KEYS-S;Logitech;MX Keys S;Logitech MX Keys S Wireless Keyboard;Keyboards;549;28;1;579;false
+local-seed-9011;5901000000001;MFN-SOLO-01;SteelSeries;SoloRun Arctis Pro;SteelSeries SoloRun Arctis Pro;Headphones;1839;10;2;1949;false
+local-seed-9012;5901000000002;MFN-LONE-01;Blue;LoneWolf XLR Studio;Blue LoneWolf XLR Studio;Microphones;989;18;2;1049;false
+local-seed-9013;5901000000003;MFN-SING-01;Logitech;Singular 4K Stream;Logitech Singular 4K Stream;Webcams;569;25;2;609;false
+local-seed-9014;5902000000001;MFN-ONLY-01;SteelSeries;OnlyHere QcK XXL;SteelSeries OnlyHere QcK XXL;MousePads;219;40;2;239;false
+local-seed-9015;5902000000002;MFN-EXCL-01;Edifier;Exclusive R1280DBs;Edifier Exclusive R1280DBs;Speakers;639;18;2;679;false
+local-seed-9016;5902000000003;MFN-UNIQ-01;Lenovo;UniqueBook 15 Pro;Lenovo UniqueBook 15 Pro;Laptops;6089;6;2;6459;false
