@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class DeliveryCreationService {
@@ -46,20 +47,26 @@ public class DeliveryCreationService {
         prepareForm(storeId, form);
         delivery.increaseTotalCost(allocationsCost(form));
         orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
-    public void releaseAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
-        delivery.decreaseTotalCost(allocationsCost(form));
+    public void releaseAllocations(String storeId, Delivery delivery) {
+        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
+        warehouseAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
         applyPendingResult(delivery, form);
-        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        warehouseAllocationsManager.updateUnitCosts(storeId, delivery.getDeliveryId(),
+                form.getItems().stream()
+                        .filter(item -> item.getRequestedQty() > 0)
+                        .collect(Collectors.toMap(DeliveryItem::getMfn, DeliveryItem::getUnitCost, (a, b) -> a)));
     }
 
-    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        applyPendingResult(delivery, form);
+    public void completeDropshipPending(Delivery delivery, DeliveryCreationForm form) {
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setOrderStatus(null);
+        deliveriesRepository.save(delivery);
     }
 
     private void applyPendingResult(Delivery delivery, DeliveryCreationForm form) {
@@ -70,7 +77,6 @@ public class DeliveryCreationService {
         delivery.setPaymentTerms(form.getPaymentTerms());
         delivery.setTax(form.getTax());
         delivery.setOrderStatus(null);
-        delivery.setPendingOrderForm(null);
 
         deliveriesRepository.save(delivery);
     }

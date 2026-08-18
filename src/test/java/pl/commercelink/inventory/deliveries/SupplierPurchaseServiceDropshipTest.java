@@ -1,16 +1,11 @@
 package pl.commercelink.inventory.deliveries;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
@@ -93,11 +88,8 @@ class SupplierPurchaseServiceDropshipTest {
     private OrdersRepository ordersRepository;
     @Mock
     private DropshipOrderCompletion dropshipOrderCompletion;
-    @Spy
-    private ObjectMapper objectMapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .build();
+    @Mock
+    private DeliveriesQueryService deliveriesQueryService;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -153,15 +145,37 @@ class SupplierPurchaseServiceDropshipTest {
         return form;
     }
 
-    private Delivery pendingDropshipDelivery(DeliveryCreationForm form, String purchaseRef) throws Exception {
+    private Delivery pendingDropshipDelivery(DeliveryCreationForm form, String purchaseRef) {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         delivery.setDropshipOrderId(ORDER_ID);
-        delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
+        lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenReturn(deliveryWithAllocations(form));
         return delivery;
+    }
+
+    private Delivery deliveryWithAllocations(DeliveryCreationForm form) {
+        List<Allocation> allocations = form.getItems().stream()
+                .map(item -> {
+                    Allocation allocation = new Allocation();
+                    allocation.setKey(new AllocationKey(ORDER_ID, java.util.UUID.randomUUID().toString(), "customer"));
+                    allocation.setType(AllocationType.Order);
+                    allocation.setName(item.getName());
+                    allocation.setEan(item.getEan());
+                    allocation.setMfn(item.getMfn());
+                    allocation.setUnitCost(item.getUnitCost());
+                    allocation.setQty(item.getRequestedQty());
+                    return allocation;
+                })
+                .toList();
+        Delivery withAllocations = new Delivery();
+        withAllocations.setDeliveryId(DELIVERY_ID);
+        withAllocations.setProvider(PROVIDER);
+        withAllocations.setItems(DeliveryItem.groupAndUnify(allocations));
+        return withAllocations;
     }
 
     @Test
@@ -310,7 +324,7 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals("+48601234567", consignee.phone());
         assertEquals("jan.kowalski@example.com", consignee.email());
         assertEquals("ref-1", request.getValue().clientOrderRef());
-        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completeDropshipPending(same(delivery), any());
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
         verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID);
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
@@ -334,7 +348,7 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         verify(supplierProvider, never()).placeDropshipOrder(any());
         verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
-        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService, never()).releaseAllocations(any(), any());
     }
 
     @Test
@@ -373,7 +387,7 @@ class SupplierPurchaseServiceDropshipTest {
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         verify(supplierProvider, never()).placeDropshipOrder(any());
-        verify(deliveryCreationService).releaseAllocations(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService, never()).releaseAllocations(any(), any());
     }
 
     @Test

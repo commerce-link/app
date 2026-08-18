@@ -59,14 +59,12 @@ public class Delivery {
     private DeliveryOrderStatus orderStatus;
     @DynamoDBAttribute(attributeName = "orderErrorMessage")
     private String orderErrorMessage;
-    @DynamoDBAttribute(attributeName = "rejectionReason")
-    private String rejectionReason;
     @DynamoDBAttribute(attributeName = "purchaseRef")
     private String purchaseRef;
-    @DynamoDBAttribute(attributeName = "pendingOrderForm")
-    private String pendingOrderForm;
     @DynamoDBAttribute(attributeName = "deliveryAddress")
     private String deliveryAddress;
+    @DynamoDBAttribute(attributeName = "deliveryAddressId")
+    private String deliveryAddressId;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
@@ -428,14 +426,6 @@ public class Delivery {
         this.orderErrorMessage = orderErrorMessage;
     }
 
-    public String getRejectionReason() {
-        return rejectionReason;
-    }
-
-    public void setRejectionReason(String rejectionReason) {
-        this.rejectionReason = rejectionReason;
-    }
-
     public String getPurchaseRef() {
         return purchaseRef;
     }
@@ -444,20 +434,20 @@ public class Delivery {
         this.purchaseRef = purchaseRef;
     }
 
-    public String getPendingOrderForm() {
-        return pendingOrderForm;
-    }
-
-    public void setPendingOrderForm(String pendingOrderForm) {
-        this.pendingOrderForm = pendingOrderForm;
-    }
-
     public String getDeliveryAddress() {
         return deliveryAddress;
     }
 
     public void setDeliveryAddress(String deliveryAddress) {
         this.deliveryAddress = deliveryAddress;
+    }
+
+    public String getDeliveryAddressId() {
+        return deliveryAddressId;
+    }
+
+    public void setDeliveryAddressId(String deliveryAddressId) {
+        this.deliveryAddressId = deliveryAddressId;
     }
 
     public ConnectionMode getConnectionMode() {
@@ -481,11 +471,6 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isAwaitingApproval() {
         return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
-    }
-
-    @DynamoDBIgnore
-    public boolean isOrderRejected() {
-        return orderStatus == DeliveryOrderStatus.REJECTED;
     }
 
     public String getDropshipOrderId() {

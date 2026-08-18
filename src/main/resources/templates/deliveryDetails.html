@@ -11,6 +11,9 @@
 
             <h2 th:text="#{deliveries.action.edit.delivery.link}"></h2>
 
+            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
             <div class="columns">
                 <div class="column is-half">
                     <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box">
@@ -54,13 +57,11 @@
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
-                                <span class="tag ml-1 is-dark" th:if="${delivery.orderRejected}"
-                                      th:text="#{deliveries.status.rejected}"></span>
                                 <span class="tag ml-1 is-info" th:if="${delivery.dropship}"
                                       th:text="#{deliveries.dropship.badge}"></span>
                             </div>
                         </div>
-                        <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : (${delivery.orderRejected} ? ${delivery.rejectionReason} : null)">
+                        <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : null">
                             <div class="field" th:if="${!#strings.isEmpty(orderIssueReason)}">
                                 <label class="label" th:text="#{general.reason}"></label>
                                 <div class="control">
@@ -149,11 +150,22 @@
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
                             <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                                <button type="button" id="reject-purchase-button" class="button is-danger"
+                                        onclick="toggleRejectModal(true)"
+                                        th:text="#{deliveries.approval.reject}">Reject</button>
+                            </div>
+                            <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
                                 <a class="button is-link"
                                    th:href="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
                                    th:text="#{deliveries.approval.realize}">Order at supplier</a>
                             </div>
                         </div>
+                    </form>
+                    <form method="post"
+                          th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
+                          th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
+                        <button type="submit" class="button is-warning is-small" th:text="#{deliveries.purchase.retry.button}"></button>
                     </form>
                 </div>
 
@@ -257,34 +269,6 @@
                     </tbody>
                 </table>
             </div>
-
-            <th:block th:if="${not #lists.isEmpty(requestedItems)}">
-                <h2 th:text="#{deliveries.requestedItems.title}"></h2>
-
-                <div class="box">
-                    <p class="help mb-3" th:text="#{deliveries.requestedItems.note}"></p>
-                    <table class="table is-fullwidth">
-                        <thead>
-                        <tr>
-                            <th th:text="#{general.name}"></th>
-                            <th th:text="#{deliveries.purchase.confirm.requested}"></th>
-                            <th th:text="#{general.ean}"></th>
-                            <th th:text="#{general.manufacturer.code}"></th>
-                            <th th:text="#{general.net.cost}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="item : ${requestedItems}">
-                            <td th:text="${item.name}"></td>
-                            <td th:text="${item.requestedQty}"></td>
-                            <td th:text="${item.ean}"></td>
-                            <td th:text="${item.mfn}"></td>
-                            <td th:text="${item.unitCost}"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </th:block>
 
             <h2 th:text="#{deliveries.allocations}"></h2>
 
@@ -459,6 +443,30 @@
                 </div>
             </div>
 
+            <div id="rejectPurchaseModal" class="modal" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                <div class="modal-background" onclick="toggleRejectModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.approval.reject}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleRejectModal(false)"></button>
+                    </header>
+                    <form th:action="@{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject|}" method="post">
+                        <section class="modal-card-body">
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.approval.reason}"></label>
+                                <div class="control">
+                                    <textarea class="textarea" name="reason"></textarea>
+                                </div>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-danger" th:text="#{deliveries.approval.reject}">Reject</button>
+                            <button type="button" class="button" onclick="toggleRejectModal(false)" th:text="#{deliveries.approval.reject.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
             <div id="confirmActionModal" class="modal">
                 <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
                 <div class="modal-card">
@@ -507,6 +515,12 @@
 
         function toggleEditItemQtyModal(show) {
             document.getElementById('editItemQtyModal').classList.toggle('is-active', show);
+        }
+
+        function toggleRejectModal(show) {
+            const modal = document.getElementById('rejectPurchaseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
         }
 
         function openEditItemQtyModal(button) {

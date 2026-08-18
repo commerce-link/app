@@ -1,12 +1,15 @@
 package pl.commercelink.web.dtos;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import pl.commercelink.inventory.deliveries.Allocation;
+import pl.commercelink.inventory.deliveries.AllocationKey;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.invoicing.api.Price;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
@@ -155,5 +158,45 @@ public class DeliveryCreationForm {
 
     private double applyExchangeRate(double amount, double exchangeRate) {
         return Price.fromNet(amount * exchangeRate).netValue();
+    }
+
+    public void applyUserSelections(DeliveryCreationForm posted) {
+        for (DeliveryItem postedItem : posted.getItems()) {
+            DeliveryItem matchingItem = findItemByMfn(postedItem.getMfn());
+            if (matchingItem != null) {
+                matchingItem.setRequestedQty(postedItem.getRequestedQty());
+                matchingItem.setUnitCost(postedItem.getUnitCost());
+                applyAllocationSelections(matchingItem, postedItem);
+            } else {
+                applyToSuggestedItem(postedItem);
+            }
+        }
+    }
+
+    private DeliveryItem findItemByMfn(String mfn) {
+        return items.stream()
+                .filter(item -> Objects.equals(item.getMfn(), mfn))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void applyAllocationSelections(DeliveryItem matchingItem, DeliveryItem postedItem) {
+        for (Allocation postedAllocation : postedItem.getAllocations()) {
+            matchingItem.getAllocations().stream()
+                    .filter(allocation -> sameKey(allocation.getKey(), postedAllocation.getKey()))
+                    .findFirst()
+                    .ifPresent(allocation -> allocation.setSelected(postedAllocation.isSelected()));
+        }
+    }
+
+    private boolean sameKey(AllocationKey a, AllocationKey b) {
+        return Objects.equals(a.getOrderId(), b.getOrderId()) && Objects.equals(a.getItemId(), b.getItemId());
+    }
+
+    private void applyToSuggestedItem(DeliveryItem postedItem) {
+        suggestedItems.stream()
+                .filter(suggested -> Objects.equals(suggested.getMfn(), postedItem.getMfn()))
+                .findFirst()
+                .ifPresent(suggested -> suggested.setRequestedQty(postedItem.getRequestedQty()));
     }
 }

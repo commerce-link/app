@@ -1,7 +1,5 @@
 package pl.commercelink.inventory.deliveries;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -53,7 +51,7 @@ public class SupplierPurchaseService {
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
-    private static final String PURCHASE_REJECTED_EVENT = "DELIVERY_PURCHASE_REJECTED";
+    private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
 
     private final SupplierProviderFactory supplierProviderFactory;
     private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
@@ -64,11 +62,11 @@ public class SupplierPurchaseService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
-    private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final OrdersRepository ordersRepository;
     private final DropshipOrderCompletion dropshipOrderCompletion;
+    private final DeliveriesQueryService deliveriesQueryService;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -179,7 +177,7 @@ public class SupplierPurchaseService {
             return;
         }
 
-        DeliveryCreationForm form = readPendingForm(delivery);
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
         if (!delivery.isDropship()) {
             delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
         }
@@ -207,12 +205,11 @@ public class SupplierPurchaseService {
             if (delivery.isDropship()) {
                 dropshipOrderCompletion.markSuppliedByDropship(storeId, delivery.getDropshipOrderId(),
                         delivery.getDeliveryId());
-                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
+                deliveryCreationService.completeDropshipPending(delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);
             }
         } catch (SupplierOrderException e) {
-            deliveryCreationService.releaseAllocations(storeId, delivery, form);
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery);
@@ -250,6 +247,9 @@ public class SupplierPurchaseService {
         if (!requiresApproval(storeId, delivery.getProvider())) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        if (delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
 
         SupplierProvider supplierProvider = getProvider(storeId, delivery.getProvider());
         if (supplierProvider == null) {
@@ -260,9 +260,10 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
-        DeliveryCreationForm form = readPendingForm(delivery);
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
         if (!delivery.isDropship()) {
             form.setDeliveryAddressId(deliveryAddressId);
+            delivery.setDeliveryAddressId(deliveryAddressId);
         }
 
         PurchaseValidation validation;
@@ -278,12 +279,6 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
 
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
-
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.addEvent(new Event(EventType.action, PURCHASE_APPROVED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
@@ -294,16 +289,28 @@ public class SupplierPurchaseService {
         return OperationResult.success(delivery.getDeliveryId());
     }
 
+    public OperationResult<String> retry(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderFailed()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.retry.error.state");
+        }
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
         Delivery delivery = findAwaitingApproval(storeId, deliveryId);
-        if (delivery == null) {
+        if (delivery == null || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
-        deliveryCreationService.releaseAllocations(storeId, delivery, readPendingForm(delivery));
-        delivery.setOrderStatus(DeliveryOrderStatus.REJECTED);
-        delivery.setRejectionReason(reason);
-        delivery.addEvent(new Event(EventType.action, PURCHASE_REJECTED_EVENT, LocalDateTime.now()));
-        deliveriesRepository.save(delivery);
+        deliveryCreationService.releaseAllocations(storeId, delivery);
+        deliveriesRepository.delete(delivery);
         return OperationResult.success(delivery.getDeliveryId());
     }
 
@@ -312,7 +319,19 @@ public class SupplierPurchaseService {
         if (delivery == null) {
             throw new IllegalStateException("Delivery " + deliveryId + " is not awaiting approval");
         }
-        return validate(storeId, readPendingForm(delivery), delivery.getPurchaseRef());
+        return validate(storeId, rebuildForm(storeId, delivery), delivery.getPurchaseRef());
+    }
+
+    private DeliveryCreationForm rebuildForm(String storeId, Delivery delivery) {
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, delivery.getDeliveryId());
+        withAllocations.getItems().forEach(item -> item.setRequestedQty(item.getOrderedQty()));
+
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setStoreId(storeId);
+        form.setProvider(delivery.getProvider());
+        form.setDeliveryAddressId(delivery.getDeliveryAddressId());
+        form.getItems().addAll(withAllocations.getItems());
+        return form;
     }
 
     private Delivery findAwaitingApproval(String storeId, String deliveryId) {
@@ -321,23 +340,6 @@ public class SupplierPurchaseService {
             return null;
         }
         return delivery;
-    }
-
-    public List<DeliveryItem> requestedItems(Delivery delivery) {
-        if (delivery == null || StringUtils.isBlank(delivery.getPendingOrderForm())) {
-            return List.of();
-        }
-        return readPendingForm(delivery).getItems().stream()
-                .filter(item -> item.getRequestedQty() > 0)
-                .toList();
-    }
-
-    private DeliveryCreationForm readPendingForm(Delivery delivery) {
-        try {
-            return objectMapper.readValue(delivery.getPendingOrderForm(), DeliveryCreationForm.class);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Unreadable pending order form on delivery " + delivery.getDeliveryId(), e);
-        }
     }
 
     public OperationResult<PurchaseSubmission> submitPurchase(String storeId, DeliveryCreationForm form,
@@ -369,15 +371,8 @@ public class SupplierPurchaseService {
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
+        delivery.setDeliveryAddressId(form.getDeliveryAddressId());
         deliveryCreationService.claimAllocations(storeId, delivery, form);
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            System.err.println("[SupplierPurchase] failed to serialize pending order form for store " + storeId
-                    + ", ref " + purchaseRef + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
@@ -433,14 +428,11 @@ public class SupplierPurchaseService {
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         deliveryCreationService.claimAllocations(storeId, delivery, form);
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            System.err.println("[SupplierPurchase] failed to serialize pending dropship form for store " + storeId
-                    + ", ref " + purchaseRef + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
+        delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
+        delivery.setShippingCost(form.getShippingCost());
+        delivery.setPaymentCost(form.getPaymentCost());
+        delivery.setPaymentTerms(form.getPaymentTerms());
+        delivery.setTax(form.getTax());
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);

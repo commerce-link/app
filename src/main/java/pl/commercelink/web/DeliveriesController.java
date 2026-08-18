@@ -19,6 +19,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
@@ -378,6 +379,14 @@ public class DeliveriesController {
     }
 
     private String showCreateDeliveryForm(String storeId, String provider, Model model) {
+        return showCreateDeliveryForm(storeId, provider, model, null);
+    }
+
+    private String backToCreateDeliveryForm(String storeId, String provider, DeliveryCreationForm posted, Model model) {
+        return showCreateDeliveryForm(storeId, provider, model, posted);
+    }
+
+    private String showCreateDeliveryForm(String storeId, String provider, Model model, DeliveryCreationForm posted) {
         var delivery = deliveriesPlanningService.run(storeId, provider);
 
         if (delivery == null) {
@@ -386,6 +395,20 @@ public class DeliveriesController {
                     : "redirect:/dashboard/deliveries/preview";
         }
 
+        DeliveryCreationForm form = buildDeliveryCreationForm(storeId, provider, delivery);
+        if (posted != null) {
+            form.applyUserSelections(posted);
+        }
+
+        model.addAttribute("form", form);
+        model.addAttribute("delivery", delivery);
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
+
+        return "deliveryCreate";
+    }
+
+    private DeliveryCreationForm buildDeliveryCreationForm(String storeId, String provider, Delivery delivery) {
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setStoreId(storeId);
         form.setProvider(provider);
@@ -408,12 +431,7 @@ public class DeliveriesController {
                 .map(SuggestedDeliveryItem::from)
                 .collect(Collectors.toList()));
 
-        model.addAttribute("form", form);
-        model.addAttribute("delivery", delivery);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
-
-        return "deliveryCreate";
+        return form;
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/updateFulfilment")
@@ -478,6 +496,21 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
                 : "redirect:/dashboard/deliveries/preview";
+    }
+
+    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/back")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String backFromPurchaseConfirmation(@PathVariable("provider") String provider,
+                                               @ModelAttribute DeliveryCreationForm form, Model model) {
+        return backToCreateDeliveryForm(getStoreId(), provider, form, model);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/back")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String backFromPurchaseConfirmationForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                             @PathVariable("provider") String provider,
+                                                             @ModelAttribute DeliveryCreationForm form, Model model) {
+        return backToCreateDeliveryForm(storeId, provider, form, model);
     }
 
     @PostMapping("/dashboard/deliveries/create/{provider}/purchase")
@@ -673,7 +706,41 @@ public class DeliveriesController {
                     messageSource.getMessage(result.getMessage(), null, locale));
             return approvalRedirectToScreen(storeId, deliveryId);
         }
-        return storeDeliveryDetailsRedirect(storeId, deliveryId);
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("deliveries.approval.rejected.success", null, locale));
+        return "redirect:/dashboard/deliveries";
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/retry")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String retryPurchase(@PathVariable("deliveryId") String deliveryId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.purchase.retry.error.global", null, locale));
+            return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        }
+        return handleRetry(getStoreId(), deliveryId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/retry")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String retryPurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                             @PathVariable("deliveryId") String deliveryId,
+                                             RedirectAttributes redirectAttributes, Locale locale) {
+        return handleRetry(storeId, deliveryId, storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleRetry(String storeId, String deliveryId, String redirect,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.retry(storeId, deliveryId);
+        if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval/validate")
@@ -693,18 +760,26 @@ public class DeliveriesController {
 
     @GetMapping("/dashboard/deliveries/details")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public String showDeliveryDetails(@RequestParam String deliveryId, Model model) {
-        return showDeliveryDetails(getStoreId(), deliveryId, model);
+    public String showDeliveryDetails(@RequestParam String deliveryId, Model model,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        return showDeliveryDetails(getStoreId(), deliveryId, model, redirectAttributes, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/deliveries/details")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String showDeliveryDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId, Model model) {
-        return showDeliveryDetails(storeId, deliveryId, model);
+    public String showDeliveryDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId,
+                                                   Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        return showDeliveryDetails(storeId, deliveryId, model, redirectAttributes, locale);
     }
 
-    private String showDeliveryDetails(String storeId, String deliveryId, Model model) {
+    private String showDeliveryDetails(String storeId, String deliveryId, Model model,
+                                       RedirectAttributes redirectAttributes, Locale locale) {
         var delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (delivery == null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.error.notFound", null, locale));
+            return "redirect:/dashboard/deliveries";
+        }
         var mergeTargetDeliveries = deliveriesRepository.findPendingDeliveriesByProvider(
                 storeId, delivery.getProvider(), deliveryId);
 
@@ -717,9 +792,6 @@ public class DeliveriesController {
         model.addAttribute("supplierRegistry", supplierRegistry);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
-        model.addAttribute("requestedItems", delivery.getAllocations().isEmpty()
-                ? supplierPurchaseService.requestedItems(delivery)
-                : List.of());
         if (delivery.isDropship()) {
             var dropshipOrder = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);

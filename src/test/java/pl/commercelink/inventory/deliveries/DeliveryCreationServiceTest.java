@@ -13,6 +13,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,12 +46,11 @@ class DeliveryCreationServiceTest {
     private DeliveryCreationService service;
 
     @Test
-    void completePendingFillsDeliveryAndCommitsAllocations() {
+    void completePendingUpdatesWarehouseCostsInsteadOfRecommitting() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        delivery.setPendingOrderForm("{\"provider\":\"Elko\"}");
 
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setExternalDeliveryId("ELKO-1");
@@ -58,8 +58,9 @@ class DeliveryCreationServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.now());
         form.setShippingCost(15.0);
         DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(2);
-        item.setUnitCost(90.0);
+        item.setMfn("MFN-1");
+        item.setRequestedQty(1);
+        item.setUnitCost(8.5);
         form.getItems().add(item);
 
         // when
@@ -68,10 +69,10 @@ class DeliveryCreationServiceTest {
         // then
         assertEquals("ELKO-1", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
-        assertNull(delivery.getPendingOrderForm());
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(warehouseAllocationsManager).commit(STORE_ID, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager).updateUnitCosts(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
     }
 
     @Test
@@ -93,25 +94,22 @@ class DeliveryCreationServiceTest {
         // then
         assertEquals(180.0, delivery.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq("delivery-1"), any(), eq(form.getItems()));
+        verify(warehouseAllocationsManager).commit(STORE_ID, "delivery-1", PROVIDER, form.getItems());
     }
 
     @Test
-    void releaseAllocationsHandsTheOrderAllocationsBackToTheSupplier() {
+    void releaseAllocationsHandsBothAllocationGroupsBackToTheSupplierAndTheWarehouse() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(2);
-        item.setUnitCost(90.0);
-        form.getItems().add(item);
+        delivery.setProvider(PROVIDER);
 
         // when
-        service.releaseAllocations(STORE_ID, delivery, form);
+        service.releaseAllocations(STORE_ID, delivery);
 
         // then
-        verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER, form.getItems());
+        verify(orderAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER);
+        verify(warehouseAllocationsManager).release(STORE_ID, "delivery-1", PROVIDER);
     }
 
     @Test
@@ -172,19 +170,20 @@ class DeliveryCreationServiceTest {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        delivery.setPendingOrderForm("{\"provider\":\"Acme\"}");
+        delivery.setShippingCost(15.0);
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setExternalDeliveryId("ACME-DS-1");
         form.setProvider("Acme");
 
         // when
-        service.completeDropshipPending(STORE_ID, delivery, form);
+        service.completeDropshipPending(delivery, form);
 
         // then
         assertEquals("ACME-DS-1", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
-        assertNull(delivery.getPendingOrderForm());
+        assertEquals(15.0, delivery.getShippingCost());
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager, never()).updateUnitCosts(any(), any(), any());
     }
 }
