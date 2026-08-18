@@ -13,6 +13,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,38 +42,60 @@ class DeliveryCreationServiceTest {
     private ExchangeRates exchangeRates;
     @Mock
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
+    @Mock
+    private DeliveryCostSync deliveryCostSync;
 
     @InjectMocks
     private DeliveryCreationService service;
 
     @Test
-    void completePendingUpdatesWarehouseCostsInsteadOfRecommitting() {
+    void completePendingAppliesConfirmedCostsAndFoldsDeltaIntoTotalCost() {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId("delivery-1");
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.increaseTotalCost(100.0);
         DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setExternalDeliveryId("ELKO-1");
-        form.setProvider(PROVIDER);
-        form.setEstimatedDeliveryAt(LocalDate.now());
-        form.setShippingCost(15.0);
+        form.setProvider("Acme");
+        form.setShippingCost(20.0);
+        form.setPaymentCost(5.0);
         DeliveryItem item = new DeliveryItem();
         item.setMfn("MFN-1");
-        item.setRequestedQty(1);
+        item.setRequestedQty(2);
         item.setUnitCost(8.5);
-        form.getItems().add(item);
+        form.setItems(List.of(item));
+        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5))).thenReturn(3.0);
 
         // when
         service.completePending(STORE_ID, delivery, form);
 
         // then
-        assertEquals("ELKO-1", delivery.getExternalDeliveryId());
-        assertNull(delivery.getOrderStatus());
+        assertThat(delivery.getTotalCost()).isEqualTo(128.0);
+        assertThat(delivery.getShippingCost()).isEqualTo(20.0);
+        assertThat(delivery.getPaymentCost()).isEqualTo(5.0);
+        assertThat(delivery.getOrderStatus()).isNull();
         verify(deliveriesRepository).save(delivery);
-        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(warehouseAllocationsManager).updateUnitCosts(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
+    }
+
+    @Test
+    void completePendingSkipsItemsWithoutRequestedQty() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        DeliveryItem ordered = new DeliveryItem();
+        ordered.setMfn("MFN-1");
+        ordered.setRequestedQty(1);
+        ordered.setUnitCost(8.5);
+        DeliveryItem skipped = new DeliveryItem();
+        skipped.setMfn("MFN-2");
+        skipped.setRequestedQty(0);
+        skipped.setUnitCost(4.0);
+        form.setItems(List.of(ordered, skipped));
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
     }
 
     @Test
