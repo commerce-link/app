@@ -28,6 +28,36 @@ class DeliveryCreationFormTest {
     }
 
     @Test
+    void overlayCopiesDeliveryHeaderFields() {
+        // given
+        DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
+        DeliveryCreationForm posted = formWithItem("MFN-1", 1, 10.0);
+        posted.setExternalDeliveryId("FV-77");
+        posted.setEstimatedDeliveryAt(java.time.LocalDate.of(2026, 8, 20));
+        posted.setSourceCurrency("EUR");
+        posted.setShippingCost(15.5);
+        posted.setPaymentCost(3.0);
+        posted.setPaymentTerms(14);
+        posted.setTax(1.08);
+        posted.setRemoveUnselected(true);
+        posted.setDeliveryAddressId("addr-2");
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getExternalDeliveryId()).isEqualTo("FV-77");
+        assertThat(fresh.getEstimatedDeliveryAt()).isEqualTo(java.time.LocalDate.of(2026, 8, 20));
+        assertThat(fresh.getSourceCurrency()).isEqualTo("EUR");
+        assertThat(fresh.getShippingCost()).isEqualTo(15.5);
+        assertThat(fresh.getPaymentCost()).isEqualTo(3.0);
+        assertThat(fresh.getPaymentTerms()).isEqualTo(14);
+        assertThat(fresh.getTax()).isEqualTo(1.08);
+        assertThat(fresh.isRemoveUnselected()).isTrue();
+        assertThat(fresh.getDeliveryAddressId()).isEqualTo("addr-2");
+    }
+
+    @Test
     void overlayCopiesAllocationSelectedFlagByOrderIdAndItemId() {
         // given
         Allocation freshAllocation = allocation("order-1", "item-1", false);

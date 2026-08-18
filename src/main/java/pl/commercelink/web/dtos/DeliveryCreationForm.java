@@ -161,6 +161,15 @@ public class DeliveryCreationForm {
     }
 
     public void applyUserSelections(DeliveryCreationForm posted) {
+        setExternalDeliveryId(posted.getExternalDeliveryId());
+        setEstimatedDeliveryAt(posted.getEstimatedDeliveryAt());
+        setSourceCurrency(posted.getSourceCurrency());
+        setShippingCost(posted.getShippingCost());
+        setPaymentCost(posted.getPaymentCost());
+        setPaymentTerms(posted.getPaymentTerms());
+        setTax(posted.getTax());
+        setRemoveUnselected(posted.isRemoveUnselected());
+        setDeliveryAddressId(posted.getDeliveryAddressId());
         for (DeliveryItem postedItem : posted.getItems()) {
             DeliveryItem matchingItem = findItemByMfn(postedItem.getMfn());
             if (matchingItem != null) {
