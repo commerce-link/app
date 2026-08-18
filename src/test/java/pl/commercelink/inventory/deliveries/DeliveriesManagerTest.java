@@ -142,6 +142,22 @@ class DeliveriesManagerTest {
     }
 
     @Test
+    void updateDeliverySetsEstimatedDateWhenExistingDeliveryHasNone() {
+        // given
+        Delivery existing = deliveryWith(null);
+        Delivery updated = deliveryWith(NEW_DELIVERY_DATE);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then
+        assertThat(existing.getEstimatedDeliveryAt()).isEqualTo(NEW_DELIVERY_DATE);
+        verify(deliveriesRepository).save(existing);
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
     void splitTargetInheritsTheConnectionModeOfTheSourceDelivery() {
         // given
         Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);

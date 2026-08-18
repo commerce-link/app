@@ -139,6 +139,7 @@ public class DeliveriesManager {
         Delivery existingDelivery = deliveriesRepository.findById(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId());
 
         boolean isDeliveryDelayed = updatedDelivery.getEstimatedDeliveryAt() != null
+                && existingDelivery.getEstimatedDeliveryAt() != null
                 && updatedDelivery.getEstimatedDeliveryAt().isAfter(existingDelivery.getEstimatedDeliveryAt());
 
         existingDelivery.setEstimatedDeliveryAt(updatedDelivery.getEstimatedDeliveryAt());
