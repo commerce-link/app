@@ -103,6 +103,24 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("release returns claimed order items to the supplier allocation pool, grouped by order")
+    void releaseReturnsClaimedOrderItemsGroupedByOrder() {
+        // given
+        OrderItem first = orderItemInStatus("i1", FulfilmentStatus.Ordered);
+        first.setOrderId("order-1");
+        OrderItem second = orderItemInStatus("i2", FulfilmentStatus.Ordered);
+        second.setOrderId("order-2");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
+
+        // when
+        orderAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
+
+        // then
+        verify(ordersManager).returnOrderItemsToSupplierAllocation(STORE_ID, "order-1", "delivery-1", "Acme", List.of("i1"));
+        verify(ordersManager).returnOrderItemsToSupplierAllocation(STORE_ID, "order-2", "delivery-1", "Acme", List.of("i2"));
+    }
+
+    @Test
     @DisplayName("updateFulfilment updates fulfilment data of item in Allocation state assigned to the given provider")
     void updateFulfilmentUpdatesItemInAllocationState() {
         // given

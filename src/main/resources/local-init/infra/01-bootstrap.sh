@@ -44,6 +44,14 @@ awslocal secretsmanager create-secret \
   --name commercelink-pim \
   --secret-string '{"apiDomain":"http://localhost:8081","apiKey":""}'
 
+# Secrets Manager - global supplier configuration for the dev-profile test suppliers.
+# A supplier connected in GLOBAL mode builds its provider from a secret named exactly like the
+# supplier. Without it the lookup throws, ordering silently reports as unsupported and the
+# "buy at supplier" button disappears from the delivery screen. Both test suppliers take only
+# optional simulation settings, so an empty object is the correct configuration.
+awslocal secretsmanager create-secret --name Acme --secret-string '{}'
+awslocal secretsmanager create-secret --name AcmeB --secret-string '{}'
+
 # Cognito User Pool + App Client for local OAuth2 login
 POOL_ID=$(awslocal cognito-idp create-user-pool \
   --pool-name commercelink-local \

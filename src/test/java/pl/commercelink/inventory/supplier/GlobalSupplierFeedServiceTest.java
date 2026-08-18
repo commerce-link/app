@@ -21,7 +21,7 @@ class GlobalSupplierFeedServiceTest {
 
     private GlobalSupplierFeedService serviceFor(SecretsManager secrets, InventoryRepository inventory) {
         SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
-        return new GlobalSupplierFeedService(factory, secrets, inventory);
+        return new GlobalSupplierFeedService(new GlobalSupplierProviderFactory(factory, secrets), inventory);
     }
 
     @Test

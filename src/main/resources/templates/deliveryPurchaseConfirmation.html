@@ -82,19 +82,19 @@
                     <span th:text="' (' + ${deliveryAddressError} + ')'"></span>
                 </div>
 
-                <div class="field" th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
-                    <label class="label" th:text="#{deliveries.purchase.confirm.address}">Delivery address</label>
-                    <div th:replace="~{fragments/searchable-picker :: picker('deliveryAddressId', *{deliveryAddressId}, ${deliveryAddressLabel}, #{deliveries.purchase.confirm.addressPlaceholder})}"></div>
-                </div>
-
                 <div class="notification is-info is-light"
                      th:if="${deliveryAddressError == null and deliveryAddresses != null and #lists.isEmpty(deliveryAddresses)}"
                      th:text="#{deliveries.purchase.confirm.addressFromSupplier}">Ships to the address held at the supplier.</div>
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{provider}"/>
                 <input type="hidden" th:field="*{removeUnselected}"/>
+                <input type="hidden" th:field="*{externalDeliveryId}"/>
+                <input type="hidden" th:field="*{estimatedDeliveryAt}"/>
+                <input type="hidden" th:field="*{sourceCurrency}"/>
+                <input type="hidden" th:field="*{shippingCost}"/>
                 <input type="hidden" th:field="*{paymentCost}"/>
                 <input type="hidden" th:field="*{paymentTerms}"/>
+                <input type="hidden" th:field="*{tax}"/>
 
                 <th:block th:each="item, itemStat : *{items}">
                     <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
@@ -118,12 +118,22 @@
                     </th:block>
                 </th:block>
 
+                <div class="notification is-info is-light" th:if="${requiresApproval}"
+                     th:text="#{deliveries.purchase.confirm.approvalNote}">Handled by the platform administrator.</div>
+
+                <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}">
+                    <div th:replace="~{fragments/address-modal :: addressModal('deliveryAddressId', ${deliveryAddressOptions}, ${form.deliveryAddressId}, ${#lists.size(deliveryAddresses) > 6}, false)}"></div>
+                </th:block>
+
+                <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
+                <th:block th:replace="~{fragments/address-modal :: addressModalScript}"></th:block>
+
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
-                            th:text="#{deliveries.purchase.confirm.submit}">Place order</button>
-                    <a class="button"
-                       th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}(provider=${form.provider})}"
-                       th:text="#{deliveries.purchase.confirm.back}">Back</a>
+                            th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{deliveries.purchase.confirm.submit}">Place order</button>
+                    <button type="submit" class="button" formnovalidate
+                            th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/back(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase/back(provider=${form.provider})}"
+                            th:text="#{deliveries.purchase.confirm.back}">Back</button>
                 </div>
             </form>
 
@@ -132,10 +142,47 @@
 
                 function refreshSubmitState() {
                     const submit = document.getElementById('purchase-confirm-submit');
-                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
                     const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
-                    const addressChosen = !address || address.value !== '';
-                    submit.disabled = addressBlocked || !validationPassed || !addressChosen;
+                    submit.disabled = addressBlocked || !validationPassed;
+                }
+
+                function selectedAddress() {
+                    return document.querySelector('#address-options input[name="deliveryAddressId"]:checked');
+                }
+
+                function refreshAddressConfirmState() {
+                    const confirm = document.getElementById('address-confirm');
+                    if (confirm) {
+                        confirm.disabled = selectedAddress() === null;
+                    }
+                }
+
+                function filterAddressOptions() {
+                    const filter = document.getElementById('address-filter');
+                    const query = filter ? filter.value.trim().toLowerCase() : '';
+                    Array.from(document.querySelectorAll('#address-options .address-option'))
+                        .forEach(function (option) {
+                            const label = option.textContent.trim().toLowerCase();
+                            option.classList.toggle('is-hidden', query !== '' && label.indexOf(query) === -1);
+                        });
+                }
+
+                function openAddressModal(event) {
+                    const modal = document.getElementById('address-modal');
+                    if (!modal) {
+                        return;
+                    }
+                    event.preventDefault();
+                    modal.classList.add('is-active');
+                    scrollAddressOptionsToSelection();
+                    refreshAddressConfirmState();
+                }
+
+                function closeAddressModal() {
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        modal.classList.remove('is-active');
+                    }
                 }
 
                 function loadValidation() {
@@ -164,16 +211,28 @@
                         });
                 }
                 document.addEventListener('DOMContentLoaded', function () {
-                    const address = document.querySelector('[data-picker-value][name="deliveryAddressId"]');
-                    if (address) {
-                        address.addEventListener('change', refreshSubmitState);
+                    const submit = document.getElementById('purchase-confirm-submit');
+                    const modal = document.getElementById('address-modal');
+                    if (modal) {
+                        submit.addEventListener('click', openAddressModal);
+                        Array.from(modal.querySelectorAll('[data-address-cancel]'))
+                            .forEach(function (element) { element.addEventListener('click', closeAddressModal); });
+                        Array.from(modal.querySelectorAll('#address-options input[name="deliveryAddressId"]'))
+                            .forEach(function (radio) { radio.addEventListener('change', refreshAddressConfirmState); });
+                        const filter = document.getElementById('address-filter');
+                        if (filter) {
+                            filter.addEventListener('input', filterAddressOptions);
+                        }
+                        document.getElementById('address-confirm').addEventListener('click', function (event) {
+                            if (selectedAddress() === null) {
+                                event.preventDefault();
+                            }
+                        });
+                        refreshAddressConfirmState();
                     }
                     loadValidation();
                 });
             </script>
-
-            <th:block th:if="${deliveryAddresses != null and !#lists.isEmpty(deliveryAddresses)}"
-                      th:replace="~{fragments/searchable-picker :: pickerScript('deliveryAddressId', ${deliveryAddressOptions})}"></th:block>
 
             <template id="validation-spinner-template">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

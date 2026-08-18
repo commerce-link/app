@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -14,12 +15,14 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -136,6 +139,28 @@ class DeliveriesManagerTest {
         // then
         verify(notificationEventPublisher, times(1))
                 .publishAssemblyDateChanged(eq(order), eq(ORIGINAL_DELIVERY_DATE));
+    }
+
+    @Test
+    void splitTargetInheritsTheConnectionModeOfTheSourceDelivery() {
+        // given
+        Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        source.setProvider("Elko");
+        source.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        Allocation warehouseAllocation = new Allocation();
+        warehouseAllocation.setQty(1);
+        warehouseAllocation.setUnitCost(50.0);
+
+        // when
+        deliveriesManager.splitAllocations(STORE_ID, DELIVERY_ID, "EXT-1", NEW_DELIVERY_DATE,
+                List.of(), List.of(warehouseAllocation));
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, times(2)).save(saved.capture());
+        Delivery target = saved.getAllValues().get(1);
+        assertThat(target.getConnectionMode()).isEqualTo(ConnectionMode.GLOBAL);
     }
 
     private Delivery deliveryWith(LocalDate estimatedDeliveryAt) {

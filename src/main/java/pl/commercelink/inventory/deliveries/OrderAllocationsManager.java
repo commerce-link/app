@@ -68,6 +68,16 @@ public class OrderAllocationsManager {
         }
     }
 
+    public void release(String storeId, String deliveryId, String provider) {
+        Map<String, List<String>> itemIdsByOrderId = orderItemsRepository.findByDeliveryId(deliveryId)
+                .stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId,
+                        Collectors.mapping(OrderItem::getItemId, Collectors.toList())));
+
+        itemIdsByOrderId.forEach((orderId, itemIds) ->
+                ordersManager.returnOrderItemsToSupplierAllocation(storeId, orderId, deliveryId, provider, itemIds));
+    }
+
     public boolean updateFulfilment(String storeId, String provider, String orderId, String itemId, String ean, String mfn, double unitCost) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {

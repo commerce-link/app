@@ -369,6 +369,13 @@
             currencySelect.addEventListener('change', syncCurrency);
             syncCurrency();
             updateDeliveryNetValue();
+            document.querySelectorAll('input[type="number"][data-mfn]').forEach(function (input) {
+                if (document.getElementById('minQty-' + input.dataset.mfn)) {
+                    updateExtraStock(input.dataset.mfn);
+                } else {
+                    updateSuggestionStock(input);
+                }
+            });
         });
 
         function updateSuggestionStock(input) {

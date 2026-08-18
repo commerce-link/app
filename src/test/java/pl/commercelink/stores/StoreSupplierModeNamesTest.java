@@ -52,4 +52,17 @@ class StoreSupplierModeNamesTest {
         assertTrue(store.getGlobalSupplierNames().isEmpty());
         assertFalse(store.hasOwnSupplierConnections());
     }
+
+    @Test
+    void recognisesAManualSupplierCaseInsensitively() {
+        // given
+        Store store = storeWithConnections(
+                new StoreSupplierConnection("Kosatec", ConnectionMode.MANUAL),
+                new StoreSupplierConnection("Action", ConnectionMode.GLOBAL));
+
+        // when / then
+        assertTrue(store.isManualSupplier("kosatec"));
+        assertFalse(store.isManualSupplier("Action"));
+        assertFalse(store.isManualSupplier("Unknown"));
+    }
 }
