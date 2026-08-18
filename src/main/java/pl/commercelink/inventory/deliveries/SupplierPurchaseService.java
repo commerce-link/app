@@ -1,12 +1,12 @@
 package pl.commercelink.inventory.deliveries;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
+import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
@@ -42,8 +42,11 @@ public class SupplierPurchaseService {
 
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
+    private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
+    private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
 
     private final SupplierProviderFactory supplierProviderFactory;
+    private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
     private final StoresRepository storesRepository;
     private final DeliveryCreationService deliveryCreationService;
     private final DeliveriesRepository deliveriesRepository;
@@ -51,20 +54,22 @@ public class SupplierPurchaseService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
-    private final ObjectMapper objectMapper;
     private final ExchangeRates exchangeRates;
+    private final SupplierConnectionModeResolver supplierConnectionModeResolver;
+    private final DeliveriesQueryService deliveriesQueryService;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
-            Store store = storesRepository.findById(storeId);
-            if (store == null || !store.isOwnSupplier(provider)) {
-                return false;
-            }
-            SupplierProvider supplierProvider = supplierProviderFactory.get(store, provider);
+            SupplierProvider supplierProvider = getProvider(storeId, provider);
             return supplierProvider != null && supplierProvider.supportsOrdering();
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public boolean requiresApproval(String storeId, String provider) {
+        Store store = storesRepository.findById(storeId);
+        return store != null && store.isGlobalSupplier(provider);
     }
 
     public List<SupplierDeliveryAddress> deliveryAddresses(String storeId, String provider) {
@@ -153,7 +158,8 @@ public class SupplierPurchaseService {
             return;
         }
 
-        DeliveryCreationForm form = readPendingForm(delivery);
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
             List<SupplierOrderLine> lines = validation.lines().stream()
@@ -181,48 +187,170 @@ public class SupplierPurchaseService {
         }
     }
 
-    private DeliveryCreationForm readPendingForm(Delivery delivery) {
+    private String resolveDeliveryAddressLabel(String storeId, DeliveryCreationForm form) {
+        if (StringUtils.isBlank(form.getDeliveryAddressId())) {
+            return null;
+        }
         try {
-            return objectMapper.readValue(delivery.getPendingOrderForm(), DeliveryCreationForm.class);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Unreadable pending order form on delivery " + delivery.getDeliveryId(), e);
+            return deliveryAddresses(storeId, form.getProvider()).stream()
+                    .filter(address -> address.id().equals(form.getDeliveryAddressId()))
+                    .map(SupplierDeliveryAddress::label)
+                    .findFirst()
+                    .orElse(form.getDeliveryAddressId());
+        } catch (Exception e) {
+            return form.getDeliveryAddressId();
         }
     }
 
-    public OperationResult<String> enqueuePurchase(String storeId, DeliveryCreationForm form,
-                                                   String purchaseRef, boolean isSuperAdmin) {
+    public List<SupplierDeliveryAddress> deliveryAddressesForDelivery(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null) {
+            return List.of();
+        }
+        return deliveryAddresses(storeId, delivery.getProvider());
+    }
+
+    public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
+        if (!requiresApproval(storeId, delivery.getProvider())) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
+        if (delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
+
+        SupplierProvider supplierProvider = getProvider(storeId, delivery.getProvider());
+        if (supplierProvider == null) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
+        if (supplierProvider.requiresDeliveryAddress() && StringUtils.isBlank(deliveryAddressId)) {
+            return OperationResult.failure("deliveries.purchase.error.address");
+        }
+
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        form.setDeliveryAddressId(deliveryAddressId);
+        delivery.setDeliveryAddressId(deliveryAddressId);
+
+        PurchaseValidation validation;
+        try {
+            validation = validate(storeId, form, delivery.getPurchaseRef());
+        } catch (Exception e) {
+            System.err.println("[SupplierPurchase] availability re-check failed for store " + storeId
+                    + ", delivery " + deliveryId + ": " + e.getMessage());
+            e.printStackTrace();
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+        if (!validation.fullyAvailable()) {
+            return OperationResult.failure("deliveries.purchase.error.availability");
+        }
+
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_APPROVED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> retry(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderFailed()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.retry.error.state");
+        }
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
+        deliveryCreationService.releaseAllocations(storeId, delivery);
+        deliveriesRepository.delete(delivery);
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public PurchaseValidation validatePending(String storeId, String deliveryId) {
+        Delivery delivery = findAwaitingApproval(storeId, deliveryId);
+        if (delivery == null) {
+            throw new IllegalStateException("Delivery " + deliveryId + " is not awaiting approval");
+        }
+        return validate(storeId, rebuildForm(storeId, delivery), delivery.getPurchaseRef());
+    }
+
+    private DeliveryCreationForm rebuildForm(String storeId, Delivery delivery) {
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, delivery.getDeliveryId());
+        withAllocations.getItems().forEach(item -> item.setRequestedQty(item.getOrderedQty()));
+
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setStoreId(storeId);
+        form.setProvider(delivery.getProvider());
+        form.setDeliveryAddressId(delivery.getDeliveryAddressId());
+        form.getItems().addAll(withAllocations.getItems());
+        return form;
+    }
+
+    private Delivery findAwaitingApproval(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isAwaitingApproval()) {
+            return null;
+        }
+        return delivery;
+    }
+
+    public OperationResult<PurchaseSubmission> submitPurchase(String storeId, DeliveryCreationForm form,
+                                                              String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
-        if (isDeliveryAddressMissing(storeId, form)) {
+
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return OperationResult.failure("deliveries.purchase.error.failed");
+        }
+        boolean requiresApproval = store.isGlobalSupplier(form.getProvider());
+
+        if (!requiresApproval && isDeliveryAddressMissing(storeId, form)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
-            return OperationResult.success(existing.get().getDeliveryId());
+            return OperationResult.success(
+                    new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
         }
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
-        delivery.setManaged(isSuperAdmin);
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setOrderStatus(requiresApproval
+                ? DeliveryOrderStatus.AWAITING_APPROVAL
+                : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
-        try {
-            delivery.setPendingOrderForm(objectMapper.writeValueAsString(form));
-        } catch (JsonProcessingException e) {
-            System.err.println("[SupplierPurchase] failed to serialize pending order form for store " + storeId
-                    + ", ref " + purchaseRef + ": " + e.getMessage());
-            e.printStackTrace();
-            return OperationResult.failure("deliveries.purchase.error.failed");
-        }
+        delivery.setDeliveryAddressId(form.getDeliveryAddressId());
+        deliveryCreationService.claimAllocations(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
 
-        return OperationResult.success(delivery.getDeliveryId());
+        if (!requiresApproval) {
+            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+        }
+
+        return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }
 
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,
@@ -272,6 +400,15 @@ public class SupplierPurchaseService {
 
     private SupplierProvider getProvider(String storeId, String provider) {
         Store store = storesRepository.findById(storeId);
-        return supplierProviderFactory.get(store, provider);
+        if (store == null) {
+            return null;
+        }
+        if (store.isOwnSupplier(provider)) {
+            return supplierProviderFactory.get(store, provider);
+        }
+        if (store.isGlobalSupplier(provider)) {
+            return globalSupplierProviderFactory.get(provider).orElse(null);
+        }
+        return null;
     }
 }

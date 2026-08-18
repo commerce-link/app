@@ -13,6 +13,7 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
+import pl.commercelink.stores.ConnectionMode;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -60,8 +61,14 @@ public class Delivery {
     private String orderErrorMessage;
     @DynamoDBAttribute(attributeName = "purchaseRef")
     private String purchaseRef;
-    @DynamoDBAttribute(attributeName = "pendingOrderForm")
-    private String pendingOrderForm;
+    @DynamoDBAttribute(attributeName = "deliveryAddress")
+    private String deliveryAddress;
+    @DynamoDBAttribute(attributeName = "deliveryAddressId")
+    private String deliveryAddressId;
+
+    @DynamoDBAttribute(attributeName = "connectionMode")
+    @DynamoDBTypeConvertedEnum
+    private ConnectionMode connectionMode;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -85,8 +92,6 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "documents")
     private List<Document> documents = new LinkedList<>();
 
-    @DynamoDBAttribute(attributeName = "managed")
-    private boolean managed;
     @DynamoDBAttribute(attributeName = "invoiced")
     private boolean invoiced;
     @DynamoDBAttribute(attributeName = "synced")
@@ -426,12 +431,28 @@ public class Delivery {
         this.purchaseRef = purchaseRef;
     }
 
-    public String getPendingOrderForm() {
-        return pendingOrderForm;
+    public String getDeliveryAddress() {
+        return deliveryAddress;
     }
 
-    public void setPendingOrderForm(String pendingOrderForm) {
-        this.pendingOrderForm = pendingOrderForm;
+    public void setDeliveryAddress(String deliveryAddress) {
+        this.deliveryAddress = deliveryAddress;
+    }
+
+    public String getDeliveryAddressId() {
+        return deliveryAddressId;
+    }
+
+    public void setDeliveryAddressId(String deliveryAddressId) {
+        this.deliveryAddressId = deliveryAddressId;
+    }
+
+    public ConnectionMode getConnectionMode() {
+        return connectionMode;
+    }
+
+    public void setConnectionMode(ConnectionMode connectionMode) {
+        this.connectionMode = connectionMode;
     }
 
     @DynamoDBIgnore
@@ -442,6 +463,11 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isOrderFailed() {
         return orderStatus == DeliveryOrderStatus.FAILED;
+    }
+
+    @DynamoDBIgnore
+    public boolean isAwaitingApproval() {
+        return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
     }
 
     public boolean isPaid() {
@@ -549,14 +575,6 @@ public class Delivery {
 
     public void setEvents(List<Event> events) {
         this.events = events;
-    }
-
-    public boolean isManaged() {
-        return managed;
-    }
-
-    public void setManaged(boolean managed) {
-        this.managed = managed;
     }
 
     public List<Document> getDocuments() {

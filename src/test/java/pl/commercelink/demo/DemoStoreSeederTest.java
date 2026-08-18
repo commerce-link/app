@@ -35,7 +35,8 @@ class DemoStoreSeederTest {
         assertEquals("Sklep demo", store.getName());
         assertSame(metadata, store.getDemo());
         assertTrue(store.canUseGlobalSuppliers());
-        assertEquals(List.of("Acme", "AcmeB"), store.getGlobalSupplierNames());
+        assertEquals(List.of("Acme"), store.getGlobalSupplierNames());
+        assertEquals(List.of("AcmeB"), store.getOwnSupplierNames());
         assertEquals("MAG-abc123def4", store.getWarehouseConfiguration().getWarehouseId());
         assertEquals("KC-abc123def4", store.getWarehouseConfiguration().getCostCenterId());
         assertEquals(2, store.getCheckoutConfiguration().getDeliveryOptions().size());
@@ -148,6 +149,28 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void buildsFourthOrderAllocatedToAcmeBWithAProductOnlyAcmeBSells() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", "a@b.pl", rows);
+
+        // then
+        Order fourth = orderById(demoOrders, "demo-order-004");
+        List<OrderItem> items = demoOrders.itemsByOrderId().get(fourth.getOrderId());
+        assertEquals(1, items.size());
+        OrderItem item = items.getFirst();
+        assertTrue(item.isInAllocation());
+        assertEquals("AcmeB", item.getDeliveryId());
+        CatalogSeedRow row = rows.stream()
+                .filter(r -> r.mfn().equals(item.getManufacturerCode()))
+                .findFirst().orElseThrow();
+        assertTrue(row.soldBy("AcmeB"));
+        assertFalse(row.soldBy("Acme"));
+    }
+
+    @Test
     void buildsOrdersWithCommonDemoDetails() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
@@ -227,7 +250,7 @@ class DemoStoreSeederTest {
 
         // then
         List<String> orderIds = firstRun.orders().stream().map(Order::getOrderId).toList();
-        assertEquals(List.of("demo-order-001", "demo-order-002", "demo-order-003"), orderIds);
+        assertEquals(List.of("demo-order-001", "demo-order-002", "demo-order-003", "demo-order-004"), orderIds);
         assertEquals(orderIds, secondRun.orders().stream().map(Order::getOrderId).toList());
         assertEquals("demo-delivery-001", firstRun.delivery().getDeliveryId());
         assertEquals(firstRun.delivery().getDeliveryId(), secondRun.delivery().getDeliveryId());

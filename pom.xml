@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.08.34</version>
+    <version>2026.08.35</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -338,7 +338,7 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
-                    <version>0.1.11</version>
+                    <version>0.1.12</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>

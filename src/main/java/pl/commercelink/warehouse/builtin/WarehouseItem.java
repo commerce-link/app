@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
@@ -26,6 +27,9 @@ public class WarehouseItem extends Item {
     private String itemId;
     @DynamoDBVersionAttribute
     private Long version;
+
+    @DynamoDBAttribute(attributeName = "purchaseClaimQty")
+    private int purchaseClaimQty;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -78,6 +82,12 @@ public class WarehouseItem extends Item {
     @DynamoDBIgnore
     public void markAsReserved() {
         this.setStatus(FulfilmentStatus.Reserved);
+    }
+
+    @DynamoDBIgnore
+    public void returnToAllocationPool(String provider) {
+        this.setStatus(FulfilmentStatus.Allocation);
+        this.setDeliveryId(provider);
     }
 
     @DynamoDBIgnore
@@ -162,5 +172,13 @@ public class WarehouseItem extends Item {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public int getPurchaseClaimQty() {
+        return purchaseClaimQty;
+    }
+
+    public void setPurchaseClaimQty(int purchaseClaimQty) {
+        this.purchaseClaimQty = purchaseClaimQty;
     }
 }

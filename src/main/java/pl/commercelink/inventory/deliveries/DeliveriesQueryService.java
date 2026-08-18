@@ -26,6 +26,9 @@ public class DeliveriesQueryService {
 
     public Delivery fetchDeliveryWithAllocations(String storeId, String deliveryId) {
         var delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null) {
+            return null;
+        }
         List<Allocation> allocations = fetchAllocations(storeId, delivery.getDeliveryId());
 
         delivery.setAllocations(allocations);

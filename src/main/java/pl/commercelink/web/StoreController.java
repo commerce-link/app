@@ -34,7 +34,6 @@ import pl.commercelink.web.dtos.PrinterForm;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Controller
 public class StoreController {
@@ -568,10 +567,6 @@ public class StoreController {
             return "error";
         }
 
-        ShippingDetails shippingDetails = new ShippingDetails();
-        shippingDetails.set_default(false);
-        store.getShippingDetails().add(shippingDetails);
-
         StoreForm form = new StoreForm(store);
 
         model.addAttribute("form", form);
@@ -792,16 +787,6 @@ public class StoreController {
             existingStore.setBillingDetails(form.getStore().getBillingDetails());
         }
 
-        List<ShippingDetails> updatedShippingDetails =
-                IntStream.range(0, form.getStore().getShippingDetails().size())
-                        .mapToObj(i -> {
-                            ShippingDetails detail = form.getStore().getShippingDetails().get(i);
-                            detail.set_default(i == form.getDefaultShippingDetailIndex());
-                            return detail;
-                        })
-                        .collect(Collectors.toList());
-        existingStore.setShippingDetails(updatedShippingDetails.stream().filter(ShippingDetails::isProperlyFilled).collect(Collectors.toList()));
-
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.company.details.update.success", null, locale));
 
@@ -859,6 +844,10 @@ public class StoreController {
             store.setWarehouseConfiguration(new WarehouseConfiguration());
         }
 
+        ShippingDetails blankRow = new ShippingDetails();
+        blankRow.set_default(false);
+        store.getShippingDetails().add(blankRow);
+
         StoreForm form = new StoreForm(store);
 
         model.addAttribute("form", form);
@@ -880,12 +869,35 @@ public class StoreController {
         existingConfiguration.setCostCenterId(submitted.getCostCenterId());
         existingConfiguration.setDocumentsGenerationEnabled(submitted.isDocumentsGenerationEnabled());
 
+        existingStore.setShippingDetails(shippingDetailsWithDefault(
+                form.getStore().getShippingDetails(), form.getDefaultShippingDetailIndex()));
+
         storesRepository.save(existingStore);
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.update.success", null, locale));
 
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/warehouse", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/warehouse";
+    }
+
+    private List<ShippingDetails> shippingDetailsWithDefault(List<ShippingDetails> submitted, int defaultIndex) {
+        ShippingDetails chosen = defaultIndex >= 0 && defaultIndex < submitted.size()
+                ? submitted.get(defaultIndex)
+                : null;
+
+        List<ShippingDetails> kept = submitted.stream()
+                .filter(ShippingDetails::isProperlyFilled)
+                .collect(Collectors.toList());
+
+        kept.forEach(details -> details.set_default(false));
+
+        if (kept.contains(chosen)) {
+            chosen.set_default(true);
+        } else if (!kept.isEmpty()) {
+            kept.getFirst().set_default(true);
+        }
+
+        return kept;
     }
 
     @PostMapping("/dashboard/store/warehouse/printers/add")

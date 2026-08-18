@@ -9,6 +9,7 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentItem;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -106,6 +107,35 @@ public class WarehouseAllocationsManager {
         warehouseRepository.delete(warehouseItem);
     }
 
+    public void release(String storeId, String deliveryId, String provider) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
+                List.of(FulfilmentStatus.Ordered))) {
+            int delta = item.getPurchaseClaimQty();
+            if (delta > 0 && delta >= item.getQty()) {
+                warehouseRepository.delete(item);
+                continue;
+            }
+            item.setQty(item.getQty() - delta);
+            if (item.getQty() <= 0) {
+                warehouseRepository.delete(item);
+                continue;
+            }
+            item.setPurchaseClaimQty(0);
+            item.returnToAllocationPool(provider);
+            warehouseRepository.save(item);
+        }
+    }
+
+    public void updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByMfn) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            Double confirmed = unitCostsByMfn.get(item.getManufacturerCode());
+            if (confirmed != null && confirmed != item.getCost()) {
+                item.setCost(confirmed);
+                warehouseRepository.save(item);
+            }
+        }
+    }
+
     private WarehouseItem createWarehouseItemFromFulfilmentItem(String storeId, FulfilmentItem item) {
         return warehouseItemFactory.create(storeId, item);
     }
@@ -126,7 +156,11 @@ public class WarehouseAllocationsManager {
 
     private void updateExistingWarehouseItem(String storeId, String deliveryId, Allocation allocation, double unitCost, int qtyAdjustment) {
         WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
+        if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
+            return;
+        }
         warehouseItem.markAsOrdered(deliveryId, unitCost);
+        warehouseItem.setPurchaseClaimQty(qtyAdjustment);
         if (qtyAdjustment != 0) {
             int newQty = warehouseItem.getQty() + qtyAdjustment;
             if (newQty > 0) {
@@ -143,6 +177,7 @@ public class WarehouseAllocationsManager {
     private void createNewWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
         WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
         warehouseItem.markAsOrdered(deliveryId, item.getUnitCost());
+        warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
         warehouseRepository.save(warehouseItem);
     }
 }
