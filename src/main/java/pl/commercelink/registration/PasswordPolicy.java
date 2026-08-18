@@ -6,7 +6,7 @@ final class PasswordPolicy {
 
     private static final int MIN_LENGTH = 8;
     private static final int MAX_LENGTH = 256;
-    private static final Pattern SYMBOL = Pattern.compile("[\\^$*.\\[\\]{}()?\"!@#%&/\\\\,><':;|_~`+=\\- ]");
+    private static final Pattern SYMBOL = Pattern.compile("[\\^$*.\\[\\]{}()?\"!@#%&/\\\\,><':;|_~`+=\\-]");
 
     private PasswordPolicy() {
     }

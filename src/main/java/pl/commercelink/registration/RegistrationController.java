@@ -130,21 +130,25 @@ public class RegistrationController {
             return "register-password";
         }
 
-        request.getSession().removeAttribute(PENDING_REGISTRATION);
+        PendingRegistration claimed = claimPendingRegistration(request);
+        if (claimed == null) {
+            return "redirect:/register";
+        }
+
         RegistrationResult result;
         try {
-            result = registrationService.register(pending.email(), pending.storeName(), clientIp(request), password);
+            result = registrationService.register(claimed.email(), claimed.storeName(), clientIp(request), password);
         } catch (RegistrationException e) {
-            request.getSession().setAttribute(PENDING_REGISTRATION, pending);
+            request.getSession().setAttribute(PENDING_REGISTRATION, claimed);
             model.addAttribute("errorMessage", messageSource.getMessage(e.messageKey(), null, locale));
             return "register-password";
         }
 
-        if (!autoLoginService.login(pending.email(), password, result.storeId(), request, response)) {
+        if (!autoLoginService.login(claimed.email(), password, result.storeId(), request, response)) {
             return "register-success";
         }
         if (!registrationService.isEmailVerifiedOnCreation()) {
-            emailVerificationService.sendCodeQuietly(pending.email());
+            emailVerificationService.sendCodeQuietly(claimed.email());
             return "redirect:" + EmailVerificationController.VERIFY_EMAIL_PATH;
         }
         return "redirect:" + homeUrl;
@@ -153,6 +157,20 @@ public class RegistrationController {
     @GetMapping("/demo/register")
     public String legacyRedirect() {
         return "redirect:/register";
+    }
+
+    private PendingRegistration claimPendingRegistration(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        synchronized (session) {
+            PendingRegistration pending = (PendingRegistration) session.getAttribute(PENDING_REGISTRATION);
+            if (pending != null) {
+                session.removeAttribute(PENDING_REGISTRATION);
+            }
+            return pending;
+        }
     }
 
     private PendingRegistration pendingRegistration(HttpServletRequest request) {
