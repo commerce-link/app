@@ -170,6 +170,12 @@ public class DeliveriesController {
                 ? "redirect:/dashboard/payments"
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
 
+        if (delivery != null && delivery.isAwaitingApproval()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
+            return redirectTarget;
+        }
+
         if (form.getBankAmount() == 0) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
@@ -207,8 +213,12 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/{deliveryId}/updatePayments")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updatePayments(@PathVariable String deliveryId, @ModelAttribute("delivery") Delivery updatedDelivery) {
+    public String updatePayments(@PathVariable String deliveryId, @ModelAttribute("delivery") Delivery updatedDelivery,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
         Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (existingDelivery.isAwaitingApproval()) {
+            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         if (updatedDelivery.getPayments() != null) {
             List<Payment> payments = updatedDelivery.getPayments().stream()
                     .filter(Payment::isComplete)
@@ -223,7 +233,11 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/markSelectedAsReceived")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
+    public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form,
+                                                    RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(form.getStoreId(), form.getDeliveryId())) {
+            return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
         OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
                 form.getProvider(),
@@ -244,7 +258,11 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/deleteSelectedAllocations")
     @PreAuthorize("hasRole('ADMIN')")
-    public String deleteSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form) {
+    public String deleteSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form,
+                                            RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), form.getDeliveryId())) {
+            return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
         return deleteAllocations(getStoreId(), form);
     }
 
@@ -256,25 +274,39 @@ public class DeliveriesController {
 
     private String deleteAllocations(String storeId, DeliveryAllocationsForm form) {
         deliveriesManager.deleteAllocations(storeId, form.getDeliveryId(), form.getSelectedAllocations());
-        return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+        return detailsRedirect(storeId, form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/mergeSelectedAllocations")
     @PreAuthorize("hasRole('ADMIN')")
-    public String mergeSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
-        return mergeAllocations(getStoreId(), form, redirectAttributes);
+    public String mergeSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form,
+                                           RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), form.getDeliveryId())) {
+            return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
+        return mergeAllocations(getStoreId(), form, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/mergeSelectedAllocations")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String mergeSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
-        return mergeAllocations(storeId, form, redirectAttributes);
+    public String mergeSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form,
+                                                        RedirectAttributes redirectAttributes, Locale locale) {
+        return mergeAllocations(storeId, form, redirectAttributes, locale);
     }
 
-    private String mergeAllocations(String storeId, DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
+    private String mergeAllocations(String storeId, DeliveryAllocationsForm form,
+                                    RedirectAttributes redirectAttributes, Locale locale) {
         if (StringUtils.isBlank(form.getTargetDeliveryId())) {
             redirectAttributes.addFlashAttribute("errorMessage", "Target delivery ID cannot be empty for merge operation.");
-            return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
+
+        Delivery source = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        Delivery target = deliveriesRepository.findById(storeId, form.getTargetDeliveryId());
+        if (source == null || target == null || source.isAwaitingApproval() != target.isAwaitingApproval()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.merge.error.approvalState", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
         }
 
         deliveriesManager.reassignAllocations(
@@ -284,12 +316,16 @@ public class DeliveriesController {
                 form.getSelectedOrderAllocations(),
                 form.getSelectedWarehouseAllocations()
         );
-        return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+        return detailsRedirect(storeId, form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/splitSelectedAllocations")
     @PreAuthorize("hasRole('ADMIN')")
-    public String splitSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
+    public String splitSelectedAllocations(@ModelAttribute DeliveryAllocationsForm form,
+                                           RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), form.getDeliveryId())) {
+            return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
         return splitAllocations(getStoreId(), form, redirectAttributes);
     }
 
@@ -316,23 +352,29 @@ public class DeliveriesController {
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
-        return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+        return detailsRedirect(storeId, form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/delete")
     @PreAuthorize("hasRole('ADMIN')")
-    public String deleteDelivery(@RequestParam String deliveryId) {
-        return deleteDelivery(getStoreId(), deliveryId);
+    public String deleteDelivery(@RequestParam String deliveryId,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        return deleteDelivery(getStoreId(), deliveryId, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/delete")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String deleteDeliveryForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId) {
-        return deleteDelivery(storeId, deliveryId);
+    public String deleteDeliveryForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId,
+                                              RedirectAttributes redirectAttributes, Locale locale) {
+        return deleteDelivery(storeId, deliveryId, redirectAttributes, locale);
     }
 
-    private String deleteDelivery(String storeId, String deliveryId) {
+    private String deleteDelivery(String storeId, String deliveryId,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         var delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery != null && delivery.isAwaitingApproval()) {
+            return redirectEditLocked(storeId, deliveryId, redirectAttributes, locale);
+        }
         deliveriesRepository.delete(delivery);
         return "redirect:/dashboard/deliveries";
     }
@@ -775,7 +817,9 @@ public class DeliveriesController {
             return "redirect:/dashboard/deliveries";
         }
         var mergeTargetDeliveries = deliveriesRepository.findPendingDeliveriesByProvider(
-                storeId, delivery.getProvider(), deliveryId);
+                        storeId, delivery.getProvider(), deliveryId).stream()
+                .filter(target -> target.isAwaitingApproval() == delivery.isAwaitingApproval())
+                .toList();
 
         model.addAttribute("delivery", delivery);
         model.addAttribute("allocationsForm", new DeliveryAllocationsForm(
@@ -818,12 +862,13 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/details")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    public String updateDelivery(@ModelAttribute Delivery updatedDelivery) {
+    public String updateDelivery(@ModelAttribute Delivery updatedDelivery,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())) {
+            return redirectEditLocked(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId(), redirectAttributes, locale);
+        }
         deliveriesManager.updateDelivery(updatedDelivery);
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + updatedDelivery.getDeliveryId();
+        return detailsRedirect(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/updateItemQty")
@@ -834,6 +879,9 @@ public class DeliveriesController {
             @RequestParam int qty,
             RedirectAttributes redirectAttributes,
             Locale locale) {
+        if (isEditLocked(getStoreId(), deliveryId)) {
+            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         return updateItemQty(getStoreId(), deliveryId, mfn, qty, redirectAttributes, locale);
     }
 
@@ -857,28 +905,38 @@ public class DeliveriesController {
                     messageSource.getMessage(result.getMessage(), null, locale));
         }
 
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        return detailsRedirect(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/deliveries/link-invoices")
     @PreAuthorize("hasRole('ADMIN')")
-    public String linkInvoices(@RequestParam String deliveryId) {
+    public String linkInvoices(@RequestParam String deliveryId,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), deliveryId)) {
+            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         invoiceLinkingService.linkInvoices(getStoreId(), deliveryId);
         return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/deliveries/link-invoice-by-id")
     @PreAuthorize("hasRole('ADMIN')")
-    public String linkInvoiceById(@RequestParam String deliveryId, @RequestParam String invoiceId) {
+    public String linkInvoiceById(@RequestParam String deliveryId, @RequestParam String invoiceId,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), deliveryId)) {
+            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         invoiceLinkingService.linkInvoiceById(getStoreId(), deliveryId, invoiceId);
         return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
     @PostMapping("/dashboard/deliveries/unlink-invoice")
     @PreAuthorize("hasRole('ADMIN')")
-    public String unlinkInvoice(@RequestParam String deliveryId, @RequestParam String invoiceId) {
+    public String unlinkInvoice(@RequestParam String deliveryId, @RequestParam String invoiceId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), deliveryId)) {
+            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         invoiceLinkingService.unlinkInvoice(getStoreId(), deliveryId, invoiceId);
         return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
@@ -906,10 +964,32 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/sync/apply")
     @PreAuthorize("hasRole('ADMIN')")
-    public String applyInvoiceSync(@ModelAttribute InvoiceSyncPreview form, RedirectAttributes redirectAttributes) {
+    public String applyInvoiceSync(@ModelAttribute InvoiceSyncPreview form,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        if (isEditLocked(getStoreId(), form.getDeliveryId())) {
+            return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
         invoiceSynchronizationService.apply(getStoreId(), form);
         redirectAttributes.addFlashAttribute("successMessage", "Synchronizacja zakonczona pomyslnie.");
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+    }
+
+    private String detailsRedirect(String storeId, String deliveryId) {
+        return isSuperAdmin()
+                ? storeDeliveryDetailsRedirect(storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+    }
+
+    private boolean isEditLocked(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        return delivery != null && delivery.isAwaitingApproval();
+    }
+
+    private String redirectEditLocked(String storeId, String deliveryId,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
+        return detailsRedirect(storeId, deliveryId);
     }
 
     private boolean isSuperAdmin() { return CustomSecurityContext.hasRole("SUPER_ADMIN"); }

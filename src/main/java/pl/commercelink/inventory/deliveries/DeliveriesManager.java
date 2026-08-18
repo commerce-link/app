@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 @Component
@@ -96,6 +97,11 @@ public class DeliveriesManager {
                 source.getTax()
         );
         target.setConnectionMode(source.getConnectionMode());
+        if (source.isAwaitingApproval()) {
+            target.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+            target.setPurchaseRef(UUID.randomUUID().toString());
+            target.setDeliveryAddressId(source.getDeliveryAddressId());
+        }
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
     }
