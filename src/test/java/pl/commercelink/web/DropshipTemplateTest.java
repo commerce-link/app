@@ -37,6 +37,7 @@ class DropshipTemplateTest {
         assertThat(html).contains("allocations[__${allocStat.index}__].key.orderId");
         assertThat(html).contains("dropship/confirm");
         assertThat(html).contains("dropship/validate");
+        assertThat(html).contains("dropship/purchase/back");
         assertThat(html).contains("data-fully-available");
     }
 

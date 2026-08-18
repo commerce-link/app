@@ -128,6 +128,36 @@ class DropshipControllerTest {
     }
 
     @Test
+    void backFromConfirmationRestoresTheUserEnteredHeaderAndSelections() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(
+                List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        posted.setExternalDeliveryId("EXT-9");
+        posted.setShippingCost(15.0);
+        posted.setPaymentTerms(30);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.backFromDropshipConfirmation(ORDER_ID, posted, model);
+        }
+
+        // then
+        assertThat(view).isEqualTo("dropshipCreate");
+        DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(form.getExternalDeliveryId()).isEqualTo("EXT-9");
+        assertThat(form.getShippingCost()).isEqualTo(15.0);
+        assertThat(form.getPaymentTerms()).isEqualTo(30);
+    }
+
+    @Test
     void purchasePostShowsTheConfirmationWithAFreshPurchaseRef() {
         // given
         Order order = order();

@@ -68,6 +68,21 @@ public class DropshipController extends BaseController {
         return showDropshipConfirmation(storeId, orderId, form, model);
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/dropship/purchase/back")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String backFromDropshipConfirmation(@PathVariable("orderId") String orderId,
+                                               @ModelAttribute DeliveryCreationForm posted, Model model) {
+        return showDropshipCreate(getStoreId(), orderId, model, posted);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase/back")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String backFromDropshipConfirmationForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                            @PathVariable("orderId") String orderId,
+                                                            @ModelAttribute DeliveryCreationForm posted, Model model) {
+        return showDropshipCreate(storeId, orderId, model, posted);
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/dropship/create")
     @PreAuthorize("hasRole('ADMIN')")
     public String createManualDropship(@PathVariable("orderId") String orderId,
@@ -118,6 +133,10 @@ public class DropshipController extends BaseController {
     }
 
     private String showDropshipCreate(String storeId, String orderId, Model model) {
+        return showDropshipCreate(storeId, orderId, model, null);
+    }
+
+    private String showDropshipCreate(String storeId, String orderId, Model model, DeliveryCreationForm posted) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
             return orderDetailsRedirect(storeId, orderId);
@@ -129,6 +148,9 @@ public class DropshipController extends BaseController {
         }
 
         DeliveryCreationForm form = buildForm(storeId, order, orderItems, provider.get());
+        if (posted != null) {
+            form.applyUserSelections(posted);
+        }
         addConfirmationModel(model, storeId, order, form);
         return "dropshipCreate";
     }
