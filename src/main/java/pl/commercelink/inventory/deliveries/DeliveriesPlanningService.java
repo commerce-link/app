@@ -67,10 +67,7 @@ public class DeliveriesPlanningService {
             if (!dropshipSupported) {
                 continue;
             }
-            candidates.add(new DropshipCandidate(entry.getKey(),
-                    entry.getValue().getFirst().getKey().getName(),
-                    provider,
-                    groupAndUnify(entry.getValue())));
+            candidates.add(new DropshipCandidate(entry.getKey(), provider, groupAndUnify(entry.getValue())));
         }
 
         Set<String> candidateOrderIds = candidates.stream()

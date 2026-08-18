@@ -80,7 +80,6 @@ class DeliveriesPlanningServiceTest {
         DropshipCandidate first = candidates.stream()
                 .filter(c -> c.orderId().equals("order-2")).findFirst().orElseThrow();
         assertThat(first.provider()).isEqualTo("Acme");
-        assertThat(first.customer()).isEqualTo("customer");
         assertThat(first.items()).hasSize(2);
     }
 
