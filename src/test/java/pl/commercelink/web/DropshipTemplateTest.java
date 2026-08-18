@@ -126,5 +126,8 @@ class DropshipTemplateTest {
         assertThat(html).contains("${dropshipContact.phone}");
         assertThat(html).contains("${dropshipContact.email}");
         assertThat(html.indexOf("${dropshipContact.phone}")).isGreaterThan(html.indexOf("deliveries.deliveryAddress"));
+        assertThat(html).contains("order.shipment.type");
+        assertThat(html).contains("${dropshipShipment.type.name()}");
+        assertThat(html).contains("${dropshipShipment.collectionPointCode}");
     }
 }

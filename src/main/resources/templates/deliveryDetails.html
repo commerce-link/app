@@ -100,6 +100,16 @@
                                 <span th:text="${dropshipContact.email}"></span>
                             </div>
                         </div>
+                        <div class="field" th:if="${delivery.dropship and dropshipShipment != null and dropshipShipment.type != null}">
+                            <label class="label" th:text="#{order.shipment.type}"></label>
+                            <div class="control">
+                                <span th:text="#{'ShipmentType.' + ${dropshipShipment.type.name()}}"></span>
+                                <span th:if="${not #strings.isEmpty(dropshipShipment.carrier)}"
+                                      th:text="' · ' + ${dropshipShipment.carrier}"></span>
+                                <span th:if="${not #strings.isEmpty(dropshipShipment.collectionPointCode)}"
+                                      th:text="' · ' + ${dropshipShipment.collectionPointCode}"></span>
+                            </div>
+                        </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentTerms}"></label>
                             <div class="control">

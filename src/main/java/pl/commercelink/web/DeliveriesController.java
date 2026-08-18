@@ -795,6 +795,9 @@ public class DeliveriesController {
         if (delivery.isDropship()) {
             var dropshipOrder = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
+            model.addAttribute("dropshipShipment", dropshipOrder != null
+                    ? dropshipOrder.firstShipment().orElse(null)
+                    : null);
         }
         return "deliveryDetails";
     }
