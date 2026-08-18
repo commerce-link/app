@@ -238,6 +238,11 @@ public class MatchedInventory {
         return inventoryItems.stream().anyMatch(i -> supplierRegistry.get(i.supplier()).isLocalFor("PL"));
     }
 
+    public boolean hasInStockWarehouseOffers() {
+        return inventoryItems.stream()
+                .anyMatch(i -> SupplierRegistry.WAREHOUSE.equalsIgnoreCase(i.supplier()) && i.inStock());
+    }
+
     public boolean hasOffersFrom(String supplierName) {
         return inventoryItems.stream().anyMatch(i -> i.supplier().equalsIgnoreCase(supplierName) && i.netPrice() > 0);
     }
@@ -281,6 +286,9 @@ public class MatchedInventory {
     }
 
     public int getEstimatedDeliveryDays(long grossPrice) {
+        if (hasInStockWarehouseOffers()) {
+            return 1;
+        }
         return getInventoryItems()
                 .stream()
                 .filter(i -> Price.fromNet(i.netPrice()).grossValue() <= grossPrice)
