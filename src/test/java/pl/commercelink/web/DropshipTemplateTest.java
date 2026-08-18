@@ -116,4 +116,15 @@ class DropshipTemplateTest {
         assertThat(read("deliveryDetails.html")).doesNotContain("deliveries.dropship.orderLink");
         assertThat(read("deliveries.html")).contains("deliveries.dropship.badge");
     }
+
+    @Test
+    void deliveryDetailsShowTheDropshipContactBelowTheAddress() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("${dropshipContact.phone}");
+        assertThat(html).contains("${dropshipContact.email}");
+        assertThat(html.indexOf("${dropshipContact.phone}")).isGreaterThan(html.indexOf("deliveries.deliveryAddress"));
+    }
 }

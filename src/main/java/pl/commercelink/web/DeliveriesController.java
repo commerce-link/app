@@ -720,6 +720,10 @@ public class DeliveriesController {
         model.addAttribute("requestedItems", delivery.getAllocations().isEmpty()
                 ? supplierPurchaseService.requestedItems(delivery)
                 : List.of());
+        if (delivery.isDropship()) {
+            var dropshipOrder = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
+            model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
+        }
         return "deliveryDetails";
     }
 
