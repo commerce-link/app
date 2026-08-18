@@ -24,8 +24,7 @@
                             <span class="tag is-info" th:text="#{deliveries.dropship.badge}">Dropshipping</span>
                         </div>
                         <div class="level-item">
-                            <a th:href="@{/dashboard/orders/{orderId}(orderId=${candidate.orderId})}"
-                               th:text="#{deliveries.preview.dropship.order} + ' ' + ${candidate.orderId} + ' · ' + ${candidate.customer}"></a>
+                            <span class="has-text-grey" th:text="${candidate.customer}"></span>
                         </div>
                     </div>
                     <div class="level-right">

@@ -60,13 +60,6 @@
                                       th:text="#{deliveries.dropship.badge}"></span>
                             </div>
                         </div>
-                        <div class="field" th:if="${delivery.dropship}">
-                            <label class="label" th:text="#{orders.dropship.confirm.consignee}"></label>
-                            <div class="control">
-                                <a th:href="${isSuperAdmin} ? '/dashboard/store/' + ${delivery.storeId} + '/orders/' + ${delivery.dropshipOrderId} : '/dashboard/orders/' + ${delivery.dropshipOrderId}"
-                                   th:text="#{deliveries.dropship.orderLink}">Order</a>
-                            </div>
-                        </div>
                         <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : (${delivery.orderRejected} ? ${delivery.rejectionReason} : null)">
                             <div class="field" th:if="${!#strings.isEmpty(orderIssueReason)}">
                                 <label class="label" th:text="#{general.reason}"></label>

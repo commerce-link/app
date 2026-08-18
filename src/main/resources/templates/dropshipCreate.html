@@ -20,14 +20,14 @@
             </div>
 
             <div class="notification is-info is-light">
-                <strong th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</strong>:
-                <span th:text="${consignee.displayName}">Jan Kowalski</span>,
-                <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span>,
-                <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span>
-                &middot; <span th:text="${consignee.phone}">+48601234567</span>
-                &middot; <span th:text="${consignee.email}">jan@example.com</span>
-                &middot; <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}"
-                            th:text="#{deliveries.preview.dropship.order} + ' ' + ${order.orderId}">Order</a>
+                <p class="mb-2"><strong th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</strong></p>
+                <p>
+                    <span th:text="${consignee.displayName}">Jan Kowalski</span><br/>
+                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
+                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
+                    <span th:text="${consignee.phone}">+48601234567</span><br/>
+                    <span th:text="${consignee.email}">jan@example.com</span>
+                </p>
             </div>
 
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>

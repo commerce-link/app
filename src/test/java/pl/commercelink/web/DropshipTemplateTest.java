@@ -61,6 +61,7 @@ class DropshipTemplateTest {
         assertThat(html).contains("deliveries.dropship.badge");
         assertThat(html).contains("deliveries.preview.create");
         assertThat(html).contains("/dropship");
+        assertThat(html).doesNotContain("deliveries.preview.dropship.order");
     }
 
     @Test
@@ -72,6 +73,7 @@ class DropshipTemplateTest {
         // then
         assertThat(dropship).contains("deliveries.create.title");
         assertThat(dropship).contains("orders.dropship.confirm.consignee");
+        assertThat(dropship).doesNotContain("deliveries.preview.dropship.order");
         assertThat(dropship).contains("dropship/create");
         assertThat(dropship).contains("dropship/purchase");
         assertThat(dropship).contains("deliveries.purchase.button");
@@ -111,7 +113,7 @@ class DropshipTemplateTest {
     void deliveryScreensCarryTheDropshipBadge() throws Exception {
         // when / then
         assertThat(read("deliveryDetails.html")).contains("deliveries.dropship.badge");
-        assertThat(read("deliveryDetails.html")).contains("${delivery.dropshipOrderId}");
+        assertThat(read("deliveryDetails.html")).doesNotContain("deliveries.dropship.orderLink");
         assertThat(read("deliveries.html")).contains("deliveries.dropship.badge");
     }
 }
