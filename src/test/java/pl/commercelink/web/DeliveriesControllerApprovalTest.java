@@ -632,6 +632,27 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void updateDeliveryIsAllowedForSuperAdminWhileAwaitingApproval() {
+        // given
+        Delivery updated = new Delivery();
+        updated.setStoreId(STORE_ID);
+        updated.setDeliveryId(DELIVERY_ID);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.updateDelivery(updated, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).updateDelivery(updated);
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
     void deleteSelectedAllocationsIsBlockedForStoreAdminWhileAwaitingApproval() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());

@@ -864,7 +864,7 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     public String updateDelivery(@ModelAttribute Delivery updatedDelivery,
                                  RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())) {
+        if (!isSuperAdmin() && isEditLocked(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId())) {
             return redirectEditLocked(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId(), redirectAttributes, locale);
         }
         deliveriesManager.updateDelivery(updatedDelivery);

@@ -17,7 +17,7 @@
             <div class="columns">
                 <div class="column is-half">
                     <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box"
-                          th:with="headerEditable=${!delivery.hasBeenReceived() and !delivery.awaitingApproval}">
+                          th:with="headerEditable=${!delivery.hasBeenReceived() and (!delivery.awaitingApproval or isSuperAdmin)}">
                         <input type="hidden" th:field="*{storeId}"/>
                         <input type="hidden" th:field="*{deliveryId}"/>
                         <input type="hidden" th:field="*{externalDeliveryId}"/>
