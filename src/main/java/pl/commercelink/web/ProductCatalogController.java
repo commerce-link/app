@@ -26,6 +26,7 @@ import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -508,6 +509,51 @@ public class ProductCatalogController {
 
         ProductRecommendation recommendation = new ProductRecommendation(categoryDefinition, matchedInventory, pimEntry);
         return showEditProductForm(model, catalogId, recommendation.toProduct(), categoryDefinition);
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-new")
+    public String newProducts(@PathVariable String catalogId, @PathVariable String categoryId, @RequestParam List<String> eans, Model model) {
+        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
+        CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
+
+        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
+        List<Product> products = eans.stream()
+                .map(enabledInventory::findByEan)
+                .filter(matchedInventory -> !matchedInventory.isEmpty())
+                .map(matchedInventory -> {
+                    InventoryKey key = matchedInventory.getInventoryKey();
+                    Optional<PimEntry> pimEntry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+                    return new ProductRecommendation(categoryDefinition, matchedInventory, pimEntry).toProduct();
+                })
+                .collect(Collectors.toList());
+
+        model.addAttribute("form", new ProductsBulkAddForm(products));
+        model.addAttribute("labels", categoryDefinition.getGroupingOrder());
+        model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
+        model.addAttribute("catalogId", catalogId);
+        model.addAttribute("categoryId", categoryId);
+
+        return "catalogDetails_categoryDefinition_productsBulkAdd";
+    }
+
+    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-create")
+    public String createProducts(@PathVariable String catalogId, @PathVariable String categoryId,
+                                 @ModelAttribute ProductsBulkAddForm form,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        form.getProducts().forEach(product -> {
+            if (StringUtils.isBlank(product.getPimId())) {
+                pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode())
+                        .ifPresent(entry -> {
+                            product.setPimId(entry.pimId());
+                            product.setBrand(brandMapper.unifyBrand(entry.brand()));
+                        });
+            }
+            productRepository.save(product);
+        });
+
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
+                "catalog.category.product.bulk.add.success", new Object[]{form.getProducts().size()}, locale));
+        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryId + "/recommendations";
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")

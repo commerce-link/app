@@ -1,0 +1,79 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <div class="section">
+        <h1 class="title" th:text="#{catalog.category.product.bulk.add.title}"></h1>
+        <p class="subtitle is-6" th:text="#{catalog.category.product.bulk.add.hint}"></p>
+
+        <form th:action="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-create(catalogId=${catalogId}, categoryId=${categoryId})}" th:object="${form}" method="post">
+            <div class="table-container">
+                <table class="table is-narrow is-hoverable is-fullwidth is-striped">
+                    <thead>
+                    <tr>
+                        <th th:text="#{product.brand}"></th>
+                        <th th:text="#{product.ean}"></th>
+                        <th th:text="#{product.manufacturer.code}"></th>
+                        <th th:text="#{product.label}"></th>
+                        <th th:text="#{product.name}"></th>
+                        <th th:text="#{product.pricing.group}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="product, iterStat : ${form.products}">
+                        <td>
+                            <input type="hidden" th:field="*{products[__${iterStat.index}__].categoryId}" />
+                            <input type="hidden" th:field="*{products[__${iterStat.index}__].productId}" />
+                            <input type="hidden" th:field="*{products[__${iterStat.index}__].pimId}" />
+                            <input type="hidden" th:field="*{products[__${iterStat.index}__].brand}" />
+                            <input type="hidden" th:field="*{products[__${iterStat.index}__].availabilityType}" />
+                            <span th:text="${product.brand}"></span>
+                        </td>
+                        <td>
+                            <input class="input" type="text" th:field="*{products[__${iterStat.index}__].ean}" />
+                        </td>
+                        <td>
+                            <input class="input" type="text" th:field="*{products[__${iterStat.index}__].manufacturerCode}" />
+                        </td>
+                        <td>
+                            <input th:if="${#lists.isEmpty(labels)}" class="input" type="text" th:field="*{products[__${iterStat.index}__].label}" />
+                            <div th:if="${!#lists.isEmpty(labels)}" class="select is-fullwidth">
+                                <select th:field="*{products[__${iterStat.index}__].label}">
+                                    <option th:each="label : ${labels}" th:value="${label}" th:text="${label}"></option>
+                                </select>
+                            </div>
+                        </td>
+                        <td>
+                            <input class="input" type="text" th:field="*{products[__${iterStat.index}__].name}" />
+                        </td>
+                        <td>
+                            <div class="select is-fullwidth">
+                                <select th:field="*{products[__${iterStat.index}__].pricingGroup}">
+                                    <option th:each="pricingGroup : ${pricingGroups}" th:value="${pricingGroup}" th:text="${pricingGroup}"></option>
+                                </select>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-primary" type="submit" th:disabled="${#lists.isEmpty(form.products)}" th:text="#{general.save}"></button>
+                </div>
+                <div class="control">
+                    <a class="button" th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/recommendations(catalogId=${catalogId}, categoryId=${categoryId})}" th:text="#{general.cancel}"></a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>

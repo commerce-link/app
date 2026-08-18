@@ -1076,7 +1076,18 @@
                                         </div>
                                     </td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingNo}"></td>
-                                    <td><input class="input" th:field="*{shipments[__${i.index}__].carrier}"></td>
+                                    <td>
+                                        <div th:if="${!carrierOptions.isEmpty()}" class="select is-fullwidth">
+                                            <select th:field="*{shipments[__${i.index}__].carrier}">
+                                                <option value=""></option>
+                                                <option th:each="option : ${carrierOptions}"
+                                                        th:value="${option}"
+                                                        th:text="${option}"></option>
+                                            </select>
+                                        </div>
+                                        <input th:if="${carrierOptions.isEmpty()}" class="input"
+                                               th:field="*{shipments[__${i.index}__].carrier}">
+                                    </td>
                                     <td><input class="input" data-collection-point
                                                th:field="*{shipments[__${i.index}__].collectionPointCode}"
                                                th:disabled="${shipment.type == null or shipment.type.name() != 'PickupPoint'}"></td>
