@@ -55,6 +55,7 @@ class DeliveryCreationServiceTest {
         delivery.increaseTotalCost(100.0);
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider("Acme");
+        form.setExternalDeliveryId("EXT-9");
         form.setShippingCost(20.0);
         form.setPaymentCost(5.0);
         DeliveryItem item = new DeliveryItem();
@@ -72,7 +73,10 @@ class DeliveryCreationServiceTest {
         assertThat(delivery.getShippingCost()).isEqualTo(20.0);
         assertThat(delivery.getPaymentCost()).isEqualTo(5.0);
         assertThat(delivery.getOrderStatus()).isNull();
+        assertThat(delivery.getExternalDeliveryId()).isEqualTo("EXT-9");
         verify(deliveriesRepository).save(delivery);
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
     }
 
     @Test
