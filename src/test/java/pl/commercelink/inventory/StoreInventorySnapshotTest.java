@@ -21,7 +21,8 @@ class StoreInventorySnapshotTest {
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private static final InventoryItem ITEM =
-            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true);
+            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true)
+                    .withSku("ACME-5900000000002");
     private static final Set<String> KEY_EANS = Set.of("5900000000002", "4011200296908");
     private static final Set<String> KEY_CODES = Set.of("MFN-1");
 
@@ -42,6 +43,7 @@ class StoreInventorySnapshotTest {
         assertEquals(expected.sellable(), actual.sellable());
         assertEquals(expected.inStock(), actual.inStock());
         assertEquals(expected.inDelivery(), actual.inDelivery());
+        assertEquals(expected.sku(), actual.sku());
     }
 
     @Test

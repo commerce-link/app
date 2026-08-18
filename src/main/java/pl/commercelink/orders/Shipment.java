@@ -5,6 +5,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 @DynamoDBDocument
@@ -21,6 +22,8 @@ public class Shipment {
     private String externalId;
     @DynamoDBAttribute(attributeName = "carrier")
     private String carrier;
+    @DynamoDBAttribute(attributeName = "collectionPointCode")
+    private String collectionPointCode;
     @DynamoDBAttribute(attributeName = "shippedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime shippedAt;
@@ -60,6 +63,26 @@ public class Shipment {
         this.externalId = externalId;
     }
 
+    public String getCollectionPointCode() {
+        return collectionPointCode;
+    }
+
+    public void setCollectionPointCode(String collectionPointCode) {
+        this.collectionPointCode = collectionPointCode;
+    }
+
+    void inheritDeliveryChoiceFrom(Shipment previous) {
+        if (collectionPointCode == null) {
+            collectionPointCode = previous.collectionPointCode;
+        }
+        if (isEmpty(carrier)) {
+            carrier = previous.carrier;
+        }
+        if (collectionPointCode != null && type == ShipmentType.Courier) {
+            type = ShipmentType.PickupPoint;
+        }
+    }
+
     public String getCarrier() {
         return carrier;
     }
@@ -95,8 +118,17 @@ public class Shipment {
     }
 
     @DynamoDBIgnore
+    public boolean isDeliveredToCollectionPoint() {
+        return isNotEmpty(collectionPointCode);
+    }
+
+    @DynamoDBIgnore
     public boolean hasShippingData() {
-        return type == ShipmentType.Courier && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+        return isCarrierShipment() && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+    }
+
+    private boolean isCarrierShipment() {
+        return type == ShipmentType.Courier || type == ShipmentType.PickupPoint;
     }
 
     public String getTrackingUrl() {

@@ -21,7 +21,7 @@
         <input type="hidden" th:field="*{shippingEntityType}">
         <input type="hidden" th:field="*{toClient}">
 
-        <div class="field">
+        <div class="field" th:if="${shippingDetailsList.size() > 1}">
             <label class="label" th:text="#{shipping.delivery.address} + ':'"></label>
             <div class="control">
                 <div class="select">
@@ -45,61 +45,41 @@
             </div>
         </div>
 
-        <div id="manualShippingDetails" class="box field" style="width: 50%;">
-            <div class="field">
-                <label class="label" th:text="#{person.name}"></label>
-                <div class="control">
-                    <input id="input-name" class="input" type="text" th:field="*{shippingDetails.name}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{person.surname}"></label>
-                <div class="control">
-                    <input id="input-surname" class="input" type="text" th:field="*{shippingDetails.surname}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{order.address.company}"></label>
-                <div class="control">
-                    <input id="input-company" class="input" type="text" th:field="*{shippingDetails.companyName}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{address.street}"></label>
-                <div class="control">
-                    <input id="input-street" class="input" type="text" th:field="*{shippingDetails.streetAndNumber}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{address.postal.code}"></label>
-                <div class="control">
-                    <input id="input-postal" class="input" type="text" th:field="*{shippingDetails.postalCode}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{address.city}"></label>
-                <div class="control">
-                    <input id="input-city" class="input" type="text" th:field="*{shippingDetails.city}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{address.country}"></label>
-                <div class="control">
-                    <input id="input-country" class="input" type="text" th:field="*{shippingDetails.country}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{person.email}"></label>
-                <div class="control">
-                    <input id="input-email" class="input" type="email" th:field="*{shippingDetails.email}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{person.phone}"></label>
-                <div class="control">
-                    <input id="input-phone" class="input" type="tel" th:field="*{shippingDetails.phone}">
-                </div>
-            </div>
+        <div id="manualShippingDetails" class="field">
+            <input type="hidden" id="input-name" th:field="*{shippingDetails.name}">
+            <input type="hidden" id="input-surname" th:field="*{shippingDetails.surname}">
+            <input type="hidden" id="input-company" th:field="*{shippingDetails.companyName}">
+            <input type="hidden" id="input-street" th:field="*{shippingDetails.streetAndNumber}">
+            <input type="hidden" id="input-postal" th:field="*{shippingDetails.postalCode}">
+            <input type="hidden" id="input-city" th:field="*{shippingDetails.city}">
+            <input type="hidden" id="input-country" th:field="*{shippingDetails.country}">
+            <input type="hidden" id="input-email" th:field="*{shippingDetails.email}">
+            <input type="hidden" id="input-phone" th:field="*{shippingDetails.phone}">
+
+            <label class="label"
+                   th:text="(${deliveryPointCode != null} ? #{shipping.collection.address} : #{shipping.delivery.address}) + ':'"></label>
+
+            <p th:if="${deliveryPointCode != null}">
+                <strong th:text="#{shipping.parcel.locker} + ':'"></strong>
+                <span th:text="${deliveryPointCode}"></span>
+            </p>
+
+            <p class="mt-3">
+                <span id="view-name" th:text="*{shippingDetails.name}"></span>
+                <span id="view-surname" th:text="*{shippingDetails.surname}"></span>
+            </p>
+            <p id="view-company" th:text="*{shippingDetails.companyName}"></p>
+            <p th:if="${deliveryPointCode == null}" id="view-street" th:text="*{shippingDetails.streetAndNumber}"></p>
+            <p th:if="${deliveryPointCode == null}">
+                <span id="view-postal" th:text="*{shippingDetails.postalCode}"></span>
+                <span id="view-city" th:text="*{shippingDetails.city}"></span>
+            </p>
+            <p id="view-country" th:text="*{shippingDetails.country}"></p>
+            <p id="view-email" th:text="*{shippingDetails.email}"></p>
+            <p>
+                <strong th:text="#{person.phone} + ':'"></strong>
+                <span id="view-phone" th:text="*{shippingDetails.phone}"></span>
+            </p>
         </div>
 
         <div class="field">
@@ -305,6 +285,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const select = document.getElementById("shippingDetailsSelect");
+            if (!select) return;
 
             const fields = {
                 name: document.getElementById("input-name"),
@@ -323,22 +304,18 @@
                 const idx = selected.value;
 
                 if (idx === "-1" || idx === "") {
-                    // Clear all fields for manual entry
-                    Object.values(fields).forEach(input => input.value = "");
+                    Object.keys(fields).forEach(key => apply(key, ""));
                     return;
                 }
 
-                // Populate all inputs with data attributes from selected option
-                fields.name.value = selected.dataset.name || "";
-                fields.surname.value = selected.dataset.surname || "";
-                fields.company.value = selected.dataset.company || "";
-                fields.street.value = selected.dataset.street || "";
-                fields.city.value = selected.dataset.city || "";
-                fields.postal.value = selected.dataset.postal || "";
-                fields.country.value = selected.dataset.country || "";
-                fields.email.value = selected.dataset.email || "";
-                fields.phone.value = selected.dataset.phone || "";
+                Object.keys(fields).forEach(key => apply(key, selected.dataset[key] || ""));
             });
+
+            function apply(key, value) {
+                fields[key].value = value;
+                const view = document.getElementById("view-" + key);
+                if (view) view.textContent = value;
+            }
         });
 
         document.addEventListener("DOMContentLoaded", function () {

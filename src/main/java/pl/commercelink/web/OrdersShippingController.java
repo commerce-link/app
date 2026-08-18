@@ -11,6 +11,10 @@ import pl.commercelink.shipping.AbstractShippingController;
 
 import java.util.Collections;
 import java.util.List;
+import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 
 @Controller
 @RequestMapping("/dashboard/orders/{orderId}/shipping")
@@ -48,9 +52,20 @@ public class OrdersShippingController extends AbstractShippingController {
     }
 
     @Override
+    protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
+        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        return order.firstShipment()
+                .map(shipment -> new DeliveryTarget(shippingProvider, shipment.getCarrier(),
+                        shipment.getCollectionPointCode()))
+                .orElseGet(() -> new DeliveryTarget(null, null, null));
+    }
+
+    @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
-        order.setShipments(shipments);
+
+        order.replaceShipments(shipments);
 
         orderLifecycle.update(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);

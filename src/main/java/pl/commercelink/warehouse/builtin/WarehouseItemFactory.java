@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -23,7 +24,7 @@ class WarehouseItemFactory {
     WarehouseItem create(String storeId, ReservationRemovalItem item) {
         ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), resolved.category(), resolved.name(),
+                storeId, item.getDeliveryId(), resolved.category(), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -36,7 +37,7 @@ class WarehouseItemFactory {
     WarehouseItem create(String storeId, GoodsReceiptItem item) {
         ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), resolved.category(), resolved.name(),
+                storeId, item.getDeliveryId(), resolved.category(), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -52,7 +53,7 @@ class WarehouseItemFactory {
                 storeId,
                 source.getProvider(),
                 resolved.category(),
-                resolved.name(),
+                nameOrUnknown(resolved.name()),
                 source.getEan(),
                 source.getMfn(),
                 source.getPriceNet(),
@@ -67,8 +68,12 @@ class WarehouseItemFactory {
     WarehouseItem create(String storeId, String provider, DeliveryItem item, int qty) {
         ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), Categories.UNCATEGORIZED);
         return new WarehouseItem(
-                storeId, provider, resolved.category(), resolved.name(),
+                storeId, provider, resolved.category(), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitCost(), qty
         );
+    }
+
+    private static String nameOrUnknown(String name) {
+        return Strings.isNotBlank(name) ? name : "Unknown";
     }
 }

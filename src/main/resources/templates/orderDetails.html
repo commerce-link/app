@@ -134,7 +134,8 @@
         <div class="columns is-vcentered">
             <div class="column">
                 <p class="heading" th:text="#{order.order.id}"></p>
-                <p class="title is-5" th:text="${order.orderId}"></p>
+                <p class="title is-5 mb-1" th:text="${order.orderId}"></p>
+                <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="'ext: ' + ${order.externalOrderId}"></p>
             </div>
             <div class="column">
                 <p class="heading" th:text="#{order.ordered.at}"></p>
@@ -1055,6 +1056,7 @@
                                     <th th:text="#{order.shipment.type}"></th>
                                     <th th:text="#{order.shipment.tracking.no}"></th>
                                     <th th:text="#{order.shipment.carrier}"></th>
+                                    <th th:text="#{order.collection.point}"></th>
                                     <th th:text="#{order.shipment.tracking.url}"></th>
                                     <th th:text="#{order.shipment.shipped.at}"></th>
                                     <th th:text="#{order.shipment.delivered.at}"></th>
@@ -1074,7 +1076,21 @@
                                         </div>
                                     </td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingNo}"></td>
-                                    <td><input class="input" th:field="*{shipments[__${i.index}__].carrier}"></td>
+                                    <td>
+                                        <div th:if="${!carrierOptions.isEmpty()}" class="select is-fullwidth">
+                                            <select th:field="*{shipments[__${i.index}__].carrier}">
+                                                <option value=""></option>
+                                                <option th:each="option : ${carrierOptions}"
+                                                        th:value="${option}"
+                                                        th:text="${option}"></option>
+                                            </select>
+                                        </div>
+                                        <input th:if="${carrierOptions.isEmpty()}" class="input"
+                                               th:field="*{shipments[__${i.index}__].carrier}">
+                                    </td>
+                                    <td><input class="input" data-collection-point
+                                               th:field="*{shipments[__${i.index}__].collectionPointCode}"
+                                               th:disabled="${shipment.type == null or shipment.type.name() != 'PickupPoint'}"></td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingUrl}" type="url"></td>
                                     <td>
                                         <input class="input"
@@ -1091,7 +1107,7 @@
                                 </tr>
 
                                 <tr th:if="${#lists.isEmpty(order.shipments)}">
-                                    <td colspan="6" class="has-text-centered has-text-grey">-</td>
+                                    <td colspan="7" class="has-text-centered has-text-grey">-</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -1471,6 +1487,12 @@
 
         <td>
             <input class="input"
+                   data-collection-point
+                   name="shipments[${index}].collectionPointCode"/>
+        </td>
+
+        <td>
+            <input class="input"
                    type="url"
                    name="shipments[${index}].trackingUrl"/>
         </td>
@@ -1489,7 +1511,26 @@
     `;
 
             tbody.appendChild(row);
+            syncCollectionPointCell(row);
         }
+
+        function syncCollectionPointCell(row) {
+            const type = row.querySelector('select[name$=".type"]');
+            const point = row.querySelector('[data-collection-point]');
+            if (!type || !point) return;
+            point.disabled = type.value !== 'PickupPoint';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const tbody = document.getElementById('editShipmentsBody');
+            if (!tbody) return;
+            tbody.querySelectorAll('tr').forEach(syncCollectionPointCell);
+            tbody.addEventListener('change', function (event) {
+                if (event.target.matches('select[name$=".type"]')) {
+                    syncCollectionPointCell(event.target.closest('tr'));
+                }
+            });
+        });
 
         function addEmptyPaymentRow() {
             const tbody = document.getElementById('editPaymentsBody');

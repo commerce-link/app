@@ -47,6 +47,22 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.item.ean}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="ean" th:value="${searchParams.ean}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label" th:text="#{warehouse.documents.item.mfn}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="mfn" th:value="${searchParams.mfn}">
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="columns">

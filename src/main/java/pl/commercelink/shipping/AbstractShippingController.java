@@ -70,7 +70,8 @@ public abstract class AbstractShippingController {
         Store store = getStore();
 
         try {
-            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store);
+            DeliveryTarget deliveryTarget = resolveDeliveryTarget(form);
+            List<ShippingEstimate> estimates = shippingService.estimateServicePrices(form, store, deliveryTarget);
             model.addAttribute("servicePrices", estimates);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, store, form, model);
@@ -82,7 +83,7 @@ public abstract class AbstractShippingController {
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
         Store store = getStore();
-        OperationResult<List<Shipment>> result = shippingService.createShipping(form, store);
+        OperationResult<List<Shipment>> result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
             return "redirect:" + form.getShippingAction();
@@ -96,9 +97,13 @@ public abstract class AbstractShippingController {
     }
 
     protected String renderShippingForm(Store store, ShippingForm shippingForm, List<ShippingDetails> shippingDetailsList, Model model) {
+        if (shippingForm.getShippingDetails() == null && !shippingDetailsList.isEmpty()) {
+            shippingForm.setShippingDetails(shippingDetailsList.get(0));
+        }
         model.addAttribute("shippingForm", shippingForm);
         model.addAttribute("shippingEntityId", shippingForm.getShippingEntityId());
         model.addAttribute("shippingDetailsList", shippingDetailsList);
+        model.addAttribute("deliveryPointCode", resolveDeliveryTarget(shippingForm).pointCode());
         model.addAttribute("pickUpAddresses", store.getPickUpAddresses());
         model.addAttribute("packageTemplates", store.getPackageTemplates());
 
@@ -148,6 +153,8 @@ public abstract class AbstractShippingController {
     protected abstract List<ShippingDetails> retrieveShippingDetailsList(ShippingForm form);
 
     protected abstract void onShippingCreated(ShippingForm form, List<Shipment> shipments);
+
+    protected abstract DeliveryTarget resolveDeliveryTarget(ShippingForm form);
 
 }
 

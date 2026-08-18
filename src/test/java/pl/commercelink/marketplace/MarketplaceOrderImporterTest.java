@@ -1,22 +1,52 @@
 package pl.commercelink.marketplace;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.stores.Integration;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MockitoExtension.class)
 class MarketplaceOrderImporterTest {
 
-    private final MarketplaceOrderImporter importer = new MarketplaceOrderImporter();
+    @Spy
+    private CarrierDictionary carrierDictionary = dictionaryForMorele();
+
+    @InjectMocks
+    private MarketplaceOrderImporter importer;
+
+    private static CarrierDictionary dictionaryForMorele() {
+        CarrierDictionary dictionary = new CarrierDictionary();
+        dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\"}")));
+        return dictionary;
+    }
+
+    private static Store storeShippingWith(String shippingProvider) {
+        Store store = new Store();
+        store.setIntegrations(List.of(new Integration(IntegrationType.SHIPPING_PROVIDER, shippingProvider)));
+        return store;
+    }
 
     @Test
-    void rendersPickupPointInShippingStreetLine() {
+    void keepsTheDeliveryStreetIntactForPointOrders() {
         // given
         MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(
-                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska",
-                new MarketplaceCustomer.PickupPoint("ALP123", "Paczkomat ALP123"));
+                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
         MarketplaceCustomer customer = new MarketplaceCustomer(
                 MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
                 "500600700", null, shippingAddress, shippingAddress);
@@ -25,7 +55,7 @@ class MarketplaceOrderImporterTest {
         ShippingDetails shipping = importer.toShippingDetails(customer);
 
         // then
-        assertEquals("ALP123 (Paczkomat ALP123), Prosta 1", shipping.getStreetAndNumber());
+        assertEquals("Prosta 1", shipping.getStreetAndNumber());
     }
 
     @Test
@@ -59,6 +89,27 @@ class MarketplaceOrderImporterTest {
         // then
         assertEquals("", shipping.getName());
         assertEquals("", shipping.getSurname());
+    }
+
+    @Test
+    void storesTheShippingProviderCarrierNameInsteadOfTheMarketplaceCode() {
+        // when / then
+        assertEquals("InPost", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "2"));
+        assertEquals("Zabka", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "6"));
+    }
+
+    @Test
+    void keepsTheMarketplaceValueWhenNothingMapsIt() {
+        // when / then
+        assertEquals("99", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "99"));
+        assertEquals("2", importer.toCarrierName(storeShippingWith("apaczka"), "Morele", "2"));
+        assertNull(importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", null));
+    }
+
+    @Test
+    void toleratesAStoreWithoutAShippingProvider() {
+        // when / then
+        assertEquals("2", importer.toCarrierName(new Store(), "Morele", "2"));
     }
 
     @Test

@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 @Component
 class WarehouseDocumentItemRepository extends DynamoDbRepository<WarehouseDocumentItem> {
 
@@ -30,6 +32,29 @@ class WarehouseDocumentItemRepository extends DynamoDbRepository<WarehouseDocume
                 .withExpressionAttributeValues(eav);
 
         return dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression);
+    }
+
+    boolean documentContainsProduct(String documentId, String ean, String mfn) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":documentId", new AttributeValue().withS(documentId));
+        StringBuilder filterExpression = new StringBuilder();
+
+        if (isNotBlank(ean)) {
+            eav.put(":ean", new AttributeValue().withS(ean));
+            appendFilter(filterExpression, "ean = :ean");
+        }
+
+        if (isNotBlank(mfn)) {
+            eav.put(":mfn", new AttributeValue().withS(mfn));
+            appendFilter(filterExpression, "mfn = :mfn");
+        }
+
+        DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = new DynamoDBQueryExpression<WarehouseDocumentItem>()
+                .withKeyConditionExpression("documentId = :documentId")
+                .withFilterExpression(filterExpression.toString())
+                .withExpressionAttributeValues(eav);
+
+        return !dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression).isEmpty();
     }
 
     List<WarehouseDocumentItem> findByDeliveryId(String deliveryId) {

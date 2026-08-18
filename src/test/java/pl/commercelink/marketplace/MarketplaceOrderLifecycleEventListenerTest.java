@@ -7,6 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -15,6 +16,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
+import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEvent;
 import pl.commercelink.orders.OrderLifecycleEventType;
@@ -42,6 +44,12 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MarketplaceOrderLifecycleEventListenerTest {
 
+    private static CarrierDictionary dictionaryWithDpd() {
+        CarrierDictionary dictionary = new CarrierDictionary();
+        dictionary.setCarriers(java.util.Map.of("furgonetka", java.util.Map.of("Empik", "{\"DPD\":\"dpd-1\"}")));
+        return dictionary;
+    }
+
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
     private static final String EXTERNAL_ORDER_ID = "EXT-1";
@@ -50,6 +58,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private StoresRepository storesRepository;
     @Mock private OrdersRepository ordersRepository;
     @Mock private MarketplaceProviderFactory providerFactory;
+    @Spy private CarrierDictionary carrierDictionary = dictionaryWithDpd();
 
     @Mock private Store store;
     @Mock private Order order;
@@ -66,6 +75,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         when(order.isMarketplaceOrder()).thenReturn(true);
         when(order.getSource()).thenReturn(source);
         when(source.getName()).thenReturn(MARKETPLACE);
+        when(store.getConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER)).thenReturn("furgonetka");
         when(order.getExternalOrderId()).thenReturn(EXTERNAL_ORDER_ID);
         when(order.getShipments()).thenReturn(List.of());
         when(order.getDocuments()).thenReturn(List.of());
@@ -130,7 +140,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "DPD", "https://track.example/TRACK-9"));
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "dpd-1", "DPD", "https://track.example/TRACK-9"));
         verifyNoMoreInteractions(provider);
     }
 
@@ -155,7 +165,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate(null, null, null));
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate(null, null, null, null));
         verifyNoMoreInteractions(provider);
     }
 

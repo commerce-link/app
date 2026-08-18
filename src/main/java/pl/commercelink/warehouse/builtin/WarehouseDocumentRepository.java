@@ -28,6 +28,16 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
 
     List<WarehouseDocument> search(String storeId, DocumentType type, LocalDateTime dateFrom,
                                           LocalDateTime dateTo, String warehouseId, int page, int pageSize) {
+        return queryWithPagination(buildSearchQuery(storeId, type, dateFrom, dateTo, warehouseId), page, pageSize, WarehouseDocument.class);
+    }
+
+    List<WarehouseDocument> findAllMatching(String storeId, DocumentType type, LocalDateTime dateFrom,
+                                            LocalDateTime dateTo, String warehouseId) {
+        return dynamoDBMapper.query(WarehouseDocument.class, buildSearchQuery(storeId, type, dateFrom, dateTo, warehouseId));
+    }
+
+    private DynamoDBQueryExpression<WarehouseDocument> buildSearchQuery(String storeId, DocumentType type, LocalDateTime dateFrom,
+                                                                        LocalDateTime dateTo, String warehouseId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
 
@@ -67,7 +77,7 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
             queryExpression.withExpressionAttributeNames(ean);
         }
 
-        return queryWithPagination(queryExpression, page, pageSize, WarehouseDocument.class);
+        return queryExpression;
     }
 
     List<WarehouseDocument> findAllBeforeDate(String storeId, LocalDateTime dateTo) {

@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.08.22</version>
+    <version>2026.08.34</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -79,7 +79,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>supplier-api</artifactId>
-            <version>0.2.2</version>
+            <version>0.3.1</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -104,12 +104,12 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>marketplace-api</artifactId>
-            <version>0.2.2</version>
+            <version>0.3.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>shipping-api</artifactId>
-            <version>0.1.2</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -338,7 +338,7 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
-                    <version>0.1.8</version>
+                    <version>0.1.11</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>
