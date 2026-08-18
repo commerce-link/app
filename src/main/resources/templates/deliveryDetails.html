@@ -159,6 +159,11 @@
                             <div class="control">
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
+                            <div class="control"
+                                 th:if="${delivery.orderFailed and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                                <button type="submit" form="retry-purchase-form" class="button is-warning"
+                                        th:text="#{deliveries.purchase.retry.button}">Retry</button>
+                            </div>
                             <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
                                 <button type="button" id="reject-purchase-button" class="button is-danger"
                                         onclick="toggleRejectModal(true)"
@@ -171,11 +176,10 @@
                             </div>
                         </div>
                     </form>
-                    <form method="post"
+                    <form id="retry-purchase-form" method="post"
                           th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
-                        <button type="submit" class="button is-warning is-small" th:text="#{deliveries.purchase.retry.button}"></button>
                     </form>
                 </div>
 
