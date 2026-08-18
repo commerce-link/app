@@ -265,7 +265,7 @@
 
             <form id="allocationsForm" th:action="@{/dashboard/deliveries/allocations}" th:object="${allocationsForm}" method="post" class="box"
                   th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}"
-                  th:with="allocationsEditable=${delivery.isWaitingForCollection() and (delivery.awaitingApproval ? isSuperAdmin : !isSuperAdmin)}">
+                  th:with="allocationsEditable=${delivery.isWaitingForCollection() and (!delivery.awaitingApproval or isSuperAdmin)}">
 
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{deliveryId}"/>
@@ -321,7 +321,7 @@
                     <div class="control">
                         <div class="select is-small" >
                             <select id="delivery-action-select">
-                                <option th:unless="${delivery.awaitingApproval}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
                                 <option th:if="${isAdmin or isSuperAdmin}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
                                 <option th:if="${isAdmin or isSuperAdmin}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
