@@ -53,9 +53,9 @@ POOL_ID=$(awslocal cognito-idp create-user-pool \
 CLIENT_ID=$(awslocal cognito-idp create-user-pool-client \
   --user-pool-id "$POOL_ID" \
   --client-name commercelink-app \
-  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_ADMIN_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
   --allowed-o-auth-flows code \
-  --allowed-o-auth-scopes openid email profile \
+  --allowed-o-auth-scopes openid email profile aws.cognito.signin.user.admin \
   --allowed-o-auth-flows-user-pool-client \
   --callback-urls '["http://localhost:8080/login/oauth2/code/cognito"]' \
   --logout-urls '["http://localhost:8080/logout-success"]' \
