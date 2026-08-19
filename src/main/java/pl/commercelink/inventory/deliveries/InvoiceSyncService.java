@@ -10,8 +10,6 @@ import pl.commercelink.invoicing.api.Invoice;
 import pl.commercelink.invoicing.api.InvoiceDirection;
 import pl.commercelink.invoicing.api.InvoicePosition;
 import pl.commercelink.invoicing.api.InvoicingProvider;
-import pl.commercelink.orders.OrderItem;
-import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -39,13 +37,13 @@ public class InvoiceSyncService {
     private DeliveriesRepository deliveriesRepository;
 
     @Autowired
-    private OrderItemsRepository orderItemsRepository;
-
-    @Autowired
     private RMAItemsRepository rmaItemsRepository;
 
     @Autowired
     private Warehouse warehouse;
+
+    @Autowired
+    private DeliveryCostSync deliveryCostSync;
 
     public void sync(String storeId) {
         Store store = storesRepository.findById(storeId);
@@ -95,10 +93,10 @@ public class InvoiceSyncService {
                 costsByMfn,
                 invoice.seller()
         );
-        double allocationsCostDelta = warehouse.invoiceSyncHandler(storeId).sync(syncRequest);
+        double allocationsCostDelta = deliveryCostSync.apply(storeId, preview.getDeliveryId(), costsByMfn);
+        warehouse.invoiceSyncHandler(storeId).sync(syncRequest);
 
         if (!costsByMfn.isEmpty()) {
-            allocationsCostDelta += updateOrderItems(preview.getDeliveryId(), costsByMfn);
             updateRMAItems(preview.getDeliveryId(), costsByMfn);
         }
 
@@ -138,23 +136,6 @@ public class InvoiceSyncService {
 
         delivery.setSynced(true);
         deliveriesRepository.save(delivery);
-    }
-
-    private double updateOrderItems(String deliveryId, Map<String, Double> costsByMfn) {
-        double delta = 0;
-        for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
-            if (!item.isReturned() && costsByMfn.containsKey(item.getManufacturerCode())) {
-                double itemDelta = item.updateCost(costsByMfn.get(item.getManufacturerCode()));
-                if (itemDelta == 0) {
-                    continue;
-                }
-                if (!item.isReplacedOrReturned()) {
-                    delta += itemDelta;
-                }
-                orderItemsRepository.save(item);
-            }
-        }
-        return delta;
     }
 
     private void updateRMAItems(String deliveryId, Map<String, Double> costsByMfn) {

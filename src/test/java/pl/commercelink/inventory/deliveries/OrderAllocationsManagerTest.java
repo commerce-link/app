@@ -18,6 +18,7 @@ import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -103,6 +104,24 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("release returns claimed order items to the supplier allocation pool, grouped by order")
+    void releaseReturnsClaimedOrderItemsGroupedByOrder() {
+        // given
+        OrderItem first = orderItemInStatus("i1", FulfilmentStatus.Ordered);
+        first.setOrderId("order-1");
+        OrderItem second = orderItemInStatus("i2", FulfilmentStatus.Ordered);
+        second.setOrderId("order-2");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
+
+        // when
+        orderAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
+
+        // then
+        verify(ordersManager).returnOrderItemsToSupplierAllocation(STORE_ID, "order-1", "delivery-1", "Acme", List.of("i1"));
+        verify(ordersManager).returnOrderItemsToSupplierAllocation(STORE_ID, "order-2", "delivery-1", "Acme", List.of("i2"));
+    }
+
+    @Test
     @DisplayName("updateFulfilment updates fulfilment data of item in Allocation state assigned to the given provider")
     void updateFulfilmentUpdatesItemInAllocationState() {
         // given
@@ -166,6 +185,85 @@ class OrderAllocationsManagerTest {
         // then
         assertThat(updated).isFalse();
         verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts applies confirmed price and returns delta")
+    void updateUnitCostsAppliesConfirmedPriceAndReturnsDelta() {
+        // given
+        OrderItem item = new OrderItem();
+        item.setQty(2);
+        item.setCost(100.0);
+        item.setManufacturerCode("MFN-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+
+        // then
+        assertThat(delta).isEqualTo(20.0);
+        assertThat(item.getCost()).isEqualTo(110.0);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts skips returned items")
+    void updateUnitCostsSkipsReturnedItems() {
+        // given
+        OrderItem item = new OrderItem();
+        item.setQty(2);
+        item.setCost(100.0);
+        item.setManufacturerCode("MFN-1");
+        item.setStatus(FulfilmentStatus.Returned);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+
+        // then
+        assertThat(delta).isZero();
+        assertThat(item.getCost()).isEqualTo(100.0);
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts updates replaced items without counting delta")
+    void updateUnitCostsUpdatesReplacedItemsWithoutCountingDelta() {
+        // given
+        OrderItem item = new OrderItem();
+        item.setQty(2);
+        item.setCost(100.0);
+        item.setManufacturerCode("MFN-1");
+        item.setStatus(FulfilmentStatus.Replaced);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+
+        // then
+        assertThat(delta).isZero();
+        assertThat(item.getCost()).isEqualTo(110.0);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts ignores items without confirmed price")
+    void updateUnitCostsIgnoresItemsWithoutConfirmedPrice() {
+        // given
+        OrderItem item = new OrderItem();
+        item.setQty(2);
+        item.setCost(100.0);
+        item.setManufacturerCode("MFN-OTHER");
+        item.setStatus(FulfilmentStatus.Ordered);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+
+        // then
+        assertThat(delta).isZero();
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
     }
 
     private Order orderWithStatus(OrderStatus status) {

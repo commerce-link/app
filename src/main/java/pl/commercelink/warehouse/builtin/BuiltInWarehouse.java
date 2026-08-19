@@ -79,7 +79,6 @@ class BuiltInWarehouse implements Warehouse {
     public InvoiceSyncHandler invoiceSyncHandler(String storeId) {
         return new BuiltInInvoiceSyncHandler(
                 storeId,
-                warehouseRepository,
                 warehouseDocumentRepository,
                 warehouseDocumentItemRepository
         );

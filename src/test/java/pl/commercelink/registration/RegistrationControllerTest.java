@@ -1,134 +1,306 @@
 package pl.commercelink.registration;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ExtendedModelMap;
 
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationControllerTest {
 
+    private static final String PASSWORD = "Tajne1!haslo";
+
     @Mock private RegistrationService registrationService;
+    @Mock private RegistrationAutoLoginService autoLoginService;
+    @Mock private EmailVerificationService emailVerificationService;
+    @Mock private CaptchaVerifier captchaVerifier;
     @Mock private MessageSource messageSource;
-    @Mock private HttpServletRequest request;
+
+    private MockHttpServletRequest request;
+    private MockHttpServletResponse response;
     private RegistrationController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new RegistrationController(registrationService, messageSource, false, 3, "");
+        request = new MockHttpServletRequest();
+        request.setRemoteAddr("1.1.1.1");
+        response = new MockHttpServletResponse();
+        controller = controller(false);
+    }
+
+    private RegistrationController controller(boolean demoMode) {
+        return new RegistrationController(registrationService, autoLoginService, emailVerificationService,
+                captchaVerifier, messageSource, demoMode, 3, "", "/dashboard");
+    }
+
+    private void captchaPasses() {
+        when(captchaVerifier.verify(any(), anyString())).thenReturn(true);
+    }
+
+    private void pending(String email, String storeName) {
+        request.getSession(true).setAttribute(RegistrationController.PENDING_REGISTRATION,
+                new PendingRegistration(email, storeName));
+    }
+
+    private Object sessionPending() {
+        return request.getSession(true).getAttribute(RegistrationController.PENDING_REGISTRATION);
     }
 
     @Test
-    void registersAndShowsSuccessPage() {
+    void storesPendingRegistrationAndRedirectsToPasswordStep() {
         // given
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("1.1.1.1");
-        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1"))
-                .thenReturn(new RegistrationResult("abc123def4", "Demo1!secret"));
+        captchaPasses();
+        when(registrationService.validateCandidate("User@Example.com", "Sklep Testowy"))
+                .thenReturn("user@example.com");
+
+        // when
+        String view = controller.register("User@Example.com", "Sklep Testowy", null, "on", "token",
+                request, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        assertEquals("redirect:/register/password", view);
+        assertEquals(new PendingRegistration("user@example.com", "Sklep Testowy"), sessionPending());
+        verify(registrationService, never()).register(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void rejectsRegistrationWhenCaptchaFails() {
+        // given
+        when(captchaVerifier.verify(any(), anyString())).thenReturn(false);
+        when(messageSource.getMessage(eq("registration.error.captcha-failed"), any(), any(Locale.class)))
+                .thenReturn("Potwierdź, że nie jesteś robotem.");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, model, Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", null,
+                request, model, Locale.ROOT);
 
         // then
-        assertEquals("register-success", view);
-        assertEquals("Demo1!secret", model.getAttribute("revealedPassword"));
-        assertEquals("user@example.com", model.getAttribute("email"));
-        assertEquals(false, model.getAttribute("demoMode"));
-    }
-
-    @Test
-    void usesFirstForwardedForAddressAsClientIp() {
-        // given
-        when(request.getHeader("X-Forwarded-For")).thenReturn("9.9.9.9, 10.0.0.1");
-        when(registrationService.register("user@example.com", "Sklep Testowy", "9.9.9.9"))
-                .thenReturn(new RegistrationResult("abc123def4", null));
-
-        // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
-
-        // then
-        assertEquals("register-success", view);
-        verify(registrationService).register("user@example.com", "Sklep Testowy", "9.9.9.9");
+        assertEquals("register", view);
+        assertEquals("Potwierdź, że nie jesteś robotem.", model.getAttribute("errorMessage"));
+        assertNull(sessionPending());
+        verifyNoInteractions(registrationService);
     }
 
     @Test
     void silentlyRedirectsWhenHoneypotFilled() {
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", "bot value", "on", request, new ExtendedModelMap(), Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", "bot value", "on", "token",
+                request, new ExtendedModelMap(), Locale.ROOT);
 
         // then
         assertEquals("redirect:/register", view);
-        verifyNoInteractions(registrationService);
+        verifyNoInteractions(registrationService, captchaVerifier);
     }
 
     @Test
-    void showsErrorMessageOnRegistrationFailure() {
+    void showsErrorWhenTermsNotAccepted() {
         // given
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("1.1.1.1");
-        when(registrationService.register(any(), any(), any()))
-                .thenThrow(new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS));
-        when(messageSource.getMessage(eq("registration.error.email-exists"), any(), any(Locale.class)))
-                .thenReturn("Konto istnieje");
+        captchaPasses();
+        when(messageSource.getMessage(eq("registration.error.terms-consent-required"), any(), any(Locale.class)))
+                .thenReturn("Zaakceptuj regulamin.");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", request, model, Locale.forLanguageTag("pl"));
+        String view = controller.register("user@example.com", "Sklep Testowy", null, null, "token",
+                request, model, Locale.ROOT);
 
         // then
         assertEquals("register", view);
-        assertEquals("Konto istnieje", model.getAttribute("errorMessage"));
-        assertEquals("Sklep Testowy", model.getAttribute("storeName"));
-        assertEquals(false, model.getAttribute("demoMode"));
+        assertEquals("Zaakceptuj regulamin.", model.getAttribute("errorMessage"));
+        verify(registrationService, never()).validateCandidate(anyString(), anyString());
+    }
+
+    @Test
+    void showsErrorWhenEmailAlreadyTaken() {
+        // given
+        captchaPasses();
+        when(registrationService.validateCandidate("user@example.com", "Sklep Testowy"))
+                .thenThrow(new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS));
+        when(messageSource.getMessage(eq("registration.error.email-exists"), any(), any(Locale.class)))
+                .thenReturn("Konto istnieje.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.register("user@example.com", "Sklep Testowy", null, "on", "token",
+                request, model, Locale.ROOT);
+
+        // then
+        assertEquals("register", view);
+        assertEquals("Konto istnieje.", model.getAttribute("errorMessage"));
+        assertNull(sessionPending());
     }
 
     @Test
     void demoModeIgnoresSubmittedStoreNameAndUsesDefault() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3, "");
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
+        captchaPasses();
         when(messageSource.getMessage("registration.store-name.default", null, Locale.ROOT)).thenReturn("Mój sklep");
-        when(registrationService.register("user@firma.pl", "Mój sklep", "10.0.0.1"))
-                .thenReturn(new RegistrationResult("demo-store-1", null));
+        when(registrationService.validateCandidate("user@firma.pl", "Mój sklep")).thenReturn("user@firma.pl");
 
         // when
-        demoController.register("user@firma.pl", "Sklep Testowy", null, "on", request, new ExtendedModelMap(), Locale.ROOT);
+        controller(true).register("user@firma.pl", "Sklep Testowy", null, "on", "token",
+                request, new ExtendedModelMap(), Locale.ROOT);
 
         // then
-        verify(registrationService).register("user@firma.pl", "Mój sklep", "10.0.0.1");
+        assertEquals(new PendingRegistration("user@firma.pl", "Mój sklep"), sessionPending());
     }
 
     @Test
-    void productionModeShowsErrorWhenStoreNameMissing() {
+    void usesFirstForwardedForAddressAsClientIp() {
         // given
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
-        when(registrationService.register("user@firma.pl", "  ", "10.0.0.1"))
-                .thenThrow(new RegistrationException(RegistrationException.Reason.STORE_NAME_REQUIRED));
-        when(messageSource.getMessage(eq("registration.error.store-name-required"), any(), any(Locale.class)))
-                .thenReturn("Podaj nazwę sklepu.");
+        request.addHeader("X-Forwarded-For", "9.9.9.9, 10.0.0.1");
+        when(captchaVerifier.verify(any(), eq("9.9.9.9"))).thenReturn(true);
+        when(registrationService.validateCandidate(anyString(), anyString())).thenReturn("user@example.com");
+
+        // when
+        controller.register("user@example.com", "Sklep Testowy", null, "on", "token",
+                request, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        verify(captchaVerifier).verify("token", "9.9.9.9");
+    }
+
+    @Test
+    void passwordPageRedirectsToRegisterWithoutPendingRegistration() {
+        // when
+        String view = controller.passwordPage(request, new ExtendedModelMap());
+
+        // then
+        assertEquals("redirect:/register", view);
+    }
+
+    @Test
+    void passwordPageShowsFormForPendingRegistration() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.register("user@firma.pl", "  ", null, "on", request, model, Locale.ROOT);
+        String view = controller.passwordPage(request, model);
 
         // then
-        assertEquals("register", view);
-        assertEquals("Podaj nazwę sklepu.", model.getAttribute("errorMessage"));
-        verify(messageSource, never()).getMessage(eq("registration.store-name.default"), any(), any(Locale.class));
+        assertEquals("register-password", view);
+        assertEquals("user@example.com", model.getAttribute("email"));
+    }
+
+    @Test
+    void rejectsWeakPasswordAndKeepsPendingRegistration() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(messageSource.getMessage(eq("registration.error.weak-password"), any(), any(Locale.class)))
+                .thenReturn("Hasło za słabe.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.setPassword("krotkie", request, response, model, Locale.ROOT);
+
+        // then
+        assertEquals("register-password", view);
+        assertEquals("Hasło za słabe.", model.getAttribute("errorMessage"));
+        assertNotNull(sessionPending());
+        verifyNoInteractions(registrationService, autoLoginService);
+    }
+
+    @Test
+    void createsAccountAndGoesStraightToPanelInDemoMode() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1", PASSWORD))
+                .thenReturn(new RegistrationResult("demo-store-1"));
+        when(autoLoginService.login("user@example.com", PASSWORD, "demo-store-1", request, response)).thenReturn(true);
+        when(registrationService.isEmailVerifiedOnCreation()).thenReturn(true);
+
+        // when
+        String view = controller.setPassword(PASSWORD, request, response, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        assertEquals("redirect:/dashboard", view);
+        assertNull(sessionPending());
+        verifyNoInteractions(emailVerificationService);
+    }
+
+    @Test
+    void sendsVerificationCodeAndGoesToVerifyScreenInProductionMode() {
+        // given
+        pending("user@firma.pl", "Moja Firma");
+        when(registrationService.register("user@firma.pl", "Moja Firma", "1.1.1.1", PASSWORD))
+                .thenReturn(new RegistrationResult("prod-store-1"));
+        when(autoLoginService.login("user@firma.pl", PASSWORD, "prod-store-1", request, response)).thenReturn(true);
+        when(registrationService.isEmailVerifiedOnCreation()).thenReturn(false);
+
+        // when
+        String view = controller.setPassword(PASSWORD, request, response, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        assertEquals("redirect:/register/verify-email", view);
+        verify(emailVerificationService).sendCodeQuietly("user@firma.pl");
+    }
+
+    @Test
+    void secondPasswordSubmitDoesNotCreateSecondStore() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1", PASSWORD))
+                .thenReturn(new RegistrationResult("demo-store-1"));
+        when(autoLoginService.login(anyString(), anyString(), anyString(), any(), any())).thenReturn(true);
+        when(registrationService.isEmailVerifiedOnCreation()).thenReturn(true);
+
+        // when
+        controller.setPassword(PASSWORD, request, response, new ExtendedModelMap(), Locale.ROOT);
+        String secondView = controller.setPassword(PASSWORD, request, response, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        assertEquals("redirect:/register", secondView);
+        verify(registrationService, times(1)).register(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void restoresPendingRegistrationWhenCreationFails() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1", PASSWORD))
+                .thenThrow(new RegistrationException(RegistrationException.Reason.CREATION_FAILED));
+        when(messageSource.getMessage(eq("registration.error.creation-failed"), any(), any(Locale.class)))
+                .thenReturn("Nie udało się utworzyć konta.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.setPassword(PASSWORD, request, response, model, Locale.ROOT);
+
+        // then
+        assertEquals("register-password", view);
+        assertEquals("Nie udało się utworzyć konta.", model.getAttribute("errorMessage"));
+        assertNotNull(sessionPending());
+    }
+
+    @Test
+    void fallsBackToSuccessPageWhenAutoLoginFails() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1", PASSWORD))
+                .thenReturn(new RegistrationResult("demo-store-1"));
+        when(autoLoginService.login("user@example.com", PASSWORD, "demo-store-1", request, response)).thenReturn(false);
+
+        // when
+        String view = controller.setPassword(PASSWORD, request, response, new ExtendedModelMap(), Locale.ROOT);
+
+        // then
+        assertEquals("register-success", view);
+        verifyNoInteractions(emailVerificationService);
     }
 
     @Test
@@ -141,37 +313,18 @@ class RegistrationControllerTest {
     }
 
     @Test
-    void registerPageExposesDemoModeFlagToTemplate() {
+    void registerPageExposesDemoModeAndCaptchaKeyToTemplate() {
         // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 3, "");
+        when(captchaVerifier.siteKey()).thenReturn("site-key");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = demoController.registerPage(model);
+        String view = controller(true).registerPage(model);
 
         // then
         assertEquals("register", view);
         assertEquals(true, model.getAttribute("demoMode"));
         assertEquals(3, model.getAttribute("ttlDays"));
-    }
-
-    @Test
-    void postPathExposesDemoModeAndTtlDaysToTemplate() {
-        // given
-        RegistrationController demoController = new RegistrationController(registrationService, messageSource, true, 7, "");
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("1.1.1.1");
-        when(messageSource.getMessage(eq("registration.store-name.default"), any(), any(Locale.class))).thenReturn("Mój sklep");
-        when(registrationService.register("user@example.com", "Mój sklep", "1.1.1.1"))
-                .thenReturn(new RegistrationResult("abc123def4", null));
-        ExtendedModelMap model = new ExtendedModelMap();
-
-        // when
-        String view = demoController.register("user@example.com", null, null, "on", request, model, Locale.forLanguageTag("pl"));
-
-        // then
-        assertEquals("register-success", view);
-        assertEquals(true, model.getAttribute("demoMode"));
-        assertEquals(7, model.getAttribute("ttlDays"));
+        assertEquals("site-key", model.getAttribute("captchaSiteKey"));
     }
 }

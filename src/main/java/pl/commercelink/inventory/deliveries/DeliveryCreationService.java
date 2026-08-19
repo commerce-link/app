@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class DeliveryCreationService {
@@ -26,12 +28,16 @@ public class DeliveryCreationService {
     private WarehouseAllocationsManager warehouseAllocationsManager;
     @Autowired
     private ExchangeRates exchangeRates;
+    @Autowired
+    private SupplierConnectionModeResolver supplierConnectionModeResolver;
+    @Autowired
+    private DeliveryCostSync deliveryCostSync;
 
-    public String run(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+    public String run(String storeId, DeliveryCreationForm form) {
         prepareForm(storeId, form);
 
         if (form.hasDeliveryDetails()) {
-            var delivery = createDelivery(storeId, form, isSuperAdmin);
+            var delivery = createDelivery(storeId, form);
             finalizeDelivery(storeId, delivery, form);
             return delivery.getDeliveryId();
         }
@@ -39,19 +45,35 @@ public class DeliveryCreationService {
         return null;
     }
 
-    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+    public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
+        delivery.increaseTotalCost(allocationsCost(form));
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+    }
 
+    public void releaseAllocations(String storeId, Delivery delivery) {
+        orderAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
+        warehouseAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
+    }
+
+    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
-        delivery.setShippingCost(form.getShippingCost());
-        delivery.setPaymentCost(form.getPaymentCost());
+        delivery.updateShippingCost(form.getShippingCost());
+        delivery.updatePaymentCost(form.getPaymentCost());
         delivery.setPaymentTerms(form.getPaymentTerms());
         delivery.setTax(form.getTax());
         delivery.setOrderStatus(null);
-        delivery.setPendingOrderForm(null);
 
-        finalizeDelivery(storeId, delivery, form);
+        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
+        deliveriesRepository.save(delivery);
+    }
+
+    private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {
+        return form.getItems().stream()
+                .filter(item -> item.getRequestedQty() > 0)
+                .collect(Collectors.toMap(DeliveryItem::getMfn, DeliveryItem::getUnitCost, (a, b) -> a));
     }
 
     private void prepareForm(String storeId, DeliveryCreationForm form) {
@@ -71,11 +93,14 @@ public class DeliveryCreationService {
         }
     }
 
-    private void finalizeDelivery(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        double allocationsCost = form.getItems().stream()
+    private double allocationsCost(DeliveryCreationForm form) {
+        return form.getItems().stream()
                 .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
                 .sum();
-        delivery.increaseTotalCost(allocationsCost);
+    }
+
+    private void finalizeDelivery(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        delivery.increaseTotalCost(allocationsCost(form));
 
         deliveriesRepository.save(delivery);
 
@@ -83,7 +108,7 @@ public class DeliveryCreationService {
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
-    private Delivery createDelivery(String storeId, DeliveryCreationForm form, boolean isSuperAdmin) {
+    private Delivery createDelivery(String storeId, DeliveryCreationForm form) {
         var delivery = new Delivery(
                 storeId,
                 form.getExternalDeliveryId(),
@@ -94,7 +119,7 @@ public class DeliveryCreationService {
                 form.getPaymentTerms(),
                 form.getTax()
         );
-        delivery.setManaged(isSuperAdmin);
+        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(storeId, form.getProvider()));
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }

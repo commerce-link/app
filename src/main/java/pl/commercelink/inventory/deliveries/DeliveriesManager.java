@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 @Component
@@ -95,6 +96,13 @@ public class DeliveriesManager {
                 source.getPaymentTerms(),
                 source.getTax()
         );
+        target.setConnectionMode(source.getConnectionMode());
+        if (source.isAwaitingApproval() || source.isOrderFailed()) {
+            target.setOrderStatus(source.getOrderStatus());
+            target.setPurchaseRef(UUID.randomUUID().toString());
+            target.setDeliveryAddressId(source.getDeliveryAddressId());
+            target.setOrderErrorMessage(source.getOrderErrorMessage());
+        }
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
     }
@@ -132,6 +140,7 @@ public class DeliveriesManager {
         Delivery existingDelivery = deliveriesRepository.findById(updatedDelivery.getStoreId(), updatedDelivery.getDeliveryId());
 
         boolean isDeliveryDelayed = updatedDelivery.getEstimatedDeliveryAt() != null
+                && existingDelivery.getEstimatedDeliveryAt() != null
                 && updatedDelivery.getEstimatedDeliveryAt().isAfter(existingDelivery.getEstimatedDeliveryAt());
 
         existingDelivery.setEstimatedDeliveryAt(updatedDelivery.getEstimatedDeliveryAt());

@@ -13,7 +13,6 @@ import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSeedingException;
 import pl.commercelink.users.CognitoUserService;
 
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,7 +24,6 @@ import java.util.regex.Pattern;
 public class RegistrationService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-    private static final String PASSWORD_CHARS = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
     private static final int STORE_NAME_MIN = 2;
     private static final int STORE_NAME_MAX = 60;
 
@@ -36,9 +34,7 @@ public class RegistrationService {
     private final RegistrationRateLimiter rateLimiter;
     private final Clock clock;
     private final int ttlDays;
-    private final boolean revealPassword;
     private final boolean demoMode;
-    private final SecureRandom random = new SecureRandom();
 
     @Autowired
     public RegistrationService(CognitoUserService cognitoUserService,
@@ -47,10 +43,9 @@ public class RegistrationService {
                                 StoreDeletionService storeDeletionService,
                                 RegistrationRateLimiter rateLimiter,
                                 @Value("${app.registration.ttl-days}") int ttlDays,
-                                @Value("${app.registration.reveal-password}") boolean revealPassword,
                                 @Value("${app.registration.demo:false}") boolean demoMode) {
         this(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService, rateLimiter,
-                Clock.systemUTC(), ttlDays, revealPassword, demoMode);
+                Clock.systemUTC(), ttlDays, demoMode);
     }
 
     RegistrationService(CognitoUserService cognitoUserService,
@@ -60,7 +55,6 @@ public class RegistrationService {
                         RegistrationRateLimiter rateLimiter,
                         Clock clock,
                         int ttlDays,
-                        boolean revealPassword,
                         boolean demoMode) {
         this.cognitoUserService = cognitoUserService;
         this.storeSeeder = storeSeeder;
@@ -69,11 +63,20 @@ public class RegistrationService {
         this.rateLimiter = rateLimiter;
         this.clock = clock;
         this.ttlDays = ttlDays;
-        this.revealPassword = revealPassword;
         this.demoMode = demoMode;
     }
 
-    public RegistrationResult register(String email, String storeName, String clientIp) {
+    public String validateCandidate(String email, String storeName) {
+        String normalized = normalize(email);
+        validateEmail(normalized);
+        validatedStoreName(storeName);
+        if (cognitoUserService.userExists(normalized)) {
+            throw new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS);
+        }
+        return normalized;
+    }
+
+    public RegistrationResult register(String email, String storeName, String clientIp, String password) {
         String normalized = normalize(email);
         validateEmail(normalized);
         String name = validatedStoreName(storeName);
@@ -82,7 +85,11 @@ public class RegistrationService {
             throw new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS);
         }
 
-        return demoMode ? registerDemo(normalized, name) : registerProduction(normalized, name);
+        return demoMode ? registerDemo(normalized, name, password) : registerProduction(normalized, name, password);
+    }
+
+    public boolean isEmailVerifiedOnCreation() {
+        return demoMode;
     }
 
     private static String normalize(String email) {
@@ -112,7 +119,7 @@ public class RegistrationService {
         return trimmed;
     }
 
-    private RegistrationResult registerProduction(String email, String storeName) {
+    private RegistrationResult registerProduction(String email, String storeName, String password) {
         Store store;
         try {
             store = storeCreationService.createStore(CreateStoreRequest.registered(storeName, email));
@@ -120,17 +127,10 @@ public class RegistrationService {
             System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
-        try {
-            cognitoUserService.createStoreAdmin(email, store.getStoreId());
-            return new RegistrationResult(store.getStoreId(), null);
-        } catch (RuntimeException e) {
-            System.err.println("[Registration] User creation failed for " + email + ", rolling back store " + store.getStoreId() + ": " + e.getMessage());
-            rollBack(store.getStoreId(), StoreDeletionService.Guard.ANY);
-            throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
-        }
+        return createAdmin(email, store.getStoreId(), password, StoreDeletionService.Guard.ANY);
     }
 
-    private RegistrationResult registerDemo(String email, String storeName) {
+    private RegistrationResult registerDemo(String email, String storeName, String password) {
         Instant now = clock.instant();
         DemoStoreMetadata metadata = new DemoStoreMetadata(email, now.toString(),
                 now.plus(ttlDays, ChronoUnit.DAYS).toString());
@@ -146,17 +146,17 @@ public class RegistrationService {
             System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
+        return createAdmin(email, store.getStoreId(), password, StoreDeletionService.Guard.DEMO_ONLY);
+    }
+
+    private RegistrationResult createAdmin(String email, String storeId, String password,
+                                           StoreDeletionService.Guard rollbackGuard) {
         try {
-            if (revealPassword) {
-                String password = generatePassword();
-                cognitoUserService.createStoreAdmin(email, store.getStoreId(), password);
-                return new RegistrationResult(store.getStoreId(), password);
-            }
-            cognitoUserService.createStoreAdmin(email, store.getStoreId());
-            return new RegistrationResult(store.getStoreId(), null);
+            cognitoUserService.createStoreAdmin(email, storeId, password, demoMode);
+            return new RegistrationResult(storeId);
         } catch (RuntimeException e) {
-            System.err.println("[Registration] User creation failed for " + email + ", rolling back store " + store.getStoreId() + ": " + e.getMessage());
-            rollBack(store.getStoreId(), StoreDeletionService.Guard.DEMO_ONLY);
+            System.err.println("[Registration] User creation failed for " + email + ", rolling back store " + storeId + ": " + e.getMessage());
+            rollBack(storeId, rollbackGuard);
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
     }
@@ -167,13 +167,5 @@ public class RegistrationService {
         } catch (RuntimeException e) {
             System.err.println("[Registration] Rollback failed for store " + storeId + ": " + e.getMessage());
         }
-    }
-
-    private String generatePassword() {
-        StringBuilder password = new StringBuilder("Demo1!");
-        for (int i = 0; i < 10; i++) {
-            password.append(PASSWORD_CHARS.charAt(random.nextInt(PASSWORD_CHARS.length())));
-        }
-        return password.toString();
     }
 }

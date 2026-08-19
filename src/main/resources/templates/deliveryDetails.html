@@ -11,9 +11,13 @@
 
             <h2 th:text="#{deliveries.action.edit.delivery.link}"></h2>
 
+            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
             <div class="columns">
                 <div class="column is-half">
-                    <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box">
+                    <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box"
+                          th:with="headerEditable=${!delivery.hasBeenReceived() and (!delivery.awaitingApproval or isSuperAdmin)}">
                         <input type="hidden" th:field="*{storeId}"/>
                         <input type="hidden" th:field="*{deliveryId}"/>
                         <input type="hidden" th:field="*{externalDeliveryId}"/>
@@ -52,9 +56,18 @@
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
+                                      th:text="#{deliveries.status.awaitingApproval}"></span>
                             </div>
-                            <p class="has-text-danger" th:if="${delivery.orderFailed}" th:text="${delivery.orderErrorMessage}"></p>
                         </div>
+                        <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : null">
+                            <div class="field" th:if="${!#strings.isEmpty(orderIssueReason)}">
+                                <label class="label" th:text="#{general.reason}"></label>
+                                <div class="control">
+                                    <span th:text="${orderIssueReason}"></span>
+                                </div>
+                            </div>
+                        </th:block>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.cost}"></label>
                             <div class="control">
@@ -68,39 +81,45 @@
                                       th:text="#{deliveries.cost.reverseCharge(${#numbers.formatDecimal(delivery.totalCost, 1, 2)})}"></span>
                             </div>
                         </div>
+                        <div class="field" th:if="${not #strings.isEmpty(delivery.deliveryAddress)}">
+                            <label class="label" th:text="#{deliveries.deliveryAddress}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.deliveryAddress}"></span>
+                            </div>
+                        </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentTerms}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentTerms}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.paymentTerms}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.estimated.delivery}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="date" th:field="*{estimatedDeliveryAt}" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.estimatedDeliveryAt}"></span>
+                                <input th:if="${headerEditable}" class="input" type="date" th:field="*{estimatedDeliveryAt}" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.estimatedDeliveryAt}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.shippingCost}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.shippingCost}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.shippingCost}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentCost}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentCost}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.paymentCost}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.tax}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.tax}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.tax}"></span>
                             </div>
                         </div>
 
@@ -109,15 +128,35 @@
                             <div class="control">
                                 <textarea class="textarea" th:field="*{comment}"
                                           th:placeholder="#{general.comment.placeholder}"
-                                          th:disabled="${delivery.hasBeenReceived()}"></textarea>
+                                          th:disabled="${!headerEditable}"></textarea>
                             </div>
                         </div>
 
                         <div class="field is-grouped" th:unless="${delivery.hasBeenReceived()}">
-                            <div class="control">
+                            <div class="control" th:if="${headerEditable}">
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
+                            <div class="control"
+                                 th:if="${delivery.orderFailed and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                                <button type="submit" form="retry-purchase-form" class="button is-warning"
+                                        th:text="#{deliveries.purchase.retry.button}">Retry</button>
+                            </div>
+                            <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                                <button type="button" id="reject-purchase-button" class="button is-danger"
+                                        onclick="toggleRejectModal(true)"
+                                        th:text="#{deliveries.approval.reject}">Reject</button>
+                            </div>
+                            <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                                <a class="button is-link"
+                                   th:href="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approval(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
+                                   th:text="#{deliveries.approval.realize}">Order at supplier</a>
+                            </div>
                         </div>
+                    </form>
+                    <form id="retry-purchase-form" method="post"
+                          th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
+                          th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
                     </form>
                 </div>
 
@@ -153,7 +192,7 @@
                             </tbody>
                         </table>
                         <p th:if="${delivery.documents.isEmpty()}" class="has-text-grey" th:text="#{deliveries.no.documents}"></p>
-                        <div class="mt-3" th:if="${isAdmin and not isSuperAdmin}">
+                        <div class="mt-3" th:if="${isAdmin and not isSuperAdmin and !delivery.awaitingApproval}">
                             <div class="field has-addons">
                                 <div class="control">
                                     <input type="text" id="invoiceIdInput" class="input is-small" th:placeholder="#{invoiceSync.invoiceId}"/>
@@ -179,7 +218,7 @@
 
             <h2 th:text="#{deliveries.items}"></h2>
 
-            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty()}">
+            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
                 <table class="table">
                     <thead>
                     <tr>
@@ -225,7 +264,8 @@
             <h2 th:text="#{deliveries.allocations}"></h2>
 
             <form id="allocationsForm" th:action="@{/dashboard/deliveries/allocations}" th:object="${allocationsForm}" method="post" class="box"
-                  th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}">
+                  th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}"
+                  th:with="allocationsEditable=${delivery.isWaitingForCollection() and (!delivery.awaitingApproval or isSuperAdmin)}">
 
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{deliveryId}"/>
@@ -237,7 +277,7 @@
                 <table class="table">
                     <thead>
                     <tr>
-                        <th th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                        <th th:if="${allocationsEditable}">
                             <input type="checkbox" id="selectAllAllocations" onclick="toggleAllAllocations(this)"/>
                         </th>
                         <th></th>
@@ -261,7 +301,7 @@
                         <input type="hidden" th:field="*{allocations[__${stat.index}__].inAllocation}"/>
                         <input type="hidden" th:field="*{allocations[__${stat.index}__].unitCost}"/>
 
-                        <td th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                        <td th:if="${allocationsEditable}">
                             <input type="checkbox" th:field="*{allocations[__${stat.index}__].selected}"
                                    class="allocation-checkbox"
                                    th:disabled="${!allocation.inAllocation}"/>
@@ -277,14 +317,14 @@
                     </tbody>
                 </table>
 
-                <div class="field" th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                <div class="field" th:if="${allocationsEditable and (!delivery.orderPending or !isSuperAdmin)}">
                     <div class="control">
                         <div class="select is-small" >
                             <select id="delivery-action-select">
-                                <option value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
-                                <option th:if="${isAdmin}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${isAdmin and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${isAdmin}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>
@@ -395,6 +435,30 @@
                 </div>
             </div>
 
+            <div id="rejectPurchaseModal" class="modal" th:if="${delivery.awaitingApproval and isSuperAdmin}">
+                <div class="modal-background" onclick="toggleRejectModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.approval.reject}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleRejectModal(false)"></button>
+                    </header>
+                    <form th:action="@{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject|}" method="post">
+                        <section class="modal-card-body">
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.approval.reason}"></label>
+                                <div class="control">
+                                    <textarea class="textarea" name="reason"></textarea>
+                                </div>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-danger" th:text="#{deliveries.approval.reject}">Reject</button>
+                            <button type="button" class="button" onclick="toggleRejectModal(false)" th:text="#{deliveries.approval.reject.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
             <div id="confirmActionModal" class="modal">
                 <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
                 <div class="modal-card">
@@ -420,7 +484,7 @@
                     pendingPayment=${pendingPayment},
                     paymentSources=${paymentSources},
                     addDisabled=false,
-                    editEnabled=${isAdmin and not isSuperAdmin},
+                    editEnabled=${isAdmin and not isSuperAdmin and !delivery.awaitingApproval},
                     mode='delivery')}"></div>
 
             <form th:if="${(isAdmin or isSuperAdmin) and delivery.allocations.isEmpty()}"
@@ -443,6 +507,12 @@
 
         function toggleEditItemQtyModal(show) {
             document.getElementById('editItemQtyModal').classList.toggle('is-active', show);
+        }
+
+        function toggleRejectModal(show) {
+            const modal = document.getElementById('rejectPurchaseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
         }
 
         function openEditItemQtyModal(button) {

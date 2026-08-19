@@ -11,6 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.handler.MappedInterceptor;
 import pl.commercelink.starter.security.StoreAccessInterceptor;
 import pl.commercelink.starter.security.StoreApiKeyAuthorizationInterceptor;
+import pl.commercelink.registration.EmailVerificationInterceptor;
 import pl.commercelink.starter.security.interceptor.ApiGatewayIdInterceptor;
 
 import java.util.List;
@@ -32,6 +33,7 @@ class WebConfigTest {
         ReflectionTestUtils.setField(webConfig, "apiGatewayIdInterceptor", mock(ApiGatewayIdInterceptor.class));
         ReflectionTestUtils.setField(webConfig, "storeApiKeyAuthorizationInterceptor", mock(StoreApiKeyAuthorizationInterceptor.class));
         ReflectionTestUtils.setField(webConfig, "storeAccessInterceptor", storeAccessInterceptor);
+        ReflectionTestUtils.setField(webConfig, "emailVerificationInterceptor", mock(EmailVerificationInterceptor.class));
 
         registry = new InterceptorRegistry();
         WebMvcConfigurer configurer = webConfig.corsConfigurer();

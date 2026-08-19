@@ -11,8 +11,10 @@ public class DeliveryFilter {
     private final boolean waitingForCollection;
     private final boolean withoutInvoice;
     private final boolean withoutSync;
+    private final boolean awaitingApproval;
+    private final boolean globalOnly;
 
-    public DeliveryFilter(String deliveryId, String externalDeliveryId, String provider, LocalDate orderedAtStart, LocalDate orderedAtEnd, boolean waitingForCollection, boolean withoutInvoice, boolean withoutSync) {
+    public DeliveryFilter(String deliveryId, String externalDeliveryId, String provider, LocalDate orderedAtStart, LocalDate orderedAtEnd, boolean waitingForCollection, boolean withoutInvoice, boolean withoutSync, boolean awaitingApproval, boolean globalOnly) {
         this.deliveryId = deliveryId;
         this.externalDeliveryId = externalDeliveryId;
         this.provider = provider;
@@ -21,6 +23,8 @@ public class DeliveryFilter {
         this.waitingForCollection = waitingForCollection;
         this.withoutInvoice = withoutInvoice;
         this.withoutSync = withoutSync;
+        this.awaitingApproval = awaitingApproval;
+        this.globalOnly = globalOnly;
     }
 
     public String getDeliveryId() {
@@ -53,5 +57,13 @@ public class DeliveryFilter {
 
     public boolean isWithoutSync() {
         return withoutSync;
+    }
+
+    public boolean isAwaitingApproval() {
+        return awaitingApproval;
+    }
+
+    public boolean isGlobalOnly() {
+        return globalOnly;
     }
 }

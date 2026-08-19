@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>CommerceLink</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script th:if="${captchaSiteKey != null}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         html, body {
             height: 100%;
@@ -96,6 +97,9 @@
                 <span th:unless="${termsUrl != null}" th:text="#{registration.terms-consent.link}"></span>
                 <span th:text="#{registration.terms-consent.suffix}"></span>
             </label>
+        </div>
+        <div class="field is-flex is-justify-content-center" th:if="${captchaSiteKey != null}">
+            <div class="cf-turnstile" th:attr="data-sitekey=${captchaSiteKey}"></div>
         </div>
         <button type="submit" class="button is-primary" th:text="#{registration.submit}"></button>
     </form>

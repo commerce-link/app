@@ -463,8 +463,18 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isGlobalSupplier(String supplier) {
+        return getGlobalSupplierNames().stream().anyMatch(supplier::equalsIgnoreCase);
+    }
+
+    @DynamoDBIgnore
     public List<String> getManualSupplierNames() {
         return supplierNamesByMode(ConnectionMode.MANUAL);
+    }
+
+    @DynamoDBIgnore
+    public boolean isManualSupplier(String supplier) {
+        return getManualSupplierNames().stream().anyMatch(supplier::equalsIgnoreCase);
     }
 
     @DynamoDBIgnore

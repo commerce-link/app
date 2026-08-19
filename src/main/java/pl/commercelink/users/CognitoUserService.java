@@ -35,12 +35,8 @@ public class CognitoUserService {
         }
     }
 
-    public void createStoreAdmin(String email, String storeId) {
-        cognitoClient.adminCreateUser(createUserRequest(email, storeId).build());
-    }
-
-    public void createStoreAdmin(String email, String storeId, String permanentPassword) {
-        cognitoClient.adminCreateUser(createUserRequest(email, storeId)
+    public void createStoreAdmin(String email, String storeId, String permanentPassword, boolean emailVerified) {
+        cognitoClient.adminCreateUser(createUserRequest(email, storeId, emailVerified)
                 .messageAction(MessageActionType.SUPPRESS)
                 .build());
         cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder()
@@ -61,14 +57,14 @@ public class CognitoUserService {
         }
     }
 
-    private AdminCreateUserRequest.Builder createUserRequest(String email, String storeId) {
+    private AdminCreateUserRequest.Builder createUserRequest(String email, String storeId, boolean emailVerified) {
         return AdminCreateUserRequest.builder()
                 .userPoolId(userPoolId)
                 .username(email)
                 .desiredDeliveryMediums(DeliveryMediumType.EMAIL)
                 .userAttributes(
                         AttributeType.builder().name("email").value(email).build(),
-                        AttributeType.builder().name("email_verified").value("true").build(),
+                        AttributeType.builder().name("email_verified").value(String.valueOf(emailVerified)).build(),
                         AttributeType.builder().name("name").value(email).build(),
                         AttributeType.builder().name("custom:role").value(UserRole.ADMIN.name()).build(),
                         AttributeType.builder().name("custom:storeId").value(storeId).build());

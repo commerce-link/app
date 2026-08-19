@@ -502,6 +502,28 @@ class OrdersManagerTest {
         assertThat(service.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
     }
 
+    @Test
+    @DisplayName("returning ordered items puts them back into the supplier's allocation pool")
+    void returningOrderedItemsPutsThemBackIntoTheSupplierAllocationPool() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        OrderItem item = new OrderItem(ORDER_ID, "CPU", "AMD Ryzen", 1, 100.0, "MFN-1", false, 1);
+        item.setItemId("item-1");
+        item.setEan("5900000000001");
+        item.setManufacturerCode("MFN-1");
+        item.markAsOrdered("delivery-1", 80.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.returnOrderItemsToSupplierAllocation(STORE_ID, ORDER_ID, "delivery-1", "Acme", List.of("item-1"));
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("Acme");
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        verify(orderItemsRepository).save(item);
+    }
+
     private Order orderWithTotalPrice(double totalPrice) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
