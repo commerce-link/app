@@ -681,7 +681,7 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(STORE_ID, form);
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(STORE_ID, form, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo(
@@ -691,15 +691,15 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void mergeIsRefusedWhenApprovalStatesOfSourceAndTargetDiffer() {
+    void mergeIsRefusedWhenOrderStatusesOfSourceAndTargetDiffer() {
         // given
         Delivery source = awaitingApprovalDelivery();
         Delivery target = new Delivery(STORE_ID, null, PROVIDER);
         target.setDeliveryId("delivery-2");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
         when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
-        when(messageSource.getMessage(eq("deliveries.merge.error.approvalState"), eq(null), eq(Locale.ENGLISH)))
-                .thenReturn("Deliveries with a different approval state cannot be merged.");
+        when(messageSource.getMessage(eq("deliveries.merge.error.statusMismatch"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Deliveries with a different supplier order status cannot be merged.");
         DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
         form.setTargetDeliveryId("delivery-2");
 
@@ -715,7 +715,7 @@ class DeliveriesControllerApprovalTest {
                     "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
             verify(redirectAttributes).addFlashAttribute("errorMessage",
-                    "Deliveries with a different approval state cannot be merged.");
+                    "Deliveries with a different supplier order status cannot be merged.");
         }
     }
 
@@ -845,10 +845,211 @@ class DeliveriesControllerApprovalTest {
         }
     }
 
+    @Test
+    void splitIsBlockedForStoreAdminWhileOrderPending() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(orderPendingDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-1");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void splitForSuperAdminIsBlockedWhileOrderPending() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(orderPendingDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-1");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminIsBlockedWhileOrderPending() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(orderPendingDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).deleteAllocations(any(), any(), any());
+        }
+    }
+
+    @Test
+    void mergeIsBlockedWhenSourceAndTargetAreBothOrderPending() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(orderPendingDelivery(DELIVERY_ID));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(orderPendingDelivery("delivery-2"));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void mergeIntoAnOrderPendingTargetIsRefusedAsAStatusMismatch() {
+        // given
+        Delivery source = new Delivery(STORE_ID, null, PROVIDER);
+        source.setDeliveryId(DELIVERY_ID);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(orderPendingDelivery("delivery-2"));
+        when(messageSource.getMessage(eq("deliveries.merge.error.statusMismatch"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Deliveries with a different supplier order status cannot be merged.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Deliveries with a different supplier order status cannot be merged.");
+        }
+    }
+
+    @Test
+    void mergeIsAllowedBetweenTwoFailedDeliveries() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(failedDelivery(DELIVERY_ID));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(failedDelivery("delivery-2"));
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).reassignAllocations(eq(STORE_ID), eq(DELIVERY_ID), eq("delivery-2"), any(), any());
+        }
+    }
+
+    @Test
+    void deleteDeliveryIsBlockedWhileOrderPending() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(orderPendingDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        }
+    }
+
+    @Test
+    void mergeTargetsExcludeDeliveriesWithADifferentOrderStatus() {
+        // given
+        Delivery delivery = failedDelivery(DELIVERY_ID);
+        delivery.setAllocations(List.of());
+        Delivery failedTarget = failedDelivery("delivery-2");
+        Delivery regularTarget = new Delivery(STORE_ID, null, PROVIDER);
+        regularTarget.setDeliveryId("delivery-3");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesRepository.findPendingDeliveriesByProvider(STORE_ID, PROVIDER, DELIVERY_ID))
+                .thenReturn(List.of(failedTarget, regularTarget));
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("mergeTargetDeliveries")).isEqualTo(List.of(failedTarget));
+        }
+    }
+
     private Delivery awaitingApprovalDelivery() {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        return delivery;
+    }
+
+    private Delivery orderPendingDelivery(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        return delivery;
+    }
+
+    private Delivery failedDelivery(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
         return delivery;
     }
 
