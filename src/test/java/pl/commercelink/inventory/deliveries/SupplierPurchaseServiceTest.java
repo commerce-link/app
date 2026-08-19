@@ -369,6 +369,34 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void processPendingConvertsConfirmedPricesToLocalCurrency() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 90.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("EUR", 4.0));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 20.0, "EUR")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 125.0, "EUR",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 25.0, "EUR"))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.FlatRate(400, 50)))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture());
+        assertEquals(100.0, completed.getValue().getItems().get(0).getUnitCost());
+        assertEquals(ExchangeRates.LOCAL_CURRENCY, completed.getValue().getSourceCurrency());
+        assertEquals(0.0, completed.getValue().getShippingCost());
+    }
+
+    @Test
     void processPendingRebuildsOrderLinesFromClaimedAllocations() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);

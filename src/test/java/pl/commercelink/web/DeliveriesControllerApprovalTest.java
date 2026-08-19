@@ -16,9 +16,12 @@ import pl.commercelink.inventory.deliveries.AllocationType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
+import pl.commercelink.inventory.deliveries.DeliveriesManager;
 import pl.commercelink.inventory.deliveries.DeliveriesPlanningService;
 import pl.commercelink.inventory.deliveries.DeliveriesQueryService;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
+import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
@@ -29,6 +32,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
+import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
 
@@ -39,6 +43,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -63,6 +68,15 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
+
+    @Mock
+    private DeliveriesManager deliveriesManager;
+
+    @Mock
+    private DeliveryOrderedQtyUpdateService deliveryOrderedQtyUpdateService;
+
+    @Mock
+    private DeliveryReceptionService deliveryReceptionService;
 
     @Mock
     private DeliveriesRepository deliveriesRepository;
@@ -592,6 +606,250 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
         }
+    }
+
+    @Test
+    void updateDeliveryIsBlockedWhileAwaitingApproval() {
+        // given
+        Delivery existing = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+        when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery is awaiting approval and cannot be edited.");
+        Delivery updated = new Delivery();
+        updated.setStoreId(STORE_ID);
+        updated.setDeliveryId(DELIVERY_ID);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            // when
+            String view = deliveriesController.updateDelivery(updated, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).updateDelivery(any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery is awaiting approval and cannot be edited.");
+        }
+    }
+
+    @Test
+    void updateDeliveryIsAllowedForSuperAdminWhileAwaitingApproval() {
+        // given
+        Delivery updated = new Delivery();
+        updated.setStoreId(STORE_ID);
+        updated.setDeliveryId(DELIVERY_ID);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.updateDelivery(updated, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).updateDelivery(updated);
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsIsBlockedForStoreAdminWhileAwaitingApproval() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());
+        when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery is awaiting approval and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).deleteAllocations(any(), any(), any());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminWorksWhileAwaitingApproval() {
+        // given
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(STORE_ID, form);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).deleteAllocations(eq(STORE_ID), eq(DELIVERY_ID), any());
+        }
+    }
+
+    @Test
+    void mergeIsRefusedWhenApprovalStatesOfSourceAndTargetDiffer() {
+        // given
+        Delivery source = awaitingApprovalDelivery();
+        Delivery target = new Delivery(STORE_ID, null, PROVIDER);
+        target.setDeliveryId("delivery-2");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
+        when(messageSource.getMessage(eq("deliveries.merge.error.approvalState"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Deliveries with a different approval state cannot be merged.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Deliveries with a different approval state cannot be merged.");
+        }
+    }
+
+    @Test
+    void mergeIsAllowedBetweenTwoAwaitingApprovalDeliveries() {
+        // given
+        Delivery source = awaitingApprovalDelivery();
+        Delivery target = awaitingApprovalDelivery();
+        target.setDeliveryId("delivery-2");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).reassignAllocations(eq(STORE_ID), eq(DELIVERY_ID), eq("delivery-2"), any(), any());
+        }
+    }
+
+    @Test
+    void receivingAllocationsIsBlockedWhileAwaitingApproval() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());
+        when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery is awaiting approval and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            // when
+            String view = deliveriesController.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveryReceptionService, never()).receive(any(), any(), any(), any(), any(), any());
+        }
+    }
+
+    @Test
+    void updateItemQtyIsBlockedForStoreAdminWhileAwaitingApproval() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());
+        when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery is awaiting approval and cannot be edited.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.updateDeliveryItemQty(DELIVERY_ID, "MFN-1", 5, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveryOrderedQtyUpdateService, never()).run(any(), any(), any(), anyInt());
+        }
+    }
+
+    @Test
+    void updateItemQtyForSuperAdminWorksWhileAwaitingApproval() {
+        // given
+        when(deliveryOrderedQtyUpdateService.run(STORE_ID, DELIVERY_ID, "MFN-1", 5))
+                .thenReturn(OperationResult.success());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.updateDeliveryItemQtyForSuperAdmin(
+                    STORE_ID, DELIVERY_ID, "MFN-1", 5, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveryOrderedQtyUpdateService).run(STORE_ID, DELIVERY_ID, "MFN-1", 5);
+        }
+    }
+
+    @Test
+    void deleteDeliveryIsBlockedWhileAwaitingApproval() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());
+        when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery is awaiting approval and cannot be edited.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        }
+    }
+
+    @Test
+    void mergeTargetsExcludeDeliveriesWithADifferentApprovalState() {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setAllocations(List.of());
+        Delivery awaitingTarget = awaitingApprovalDelivery();
+        awaitingTarget.setDeliveryId("delivery-2");
+        Delivery regularTarget = new Delivery(STORE_ID, null, PROVIDER);
+        regularTarget.setDeliveryId("delivery-3");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesRepository.findPendingDeliveriesByProvider(STORE_ID, PROVIDER, DELIVERY_ID))
+                .thenReturn(List.of(awaitingTarget, regularTarget));
+        Model model = new ConcurrentModel();
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("mergeTargetDeliveries")).isEqualTo(List.of(awaitingTarget));
+        }
+    }
+
+    private Delivery awaitingApprovalDelivery() {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        return delivery;
     }
 
     @Test

@@ -9,36 +9,30 @@ import java.util.Map;
 class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
 
     private final String storeId;
-    private final WarehouseRepository warehouseRepository;
     private final WarehouseDocumentRepository warehouseDocumentRepository;
     private final WarehouseDocumentItemRepository warehouseDocumentItemRepository;
 
     BuiltInInvoiceSyncHandler(
             String storeId,
-            WarehouseRepository warehouseRepository,
             WarehouseDocumentRepository warehouseDocumentRepository,
             WarehouseDocumentItemRepository warehouseDocumentItemRepository
     ) {
         this.storeId = storeId;
-        this.warehouseRepository = warehouseRepository;
         this.warehouseDocumentRepository = warehouseDocumentRepository;
         this.warehouseDocumentItemRepository = warehouseDocumentItemRepository;
     }
 
     @Override
-    public double sync(InvoiceSyncRequest request) {
-        Map<String, Double> costsByMfn = request.costsByMfn();
-
+    public void sync(InvoiceSyncRequest request) {
         if (request.counterparty() != null) {
             updateGoodsReceiptCounterparty(request);
         }
 
-        if (costsByMfn.isEmpty()) {
-            return 0;
+        if (request.costsByMfn().isEmpty()) {
+            return;
         }
 
-        updateWarehouseDocumentItems(request.deliveryId(), costsByMfn);
-        return updateWarehouseItems(request.deliveryId(), costsByMfn);
+        updateWarehouseDocumentItems(request.deliveryId(), request.costsByMfn());
     }
 
     private void updateGoodsReceiptCounterparty(InvoiceSyncRequest request) {
@@ -60,20 +54,5 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
                 }
             }
         }
-    }
-
-    private double updateWarehouseItems(String deliveryId, Map<String, Double> costsByMfn) {
-        double delta = 0;
-        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
-            if (costsByMfn.containsKey(item.getManufacturerCode())) {
-                double itemDelta = item.updateCost(costsByMfn.get(item.getManufacturerCode()));
-                if (itemDelta == 0) {
-                    continue;
-                }
-                delta += itemDelta;
-                warehouseRepository.save(item);
-            }
-        }
-        return delta;
     }
 }

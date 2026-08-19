@@ -126,14 +126,21 @@ public class WarehouseAllocationsManager {
         }
     }
 
-    public void updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByMfn) {
+    public double updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByMfn) {
+        double delta = 0;
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
             Double confirmed = unitCostsByMfn.get(item.getManufacturerCode());
-            if (confirmed != null && confirmed != item.getCost()) {
-                item.setCost(confirmed);
-                warehouseRepository.save(item);
+            if (confirmed == null) {
+                continue;
             }
+            double itemDelta = item.updateCost(confirmed);
+            if (itemDelta == 0) {
+                continue;
+            }
+            delta += itemDelta;
+            warehouseRepository.save(item);
         }
+        return delta;
     }
 
     private WarehouseItem createWarehouseItemFromFulfilmentItem(String storeId, FulfilmentItem item) {
