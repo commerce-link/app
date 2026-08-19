@@ -35,6 +35,7 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +50,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -364,7 +366,7 @@ class SupplierPurchaseServiceDropshipTest {
 
         // then
         assertFalse(result.isSuccess());
-        assertEquals("orders.dropship.error.address", result.getMessage());
+        assertEquals("orders.dropship.error.consignee", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
     }
 
@@ -430,6 +432,46 @@ class SupplierPurchaseServiceDropshipTest {
         assertFalse(result.isSuccess());
         verify(deliveriesRepository, never()).save(any());
         verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
+    }
+
+    @Test
+    void manualAndAutomaticDropshipCreateIdenticallyConfiguredDeliveries() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-a")).thenReturn(Optional.empty());
+        DeliveryCreationForm submitForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        submitForm.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
+        submitForm.setShippingCost(9.99);
+        submitForm.setPaymentCost(1.5);
+        submitForm.setPaymentTerms(14);
+        submitForm.setTax(23.0);
+        DeliveryCreationForm manualForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        manualForm.setEstimatedDeliveryAt(submitForm.getEstimatedDeliveryAt());
+        manualForm.setShippingCost(submitForm.getShippingCost());
+        manualForm.setPaymentCost(submitForm.getPaymentCost());
+        manualForm.setPaymentTerms(submitForm.getPaymentTerms());
+        manualForm.setTax(submitForm.getTax());
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), submitForm, "ref-a");
+        service.createManualDropship(STORE_ID, directToConsumerOrder(), manualForm);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, times(2)).save(saved.capture());
+        Delivery submitted = saved.getAllValues().get(0);
+        Delivery manual = saved.getAllValues().get(1);
+        assertEquals(submitted.getProvider(), manual.getProvider());
+        assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
+        assertEquals(submitted.getDropshipOrderId(), manual.getDropshipOrderId());
+        assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
+        assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
+        assertEquals(submitted.getShippingCost(), manual.getShippingCost());
+        assertEquals(submitted.getPaymentCost(), manual.getPaymentCost());
+        assertEquals(submitted.getPaymentTerms(), manual.getPaymentTerms());
+        assertEquals(submitted.getTax(), manual.getTax());
     }
 
     @Test

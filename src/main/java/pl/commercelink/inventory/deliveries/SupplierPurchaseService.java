@@ -391,26 +391,16 @@ public class SupplierPurchaseService {
 
     public OperationResult<PurchaseSubmission> submitDropship(String storeId, Order order,
                                                               DeliveryCreationForm form, String purchaseRef) {
-        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
-            return OperationResult.failure("orders.dropship.error.fulfilmentType");
+        String validationError = dropshipValidationError(order, form);
+        if (validationError != null) {
+            return OperationResult.failure(validationError);
         }
-        if (!order.hasShippingDetails()) {
-            return OperationResult.failure("orders.dropship.error.address");
-        }
-        try {
-            toConsignee(order.getShippingDetails());
-        } catch (IllegalArgumentException e) {
-            return OperationResult.failure("orders.dropship.error.address");
+        if (!isValidConsignee(order.getShippingDetails())) {
+            return OperationResult.failure("orders.dropship.error.consignee");
         }
         if (!isDropshipAvailable(storeId, form.getProvider())) {
             return OperationResult.failure("orders.dropship.error.unsupported");
         }
-
-        boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
-        if (!hasOrderableItems) {
-            return OperationResult.failure("deliveries.purchase.error.availability");
-        }
-
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return OperationResult.failure("deliveries.purchase.error.failed");
@@ -423,66 +413,74 @@ public class SupplierPurchaseService {
                     new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
         }
 
-        Delivery delivery = new Delivery(storeId, null, form.getProvider());
-        delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
-        delivery.setDropshipOrderId(order.getOrderId());
-        delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
+        Delivery delivery = newDropshipDelivery(storeId, store, order, form);
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         deliveryCreationService.claimAllocations(storeId, delivery, form);
-        delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
-        delivery.setShippingCost(form.getShippingCost());
-        delivery.setPaymentCost(form.getPaymentCost());
-        delivery.setPaymentTerms(form.getPaymentTerms());
-        delivery.setTax(form.getTax());
-        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
-
         deliveriesRepository.save(delivery);
 
         if (!requiresApproval) {
             supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
                     storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
         }
-
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }
 
     public OperationResult<String> createManualDropship(String storeId, Order order, DeliveryCreationForm form) {
-        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
-            return OperationResult.failure("orders.dropship.error.fulfilmentType");
-        }
-        if (!order.hasShippingDetails()) {
-            return OperationResult.failure("orders.dropship.error.address");
-        }
-        boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
-        if (!hasOrderableItems) {
-            return OperationResult.failure("deliveries.purchase.error.availability");
+        String validationError = dropshipValidationError(order, form);
+        if (validationError != null) {
+            return OperationResult.failure(validationError);
         }
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return OperationResult.failure("deliveries.purchase.error.failed");
         }
 
+        Delivery delivery = newDropshipDelivery(storeId, store, order, form);
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        deliveryCreationService.claimAllocations(storeId, delivery, form);
+        deliveriesRepository.save(delivery);
+        dropshipOrderCompletion.markSuppliedByDropship(storeId, order.getOrderId(), delivery.getDeliveryId());
+
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    private String dropshipValidationError(Order order, DeliveryCreationForm form) {
+        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            return "orders.dropship.error.fulfilmentType";
+        }
+        if (!order.hasShippingDetails()) {
+            return "orders.dropship.error.address";
+        }
+        if (form.getItems().stream().noneMatch(item -> item.getRequestedQty() > 0)) {
+            return "deliveries.purchase.error.availability";
+        }
+        return null;
+    }
+
+    private static boolean isValidConsignee(ShippingDetails details) {
+        try {
+            toConsignee(details);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private Delivery newDropshipDelivery(String storeId, Store store, Order order, DeliveryCreationForm form) {
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
         delivery.setDropshipOrderId(order.getOrderId());
         delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
-        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
-        deliveryCreationService.claimAllocations(storeId, delivery, form);
-
-        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         delivery.setShippingCost(form.getShippingCost());
         delivery.setPaymentCost(form.getPaymentCost());
         delivery.setPaymentTerms(form.getPaymentTerms());
         delivery.setTax(form.getTax());
-
-        deliveriesRepository.save(delivery);
-        dropshipOrderCompletion.markSuppliedByDropship(storeId, order.getOrderId(), delivery.getDeliveryId());
-
-        return OperationResult.success(delivery.getDeliveryId());
+        delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
+        return delivery;
     }
 
     private SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines) {
