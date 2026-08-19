@@ -238,10 +238,10 @@ public class DeliveriesController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form,
                                                     RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(form.getStoreId(), form.getDeliveryId())) {
+        Delivery delivery = deliveriesRepository.findById(form.getStoreId(), form.getDeliveryId());
+        if (delivery != null && delivery.isAwaitingApproval()) {
             return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
-        Delivery delivery = deliveriesRepository.findById(form.getStoreId(), form.getDeliveryId());
         if (delivery != null && delivery.isDropship()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.receive.error.dropship", null, locale));

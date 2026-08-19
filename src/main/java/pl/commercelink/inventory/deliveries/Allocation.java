@@ -134,10 +134,6 @@ public class Allocation {
         return directToConsumer;
     }
 
-    public void setDirectToConsumer(boolean directToConsumer) {
-        this.directToConsumer = directToConsumer;
-    }
-
     public boolean isSelected() {
         return selected;
     }

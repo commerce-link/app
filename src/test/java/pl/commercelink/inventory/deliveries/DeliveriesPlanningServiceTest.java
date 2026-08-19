@@ -5,9 +5,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.List;
@@ -39,18 +43,22 @@ class DeliveriesPlanningServiceTest {
 
     private static Allocation allocation(String orderId, String itemId, String provider,
                                          boolean directToConsumer) {
-        Allocation allocation = new Allocation();
-        allocation.setKey(new AllocationKey(orderId, itemId, "customer@example.com"));
-        allocation.setType(AllocationType.Order);
-        allocation.setName("Product " + itemId);
-        allocation.setQty(1);
-        allocation.setDeliveryId(provider);
-        allocation.setEan("59000000000" + itemId);
-        allocation.setMfn("MFN-" + itemId);
-        allocation.setUnitCost(100.0);
-        allocation.setInAllocation(true);
-        allocation.setDirectToConsumer(directToConsumer);
-        return allocation;
+        Order order = new Order();
+        order.setOrderId(orderId);
+        order.setFulfilmentType(directToConsumer ? FulfilmentType.DirectToConsumer : FulfilmentType.WarehouseFulfilment);
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("customer@example.com");
+        order.setBillingDetails(billingDetails);
+
+        OrderItem item = new OrderItem(orderId, "Category", "Product " + itemId, 1, 100.0, null, false);
+        item.setItemId(itemId);
+        item.setEan("59000000000" + itemId);
+        item.setManufacturerCode("MFN-" + itemId);
+        item.setCost(100.0);
+        item.setDeliveryId(provider);
+        item.setStatus(FulfilmentStatus.Allocation);
+
+        return Allocation.fromOrderItem(order, item);
     }
 
     @Test
@@ -125,7 +133,7 @@ class DeliveriesPlanningServiceTest {
     }
 
     @Test
-    void directToConsumerOrderSplitAcrossSuppliersFallsBackToTheBatches() {
+    void directToConsumerAllocationsOfAnIneligibleOrderGroupIntoProviderBatches() {
         // given
         Order order = new Order();
         when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(

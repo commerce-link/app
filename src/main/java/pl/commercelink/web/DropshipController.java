@@ -166,7 +166,6 @@ public class DropshipController extends BaseController {
         if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
             return Optional.empty();
         }
-        form.setStoreId(storeId);
         return Optional.of(order);
     }
 
@@ -175,6 +174,7 @@ public class DropshipController extends BaseController {
         if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
+        form.setStoreId(storeId);
         addConfirmationModel(model, storeId, order.get(), form);
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         return "dropshipConfirmation";
@@ -186,6 +186,7 @@ public class DropshipController extends BaseController {
         if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
+        form.setStoreId(storeId);
         OperationResult<String> result = dropshipPurchaseService.createManualDropship(storeId, order.get(), form);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -245,6 +246,7 @@ public class DropshipController extends BaseController {
         if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
+        form.setStoreId(storeId);
         OperationResult<PurchaseSubmission> result =
                 dropshipPurchaseService.submitDropship(storeId, order.get(), form, purchaseRef);
 
