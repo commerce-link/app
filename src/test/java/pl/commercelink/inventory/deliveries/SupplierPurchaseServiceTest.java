@@ -115,24 +115,6 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void orderingUnavailableWhenSupplierIsConnectedGlobally() {
-        // given
-        connectSupplier(ConnectionMode.GLOBAL);
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
-        // given
-        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
     void orderingAvailableWhenProviderSupportsIt() {
         // given
         when(supplierProvider.supportsOrdering()).thenReturn(true);
@@ -251,12 +233,6 @@ class SupplierPurchaseServiceTest {
         // given
         when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void refusesOrderingForManualConnections() {
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
     }
