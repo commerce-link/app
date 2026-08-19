@@ -263,16 +263,21 @@ public class DeliveriesController {
         if (isEditLocked(getStoreId(), form.getDeliveryId())) {
             return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
-        return deleteAllocations(getStoreId(), form);
+        return deleteAllocations(getStoreId(), form, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/deleteSelectedAllocations")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String deleteSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form) {
-        return deleteAllocations(storeId, form);
+    public String deleteSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form,
+                                                         RedirectAttributes redirectAttributes, Locale locale) {
+        return deleteAllocations(storeId, form, redirectAttributes, locale);
     }
 
-    private String deleteAllocations(String storeId, DeliveryAllocationsForm form) {
+    private String deleteAllocations(String storeId, DeliveryAllocationsForm form,
+                                     RedirectAttributes redirectAttributes, Locale locale) {
+        if (isOrderingInProgress(storeId, form.getDeliveryId())) {
+            return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
+        }
         deliveriesManager.deleteAllocations(storeId, form.getDeliveryId(), form.getSelectedAllocations());
         return detailsRedirect(storeId, form.getDeliveryId());
     }
@@ -303,10 +308,13 @@ public class DeliveriesController {
 
         Delivery source = deliveriesRepository.findById(storeId, form.getDeliveryId());
         Delivery target = deliveriesRepository.findById(storeId, form.getTargetDeliveryId());
-        if (source == null || target == null || source.isAwaitingApproval() != target.isAwaitingApproval()) {
+        if (source == null || target == null || source.getOrderStatus() != target.getOrderStatus()) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.merge.error.approvalState", null, locale));
+                    messageSource.getMessage("deliveries.merge.error.statusMismatch", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
+        }
+        if (source.isOrderPending()) {
+            return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
 
         deliveriesManager.reassignAllocations(
@@ -326,16 +334,21 @@ public class DeliveriesController {
         if (isEditLocked(getStoreId(), form.getDeliveryId())) {
             return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
-        return splitAllocations(getStoreId(), form, redirectAttributes);
+        return splitAllocations(getStoreId(), form, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/splitSelectedAllocations")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String splitSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
-        return splitAllocations(storeId, form, redirectAttributes);
+    public String splitSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form,
+                                                        RedirectAttributes redirectAttributes, Locale locale) {
+        return splitAllocations(storeId, form, redirectAttributes, locale);
     }
 
-    private String splitAllocations(String storeId, DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
+    private String splitAllocations(String storeId, DeliveryAllocationsForm form,
+                                    RedirectAttributes redirectAttributes, Locale locale) {
+        if (isOrderingInProgress(storeId, form.getDeliveryId())) {
+            return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
+        }
         if (StringUtils.isBlank(form.getTargetExternalDeliveryId())) {
             redirectAttributes.addFlashAttribute("errorMessage", "Target external delivery ID cannot be empty for split operation.");
         }
@@ -374,6 +387,9 @@ public class DeliveriesController {
         var delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (delivery != null && delivery.isAwaitingApproval()) {
             return redirectEditLocked(storeId, deliveryId, redirectAttributes, locale);
+        }
+        if (delivery != null && delivery.isOrderPending()) {
+            return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
         }
         deliveriesRepository.delete(delivery);
         return "redirect:/dashboard/deliveries";
@@ -818,7 +834,7 @@ public class DeliveriesController {
         }
         var mergeTargetDeliveries = deliveriesRepository.findPendingDeliveriesByProvider(
                         storeId, delivery.getProvider(), deliveryId).stream()
-                .filter(target -> target.isAwaitingApproval() == delivery.isAwaitingApproval())
+                .filter(target -> target.getOrderStatus() == delivery.getOrderStatus())
                 .toList();
 
         model.addAttribute("delivery", delivery);
@@ -989,6 +1005,18 @@ public class DeliveriesController {
                                       RedirectAttributes redirectAttributes, Locale locale) {
         redirectAttributes.addFlashAttribute("errorMessage",
                 messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
+        return detailsRedirect(storeId, deliveryId);
+    }
+
+    private boolean isOrderingInProgress(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        return delivery != null && delivery.isOrderPending();
+    }
+
+    private String redirectOrderingInProgress(String storeId, String deliveryId,
+                                              RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage("deliveries.edit.locked.orderPending", null, locale));
         return detailsRedirect(storeId, deliveryId);
     }
 
