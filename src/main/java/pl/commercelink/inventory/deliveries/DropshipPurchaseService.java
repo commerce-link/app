@@ -134,7 +134,7 @@ public class DropshipPurchaseService {
     private Delivery newDropshipDelivery(String storeId, Store store, Order order, DeliveryCreationForm form) {
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
-        delivery.setDropshipOrderId(order.getOrderId());
+        delivery.setDropship(new Dropship(order.getOrderId()));
         delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         delivery.setShippingCost(form.getShippingCost());
@@ -146,9 +146,11 @@ public class DropshipPurchaseService {
     }
 
     SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines) {
-        Order order = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
+        String orderId = delivery.dropshipOrderId().orElseThrow(() -> new SupplierOrderException(
+                "Delivery " + delivery.getDeliveryId() + " is not a dropship delivery"));
+        Order order = ordersRepository.findById(storeId, orderId);
         if (order == null || !order.hasShippingDetails()) {
-            throw new SupplierOrderException("Order " + delivery.getDropshipOrderId()
+            throw new SupplierOrderException("Order " + orderId
                     + " has no complete shipping details for a dropship purchase");
         }
         SupplierConsignee consignee;

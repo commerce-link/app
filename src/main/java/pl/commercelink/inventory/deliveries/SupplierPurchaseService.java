@@ -188,8 +188,8 @@ public class SupplierPurchaseService {
             applyOrderResult(form, validation, orderResult);
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             if (delivery.isDropship()) {
-                dropshipOrderCompletion.markSuppliedByDropship(storeId, delivery.getDropshipOrderId(),
-                        delivery.getDeliveryId());
+                dropshipOrderCompletion.markSuppliedByDropship(storeId,
+                        delivery.dropshipOrderId().orElseThrow(), delivery.getDeliveryId());
                 deliveryCreationService.completeDropshipPending(storeId, delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);

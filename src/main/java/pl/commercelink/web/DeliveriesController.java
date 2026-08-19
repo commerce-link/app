@@ -870,7 +870,7 @@ public class DeliveriesController {
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
-            var dropshipOrder = ordersRepository.findById(storeId, delivery.getDropshipOrderId());
+            var dropshipOrder = ordersRepository.findById(storeId, delivery.dropshipOrderId().orElseThrow());
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
             model.addAttribute("dropshipShipment", dropshipOrder != null
                     ? dropshipOrder.firstShipment().orElse(null)

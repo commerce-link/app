@@ -131,7 +131,7 @@ class DropshipPurchaseServiceTest {
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
-        delivery.setDropshipOrderId(ORDER_ID);
+        delivery.setDropship(new Dropship(ORDER_ID));
         return delivery;
     }
 
@@ -172,7 +172,7 @@ class DropshipPurchaseServiceTest {
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
-        assertEquals(ORDER_ID, saved.getValue().getDropshipOrderId());
+        assertEquals(Optional.of(ORDER_ID), saved.getValue().dropshipOrderId());
         assertTrue(saved.getValue().isDropship());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
@@ -282,7 +282,7 @@ class DropshipPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
         Delivery delivery = saved.getValue();
-        assertEquals(ORDER_ID, delivery.getDropshipOrderId());
+        assertEquals(Optional.of(ORDER_ID), delivery.dropshipOrderId());
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
@@ -341,7 +341,7 @@ class DropshipPurchaseServiceTest {
         Delivery manual = saved.getAllValues().get(1);
         assertEquals(submitted.getProvider(), manual.getProvider());
         assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
-        assertEquals(submitted.getDropshipOrderId(), manual.getDropshipOrderId());
+        assertEquals(submitted.dropshipOrderId(), manual.dropshipOrderId());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
         assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());
