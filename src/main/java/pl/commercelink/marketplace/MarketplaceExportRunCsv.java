@@ -18,7 +18,7 @@ final class MarketplaceExportRunCsv {
     private static final String[] HEADERS =
             {"pimId", "price", "quantity", "removalAttempts", "outcome", "reasonCode", "message"};
     private static final String FAILED_SUFFIX = "-failed";
-    private static final int MAX_MESSAGE_LENGTH = 1000;
+    private static final int MAX_MESSAGE_CHARACTERS = 1000;
     private static final String TRUNCATION_MARKER = "\u2026";
     private static final int FULL_COLUMNS = 7;
     private static final int COLUMNS_WITH_REMOVAL_ATTEMPTS = 4;
@@ -64,8 +64,8 @@ final class MarketplaceExportRunCsv {
             return null;
         }
         String collapsed = message.replaceAll("\\s+", " ").trim();
-        return collapsed.length() > MAX_MESSAGE_LENGTH
-                ? collapsed.substring(0, MAX_MESSAGE_LENGTH) + TRUNCATION_MARKER
+        return collapsed.length() > MAX_MESSAGE_CHARACTERS
+                ? collapsed.substring(0, MAX_MESSAGE_CHARACTERS) + TRUNCATION_MARKER
                 : collapsed;
     }
 

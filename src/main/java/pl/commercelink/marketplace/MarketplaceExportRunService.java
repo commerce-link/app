@@ -22,7 +22,6 @@ public class MarketplaceExportRunService {
     private static final String RUNS_PREFIX = "marketplace-export-runs";
     private static final String RUN_EXTENSION = ".csv";
     private static final String FAILED_RUN_EXTENSION = "-failed.csv";
-    private static final int LISTING_LIMIT = 1000;
     private static final int UNREADABLE_RUN_ATTEMPTS = 5;
 
     private final FileStorage fileStorage;
@@ -45,12 +44,7 @@ public class MarketplaceExportRunService {
         String prefix = catalogPrefix(storeId, marketplace, catalogId);
         List<String> keysNewestFirst;
         try {
-            Map<String, LocalDateTime> lastModifiedByKey = fileStorage.getAllObjectLastModified(bucketName, prefix);
-            if (lastModifiedByKey.size() >= LISTING_LIMIT) {
-                System.err.println("Marketplace export run listing hit the object limit for prefix " + prefix);
-            }
-
-            keysNewestFirst = lastModifiedByKey.entrySet().stream()
+            keysNewestFirst = fileStorage.getAllObjectLastModified(bucketName, prefix).entrySet().stream()
                     .filter(entry -> isSucceededRunKey(entry.getKey()))
                     .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                     .map(Map.Entry::getKey)
