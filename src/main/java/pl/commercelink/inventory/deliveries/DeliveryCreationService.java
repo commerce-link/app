@@ -30,6 +30,8 @@ public class DeliveryCreationService {
     private ExchangeRates exchangeRates;
     @Autowired
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
+    @Autowired
+    private DeliveryCostSync deliveryCostSync;
 
     public String run(String storeId, DeliveryCreationForm form) {
         prepareForm(storeId, form);
@@ -56,29 +58,29 @@ public class DeliveryCreationService {
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        applyPendingResult(delivery, form);
-        warehouseAllocationsManager.updateUnitCosts(storeId, delivery.getDeliveryId(),
-                form.getItems().stream()
-                        .filter(item -> item.getRequestedQty() > 0)
-                        .collect(Collectors.toMap(DeliveryItem::getMfn, DeliveryItem::getUnitCost, (a, b) -> a)));
-    }
-
-    public void completeDropshipPending(Delivery delivery, DeliveryCreationForm form) {
-        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
-        delivery.setOrderStatus(null);
-        deliveriesRepository.save(delivery);
-    }
-
-    private void applyPendingResult(Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
-        delivery.setShippingCost(form.getShippingCost());
-        delivery.setPaymentCost(form.getPaymentCost());
+        delivery.updateShippingCost(form.getShippingCost());
+        delivery.updatePaymentCost(form.getPaymentCost());
         delivery.setPaymentTerms(form.getPaymentTerms());
         delivery.setTax(form.getTax());
         delivery.setOrderStatus(null);
 
+        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
+    }
+
+    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setOrderStatus(null);
+        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
+        deliveriesRepository.save(delivery);
+    }
+
+    private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {
+        return form.getItems().stream()
+                .filter(item -> item.getRequestedQty() > 0)
+                .collect(Collectors.toMap(DeliveryItem::getMfn, DeliveryItem::getUnitCost, (a, b) -> a));
     }
 
     private void prepareForm(String storeId, DeliveryCreationForm form) {

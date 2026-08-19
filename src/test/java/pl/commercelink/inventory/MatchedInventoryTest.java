@@ -1,0 +1,83 @@
+package pl.commercelink.inventory;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.taxonomy.TaxonomyCache;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class MatchedInventoryTest {
+
+    @Mock
+    private TaxonomyCache taxonomyCache;
+    @Mock
+    private SupplierRegistry supplierRegistry;
+
+    private MatchedInventory inventoryWith(InventoryItem... items) {
+        return new MatchedInventory(InventoryKey.fromMfn("M1"), List.of(items), taxonomyCache, supplierRegistry);
+    }
+
+    private InventoryItem warehouseItem(double netPrice, boolean inStock) {
+        return new InventoryItem("E1", "M1", netPrice, "PLN", 2, 1, SupplierRegistry.WAREHOUSE, true, inStock, !inStock);
+    }
+
+    private InventoryItem supplierItem(String supplier, double netPrice, int leadTimeDays) {
+        return new InventoryItem("E1", "M1", netPrice, "PLN", 20, leadTimeDays, supplier, true);
+    }
+
+    private SupplierInfo supplierInfo(String name, int arrivalDays) {
+        return new SupplierInfo(name, SupplierType.Distributor, 1, "PL",
+                new ShippingPolicy(new ShippingTerms(arrivalDays, new ShippingCostPolicy.Free())));
+    }
+
+    @Test
+    void returnsOneDayWhenWarehouseHasDeliveredItemsRegardlessOfPrice() {
+        // given
+        MatchedInventory matched = inventoryWith(warehouseItem(1199.99, true), supplierItem("Action", 1175.49, 1));
+
+        // when
+        int days = matched.getEstimatedDeliveryDays(1449);
+
+        // then
+        assertThat(days).isEqualTo(1);
+    }
+
+    @Test
+    void calculatesDaysFromOffersWhenWarehouseItemsAreOnlyOrdered() {
+        // given
+        when(supplierRegistry.get(SupplierRegistry.WAREHOUSE)).thenReturn(supplierInfo(SupplierRegistry.WAREHOUSE, 1));
+        MatchedInventory matched = inventoryWith(warehouseItem(1000.0, false));
+
+        // when
+        int days = matched.getEstimatedDeliveryDays(1449);
+
+        // then
+        assertThat(days).isEqualTo(2);
+    }
+
+    @Test
+    void skipsOrderedWarehouseItemsAbovePricePoint() {
+        // given
+        when(supplierRegistry.get("Action")).thenReturn(supplierInfo("Action", 2));
+        MatchedInventory matched = inventoryWith(warehouseItem(1199.99, false), supplierItem("Action", 1175.49, 2));
+
+        // when
+        int days = matched.getEstimatedDeliveryDays(1449);
+
+        // then
+        assertThat(days).isEqualTo(4);
+    }
+}

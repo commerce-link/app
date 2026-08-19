@@ -16,7 +16,8 @@
 
             <div class="columns">
                 <div class="column is-half">
-                    <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box">
+                    <form th:action="@{/dashboard/deliveries/details}" th:object="${delivery}" method="post" class="box"
+                          th:with="headerEditable=${!delivery.hasBeenReceived() and (!delivery.awaitingApproval or isSuperAdmin)}">
                         <input type="hidden" th:field="*{storeId}"/>
                         <input type="hidden" th:field="*{deliveryId}"/>
                         <input type="hidden" th:field="*{externalDeliveryId}"/>
@@ -113,36 +114,36 @@
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentTerms}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentTerms}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{paymentTerms}" min="0" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.paymentTerms}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.estimated.delivery}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="date" th:field="*{estimatedDeliveryAt}" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.estimatedDeliveryAt}"></span>
+                                <input th:if="${headerEditable}" class="input" type="date" th:field="*{estimatedDeliveryAt}" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.estimatedDeliveryAt}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.shippingCost}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.shippingCost}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{shippingCost}" step="0.01" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.shippingCost}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.paymentCost}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.paymentCost}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{paymentCost}" step="0.01" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.paymentCost}"></span>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.tax}"></label>
                             <div class="control">
-                                <input th:unless="${delivery.hasBeenReceived()}" class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
-                                <span th:if="${delivery.hasBeenReceived()}" th:text="${delivery.tax}"></span>
+                                <input th:if="${headerEditable}" class="input" type="number" th:field="*{tax}" step="0.01" min="1.0" required/>
+                                <span th:unless="${headerEditable}" th:text="${delivery.tax}"></span>
                             </div>
                         </div>
 
@@ -151,12 +152,12 @@
                             <div class="control">
                                 <textarea class="textarea" th:field="*{comment}"
                                           th:placeholder="#{general.comment.placeholder}"
-                                          th:disabled="${delivery.hasBeenReceived()}"></textarea>
+                                          th:disabled="${!headerEditable}"></textarea>
                             </div>
                         </div>
 
                         <div class="field is-grouped" th:unless="${delivery.hasBeenReceived()}">
-                            <div class="control">
+                            <div class="control" th:if="${headerEditable}">
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
                             <div class="control"
@@ -215,7 +216,7 @@
                             </tbody>
                         </table>
                         <p th:if="${delivery.documents.isEmpty()}" class="has-text-grey" th:text="#{deliveries.no.documents}"></p>
-                        <div class="mt-3" th:if="${isAdmin and not isSuperAdmin}">
+                        <div class="mt-3" th:if="${isAdmin and not isSuperAdmin and !delivery.awaitingApproval}">
                             <div class="field has-addons">
                                 <div class="control">
                                     <input type="text" id="invoiceIdInput" class="input is-small" th:placeholder="#{invoiceSync.invoiceId}"/>
@@ -241,7 +242,7 @@
 
             <h2 th:text="#{deliveries.items}"></h2>
 
-            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty()}">
+            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
                 <table class="table">
                     <thead>
                     <tr>
@@ -287,7 +288,8 @@
             <h2 th:text="#{deliveries.allocations}"></h2>
 
             <form id="allocationsForm" th:action="@{/dashboard/deliveries/allocations}" th:object="${allocationsForm}" method="post" class="box"
-                  th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}">
+                  th:data-base-url="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries(storeId=${delivery.storeId})} : @{/dashboard/deliveries}"
+                  th:with="allocationsEditable=${delivery.isWaitingForCollection() and (!delivery.awaitingApproval or isSuperAdmin)}">
 
                 <input type="hidden" th:field="*{storeId}"/>
                 <input type="hidden" th:field="*{deliveryId}"/>
@@ -299,7 +301,7 @@
                 <table class="table">
                     <thead>
                     <tr>
-                        <th th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                        <th th:if="${allocationsEditable}">
                             <input type="checkbox" id="selectAllAllocations" onclick="toggleAllAllocations(this)"/>
                         </th>
                         <th></th>
@@ -323,7 +325,7 @@
                         <input type="hidden" th:field="*{allocations[__${stat.index}__].inAllocation}"/>
                         <input type="hidden" th:field="*{allocations[__${stat.index}__].unitCost}"/>
 
-                        <td th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                        <td th:if="${allocationsEditable}">
                             <input type="checkbox" th:field="*{allocations[__${stat.index}__].selected}"
                                    class="allocation-checkbox"
                                    th:disabled="${!allocation.inAllocation}"/>
@@ -339,14 +341,14 @@
                     </tbody>
                 </table>
 
-                <div class="field" th:if="${!isSuperAdmin and delivery.isWaitingForCollection()}">
+                <div class="field" th:if="${allocationsEditable}">
                     <div class="control">
                         <div class="select is-small" >
                             <select id="delivery-action-select">
-                                <option value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
-                                <option th:if="${isAdmin}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${isAdmin and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${isAdmin}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:if="${isAdmin or isSuperAdmin}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${isAdmin or isSuperAdmin}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>
@@ -506,7 +508,7 @@
                     pendingPayment=${pendingPayment},
                     paymentSources=${paymentSources},
                     addDisabled=false,
-                    editEnabled=${isAdmin and not isSuperAdmin},
+                    editEnabled=${isAdmin and not isSuperAdmin and !delivery.awaitingApproval},
                     mode='delivery')}"></div>
 
             <form th:if="${(isAdmin or isSuperAdmin) and delivery.allocations.isEmpty()}"

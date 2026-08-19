@@ -215,20 +215,40 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("updateUnitCosts applies confirmed prices to items matched by manufacturer code")
-    void updateUnitCostsAppliesConfirmedPricesByMfn() {
+    @DisplayName("updateUnitCosts returns the summed cost delta for changed items")
+    void updateUnitCostsReturnsSummedCostDelta() {
         // given
-        WarehouseItem claimed = new WarehouseItem();
-        claimed.setManufacturerCode("MFN-1");
-        claimed.setCost(10.0);
-        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
+        WarehouseItem item = new WarehouseItem();
+        item.setQty(3);
+        item.setCost(10.0);
+        item.setManufacturerCode("MFN-1");
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(item));
 
         // when
-        warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 12.5));
 
         // then
-        assertThat(claimed.getCost()).isEqualTo(8.5);
-        verify(warehouseRepository).save(claimed);
+        assertThat(delta).isEqualTo(7.5);
+        assertThat(item.getCost()).isEqualTo(12.5);
+        verify(warehouseRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("updateUnitCosts returns zero and skips save when the price is unchanged")
+    void updateUnitCostsReturnsZeroWhenPriceUnchanged() {
+        // given
+        WarehouseItem item = new WarehouseItem();
+        item.setQty(3);
+        item.setCost(10.0);
+        item.setManufacturerCode("MFN-1");
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(item));
+
+        // when
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 10.0));
+
+        // then
+        assertThat(delta).isZero();
+        verify(warehouseRepository, never()).save(any(WarehouseItem.class));
     }
 
     @Test
@@ -241,9 +261,10 @@ class WarehouseAllocationsManagerTest {
         when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
 
         // then
+        assertThat(delta).isZero();
         assertThat(claimed.getCost()).isEqualTo(10.0);
         verify(warehouseRepository, never()).save(any());
     }

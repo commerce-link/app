@@ -78,6 +78,24 @@ public class OrderAllocationsManager {
                 ordersManager.returnOrderItemsToSupplierAllocation(storeId, orderId, deliveryId, provider, itemIds));
     }
 
+    public double updateUnitCosts(String deliveryId, Map<String, Double> unitCostsByMfn) {
+        double delta = 0;
+        for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
+            if (item.isReturned() || !unitCostsByMfn.containsKey(item.getManufacturerCode())) {
+                continue;
+            }
+            double itemDelta = item.updateCost(unitCostsByMfn.get(item.getManufacturerCode()));
+            if (itemDelta == 0) {
+                continue;
+            }
+            if (!item.isReplacedOrReturned()) {
+                delta += itemDelta;
+            }
+            orderItemsRepository.save(item);
+        }
+        return delta;
+    }
+
     public boolean updateFulfilment(String storeId, String provider, String orderId, String itemId, String ean, String mfn, double unitCost) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {

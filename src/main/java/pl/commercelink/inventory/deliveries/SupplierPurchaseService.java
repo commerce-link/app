@@ -152,11 +152,15 @@ public class SupplierPurchaseService {
     }
 
     private LiveCostConversion liveCostConversion(List<SupplierQuote> quotes) {
-        String quoteCurrency = quotes.stream()
+        return liveCostConversionFor(quotes.stream()
                 .map(SupplierQuote::currency)
                 .filter(currency -> currency != null && !currency.isBlank())
                 .findFirst()
-                .orElse(ExchangeRates.LOCAL_CURRENCY);
+                .orElse(ExchangeRates.LOCAL_CURRENCY));
+    }
+
+    private LiveCostConversion liveCostConversionFor(String currency) {
+        String quoteCurrency = currency != null && !currency.isBlank() ? currency : ExchangeRates.LOCAL_CURRENCY;
         if (ExchangeRates.LOCAL_CURRENCY.equals(quoteCurrency)) {
             return new LiveCostConversion(quoteCurrency, 1.0);
         }
@@ -205,7 +209,7 @@ public class SupplierPurchaseService {
             if (delivery.isDropship()) {
                 dropshipOrderCompletion.markSuppliedByDropship(storeId, delivery.getDropshipOrderId(),
                         delivery.getDeliveryId());
-                deliveryCreationService.completeDropshipPending(delivery, form);
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);
             }
@@ -521,13 +525,16 @@ public class SupplierPurchaseService {
     private void applyOrderResult(DeliveryCreationForm form, PurchaseValidation validation,
                                   SupplierOrderResult orderResult) {
         form.setExternalDeliveryId(orderResult.externalOrderId());
-        form.setSourceCurrency(orderResult.currency());
+        form.setSourceCurrency(ExchangeRates.LOCAL_CURRENCY);
         form.setTax(deliveryTaxResolver.resolveFor(form.getProvider()));
 
-        Map<String, Double> confirmedPricesByEan = orderResult.confirmedLines() != null
-                ? orderResult.confirmedLines().stream()
-                        .collect(Collectors.toMap(SupplierQuote::ean, SupplierQuote::netPrice, (a, b) -> a))
-                : Map.of();
+        List<SupplierQuote> confirmedLines = orderResult.confirmedLines() != null
+                ? orderResult.confirmedLines()
+                : List.of();
+        LiveCostConversion conversion = liveCostConversionFor(orderResult.currency());
+        Map<String, Double> confirmedPricesByEan = confirmedLines.stream()
+                .collect(Collectors.toMap(SupplierQuote::ean,
+                        quote -> quote.netPrice() * conversion.sellRate(), (a, b) -> a));
         Map<String, PurchaseValidation.Line> linesByEan = validation.lines().stream()
                 .collect(Collectors.toMap(PurchaseValidation.Line::ean, Function.identity(), (a, b) -> a));
         form.getItems().forEach(item -> {
@@ -545,7 +552,9 @@ public class SupplierPurchaseService {
         SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
         ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
-        double totalNetForShipping = orderResult.totalNet() > 0 ? orderResult.totalNet() : validation.totalNet();
+        double totalNetForShipping = orderResult.totalNet() > 0
+                ? orderResult.totalNet() * conversion.sellRate()
+                : validation.totalNet();
         form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
     }
 

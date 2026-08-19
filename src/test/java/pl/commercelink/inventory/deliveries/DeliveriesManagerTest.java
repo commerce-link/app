@@ -142,6 +142,22 @@ class DeliveriesManagerTest {
     }
 
     @Test
+    void updateDeliverySetsEstimatedDateWhenExistingDeliveryHasNone() {
+        // given
+        Delivery existing = deliveryWith(null);
+        Delivery updated = deliveryWith(NEW_DELIVERY_DATE);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then
+        assertThat(existing.getEstimatedDeliveryAt()).isEqualTo(NEW_DELIVERY_DATE);
+        verify(deliveriesRepository).save(existing);
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
     void splitTargetInheritsTheConnectionModeOfTheSourceDelivery() {
         // given
         Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
@@ -161,6 +177,56 @@ class DeliveriesManagerTest {
         verify(deliveriesRepository, times(2)).save(saved.capture());
         Delivery target = saved.getAllValues().get(1);
         assertThat(target.getConnectionMode()).isEqualTo(ConnectionMode.GLOBAL);
+    }
+
+    @Test
+    void splitOfAnAwaitingApprovalDeliveryCreatesAnAwaitingApprovalTarget() {
+        // given
+        Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        source.setProvider("Elko");
+        source.setConnectionMode(ConnectionMode.GLOBAL);
+        source.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        source.setPurchaseRef("source-ref");
+        source.setDeliveryAddressId("addr-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        Allocation warehouseAllocation = new Allocation();
+        warehouseAllocation.setQty(1);
+        warehouseAllocation.setUnitCost(50.0);
+
+        // when
+        deliveriesManager.splitAllocations(STORE_ID, DELIVERY_ID, "EXT-1", NEW_DELIVERY_DATE,
+                List.of(), List.of(warehouseAllocation));
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, times(2)).save(saved.capture());
+        Delivery target = saved.getAllValues().get(1);
+        assertThat(target.isAwaitingApproval()).isTrue();
+        assertThat(target.getPurchaseRef()).isNotBlank().isNotEqualTo("source-ref");
+        assertThat(target.getDeliveryAddressId()).isEqualTo("addr-1");
+    }
+
+    @Test
+    void splitOfARegularDeliveryLeavesTheTargetWithoutApprovalState() {
+        // given
+        Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        source.setProvider("Elko");
+        source.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        Allocation warehouseAllocation = new Allocation();
+        warehouseAllocation.setQty(1);
+        warehouseAllocation.setUnitCost(50.0);
+
+        // when
+        deliveriesManager.splitAllocations(STORE_ID, DELIVERY_ID, "EXT-1", NEW_DELIVERY_DATE,
+                List.of(), List.of(warehouseAllocation));
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, times(2)).save(saved.capture());
+        Delivery target = saved.getAllValues().get(1);
+        assertThat(target.getOrderStatus()).isNull();
+        assertThat(target.getPurchaseRef()).isNull();
     }
 
     private Delivery deliveryWith(LocalDate estimatedDeliveryAt) {

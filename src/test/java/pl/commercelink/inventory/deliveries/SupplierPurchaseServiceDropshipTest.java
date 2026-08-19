@@ -324,7 +324,7 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals("+48601234567", consignee.phone());
         assertEquals("jan.kowalski@example.com", consignee.email());
         assertEquals("ref-1", request.getValue().clientOrderRef());
-        verify(deliveryCreationService).completeDropshipPending(same(delivery), any());
+        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
         verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID);
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
