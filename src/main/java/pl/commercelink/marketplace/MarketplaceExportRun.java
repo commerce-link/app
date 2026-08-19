@@ -23,7 +23,7 @@ public class MarketplaceExportRun {
     private final Map<String, MarketplaceOfferRejection> rejectionsByPimId = new LinkedHashMap<>();
 
     private List<MarketplaceOfferSnapshot> offers = List.of();
-    private String failure;
+    private Throwable failure;
 
     public void offers(List<MarketplaceOfferSnapshot> offers) {
         this.offers = offers;
@@ -34,7 +34,7 @@ public class MarketplaceExportRun {
     }
 
     public void failed(Throwable throwable) {
-        this.failure = throwable.toString();
+        this.failure = throwable;
     }
 
     public boolean isFailed() {
@@ -56,7 +56,7 @@ public class MarketplaceExportRun {
             }
         }
         if (isFailed()) {
-            rows.add(MarketplaceOfferSnapshot.exportAborted(failure));
+            rows.add(MarketplaceOfferSnapshot.exportAborted(failure.toString()));
         }
         return rows;
     }
