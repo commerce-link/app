@@ -241,6 +241,12 @@ public class DeliveriesController {
         if (isEditLocked(form.getStoreId(), form.getDeliveryId())) {
             return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
+        Delivery delivery = deliveriesRepository.findById(form.getStoreId(), form.getDeliveryId());
+        if (delivery != null && delivery.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
+            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+        }
         OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
                 form.getProvider(),
