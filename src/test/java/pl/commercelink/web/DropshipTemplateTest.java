@@ -140,6 +140,6 @@ class DropshipTemplateTest {
 
         // then
         assertThat(html).contains("!delivery.dropship and !mergeTargetDeliveries.isEmpty()");
-        assertThat(html).contains("(isAdmin or isSuperAdmin) and !delivery.dropship}\" value=\"splitSelectedAllocations\"");
+        assertThat(html).contains("!delivery.orderPending and !delivery.dropship}\" value=\"splitSelectedAllocations\"");
     }
 }
