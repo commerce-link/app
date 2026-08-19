@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DropshipEligibility {
 
-    private final SupplierPurchaseService supplierPurchaseService;
+    private final DropshipPurchaseService dropshipPurchaseService;
 
     public Optional<String> eligibleProvider(Order order, List<OrderItem> orderItems) {
         if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer || !order.hasShippingDetails()) {
@@ -43,7 +43,7 @@ public class DropshipEligibility {
         if (!everyOtherItemSettled) {
             return Optional.empty();
         }
-        return supplierPurchaseService.isDropshipAvailable(order.getStoreId(), provider)
+        return dropshipPurchaseService.isDropshipAvailable(order.getStoreId(), provider)
                 ? Optional.of(provider)
                 : Optional.empty();
     }

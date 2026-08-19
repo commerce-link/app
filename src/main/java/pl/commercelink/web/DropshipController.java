@@ -15,6 +15,7 @@ import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
+import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.orders.Order;
@@ -37,6 +38,7 @@ public class DropshipController extends BaseController {
     private final OrderItemsRepository orderItemsRepository;
     private final DropshipEligibility dropshipEligibility;
     private final SupplierPurchaseService supplierPurchaseService;
+    private final DropshipPurchaseService dropshipPurchaseService;
     private final DeliveryTaxResolver deliveryTaxResolver;
     private final MessageSource messageSource;
 
@@ -184,7 +186,7 @@ public class DropshipController extends BaseController {
         if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
-        OperationResult<String> result = supplierPurchaseService.createManualDropship(storeId, order.get(), form);
+        OperationResult<String> result = dropshipPurchaseService.createManualDropship(storeId, order.get(), form);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
@@ -225,7 +227,7 @@ public class DropshipController extends BaseController {
     private String renderValidationFragment(String storeId, DeliveryCreationForm form, Model model, Locale locale) {
         form.setStoreId(storeId);
         try {
-            if (!supplierPurchaseService.isDropshipAvailable(storeId, form.getProvider())) {
+            if (!dropshipPurchaseService.isDropshipAvailable(storeId, form.getProvider())) {
                 throw new IllegalStateException(form.getProvider());
             }
             model.addAttribute("validation", supplierPurchaseService.validate(storeId, form));
@@ -244,7 +246,7 @@ public class DropshipController extends BaseController {
             return orderDetailsRedirect(storeId, orderId);
         }
         OperationResult<PurchaseSubmission> result =
-                supplierPurchaseService.submitDropship(storeId, order.get(), form, purchaseRef);
+                dropshipPurchaseService.submitDropship(storeId, order.get(), form, purchaseRef);
 
         if (!result.isSuccess()) {
             addConfirmationModel(model, storeId, order.get(), form);

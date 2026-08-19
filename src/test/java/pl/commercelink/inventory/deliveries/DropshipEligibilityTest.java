@@ -27,7 +27,7 @@ class DropshipEligibilityTest {
     private static final String PROVIDER = "Acme";
 
     @Mock
-    private SupplierPurchaseService supplierPurchaseService;
+    private DropshipPurchaseService dropshipPurchaseService;
 
     @InjectMocks
     private DropshipEligibility eligibility;
@@ -50,7 +50,7 @@ class DropshipEligibilityTest {
         details.setPhone("+48601234567");
         details.setEmail("jan@example.com");
         order.setShippingDetails(details);
-        lenient().when(supplierPurchaseService.isDropshipAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        lenient().when(dropshipPurchaseService.isDropshipAvailable(STORE_ID, PROVIDER)).thenReturn(true);
     }
 
     private static OrderItem item(String deliveryId, FulfilmentStatus status) {
@@ -90,7 +90,7 @@ class DropshipEligibilityTest {
         // when / then
         assertTrue(eligibility.eligibleProvider(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation))).isEmpty());
-        verifyNoInteractions(supplierPurchaseService);
+        verifyNoInteractions(dropshipPurchaseService);
     }
 
     @Test

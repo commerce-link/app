@@ -13,6 +13,7 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
+import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -54,6 +55,8 @@ class DropshipControllerTest {
     private DropshipEligibility dropshipEligibility;
     @Mock
     private SupplierPurchaseService supplierPurchaseService;
+    @Mock
+    private DropshipPurchaseService dropshipPurchaseService;
     @Mock
     private DeliveryTaxResolver deliveryTaxResolver;
     @Mock
@@ -190,7 +193,7 @@ class DropshipControllerTest {
         when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
-        when(supplierPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
+        when(dropshipPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
                 .thenReturn(OperationResult.success("delivery-7"));
 
         // when
@@ -232,7 +235,7 @@ class DropshipControllerTest {
         when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
-        when(supplierPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
+        when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
                 .thenReturn(OperationResult.success(new PurchaseSubmission("delivery-9", false)));
 
         // when
@@ -244,7 +247,7 @@ class DropshipControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-9");
-        verify(supplierPurchaseService).submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1"));
+        verify(dropshipPurchaseService).submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1"));
     }
 
     @Test
@@ -266,7 +269,7 @@ class DropshipControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(supplierPurchaseService, never()).submitDropship(any(), any(), any(), any());
+        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
     }
 
     @Test
@@ -288,7 +291,7 @@ class DropshipControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(supplierPurchaseService, never()).submitDropship(any(), any(), any(), any());
+        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
     }
 
     @Test
@@ -300,7 +303,7 @@ class DropshipControllerTest {
         when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
-        when(supplierPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
+        when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
                 .thenReturn(OperationResult.failure("orders.dropship.error.unsupported"));
         when(messageSource.getMessage(eq("orders.dropship.error.unsupported"), any(), any()))
                 .thenReturn("unsupported");
