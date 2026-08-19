@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.storage.FileStorage;
-import pl.commercelink.starter.util.ConversionUtil;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -21,10 +20,10 @@ public class MarketplaceExportRunService {
     private static final DateTimeFormatter RUN_TIMESTAMP =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").withZone(ZoneOffset.UTC);
     private static final String RUNS_PREFIX = "marketplace-export-runs";
+    private static final String RUN_EXTENSION = ".csv";
+    private static final String FAILED_RUN_EXTENSION = "-failed.csv";
     private static final int LISTING_LIMIT = 1000;
-
-    private final List<MarketplaceExportRunReader> readers =
-            List.of(new JsonMarketplaceExportRunReader(), new CsvMarketplaceExportRunReader());
+    private static final int UNREADABLE_RUN_ATTEMPTS = 5;
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -43,28 +42,47 @@ public class MarketplaceExportRunService {
     }
 
     public List<MarketplaceOfferSnapshot> loadPreviousExport(String storeId, String catalogId, String marketplace) {
+        String prefix = catalogPrefix(storeId, marketplace, catalogId);
+        List<String> keysNewestFirst;
         try {
-            List<String> runKeys = listRunKeysFromNewest(catalogPrefix(storeId, marketplace, catalogId));
-
-            for (String key : runKeys) {
-                MarketplaceExportRunDocument document = readDocument(key);
-                if (document != null && document.wasSuccessful()) {
-                    return List.copyOf(document.offersOrEmpty());
-                }
+            Map<String, LocalDateTime> lastModifiedByKey = fileStorage.getAllObjectLastModified(bucketName, prefix);
+            if (lastModifiedByKey.size() >= LISTING_LIMIT) {
+                System.err.println("Marketplace export run listing hit the object limit for prefix " + prefix);
             }
-            return List.of();
+
+            keysNewestFirst = lastModifiedByKey.entrySet().stream()
+                    .filter(entry -> isSucceededRunKey(entry.getKey()))
+                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                    .map(Map.Entry::getKey)
+                    .toList();
         } catch (Exception exception) {
             System.err.println("Failed to load previous marketplace export: " + exception.getMessage());
             return List.of();
         }
+
+        int attempts = 0;
+        for (String key : keysNewestFirst) {
+            if (attempts == UNREADABLE_RUN_ATTEMPTS) {
+                System.err.println("Gave up looking for a readable marketplace export run after "
+                        + UNREADABLE_RUN_ATTEMPTS + " unreadable files under prefix " + prefix);
+                return List.of();
+            }
+            attempts++;
+            try {
+                return readOffers(key);
+            } catch (Exception exception) {
+                System.err.println("Skipping unreadable marketplace export run " + key + ": " + exception.getMessage());
+            }
+        }
+        return List.of();
     }
 
     public void saveRun(MarketplaceExportRun run) {
         try {
             String runId = RUN_TIMESTAMP.format(clock.instant());
-            MarketplaceExportRunDocument document = run.toDocument(runId, clock.instant());
-            String key = jsonRunKey(run.getStoreId(), run.getMarketplace(), run.getCatalogId(), runId);
-            fileStorage.put(bucketName, key, ConversionUtil.fromJsonToBytes(document));
+            String key = runKey(run.getStoreId(), run.getMarketplace(), run.getCatalogId(), runId, run.isFailed());
+            List<MarketplaceOfferSnapshot> rows = run.toRows();
+            fileStorage.put(bucketName, key, MarketplaceExportRunCsv.toBytes(rows));
         } catch (Exception exception) {
             System.err.println("Failed to save marketplace export run: " + exception.getMessage());
         }
@@ -75,7 +93,7 @@ public class MarketplaceExportRunService {
             return fileStorage.getAllObjectLastModified(bucketName, storePrefix(storeId))
                     .entrySet()
                     .stream()
-                    .filter(entry -> hasReaderFor(entry.getKey()))
+                    .filter(entry -> isRunKey(entry.getKey()))
                     .flatMap(entry -> toHeader(entry.getKey(), entry.getValue()).stream())
                     .sorted(Comparator.comparing(MarketplaceExportRunHeader::runId).reversed())
                     .toList();
@@ -90,7 +108,7 @@ public class MarketplaceExportRunService {
                                                       String catalogId,
                                                       String runId) {
         String keyWithoutExtension = catalogPrefix(storeId, marketplace, catalogId) + runId;
-        for (String key : List.of(keyWithoutExtension + ".json", keyWithoutExtension + ".csv")) {
+        for (String key : List.of(keyWithoutExtension + RUN_EXTENSION, keyWithoutExtension + FAILED_RUN_EXTENSION)) {
             Optional<MarketplaceExportRunFile> runFile = readRunFile(key);
             if (runFile.isPresent()) {
                 return runFile;
@@ -105,39 +123,33 @@ public class MarketplaceExportRunService {
                 return Optional.empty();
             }
             byte[] data = fileStorage.getBytes(bucketName, key);
-            return readerFor(key)
-                    .map(reader -> new MarketplaceExportRunFile(reader.parse(key, data), data));
+            return Optional.of(new MarketplaceExportRunFile(
+                    MarketplaceExportRunCsv.runIdFrom(key),
+                    isFailedRunKey(key),
+                    MarketplaceExportRunCsv.parse(data),
+                    data));
         } catch (Exception exception) {
             System.err.println("Failed to read marketplace export run: " + exception.getMessage());
             return Optional.empty();
         }
     }
 
-    private List<String> listRunKeysFromNewest(String prefix) {
-        Map<String, LocalDateTime> lastModifiedByKey = fileStorage.getAllObjectLastModified(bucketName, prefix);
-        if (lastModifiedByKey.size() >= LISTING_LIMIT) {
-            System.err.println("Marketplace export run listing hit the object limit for prefix " + prefix);
-        }
-
-        return lastModifiedByKey.entrySet().stream()
-                .filter(entry -> hasReaderFor(entry.getKey()))
-                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                .map(Map.Entry::getKey)
+    private List<MarketplaceOfferSnapshot> readOffers(String key) {
+        return MarketplaceExportRunCsv.parse(fileStorage.getBytes(bucketName, key)).stream()
+                .filter(snapshot -> snapshot.pimId() != null && !snapshot.pimId().isBlank())
                 .toList();
     }
 
-    private MarketplaceExportRunDocument readDocument(String key) {
-        return readerFor(key)
-                .map(reader -> reader.parse(key, fileStorage.getBytes(bucketName, key)))
-                .orElse(null);
+    private boolean isRunKey(String key) {
+        return key.endsWith(RUN_EXTENSION);
     }
 
-    private Optional<MarketplaceExportRunReader> readerFor(String key) {
-        return readers.stream().filter(reader -> reader.handlesFileFormatOf(key)).findFirst();
+    private boolean isFailedRunKey(String key) {
+        return key.endsWith(FAILED_RUN_EXTENSION);
     }
 
-    private boolean hasReaderFor(String key) {
-        return readerFor(key).isPresent();
+    private boolean isSucceededRunKey(String key) {
+        return isRunKey(key) && !isFailedRunKey(key);
     }
 
     private Optional<MarketplaceExportRunHeader> toHeader(String key, LocalDateTime storedAt) {
@@ -146,7 +158,7 @@ public class MarketplaceExportRunService {
             return Optional.empty();
         }
         return Optional.of(new MarketplaceExportRunHeader(
-                segments[2], segments[3], MarketplaceExportRunReader.runIdFrom(key), storedAt));
+                segments[2], segments[3], MarketplaceExportRunCsv.runIdFrom(key), storedAt, isFailedRunKey(key)));
     }
 
     private String storePrefix(String storeId) {
@@ -157,7 +169,7 @@ public class MarketplaceExportRunService {
         return String.format("%s/%s/%s/%s/", RUNS_PREFIX, storeId, marketplace, catalogId);
     }
 
-    private String jsonRunKey(String storeId, String marketplace, String catalogId, String runId) {
-        return catalogPrefix(storeId, marketplace, catalogId) + runId + ".json";
+    private String runKey(String storeId, String marketplace, String catalogId, String runId, boolean failed) {
+        return catalogPrefix(storeId, marketplace, catalogId) + runId + (failed ? FAILED_RUN_EXTENSION : RUN_EXTENSION);
     }
 }

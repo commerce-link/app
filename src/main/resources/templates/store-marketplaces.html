@@ -22,6 +22,7 @@
                         <th th:text="#{store.marketplaces.exports.column.date}"></th>
                         <th th:text="#{store.marketplaces.exports.column.marketplace}"></th>
                         <th th:text="#{store.marketplaces.exports.column.catalog}"></th>
+                        <th th:text="#{store.marketplaces.exports.status}"></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -32,6 +33,12 @@
                         </td>
                         <td th:text="${run.marketplace()}"></td>
                         <td th:text="${run.catalogId()}"></td>
+                        <td>
+                            <span class="tag is-success" th:unless="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                            <span class="tag is-danger" th:if="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
+                        </td>
                     </tr>
                     </tbody>
                 </table>

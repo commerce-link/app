@@ -13,21 +13,14 @@ import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
-import pl.commercelink.marketplace.MarketplaceExportRun;
-import pl.commercelink.marketplace.MarketplaceExportRunDocument;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
-import pl.commercelink.marketplace.MarketplaceExportSkipReason;
-import pl.commercelink.marketplace.MarketplaceExportThresholds;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
-import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.products.Product;
 
 import java.text.MessageFormat;
-import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.ResourceBundle;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,51 +30,59 @@ class MarketplaceExportHistoryTemplateTest {
     private static final String RUN_ID = "2026-08-13_01-31-05";
 
     @Test
-    void rendersRunDetailsWithLocalizedReasonAndThresholdNumbers() {
+    void rendersEveryColumnOfARunRow() {
         // given
-        WebContext context = webContext();
-        context.setVariable("run", failedDocument());
-        context.setVariable("reasonLabels", Map.of(
-                MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS.name(),
-                "Ilosc wyzerowana - ponizej progow dostawcow"));
-        context.setVariable("marketplace", "allegro");
-        context.setVariable("catalogId", "catalog-1");
-        context.setVariable("runId", RUN_ID);
-        context.setVariable("storeId", "store-1");
-        context.setVariable("isSuperAdmin", false);
-        context.setVariable("rawTooLarge", false);
-        context.setVariable("raw", "{\"runId\":\"" + RUN_ID + "\"}");
+        WebContext context = runDetailsContext(List.of(
+                MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)
+                        .rejected("VALIDATION_ERROR", "price out of range")), false);
 
         // when
         String html = templateEngine().process("store-marketplace-export-run", context);
 
         // then
-        assertThat(html).contains("Ilosc wyzerowana - ponizej progow dostawcow");
-        assertThat(html).contains("Laptopy");
-        assertThat(html).contains("Name-B");
-        assertThat(html).contains("marketplace unavailable");
+        assertThat(html).contains("pim-A");
+        assertThat(html).contains("3503");
+        assertThat(html).contains("VALIDATION_ERROR");
+        assertThat(html).contains("price out of range");
+        assertThat(html).contains("Zakończony");
         assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "/file");
         assertThat(html).doesNotContain("??");
     }
 
     @Test
-    void limitsTheExcludedTableAndAnnouncesTheRealTotalWhenThereAreTooManyRows() {
+    void showsTheFailedStatusForAFailedRun() {
         // given
-        WebContext context = runDetailsContext(documentWithExcludedProducts(620));
+        WebContext context = runDetailsContext(List.of(
+                MarketplaceOfferSnapshot.exportAborted("java.lang.IllegalStateException: marketplace unavailable")), true);
+
+        // when
+        String html = templateEngine().process("store-marketplace-export-run", context);
+
+        // then
+        assertThat(html).contains("Nieudany");
+        assertThat(html).contains("marketplace unavailable");
+        assertThat(html).doesNotContain("Zakończony");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void limitsTheRowsTableAndAnnouncesTheRealTotalWhenThereAreTooManyRows() {
+        // given
+        WebContext context = runDetailsContext(rows(620), false);
 
         // when
         String html = templateEngine().process("store-marketplace-export-run", context);
 
         // then
         assertThat(countRows(html)).isEqualTo(500);
-        assertThat(html).contains("Pokazano 500 z 620 pozycji");
+        assertThat(html).contains("Pokazano 500 z 620 wierszy");
         assertThat(html).doesNotContain("??");
     }
 
     @Test
-    void rendersEveryExcludedRowWithoutTheTruncationNoticeWhenBelowTheLimit() {
+    void rendersEveryRowWithoutTheTruncationNoticeWhenBelowTheLimit() {
         // given
-        WebContext context = runDetailsContext(documentWithExcludedProducts(12));
+        WebContext context = runDetailsContext(rows(12), false);
 
         // when
         String html = templateEngine().process("store-marketplace-export-run", context);
@@ -93,11 +94,12 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void rendersRunHistoryTableOnTheMarketplacesPage() {
+    void rendersRunHistoryTableWithTheFailureStatusOnTheMarketplacesPage() {
         // given
         WebContext context = webContext();
-        context.setVariable("exportRuns", List.of(new MarketplaceExportRunHeader(
-                "allegro", "catalog-1", RUN_ID, LocalDateTime.parse("2026-08-13T01:31:05"))));
+        context.setVariable("exportRuns", List.of(
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID,
+                        LocalDateTime.parse("2026-08-13T01:31:05"), true)));
 
         // when
         String html = renderRunsTable(context);
@@ -105,6 +107,7 @@ class MarketplaceExportHistoryTemplateTest {
         // then
         assertThat(html).contains("2026-08-13 01:31:05");
         assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID);
+        assertThat(html).contains("Nieudany");
         assertThat(html).doesNotContain("??");
     }
 
@@ -139,6 +142,10 @@ class MarketplaceExportHistoryTemplateTest {
                     <tr th:each="run : ${exportRuns}">
                       <td><a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
                              th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${run.runId()}"></a></td>
+                      <td>
+                        <span th:unless="${run.failed()}" th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                        <span th:if="${run.failed()}" th:text="#{store.marketplaces.exports.status.failed}"></span>
+                      </td>
                     </tr>
                     </tbody>
                   </table>
@@ -148,13 +155,13 @@ class MarketplaceExportHistoryTemplateTest {
         return stringTemplateEngine().process(template, context);
     }
 
-    private WebContext runDetailsContext(MarketplaceExportRunDocument document) {
+    private WebContext runDetailsContext(List<MarketplaceOfferSnapshot> rows, boolean failed) {
         WebContext context = webContext();
-        context.setVariable("run", document);
-        context.setVariable("reasonLabels", Map.of());
+        context.setVariable("runId", RUN_ID);
+        context.setVariable("failed", failed);
+        context.setVariable("rows", rows);
         context.setVariable("marketplace", "allegro");
         context.setVariable("catalogId", "catalog-1");
-        context.setVariable("runId", RUN_ID);
         context.setVariable("storeId", "store-1");
         context.setVariable("isSuperAdmin", false);
         context.setVariable("rawTooLarge", false);
@@ -162,46 +169,16 @@ class MarketplaceExportHistoryTemplateTest {
         return context;
     }
 
+    private List<MarketplaceOfferSnapshot> rows(int count) {
+        List<MarketplaceOfferSnapshot> rows = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            rows.add(MarketplaceOfferSnapshot.published("pim-" + index, 1999L, 7L));
+        }
+        return rows;
+    }
+
     private int countRows(String html) {
         return html.split("<tr", -1).length - 2;
-    }
-
-    private MarketplaceExportRunDocument documentWithExcludedProducts(int count) {
-        MarketplaceExportRun run = new MarketplaceExportRun("store-1", "allegro", "catalog-1", "pricelist-1");
-        run.providerCalled(true);
-        for (int index = 0; index < count; index++) {
-            run.excludeProduct(category(), product("pim-" + index),
-                    MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS,
-                    MarketplaceExportThresholds.distributors(3L, 3, 1L, 2, 2));
-        }
-        return run.toDocument(RUN_ID, Instant.parse("2026-08-13T01:31:05Z"));
-    }
-
-    private MarketplaceExportRunDocument failedDocument() {
-        MarketplaceExportRun run = new MarketplaceExportRun("store-1", "allegro", "catalog-1", "pricelist-1");
-        run.providerCalled(true);
-        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 0L,
-                MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS.name())));
-        run.excludeProduct(category(), product(),
-                MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS,
-                MarketplaceExportThresholds.distributors(3L, 3, 1L, 2, 2));
-        run.failed(new IllegalStateException("marketplace unavailable"));
-        return run.toDocument(RUN_ID, Instant.parse("2026-08-13T01:31:05Z"));
-    }
-
-    private CategoryDefinition category() {
-        CategoryDefinition category = new CategoryDefinition();
-        category.setCategoryId("category-1");
-        category.setName("Laptopy");
-        return category;
-    }
-
-    private Product product() {
-        return product("pim-B");
-    }
-
-    private Product product(String pimId) {
-        return new Product("category-1", pimId, "EAN-B", "MFN-B", "Brand", "Label", "Name-B", "default");
     }
 
     private TemplateEngine templateEngine() {

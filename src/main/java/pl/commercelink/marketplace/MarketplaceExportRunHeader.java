@@ -6,5 +6,6 @@ public record MarketplaceExportRunHeader(
         String marketplace,
         String catalogId,
         String runId,
-        LocalDateTime storedAt) {
+        LocalDateTime storedAt,
+        boolean failed) {
 }

@@ -15,6 +15,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.marketplace.api.MarketplaceExportReport;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -29,13 +30,13 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -133,7 +134,7 @@ class MarketplaceOfferExportEventListenerTest {
     void incrementsRemovalAttemptsForProductsNoLongerInCategoryDefinitions() {
         // given
         noCategoriesConfigured();
-        previousSnapshotContains(snapshot("pim-X", 999L, 5L, 0));
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L));
 
         // when
         listener.handleMessage(request());
@@ -145,26 +146,26 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(removed.get(0).quantity()).isEqualTo(0L);
         assertThat(removed.get(0).price()).isEqualTo(999L);
 
-        List<MarketplaceOfferSnapshot> saved = captureSavedOffers();
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).pimId()).isEqualTo("pim-X");
         assertThat(saved.get(0).removalAttempts()).isEqualTo(1);
         assertThat(saved.get(0).quantity()).isEqualTo(0L);
-        assertThat(saved.get(0).pendingRemoval()).isTrue();
+        assertThat(saved.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING);
     }
 
     @Test
     void dropsSnapshotEntryAfterReachingRetryThreshold() {
         // given
         noCategoriesConfigured();
-        previousSnapshotContains(snapshot("pim-X", 999L, 0L, 3));
+        previousSnapshotContains(MarketplaceOfferSnapshot.removalPending("pim-X", 999L, 3));
 
         // when
         listener.handleMessage(request());
 
         // then
-        verify(provider, never()).exportOffers(any(), any());
-        assertThat(captureSavedOffers()).isEmpty();
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
     }
 
     @Test
@@ -173,17 +174,18 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-A", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        previousSnapshotContains(snapshot("pim-A", 80L, 0L, 2));
+        previousSnapshotContains(MarketplaceOfferSnapshot.removalPending("pim-A", 80L, 2));
 
         // when
         listener.handleMessage(request());
 
         // then
-        List<MarketplaceOfferSnapshot> saved = captureSavedOffers();
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).pimId()).isEqualTo("pim-A");
         assertThat(saved.get(0).quantity()).isEqualTo(10L);
         assertThat(saved.get(0).removalAttempts()).isEqualTo(0);
+        assertThat(saved.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
     }
 
     @Test
@@ -196,7 +198,7 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then
-        verify(provider, never()).exportOffers(any(), any());
+        verify(provider, never()).exportOffers(any(), any(), any());
     }
 
     @Test
@@ -212,7 +214,35 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then
-        verify(provider, never()).exportOffers(any(), any());
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void skipsProductsMissingFromThePricelist() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        when(pricelist.findByPimId("pim-A")).thenReturn(Optional.empty());
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void skipsCategoriesWithoutAnEnabledMarketplaceDefinition() {
+        // given
+        MarketplaceDefinition marketplaceDefinition = warehouseDefinition(5);
+        marketplaceDefinition.setEnabled(false);
+        when(catalog.getCategories()).thenReturn(List.of(category("Laptops", null, List.of(marketplaceDefinition))));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
     }
 
     @Test
@@ -220,14 +250,14 @@ class MarketplaceOfferExportEventListenerTest {
         // given
         ReflectionTestUtils.setField(listener, "removalRetryCount", 5);
         noCategoriesConfigured();
-        previousSnapshotContains(snapshot("pim-X", 999L, 0L, 4));
+        previousSnapshotContains(MarketplaceOfferSnapshot.removalPending("pim-X", 999L, 4));
 
         // when
         listener.handleMessage(request());
 
         // then
         assertThat(captureRemovedOffers()).hasSize(1);
-        List<MarketplaceOfferSnapshot> saved = captureSavedOffers();
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).removalAttempts()).isEqualTo(5);
     }
@@ -254,7 +284,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-A", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        previousSnapshotContains(snapshot("pim-A", 100L, 10L, 0));
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-A", 100L, 10L));
 
         // when
         listener.handleMessage(request());
@@ -266,119 +296,70 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void recordsCategoryWithoutMarketplaceDefinitionAsExcluded() {
+    void recordsRejectionsReportedByTheConnectorOnTheMatchingRow() {
         // given
-        CategoryDefinition category = category("Laptops", null, List.of());
-        when(catalog.getCategories()).thenReturn(List.of(category));
+        Product rejectedProduct = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), rejectedProduct, 10);
+        priceFor(rejectedProduct, 100, 2);
+        connectorRejects("pim-A", "VALIDATION_ERROR", "price out of range");
 
         // when
         listener.handleMessage(request());
 
         // then
-        assertThat(reasonsOf(captureRun()))
-                .containsExactly(MarketplaceExportSkipReason.CATEGORY_NOT_CONFIGURED_FOR_MARKETPLACE.name());
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).pimId()).isEqualTo("pim-A");
+        assertThat(saved.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REJECTED);
+        assertThat(saved.get(0).reasonCode()).isEqualTo("VALIDATION_ERROR");
+        assertThat(saved.get(0).message()).isEqualTo("price out of range");
     }
 
     @Test
-    void recordsDisabledMarketplaceDefinitionAsExcluded() {
-        // given
-        MarketplaceDefinition marketplaceDefinition = warehouseDefinition(5);
-        marketplaceDefinition.setEnabled(false);
-        CategoryDefinition category = category("Laptops", null, List.of(marketplaceDefinition));
-        when(catalog.getCategories()).thenReturn(List.of(category));
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        assertThat(reasonsOf(captureRun()))
-                .containsExactly(MarketplaceExportSkipReason.CATEGORY_MARKETPLACE_DEFINITION_DISABLED.name());
-    }
-
-    @Test
-    void recordsDisabledProductAsExcluded() {
-        // given
-        Product product = product("pim-A", "EAN-A");
-        product.setEnabled(false);
-        configureCategoryWith(warehouseDefinition(5), product, 10);
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        assertThat(reasonsOf(captureRun()))
-                .containsExactly(MarketplaceExportSkipReason.PRODUCT_DISABLED.name());
-    }
-
-    @Test
-    void recordsProductWithoutPimIdAsExcluded() {
-        // given
-        Product product = product(null, "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, 10);
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        assertThat(reasonsOf(captureRun()))
-                .containsExactly(MarketplaceExportSkipReason.PRODUCT_WITHOUT_PIM_ID.name());
-    }
-
-    @Test
-    void recordsProductMissingFromPricelistAsExcluded() {
+    void appendsARowForARejectionReportedForAProductThatIsNotAmongTheOffers() {
         // given
         Product product = product("pim-A", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
-        when(pricelist.findByPimId("pim-A")).thenReturn(Optional.empty());
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        MarketplaceExportRunDocument document = captureRun();
-        assertThat(reasonsOf(document))
-                .containsExactly(MarketplaceExportSkipReason.PRODUCT_NOT_IN_PRICELIST.name());
-        assertThat(document.excluded().get(0).pimId()).isEqualTo("pim-A");
-        assertThat(document.excluded().get(0).ean()).isEqualTo("EAN-A");
-    }
-
-    @Test
-    void recordsUnapprovedProductAsExcludedWithItsReason() {
-        // given
-        Product product = product("pim-A", "EAN-A");
-        MarketplaceDefinition marketplaceDefinition = warehouseDefinition(5);
-        marketplaceDefinition.setExportSelectedProducts(true);
-        configureCategoryWith(marketplaceDefinition, product, 10);
         priceFor(product, 100, 2);
+        connectorRejects("pim-OTHER", "VALIDATION_ERROR", "price out of range");
 
         // when
         listener.handleMessage(request());
 
         // then
-        assertThat(reasonsOf(captureRun()))
-                .containsExactly(MarketplaceExportSkipReason.PRODUCT_NOT_APPROVED_FOR_MARKETPLACE.name());
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
+        assertThat(saved).hasSize(2);
+        assertThat(saved.get(0).pimId()).isEqualTo("pim-A");
+        assertThat(saved.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+        assertThat(saved.get(0).reasonCode()).isNull();
+        assertThat(saved.get(1).pimId()).isEqualTo("pim-OTHER");
+        assertThat(saved.get(1).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REJECTED);
+        assertThat(saved.get(1).reasonCode()).isEqualTo("VALIDATION_ERROR");
+        assertThat(saved.get(1).message()).isEqualTo("price out of range");
     }
 
     @Test
-    void recordsZeroedQuantityWithThresholdsAndStillPublishesTheOffer() {
+    void savesFailedRunWithTheExceptionSummaryAndRethrowsWhenProviderFails() {
         // given
         Product product = product("pim-A", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, 2);
+        configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
+        doThrow(new IllegalStateException("marketplace unavailable"))
+                .when(provider).exportOffers(any(), any(), any());
 
-        // when
-        listener.handleMessage(request());
+        // when / then
+        assertThatThrownBy(() -> listener.handleMessage(request()))
+                .isInstanceOf(IllegalStateException.class);
 
-        // then
-        MarketplaceExportRunDocument document = captureRun();
-        assertThat(reasonsOf(document))
-                .containsExactly(MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD.name());
-        assertThat(document.excluded().get(0).detail().warehouseQuantity()).isEqualTo(2L);
-        assertThat(document.excluded().get(0).detail().minWarehouseQuantity()).isEqualTo(5);
-        assertThat(document.offers()).hasSize(1);
-        assertThat(document.offers().get(0).quantity()).isEqualTo(0L);
-        assertThat(document.offers().get(0).quantityZeroedReason())
-                .isEqualTo(MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD.name());
+        MarketplaceExportRun run = captureRun();
+        assertThat(run.isFailed()).isTrue();
+
+        List<MarketplaceOfferSnapshot> saved = run.toRows();
+        assertThat(saved).hasSize(2);
+        assertThat(saved.get(0).pimId()).isEqualTo("pim-A");
+        assertThat(saved.get(1).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_EXPORT_ABORTED);
+        assertThat(saved.get(1).message())
+                .isEqualTo("java.lang.IllegalStateException: marketplace unavailable");
     }
 
     @Test
@@ -390,44 +371,11 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then
-        MarketplaceExportRunDocument document = captureRun();
-        assertThat(document.storeId()).isEqualTo(STORE_ID);
-        assertThat(document.catalogId()).isEqualTo(CATALOG_ID);
-        assertThat(document.marketplace()).isEqualTo(MARKETPLACE);
-        assertThat(document.pricelistId()).isEqualTo(PRICELIST_ID);
-        assertThat(document.wasSuccessful()).isTrue();
-    }
-
-    @Test
-    void marksProviderNotCalledWhenThereIsNothingToPublishOrRemove() {
-        // given
-        noCategoriesConfigured();
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        assertThat(captureRun().providerCalled()).isFalse();
-    }
-
-    @Test
-    void savesFailedRunWithStackTraceAndRethrowsWhenProviderFails() {
-        // given
-        Product product = product("pim-A", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, 10);
-        priceFor(product, 100, 2);
-        doThrow(new IllegalStateException("marketplace unavailable"))
-                .when(provider).exportOffers(any(), any());
-
-        // when / then
-        assertThatThrownBy(() -> listener.handleMessage(request()))
-                .isInstanceOf(IllegalStateException.class);
-
-        MarketplaceExportRunDocument document = captureRun();
-        assertThat(document.wasSuccessful()).isFalse();
-        assertThat(document.failure()).isNotEmpty();
-        assertThat(document.failure().get(0)).contains("marketplace unavailable");
-        assertThat(document.offers()).hasSize(1);
+        MarketplaceExportRun run = captureRun();
+        assertThat(run.getStoreId()).isEqualTo(STORE_ID);
+        assertThat(run.getCatalogId()).isEqualTo(CATALOG_ID);
+        assertThat(run.getMarketplace()).isEqualTo(MARKETPLACE);
+        assertThat(run.isFailed()).isFalse();
     }
 
     private MarketplaceOfferExportRequest request() {
@@ -436,10 +384,6 @@ class MarketplaceOfferExportEventListenerTest {
 
     private Product product(String pimId, String ean) {
         return new Product(CATEGORY_ID, pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name-" + pimId, "default");
-    }
-
-    private MarketplaceOfferSnapshot snapshot(String pimId, long price, long qty, int removalAttempts) {
-        return new MarketplaceOfferSnapshot(pimId, price, qty, removalAttempts, removalAttempts > 0, null);
     }
 
     private MarketplaceDefinition warehouseDefinition(int minWarehouseQuantity) {
@@ -467,7 +411,7 @@ class MarketplaceOfferExportEventListenerTest {
 
     private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, int warehouseQuantity, String categoryName, String definitionName) {
         when(catalog.getCategories()).thenReturn(List.of(category(categoryName, definitionName, List.of(marketplaceDefinition))));
-        when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of(product));
+        when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(product));
 
         MatchedInventory matchedInventory = mockMatchedInventoryWithWarehouseQuantity(warehouseQuantity);
         when(inventoryView.findByProduct(product)).thenReturn(matchedInventory);
@@ -490,32 +434,35 @@ class MarketplaceOfferExportEventListenerTest {
         when(pricelist.findByPimId(product.getPimId())).thenReturn(Optional.of(availabilityAndPrice));
     }
 
+    private void connectorRejects(String pimId, String reasonCode, String message) {
+        doAnswer(invocation -> {
+            invocation.getArgument(2, MarketplaceExportReport.class).rejected(pimId, reasonCode, message);
+            return null;
+        }).when(provider).exportOffers(any(), any(), any());
+    }
+
     @SuppressWarnings("unchecked")
     private List<MarketplaceOffer> capturePublishedOffers() {
         ArgumentCaptor<List<MarketplaceOffer>> captor = ArgumentCaptor.forClass(List.class);
-        verify(provider).exportOffers(captor.capture(), any());
+        verify(provider).exportOffers(captor.capture(), any(), any());
         return captor.getValue();
     }
 
     @SuppressWarnings("unchecked")
     private List<MarketplaceOffer> captureRemovedOffers() {
         ArgumentCaptor<List<MarketplaceOffer>> captor = ArgumentCaptor.forClass(List.class);
-        verify(provider).exportOffers(any(), captor.capture());
+        verify(provider).exportOffers(any(), captor.capture(), any());
         return captor.getValue();
     }
 
-    private MarketplaceExportRunDocument captureRun() {
+    private MarketplaceExportRun captureRun() {
         ArgumentCaptor<MarketplaceExportRun> captor = ArgumentCaptor.forClass(MarketplaceExportRun.class);
         verify(marketplaceExportRunService).saveRun(captor.capture());
-        return captor.getValue().toDocument("2026-08-13_01-31-05", Instant.parse("2026-08-13T01:31:05Z"));
+        return captor.getValue();
     }
 
-    private List<MarketplaceOfferSnapshot> captureSavedOffers() {
-        return captureRun().offers();
-    }
-
-    private List<String> reasonsOf(MarketplaceExportRunDocument document) {
-        return document.excluded().stream().map(MarketplaceExportExcludedItem::reason).toList();
+    private List<MarketplaceOfferSnapshot> captureSavedRows() {
+        return captureRun().toRows();
     }
 
     private void previousSnapshotContains(MarketplaceOfferSnapshot... snapshots) {

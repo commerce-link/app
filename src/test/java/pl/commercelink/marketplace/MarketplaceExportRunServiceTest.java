@@ -10,7 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.starter.storage.FileStorage;
-import pl.commercelink.starter.util.ConversionUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -50,48 +49,62 @@ class MarketplaceExportRunServiceTest {
     @Captor
     private ArgumentCaptor<byte[]> bytesCaptor;
 
-    private MarketplaceExportRunService repository;
+    private MarketplaceExportRunService service;
 
     @BeforeEach
     void setUp() {
-        repository = new MarketplaceExportRunService(
+        service = new MarketplaceExportRunService(
                 fileStorage, BUCKET, Clock.fixed(RUN_FINISHED_AT, ZoneOffset.UTC));
     }
 
     @Test
-    void saveRunWritesSingleJsonObjectUnderTimestampedKey() {
+    void saveRunWritesCsvRowsUnderTimestampedKey() {
         // given
         MarketplaceExportRun run = run();
-        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L, null)));
+        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)));
 
         // when
-        repository.saveRun(run);
+        service.saveRun(run);
 
         // then
         verify(fileStorage).put(eq(BUCKET), keyCaptor.capture(), bytesCaptor.capture());
-        assertThat(keyCaptor.getValue()).isEqualTo(CATALOG_PREFIX + RUN_ID + ".json");
+        assertThat(keyCaptor.getValue()).isEqualTo(CATALOG_PREFIX + RUN_ID + ".csv");
 
-        MarketplaceExportRunDocument written = ConversionUtil.fromJson(
-                new String(bytesCaptor.getValue(), StandardCharsets.UTF_8), MarketplaceExportRunDocument.class);
-        assertThat(written.runId()).isEqualTo(RUN_ID);
-        assertThat(written.storeId()).isEqualTo(STORE_ID);
-        assertThat(written.marketplace()).isEqualTo(MARKETPLACE);
-        assertThat(written.catalogId()).isEqualTo(CATALOG_ID);
-        assertThat(written.pricelistId()).isEqualTo("pricelist-1");
-        assertThat(written.wasSuccessful()).isTrue();
-        assertThat(written.offers()).hasSize(1);
-        assertThat(written.offers().get(0).pimId()).isEqualTo("pim-A");
+        List<MarketplaceOfferSnapshot> written = MarketplaceExportRunCsv.parse(bytesCaptor.getValue());
+        assertThat(written).hasSize(1);
+        assertThat(written.get(0).pimId()).isEqualTo("pim-A");
+        assertThat(written.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+    }
+
+    @Test
+    void saveRunMarksAFailedRunWithTheFailedSuffixAndAppendsTheAbortedRow() {
+        // given
+        MarketplaceExportRun run = run();
+        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)));
+        run.failed(new IllegalStateException("marketplace unavailable"));
+
+        // when
+        service.saveRun(run);
+
+        // then
+        verify(fileStorage).put(eq(BUCKET), keyCaptor.capture(), bytesCaptor.capture());
+        assertThat(keyCaptor.getValue()).isEqualTo(CATALOG_PREFIX + RUN_ID + "-failed.csv");
+
+        List<MarketplaceOfferSnapshot> written = MarketplaceExportRunCsv.parse(bytesCaptor.getValue());
+        assertThat(written).hasSize(2);
+        assertThat(written.get(1).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_EXPORT_ABORTED);
+        assertThat(written.get(1).message()).contains("marketplace unavailable");
     }
 
     @Test
     void loadPreviousExportPicksNewestByLastModified() {
         // given
         givenCatalogObjects(
-                object(CATALOG_PREFIX + "2026-08-11_01-00-00.json", "2026-08-11T01:00:00", offersJson("pim-OLD")),
-                object(CATALOG_PREFIX + "2026-08-13_01-31-05.json", "2026-08-13T01:31:05", offersJson("pim-NEW")));
+                object(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", "2026-08-11T01:00:00", offersCsv("pim-OLD")),
+                object(CATALOG_PREFIX + "2026-08-13_01-31-05.csv", "2026-08-13T01:31:05", offersCsv("pim-NEW")));
 
         // when
-        List<MarketplaceOfferSnapshot> offers = repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
 
         // then
         assertThat(offers).hasSize(1);
@@ -99,15 +112,15 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void loadPreviousExportSkipsFailedRunsAndFallsBackToTheLastSuccessfulOne() {
+    void loadPreviousExportIgnoresFailedRunsAndNonCsvObjects() {
         // given
         givenCatalogObjects(
-                object(CATALOG_PREFIX + "2026-08-11_01-00-00.json", "2026-08-11T01:00:00", offersJson("pim-OK")),
-                object(CATALOG_PREFIX + "2026-08-12_01-00-00.json", "2026-08-12T01:00:00", failedJson()),
-                object(CATALOG_PREFIX + "2026-08-13_01-31-05.json", "2026-08-13T01:31:05", failedJson()));
+                object(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", "2026-08-11T01:00:00", offersCsv("pim-OK")),
+                object(CATALOG_PREFIX + "2026-08-12_01-00-00-failed.csv", "2026-08-12T01:00:00", offersCsv("pim-FAILED")),
+                object(CATALOG_PREFIX + "2026-08-13_01-31-05.json", "2026-08-13T01:31:05", offersCsv("pim-JSON")));
 
         // when
-        List<MarketplaceOfferSnapshot> offers = repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
 
         // then
         assertThat(offers).hasSize(1);
@@ -115,13 +128,30 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void loadPreviousExportReadsLegacyCsvFileWithTheOldParser() {
+    void loadPreviousExportDropsRowsWithoutPimId() {
         // given
+        MarketplaceExportRun run = run();
+        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L)));
+        run.failed(new IllegalStateException("marketplace unavailable"));
         givenCatalogObjects(object(CATALOG_PREFIX + "2026-08-13_01-31-05.csv", "2026-08-13T01:31:05",
-                csvBytes("pim-CSV;1999;7;1")));
+                MarketplaceExportRunCsv.toBytes(run.toRows())));
 
         // when
-        List<MarketplaceOfferSnapshot> offers = repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+
+        // then
+        assertThat(offers).hasSize(1);
+        assertThat(offers.get(0).pimId()).isEqualTo("pim-A");
+    }
+
+    @Test
+    void loadPreviousExportReadsLegacyFourColumnFiles() {
+        // given
+        givenCatalogObjects(object(CATALOG_PREFIX + "2026-08-13_01-31-05.csv", "2026-08-13T01:31:05",
+                legacyCsv("pim-CSV;1999;7;1")));
+
+        // when
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
 
         // then
         assertThat(offers).hasSize(1);
@@ -131,92 +161,81 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void loadPreviousExportPrefersNewerJsonOverOlderCsv() {
-        // given
-        givenCatalogObjects(
-                object(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", "2026-08-11T01:00:00",
-                        csvBytes("pim-CSV;1999;7;0")),
-                object(CATALOG_PREFIX + "2026-08-13_01-31-05.json", "2026-08-13T01:31:05", offersJson("pim-JSON")));
-
-        // when
-        List<MarketplaceOfferSnapshot> offers = repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
-
-        // then
-        assertThat(offers).hasSize(1);
-        assertThat(offers.get(0).pimId()).isEqualTo("pim-JSON");
-    }
-
-    @Test
     void loadPreviousExportReturnsEmptyListWhenPrefixHasNoObjects() {
         // given
         when(fileStorage.getAllObjectLastModified(BUCKET, CATALOG_PREFIX)).thenReturn(Map.of());
 
         // when / then
-        assertThat(repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE)).isEmpty();
+        assertThat(service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE)).isEmpty();
     }
 
     @Test
     void loadPreviousExportReturnsEmptyListWhenObjectCannotBeParsed() {
         // given
-        givenCatalogObjects(object(CATALOG_PREFIX + "2026-08-13_01-31-05.json", "2026-08-13T01:31:05",
-                "not json at all".getBytes(StandardCharsets.UTF_8)));
+        givenCatalogObjects(object(CATALOG_PREFIX + "2026-08-13_01-31-05.csv", "2026-08-13T01:31:05",
+                legacyCsv("pim-CSV;not-a-number;7;0")));
 
         // when / then
-        assertThat(repository.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE)).isEmpty();
+        assertThat(service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE)).isEmpty();
     }
 
     @Test
-    void findRunsParsesMarketplaceCatalogAndRunIdFromKeysNewestFirst() {
+    void findRunsParsesMarketplaceCatalogRunIdAndFailureFromKeysNewestFirst() {
         // given
         Map<String, LocalDateTime> objects = new LinkedHashMap<>();
-        objects.put(CATALOG_PREFIX + "2026-08-11_01-00-00.json", LocalDateTime.parse("2026-08-11T01:00:00"));
-        objects.put(CATALOG_PREFIX + "2026-08-13_01-31-05.json", LocalDateTime.parse("2026-08-13T01:31:05"));
-        objects.put(STORE_PREFIX + "other/nested/deeper/key.json", LocalDateTime.parse("2026-08-14T01:00:00"));
+        objects.put(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", LocalDateTime.parse("2026-08-11T01:00:00"));
+        objects.put(CATALOG_PREFIX + "2026-08-13_01-31-05-failed.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
+        objects.put(STORE_PREFIX + "other/nested/deeper/key.csv", LocalDateTime.parse("2026-08-14T01:00:00"));
         when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
 
         // when
-        List<MarketplaceExportRunHeader> runs = repository.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
 
         // then
         assertThat(runs).hasSize(2);
         assertThat(runs.get(0).runId()).isEqualTo("2026-08-13_01-31-05");
         assertThat(runs.get(0).marketplace()).isEqualTo(MARKETPLACE);
         assertThat(runs.get(0).catalogId()).isEqualTo(CATALOG_ID);
+        assertThat(runs.get(0).failed()).isTrue();
         assertThat(runs.get(1).runId()).isEqualTo("2026-08-11_01-00-00");
+        assertThat(runs.get(1).failed()).isFalse();
     }
 
     @Test
-    void findRunReturnsDocumentAndRawBytes() {
+    void findRunReturnsParsedRowsAndRawBytes() {
         // given
-        byte[] data = offersJson("pim-A");
-        String key = CATALOG_PREFIX + RUN_ID + ".json";
+        byte[] data = offersCsv("pim-A");
+        String key = CATALOG_PREFIX + RUN_ID + ".csv";
         when(fileStorage.canRead(BUCKET, key)).thenReturn(true);
         when(fileStorage.getBytes(BUCKET, key)).thenReturn(data);
 
         // when
-        Optional<MarketplaceExportRunFile> runFile = repository.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID);
+        Optional<MarketplaceExportRunFile> runFile = service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID);
 
         // then
         assertThat(runFile).isPresent();
-        assertThat(runFile.get().document().offers().get(0).pimId()).isEqualTo("pim-A");
+        assertThat(runFile.get().runId()).isEqualTo(RUN_ID);
+        assertThat(runFile.get().failed()).isFalse();
+        assertThat(runFile.get().rows().get(0).pimId()).isEqualTo("pim-A");
         assertThat(runFile.get().raw()).isEqualTo(data);
     }
 
     @Test
-    void findRunFallsBackToCsvWhenThereIsNoJsonObject() {
+    void findRunFallsBackToTheFailedFileWhenThereIsNoSucceededOne() {
         // given
-        when(fileStorage.canRead(BUCKET, CATALOG_PREFIX + RUN_ID + ".json")).thenReturn(false);
-        when(fileStorage.canRead(BUCKET, CATALOG_PREFIX + RUN_ID + ".csv")).thenReturn(true);
-        when(fileStorage.getBytes(BUCKET, CATALOG_PREFIX + RUN_ID + ".csv"))
-                .thenReturn(csvBytes("pim-CSV;1999;7;0"));
+        when(fileStorage.canRead(BUCKET, CATALOG_PREFIX + RUN_ID + ".csv")).thenReturn(false);
+        when(fileStorage.canRead(BUCKET, CATALOG_PREFIX + RUN_ID + "-failed.csv")).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, CATALOG_PREFIX + RUN_ID + "-failed.csv"))
+                .thenReturn(offersCsv("pim-CSV"));
 
         // when
-        Optional<MarketplaceExportRunFile> runFile = repository.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID);
+        Optional<MarketplaceExportRunFile> runFile = service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID);
 
         // then
         assertThat(runFile).isPresent();
-        assertThat(runFile.get().document().offers().get(0).pimId()).isEqualTo("pim-CSV");
-        assertThat(runFile.get().document().wasSuccessful()).isTrue();
+        assertThat(runFile.get().runId()).isEqualTo(RUN_ID);
+        assertThat(runFile.get().failed()).isTrue();
+        assertThat(runFile.get().rows().get(0).pimId()).isEqualTo("pim-CSV");
     }
 
     @Test
@@ -225,13 +244,11 @@ class MarketplaceExportRunServiceTest {
         when(fileStorage.canRead(eq(BUCKET), anyString())).thenReturn(false);
 
         // when / then
-        assertThat(repository.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID)).isEmpty();
+        assertThat(service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID)).isEmpty();
     }
 
     private MarketplaceExportRun run() {
-        MarketplaceExportRun run = new MarketplaceExportRun(STORE_ID, MARKETPLACE, CATALOG_ID, "pricelist-1");
-        run.providerCalled(true);
-        return run;
+        return new MarketplaceExportRun(STORE_ID, MARKETPLACE, CATALOG_ID);
     }
 
     private Map.Entry<String, byte[]> object(String key, String lastModified, byte[] data) {
@@ -249,20 +266,11 @@ class MarketplaceExportRunServiceTest {
         when(fileStorage.getAllObjectLastModified(BUCKET, CATALOG_PREFIX)).thenReturn(lastModified);
     }
 
-    private byte[] csvBytes(String csvRow) {
+    private byte[] legacyCsv(String csvRow) {
         return ("pimId;price;qty;removalAttempts\n" + csvRow + "\n").getBytes(StandardCharsets.UTF_8);
     }
 
-    private byte[] offersJson(String pimId) {
-        MarketplaceExportRun run = run();
-        run.offers(List.of(MarketplaceOfferSnapshot.published(pimId, 1999L, 7L, null)));
-        return ConversionUtil.fromJsonToBytes(run.toDocument(RUN_ID, RUN_FINISHED_AT));
-    }
-
-    private byte[] failedJson() {
-        MarketplaceExportRun run = run();
-        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-FAILED", 1999L, 7L, null)));
-        run.failed(new IllegalStateException("marketplace unavailable"));
-        return ConversionUtil.fromJsonToBytes(run.toDocument(RUN_ID, RUN_FINISHED_AT));
+    private byte[] offersCsv(String pimId) {
+        return MarketplaceExportRunCsv.toBytes(List.of(MarketplaceOfferSnapshot.published(pimId, 1999L, 7L)));
     }
 }

@@ -19,8 +19,10 @@
                     <div class="column is-one-quarter">
                         <p class="heading" th:text="#{store.marketplaces.exports.status}"></p>
                         <p class="title is-6">
-                            <span class="tag is-success" th:if="${run.wasSuccessful()}" th:text="${run.status()}"></span>
-                            <span class="tag is-danger" th:unless="${run.wasSuccessful()}" th:text="${run.status()}"></span>
+                            <span class="tag is-success" th:unless="${failed}"
+                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                            <span class="tag is-danger" th:if="${failed}"
+                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
                         </p>
                     </div>
                     <div class="column is-one-quarter">
@@ -32,74 +34,47 @@
                         <p class="title is-6" th:text="${catalogId}"></p>
                     </div>
                     <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.pricelist}"></p>
-                        <p class="title is-6" th:text="${run.pricelistId()} ?: '-'"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.provider.called}"></p>
-                        <p class="title is-6" th:text="${run.providerCalled()} ? #{general.yes} : #{general.no}"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.offers.count}"></p>
-                        <p class="title is-6" th:text="${run.offersOrEmpty().size()}"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.excluded.count}"></p>
-                        <p class="title is-6" th:text="${run.excludedOrEmpty().size()}"></p>
+                        <p class="heading" th:text="#{store.marketplaces.exports.rows.count}"></p>
+                        <p class="title is-6" th:text="${rows.size()}"></p>
                     </div>
                 </div>
             </div>
 
-            <div class="box mb-5" th:if="${run.failure() != null}">
-                <h2 class="title is-6 has-text-danger" th:text="#{store.marketplaces.exports.failure}"></h2>
-                <pre><code th:text="${#strings.listJoin(run.failure(), '&#10;')}"></code></pre>
-            </div>
-
             <div class="box mb-5" th:with="rowLimit=500">
-                <h2 class="title is-6" th:text="#{store.marketplaces.exports.excluded.title}"></h2>
+                <h2 class="title is-6" th:text="#{store.marketplaces.exports.rows.title}"></h2>
 
-                <div class="table-container" th:if="${!run.excludedOrEmpty().isEmpty()}">
+                <div class="table-container" th:if="${!rows.isEmpty()}">
                     <table class="table is-fullwidth is-narrow is-striped">
                         <thead>
                         <tr>
-                            <th th:text="#{store.marketplaces.exports.reason}"></th>
-                            <th th:text="#{store.marketplaces.exports.category}"></th>
-                            <th th:text="#{store.marketplaces.exports.product}"></th>
-                            <th th:text="#{store.marketplaces.exports.detail}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.pimId}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.price}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.quantity}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.removalAttempts}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.outcome}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.reasonCode}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.message}"></th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="item, iteration : ${run.excludedOrEmpty()}" th:if="${iteration.index < rowLimit}">
-                            <td th:text="${reasonLabels.getOrDefault(item.reason(), item.reason())}"></td>
-                            <td th:text="${item.categoryName()} ?: '-'"></td>
-                            <td>
-                                <span th:if="${item.name() != null}" th:text="${item.name()}"></span>
-                                <span th:if="${item.name() == null}" class="has-text-grey">&mdash;</span>
-                                <br/>
-                                <small class="has-text-grey" th:if="${item.pimId() != null}" th:text="${item.pimId()}"></small>
-                                <small class="has-text-grey" th:if="${item.ean() != null}" th:text="' / ' + ${item.ean()}"></small>
-                            </td>
-                            <td>
-                                <small th:if="${item.detail() != null and item.detail().minWarehouseQuantity() > 0}"
-                                       th:text="#{store.marketplaces.exports.detail.warehouse(
-                                            ${item.detail().warehouseQuantity()}, ${item.detail().minWarehouseQuantity()})}"></small>
-                                <small th:if="${item.detail() != null and item.detail().minWarehouseQuantity() == 0}"
-                                       th:text="#{store.marketplaces.exports.detail.distributors(
-                                            ${item.detail().totalQuantity()}, ${item.detail().minTotalQuantity()},
-                                            ${item.detail().distributorsWithMinQuantity()}, ${item.detail().minNumOfDistributors()},
-                                            ${item.detail().minQuantityPerDistributor()})}"></small>
-                                <span th:if="${item.detail() == null}" class="has-text-grey">&mdash;</span>
-                            </td>
+                        <tr th:each="row, iteration : ${rows}" th:if="${iteration.index < rowLimit}">
+                            <td th:text="${row.pimId()}"></td>
+                            <td th:text="${row.price()}"></td>
+                            <td th:text="${row.quantity()}"></td>
+                            <td th:text="${row.removalAttempts()}"></td>
+                            <td th:text="${row.outcome()}"></td>
+                            <td th:text="${row.reasonCode()}"></td>
+                            <td th:text="${row.message()}"></td>
                         </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <p th:if="${run.excludedOrEmpty().size() > rowLimit}" class="has-text-grey"
-                   th:text="#{store.marketplaces.exports.excluded.truncated(${rowLimit}, ${run.excludedOrEmpty().size()})}"></p>
+                <p th:if="${rows.size() > rowLimit}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.rows.truncated(${rowLimit}, ${rows.size()})}"></p>
 
-                <p th:if="${run.excludedOrEmpty().isEmpty()}" class="has-text-grey"
-                   th:text="#{store.marketplaces.exports.excluded.empty}"></p>
+                <p th:if="${rows.isEmpty()}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.rows.empty}"></p>
             </div>
 
             <div class="box mb-5">

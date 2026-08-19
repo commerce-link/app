@@ -1,7 +1,5 @@
 package pl.commercelink.web;
 
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,17 +9,11 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import pl.commercelink.marketplace.MarketplaceExportExcludedItem;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
-import pl.commercelink.marketplace.MarketplaceExportSkipReason;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 @Controller
@@ -32,12 +24,9 @@ public class MarketplaceExportHistoryController {
     private static final int MAX_INLINE_RAW_BYTES = 512 * 1024;
 
     private final MarketplaceExportRunService marketplaceExportRunService;
-    private final MessageSource messageSource;
 
-    MarketplaceExportHistoryController(MarketplaceExportRunService marketplaceExportRunService,
-                                       MessageSource messageSource) {
+    MarketplaceExportHistoryController(MarketplaceExportRunService marketplaceExportRunService) {
         this.marketplaceExportRunService = marketplaceExportRunService;
-        this.messageSource = messageSource;
     }
 
     @GetMapping("/dashboard/store/marketplaces/exports" + RUN_PATH)
@@ -88,15 +77,15 @@ public class MarketplaceExportHistoryController {
         MarketplaceExportRunFile presentRunFile = runFile.get();
         boolean rawTooLarge = presentRunFile.raw().length > MAX_INLINE_RAW_BYTES;
 
-        model.addAttribute("run", presentRunFile.document());
-        model.addAttribute("reasonLabels", reasonLabels(presentRunFile));
+        model.addAttribute("runId", runId);
+        model.addAttribute("failed", presentRunFile.failed());
+        model.addAttribute("rows", presentRunFile.rows());
+        model.addAttribute("raw", rawTooLarge ? null : new String(presentRunFile.raw(), StandardCharsets.UTF_8));
+        model.addAttribute("rawTooLarge", rawTooLarge);
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("catalogId", catalogId);
-        model.addAttribute("runId", runId);
-        model.addAttribute("rawTooLarge", rawTooLarge);
-        model.addAttribute("raw", rawTooLarge ? null : new String(presentRunFile.raw(), StandardCharsets.UTF_8));
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("storeId", storeId);
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
 
         return "store-marketplace-export-run";
     }
@@ -110,23 +99,9 @@ public class MarketplaceExportHistoryController {
         }
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + runId + ".json\"")
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + runId + ".csv\"")
                 .body(new ByteArrayResource(runFile.get().raw()));
-    }
-
-    private Map<String, String> reasonLabels(MarketplaceExportRunFile runFile) {
-        Locale locale = LocaleContextHolder.getLocale();
-        Map<String, String> reasonLabels = new HashMap<>();
-
-        runFile.document().excludedOrEmpty().stream()
-                .map(MarketplaceExportExcludedItem::reason)
-                .filter(Objects::nonNull)
-                .distinct()
-                .forEach(reason -> reasonLabels.put(reason, messageSource.getMessage(
-                        MarketplaceExportSkipReason.class.getSimpleName() + "." + reason, null, reason, locale)));
-
-        return reasonLabels;
     }
 
     private String getStoreId() {

@@ -2,7 +2,6 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,21 +19,12 @@ import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.CATEGORY_MARKETPLACE_DEFINITION_DISABLED;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.CATEGORY_NOT_CONFIGURED_FOR_MARKETPLACE;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.PRODUCT_DISABLED;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.PRODUCT_NOT_APPROVED_FOR_MARKETPLACE;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.PRODUCT_NOT_IN_PRICELIST;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.PRODUCT_WITHOUT_PIM_ID;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS;
-import static pl.commercelink.marketplace.MarketplaceExportSkipReason.QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -75,12 +65,12 @@ public class MarketplaceOfferExportEventListener {
         }
 
         MarketplaceExportRun run = new MarketplaceExportRun(
-                payload.getStoreId(), payload.getMarketplace(), payload.getCatalogId(), payload.getPricelistId());
+                payload.getStoreId(), payload.getMarketplace(), payload.getCatalogId());
 
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(store.getStoreId());
 
         List<MarketplaceOffer> offers = collectOffersFromCatalog(
-                catalog, payload.getMarketplace(), enrichedInventory, pricelist, run);
+                catalog, payload.getMarketplace(), enrichedInventory, pricelist);
 
         handleMarketplaceExport(store, catalog, payload.getMarketplace(), offers, run);
     }
@@ -88,25 +78,22 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> collectOffersFromCatalog(ProductCatalog catalog,
                                                             String marketplace,
                                                             InventoryView inventory,
-                                                            Pricelist pricelist,
-                                                            MarketplaceExportRun run) {
-        List<MarketplaceOffer> offers = new ArrayList<>();
+                                                            Pricelist pricelist) {
+        List<MarketplaceOffer> offers = new LinkedList<>();
 
         for (CategoryDefinition category : catalog.getCategories()) {
             Optional<MarketplaceDefinition> definitionForMarketplace = category.getCategoryDefinition(marketplace);
 
             if (definitionForMarketplace.isEmpty()) {
-                run.excludeCategory(category, CATEGORY_NOT_CONFIGURED_FOR_MARKETPLACE);
                 continue;
             }
 
             MarketplaceDefinition marketplaceDefinition = definitionForMarketplace.get();
             if (!marketplaceDefinition.isEnabled()) {
-                run.excludeCategory(category, CATEGORY_MARKETPLACE_DEFINITION_DISABLED);
                 continue;
             }
 
-            offers.addAll(createMarketplaceOffers(category, marketplaceDefinition, inventory, pricelist, run));
+            offers.addAll(createMarketplaceOffers(category, marketplaceDefinition, inventory, pricelist));
         }
         return offers;
     }
@@ -114,117 +101,50 @@ public class MarketplaceOfferExportEventListener {
     private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category,
                                                            MarketplaceDefinition marketplaceDefinition,
                                                            InventoryView inventory,
-                                                           Pricelist pricelist,
-                                                           MarketplaceExportRun run) {
-        List<MarketplaceOffer> categoryOffers = new ArrayList<>();
+                                                           Pricelist pricelist) {
+        List<MarketplaceOffer> result = new LinkedList<>();
 
-        for (Product product : productRepository.findAll(category.getCategoryId())) {
-            MarketplaceOfferClassification classification =
-                    classify(product, marketplaceDefinition, inventory, pricelist);
+        String categoryName = category.getName();
 
-            if (classification.isExcluded()) {
-                run.excludeProduct(category, product, classification.exclusion(), classification.thresholds());
+        for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
+
+            Optional<AvailabilityAndPrice> priceInPricelist = pricelist.findByPimId(product.getPimId());
+
+            if (priceInPricelist.isEmpty()) {
                 continue;
             }
 
-            if (classification.quantityZeroedReason() != null) {
-                run.excludeProduct(category, product, classification.quantityZeroedReason(), classification.thresholds());
+            if (marketplaceDefinition.isExportSelectedProducts()
+                    && !product.isApprovedForMarketplace(marketplaceDefinition.getName())) {
+                continue;
             }
 
-            categoryOffers.add(toMarketplaceOffer(
-                    classification.availabilityAndPrice(),
-                    marketplaceDefinition.getMarkup(),
-                    classification.quantityToPublish(),
-                    category.getName()));
+            AvailabilityAndPrice availabilityAndPrice = priceInPricelist.get();
+            MatchedInventory matchedInventory = inventory.findByProduct(product);
+
+            long qtyToPublish;
+            if (marketplaceDefinition.getMinWarehouseQty() > 0) {
+                int totalQty = matchedInventory
+                        .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
+                        .stream()
+                        .map(InventoryItem::qty)
+                        .mapToInt(Integer::intValue)
+                        .sum();
+                qtyToPublish = totalQty >= marketplaceDefinition.getMinWarehouseQty() ? totalQty : 0L;
+            } else {
+                boolean hasRequiredTotalQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinTotalQty());
+                boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
+                        marketplaceDefinition.getMinNumOfDistributors(),
+                        marketplaceDefinition.getMinQtyPerDistributor()
+                );
+                qtyToPublish = (hasRequiredTotalQty && hasRequiredNumOfDistributorsWithMinQty)
+                        ? matchedInventory.getTotalAvailableQty()
+                        : 0L;
+            }
+
+            result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
-        return categoryOffers;
-    }
-
-    private MarketplaceOfferClassification classify(Product product,
-                                                    MarketplaceDefinition marketplaceDefinition,
-                                                    InventoryView inventory,
-                                                    Pricelist pricelist) {
-        if (!product.isEnabled()) {
-            return MarketplaceOfferClassification.excluded(PRODUCT_DISABLED);
-        }
-
-        if (StringUtils.isBlank(product.getPimId())) {
-            return MarketplaceOfferClassification.excluded(PRODUCT_WITHOUT_PIM_ID);
-        }
-
-        Optional<AvailabilityAndPrice> priceInPricelist = pricelist.findByPimId(product.getPimId());
-        if (priceInPricelist.isEmpty()) {
-            return MarketplaceOfferClassification.excluded(PRODUCT_NOT_IN_PRICELIST);
-        }
-
-        if (marketplaceDefinition.isExportSelectedProducts()
-                && !product.isApprovedForMarketplace(marketplaceDefinition.getName())) {
-            return MarketplaceOfferClassification.excluded(PRODUCT_NOT_APPROVED_FOR_MARKETPLACE);
-        }
-
-        AvailabilityAndPrice availabilityAndPrice = priceInPricelist.get();
-        MatchedInventory matchedInventory = inventory.findByProduct(product);
-
-        if (marketplaceDefinition.getMinWarehouseQty() > 0) {
-            return classifyAgainstWarehouse(availabilityAndPrice, matchedInventory, marketplaceDefinition);
-        }
-        return classifyAgainstDistributors(availabilityAndPrice, matchedInventory, marketplaceDefinition);
-    }
-
-    private MarketplaceOfferClassification classifyAgainstWarehouse(AvailabilityAndPrice availabilityAndPrice,
-                                                                    MatchedInventory matchedInventory,
-                                                                    MarketplaceDefinition marketplaceDefinition) {
-        long warehouseQuantity = matchedInventory
-                .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
-                .stream()
-                .mapToLong(InventoryItem::qty)
-                .sum();
-
-        if (warehouseQuantity >= marketplaceDefinition.getMinWarehouseQty()) {
-            return MarketplaceOfferClassification.published(availabilityAndPrice, warehouseQuantity);
-        }
-        return MarketplaceOfferClassification.zeroed(
-                availabilityAndPrice,
-                QUANTITY_ZEROED_BELOW_WAREHOUSE_THRESHOLD,
-                MarketplaceExportThresholds.warehouse(warehouseQuantity, marketplaceDefinition.getMinWarehouseQty()));
-    }
-
-    private MarketplaceOfferClassification classifyAgainstDistributors(AvailabilityAndPrice availabilityAndPrice,
-                                                                       MatchedInventory matchedInventory,
-                                                                       MarketplaceDefinition marketplaceDefinition) {
-        boolean hasRequiredTotalQuantity = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinTotalQty());
-        boolean hasRequiredNumOfDistributorsWithMinQuantity = matchedInventory.hasOffersFromMultipleSuppliers(
-                marketplaceDefinition.getMinNumOfDistributors(),
-                marketplaceDefinition.getMinQtyPerDistributor()
-        );
-
-        if (hasRequiredTotalQuantity && hasRequiredNumOfDistributorsWithMinQuantity) {
-            return MarketplaceOfferClassification.published(
-                    availabilityAndPrice, matchedInventory.getTotalAvailableQty());
-        }
-        return MarketplaceOfferClassification.zeroed(
-                availabilityAndPrice,
-                QUANTITY_ZEROED_BELOW_DISTRIBUTOR_THRESHOLDS,
-                distributorThresholds(matchedInventory, marketplaceDefinition));
-    }
-
-    private MarketplaceExportThresholds distributorThresholds(MatchedInventory matchedInventory,
-                                                              MarketplaceDefinition marketplaceDefinition) {
-        List<InventoryItem> inventoryItems = matchedInventory.getInventoryItems();
-        long totalQuantity = inventoryItems.stream().mapToLong(InventoryItem::qty).sum();
-        long distributorsWithMinQuantity = inventoryItems.stream()
-                .collect(Collectors.groupingBy(InventoryItem::supplier, Collectors.summingLong(InventoryItem::qty)))
-                .values()
-                .stream()
-                .filter(quantity -> quantity >= marketplaceDefinition.getMinQtyPerDistributor())
-                .count();
-
-        return MarketplaceExportThresholds.distributors(
-                totalQuantity,
-                marketplaceDefinition.getMinTotalQty(),
-                distributorsWithMinQuantity,
-                marketplaceDefinition.getMinNumOfDistributors(),
-                marketplaceDefinition.getMinQtyPerDistributor());
+        return result;
     }
 
     private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQuantity, String categoryName) {
@@ -259,12 +179,11 @@ public class MarketplaceOfferExportEventListener {
         List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
         boolean providerCalled = !currentOffers.isEmpty() || !pendingRemovals.isEmpty();
-        run.providerCalled(providerCalled);
-        run.offers(buildNextSnapshot(retryableOrphans, currentOffers, run));
+        run.offers(buildNextSnapshot(retryableOrphans, currentOffers));
 
         try {
             if (providerCalled) {
-                provider.exportOffers(currentOffers, pendingRemovals);
+                provider.exportOffers(currentOffers, pendingRemovals, run::rejected);
             }
         } catch (RuntimeException exception) {
             run.failed(exception);
@@ -303,14 +222,13 @@ public class MarketplaceOfferExportEventListener {
     }
 
     private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans,
-                                                             List<MarketplaceOffer> currentOffers,
-                                                             MarketplaceExportRun run) {
+                                                             List<MarketplaceOffer> currentOffers) {
         Stream<MarketplaceOfferSnapshot> incrementedOrphans = retryableOrphans.stream()
-                .map(snapshot -> MarketplaceOfferSnapshot.pendingRemoval(
+                .map(snapshot -> MarketplaceOfferSnapshot.removalPending(
                         snapshot.pimId(), snapshot.price(), snapshot.removalAttempts() + 1));
         Stream<MarketplaceOfferSnapshot> currentAsActive = currentOffers.stream()
                 .map(offer -> MarketplaceOfferSnapshot.published(
-                        offer.productId(), offer.price(), offer.quantity(), run.quantityZeroedReason(offer.productId())));
+                        offer.productId(), offer.price(), offer.quantity()));
         return Stream.concat(incrementedOrphans, currentAsActive).toList();
     }
 }

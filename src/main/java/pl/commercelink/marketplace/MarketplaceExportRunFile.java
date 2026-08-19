@@ -1,6 +1,10 @@
 package pl.commercelink.marketplace;
 
+import java.util.List;
+
 public record MarketplaceExportRunFile(
-        MarketplaceExportRunDocument document,
+        String runId,
+        boolean failed,
+        List<MarketplaceOfferSnapshot> rows,
         byte[] raw) {
 }

@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,26 +17,17 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
-import pl.commercelink.marketplace.MarketplaceExportRun;
-import pl.commercelink.marketplace.MarketplaceExportRunDocument;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
-import pl.commercelink.marketplace.MarketplaceExportSkipReason;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
-import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.products.Product;
 import pl.commercelink.starter.security.model.CustomUser;
-import pl.commercelink.starter.util.ConversionUtil;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -53,17 +43,12 @@ class MarketplaceExportHistoryControllerTest {
     @Mock
     private MarketplaceExportRunService marketplaceExportRunService;
 
-    @Mock
-    private MessageSource messageSource;
-
     @InjectMocks
     private MarketplaceExportHistoryController controller;
 
     @BeforeEach
     void loggedInAsStoreAdmin() {
         authenticateAs(STORE_ID, "ADMIN");
-        when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
-                .thenReturn("Produkt bez ceny w cenniku");
     }
 
     @AfterEach
@@ -72,9 +57,9 @@ class MarketplaceExportHistoryControllerTest {
     }
 
     @Test
-    void rendersRunDetailsForTheStoreOfTheLoggedInAdmin() {
+    void rendersRunRowsForTheStoreOfTheLoggedInAdmin() {
         // given
-        givenRun(STORE_ID, runFile());
+        givenRun(STORE_ID, runFile(false));
         Model model = new ExtendedModelMap();
 
         // when
@@ -82,27 +67,31 @@ class MarketplaceExportHistoryControllerTest {
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-run");
-        MarketplaceExportRunDocument run = (MarketplaceExportRunDocument) model.getAttribute("run");
-        assertThat(run.offers()).hasSize(1);
-        assertThat(run.excluded()).hasSize(1);
-        assertThat(model.getAttribute("raw")).asString().contains("pim-A");
+        assertThat(model.getAttribute("runId")).isEqualTo(RUN_ID);
+        assertThat(model.getAttribute("failed")).isEqualTo(false);
+        assertThat(model.getAttribute("marketplace")).isEqualTo(MARKETPLACE);
+        assertThat(model.getAttribute("catalogId")).isEqualTo(CATALOG_ID);
+        assertThat(model.getAttribute("storeId")).isEqualTo(STORE_ID);
         assertThat(model.getAttribute("rawTooLarge")).isEqualTo(false);
+        assertThat(model.getAttribute("raw")).asString().contains("pim-A");
+
+        @SuppressWarnings("unchecked")
+        List<MarketplaceOfferSnapshot> rows = (List<MarketplaceOfferSnapshot>) model.getAttribute("rows");
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).pimId()).isEqualTo("pim-A");
     }
 
     @Test
-    void localizesEveryExclusionReasonPresentInTheDocument() {
+    void marksTheRunAsFailedWhenTheStoredFileSaysSo() {
         // given
-        givenRun(STORE_ID, runFile());
+        givenRun(STORE_ID, runFile(true));
         Model model = new ExtendedModelMap();
 
         // when
         controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
 
         // then
-        @SuppressWarnings("unchecked")
-        Map<String, String> reasonLabels = (Map<String, String>) model.getAttribute("reasonLabels");
-        assertThat(reasonLabels).containsEntry(
-                MarketplaceExportSkipReason.PRODUCT_NOT_IN_PRICELIST.name(), "Produkt bez ceny w cenniku");
+        assertThat(model.getAttribute("failed")).isEqualTo(true);
     }
 
     @Test
@@ -120,17 +109,18 @@ class MarketplaceExportHistoryControllerTest {
     }
 
     @Test
-    void rawFileEndpointReturnsInlineJson() {
+    void rawFileEndpointReturnsInlineCsv() {
         // given
-        givenRun(STORE_ID, runFile());
+        givenRun(STORE_ID, runFile(false));
 
         // when
         ResponseEntity<?> response = controller.exportRunFile(MARKETPLACE, CATALOG_ID, RUN_ID);
 
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getContentType().toString()).startsWith("text/csv");
         assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-                .isEqualTo("inline; filename=\"" + RUN_ID + ".json\"");
+                .isEqualTo("inline; filename=\"" + RUN_ID + ".csv\"");
     }
 
     @Test
@@ -150,7 +140,7 @@ class MarketplaceExportHistoryControllerTest {
     void superAdminPathReadsTheStoreFromThePathInsteadOfTheSession() {
         // given
         authenticateAs(STORE_ID, "SUPER_ADMIN");
-        givenRun("store-2", runFile());
+        givenRun("store-2", runFile(false));
         Model model = new ExtendedModelMap();
 
         // when
@@ -167,26 +157,12 @@ class MarketplaceExportHistoryControllerTest {
                 .thenReturn(Optional.of(runFile));
     }
 
-    private MarketplaceExportRunFile runFile() {
-        MarketplaceExportRun run = new MarketplaceExportRun(STORE_ID, MARKETPLACE, CATALOG_ID, "pricelist-1");
-        run.providerCalled(true);
-        run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L, null)));
-        run.excludeProduct(category(), product(), MarketplaceExportSkipReason.PRODUCT_NOT_IN_PRICELIST, null);
-
-        MarketplaceExportRunDocument document = run.toDocument(RUN_ID, Instant.parse("2026-08-13T01:31:05Z"));
-        byte[] raw = ConversionUtil.toJson(document).getBytes(StandardCharsets.UTF_8);
-        return new MarketplaceExportRunFile(document, raw);
-    }
-
-    private CategoryDefinition category() {
-        CategoryDefinition category = new CategoryDefinition();
-        category.setCategoryId(CATALOG_ID);
-        category.setName("Laptopy");
-        return category;
-    }
-
-    private Product product() {
-        return new Product(CATALOG_ID, "pim-B", "EAN-B", "MFN-B", "Brand", "Label", "Name-B", "default");
+    private MarketplaceExportRunFile runFile(boolean failed) {
+        List<MarketplaceOfferSnapshot> rows =
+                List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L));
+        byte[] raw = "pimId;price;quantity;removalAttempts;outcome;reasonCode;message\npim-A;3503;7;0;PUBLISHED;;\n"
+                .getBytes(StandardCharsets.UTF_8);
+        return new MarketplaceExportRunFile(RUN_ID, failed, rows, raw);
     }
 
     private void authenticateAs(String storeId, String role) {
