@@ -2,13 +2,16 @@ package pl.commercelink.inventory.deliveries;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,7 +25,11 @@ public class DeliveriesPlanningService {
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
     @Autowired
-    private SupplierPurchaseService supplierPurchaseService;
+    private OrdersRepository ordersRepository;
+    @Autowired
+    private OrderItemsRepository orderItemsRepository;
+    @Autowired
+    private DropshipEligibility dropshipEligibility;
 
     public record Planning(List<Delivery> deliveries, List<DropshipCandidate> dropshipCandidates) {
     }
@@ -55,23 +62,10 @@ public class DeliveriesPlanningService {
                 .filter(Allocation::isDirectToConsumer)
                 .collect(Collectors.groupingBy(allocation -> allocation.getKey().getOrderId()));
 
-        Map<String, Boolean> dropshipByProvider = new HashMap<>();
         List<DropshipCandidate> candidates = new LinkedList<>();
-        for (Map.Entry<String, List<Allocation>> entry : directToConsumerByOrderId.entrySet()) {
-            Set<String> providers = entry.getValue().stream()
-                    .map(Allocation::getDeliveryId)
-                    .collect(Collectors.toSet());
-            if (providers.size() != 1) {
-                continue;
-            }
-            String provider = providers.iterator().next();
-            boolean dropshipSupported = dropshipByProvider.computeIfAbsent(provider,
-                    p -> supplierPurchaseService.isDropshipAvailable(storeId, p));
-            if (!dropshipSupported) {
-                continue;
-            }
-            candidates.add(new DropshipCandidate(entry.getKey(), provider, groupAndUnify(entry.getValue())));
-        }
+        directToConsumerByOrderId.forEach((orderId, allocations) ->
+                eligibleProvider(storeId, orderId).ifPresent(provider ->
+                        candidates.add(new DropshipCandidate(orderId, provider, groupAndUnify(allocations)))));
 
         Set<String> candidateOrderIds = candidates.stream()
                 .map(DropshipCandidate::orderId)
@@ -84,6 +78,14 @@ public class DeliveriesPlanningService {
         return new Partition(batch, candidates.stream()
                 .sorted(Comparator.comparing(DropshipCandidate::orderId))
                 .toList());
+    }
+
+    private Optional<String> eligibleProvider(String storeId, String orderId) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        if (order == null) {
+            return Optional.empty();
+        }
+        return dropshipEligibility.eligibleProvider(order, orderItemsRepository.findByOrderId(orderId));
     }
 
     private List<Delivery> groupIntoDeliveries(String storeId, List<Allocation> allocations) {
