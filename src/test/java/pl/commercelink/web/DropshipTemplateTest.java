@@ -73,7 +73,8 @@ class DropshipTemplateTest {
 
         // then
         assertThat(dropship).contains("deliveries.create.title");
-        assertThat(dropship).contains("orders.dropship.confirm.consignee");
+        assertThat(dropship).doesNotContain("orders.dropship.confirm.consignee");
+        assertThat(dropship).doesNotContain("${consignee");
         assertThat(dropship).doesNotContain("deliveries.preview.dropship.order");
         assertThat(dropship).contains("dropship/create");
         assertThat(dropship).contains("dropship/purchase");

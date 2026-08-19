@@ -19,17 +19,6 @@
                 </div>
             </div>
 
-            <div class="notification is-info is-light">
-                <p class="mb-2"><strong th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</strong></p>
-                <p>
-                    <span th:text="${consignee.displayName}">Jan Kowalski</span><br/>
-                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
-                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
-                    <span th:text="${consignee.phone}">+48601234567</span><br/>
-                    <span th:text="${consignee.email}">jan@example.com</span>
-                </p>
-            </div>
-
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
             <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/create(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/create(orderId=${order.orderId})}"
