@@ -9,6 +9,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import pl.commercelink.starter.security.StoreAccessInterceptor;
 import pl.commercelink.starter.security.StoreApiKeyAuthorizationInterceptor;
+import pl.commercelink.registration.EmailVerificationInterceptor;
 import pl.commercelink.starter.security.interceptor.ApiGatewayIdInterceptor;
 
 @Configuration
@@ -25,6 +26,9 @@ public class WebConfig {
 
     @Autowired
     private StoreAccessInterceptor storeAccessInterceptor;
+
+    @Autowired
+    private EmailVerificationInterceptor emailVerificationInterceptor;
 
     @Bean
     public WebMvcConfigurer corsConfigurer()
@@ -43,6 +47,9 @@ public class WebConfig {
                 registry.addInterceptor(storeApiKeyAuthorizationInterceptor)
                         .addPathPatterns("/Store/*/Catalog/**")
                         .excludePathPatterns("/store/*/individual/offer/**");
+
+                registry.addInterceptor(emailVerificationInterceptor)
+                        .addPathPatterns("/dashboard/**");
 
                 registry.addInterceptor(storeAccessInterceptor)
                         .addPathPatterns("/dashboard/store/**")
