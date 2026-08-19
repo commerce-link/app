@@ -49,7 +49,7 @@ class DeliveriesControllerReceiveTest {
     void receiveOnDropshipDeliveryRedirectsWithoutReceiving() {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
-        delivery.setDropship(new Dropship("order-1"));
+        delivery.setDropshipDetails(new Dropship("order-1"));
         when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
         when(messageSource.getMessage(eq("deliveries.receive.error.dropship"), any(), any()))
                 .thenReturn("blocked");

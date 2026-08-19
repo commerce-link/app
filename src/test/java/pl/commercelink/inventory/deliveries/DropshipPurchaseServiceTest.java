@@ -131,7 +131,7 @@ class DropshipPurchaseServiceTest {
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
-        delivery.setDropship(new Dropship(ORDER_ID));
+        delivery.setDropshipDetails(new Dropship(ORDER_ID));
         return delivery;
     }
 

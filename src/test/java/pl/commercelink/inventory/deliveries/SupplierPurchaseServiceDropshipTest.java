@@ -117,7 +117,7 @@ class SupplierPurchaseServiceDropshipTest {
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
-        delivery.setDropship(new Dropship(ORDER_ID));
+        delivery.setDropshipDetails(new Dropship(ORDER_ID));
         lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
                 .thenReturn(deliveryWithAllocations(form));
         return delivery;

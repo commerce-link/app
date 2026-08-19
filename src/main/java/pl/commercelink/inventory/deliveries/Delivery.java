@@ -72,7 +72,7 @@ public class Delivery {
     private ConnectionMode connectionMode;
 
     @DynamoDBAttribute(attributeName = "dropship")
-    private Dropship dropship;
+    private Dropship dropshipDetails;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -474,22 +474,22 @@ public class Delivery {
         return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
     }
 
-    public Dropship getDropship() {
-        return dropship;
+    public Dropship getDropshipDetails() {
+        return dropshipDetails;
     }
 
-    public void setDropship(Dropship dropship) {
-        this.dropship = dropship;
+    public void setDropshipDetails(Dropship dropshipDetails) {
+        this.dropshipDetails = dropshipDetails;
     }
 
     @DynamoDBIgnore
     public boolean isDropship() {
-        return dropship != null && dropship.hasOrder();
+        return dropshipDetails != null && dropshipDetails.hasOrder();
     }
 
     @DynamoDBIgnore
     public Optional<String> dropshipOrderId() {
-        return isDropship() ? Optional.of(dropship.getOrderId()) : Optional.empty();
+        return isDropship() ? Optional.of(dropshipDetails.getOrderId()) : Optional.empty();
     }
 
     public boolean isPaid() {

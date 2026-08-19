@@ -2,7 +2,6 @@ package pl.commercelink.inventory.deliveries;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 
 @DynamoDBDocument
 public class Dropship {
@@ -13,6 +12,9 @@ public class Dropship {
     }
 
     public Dropship(String orderId) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new IllegalArgumentException("Dropship requires an orderId");
+        }
         this.orderId = orderId;
     }
 
@@ -25,7 +27,6 @@ public class Dropship {
         this.orderId = orderId;
     }
 
-    @DynamoDBIgnore
     public boolean hasOrder() {
         return orderId != null && !orderId.isBlank();
     }

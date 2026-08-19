@@ -1,6 +1,8 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 import java.util.Optional;
 
@@ -27,7 +29,7 @@ class DeliveryTest {
     void isDropshipReturnsTrueWhenDropshipAspectCarriesOrderId() {
         // given
         Delivery delivery = new Delivery();
-        delivery.setDropship(new Dropship("order-1"));
+        delivery.setDropshipDetails(new Dropship("order-1"));
 
         // when / then
         assertTrue(delivery.isDropship());
@@ -46,7 +48,9 @@ class DeliveryTest {
     void isDropshipReturnsFalseWhenDropshipOrderIdIsBlank() {
         // given
         Delivery delivery = new Delivery();
-        delivery.setDropship(new Dropship(" "));
+        Dropship dropship = new Dropship();
+        dropship.setOrderId(" ");
+        delivery.setDropshipDetails(dropship);
 
         // when / then
         assertFalse(delivery.isDropship());
@@ -56,7 +60,7 @@ class DeliveryTest {
     void dropshipOrderIdReturnsOrderIdForDropshipDelivery() {
         // given
         Delivery delivery = new Delivery();
-        delivery.setDropship(new Dropship("order-1"));
+        delivery.setDropshipDetails(new Dropship("order-1"));
 
         // when / then
         assertEquals(Optional.of("order-1"), delivery.dropshipOrderId());
@@ -69,5 +73,20 @@ class DeliveryTest {
 
         // when / then
         assertEquals(Optional.empty(), delivery.dropshipOrderId());
+    }
+
+    @Test
+    void dropshipPropertyBindsToBooleanInSpel() {
+        // given
+        Delivery dropship = new Delivery();
+        dropship.setDropshipDetails(new Dropship("order-1"));
+        Delivery warehouse = new Delivery();
+        SpelExpressionParser parser = new SpelExpressionParser();
+
+        // when / then
+        assertEquals(Boolean.TRUE, parser.parseExpression("dropship and true")
+                .getValue(new StandardEvaluationContext(dropship), Boolean.class));
+        assertEquals(Boolean.FALSE, parser.parseExpression("dropship and true")
+                .getValue(new StandardEvaluationContext(warehouse), Boolean.class));
     }
 }
