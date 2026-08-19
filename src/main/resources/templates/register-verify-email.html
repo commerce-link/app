@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>CommerceLink</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <script th:if="${captchaSiteKey != null}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         html, body {
             height: 100%;
@@ -69,39 +68,21 @@
 <body>
 
 <div class="demo-card">
-    <h1 th:text="#{registration.title}"></h1>
-    <p th:text="#{registration.lead}"></p>
-    <div th:if="${demoMode}" class="notification is-info is-light" th:text="#{registration.demo-notice(${ttlDays})}"></div>
+    <h1 th:text="#{registration.verify.title}"></h1>
+    <p th:text="#{registration.verify.lead(${email})}"></p>
     <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
-    <form method="post" action="/register">
+    <div th:if="${infoMessage}" class="notification is-info is-light" th:text="${infoMessage}"></div>
+    <form method="post" action="/register/verify-email">
         <div class="field">
             <div class="control">
-                <input class="input" type="email" name="email" required
-                       th:placeholder="#{registration.email.placeholder}" th:value="${email}">
+                <input class="input" type="text" name="code" required autofocus inputmode="numeric"
+                       autocomplete="one-time-code" th:placeholder="#{registration.verify.placeholder}">
             </div>
         </div>
-        <div class="field" th:unless="${demoMode}">
-            <label class="label" th:text="#{registration.store-name.label}"></label>
-            <div class="control">
-                <input class="input" type="text" name="storeName" required minlength="2" maxlength="60"
-                       th:placeholder="#{registration.store-name.placeholder}" th:value="${storeName}">
-            </div>
-        </div>
-        <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
-        <div class="field">
-            <label class="checkbox">
-                <input type="checkbox" name="termsConsent" required>
-                <span th:text="#{registration.terms-consent}"></span>
-                <a th:if="${termsUrl != null}" th:href="${termsUrl}" target="_blank" rel="noopener"
-                   th:text="#{registration.terms-consent.link}"></a>
-                <span th:unless="${termsUrl != null}" th:text="#{registration.terms-consent.link}"></span>
-                <span th:text="#{registration.terms-consent.suffix}"></span>
-            </label>
-        </div>
-        <div class="field is-flex is-justify-content-center" th:if="${captchaSiteKey != null}">
-            <div class="cf-turnstile" th:attr="data-sitekey=${captchaSiteKey}"></div>
-        </div>
-        <button type="submit" class="button is-primary" th:text="#{registration.submit}"></button>
+        <button type="submit" class="button is-primary" th:text="#{registration.verify.submit}"></button>
+    </form>
+    <form method="post" action="/register/verify-email/resend" class="mt-4">
+        <button type="submit" class="button is-text" th:text="#{registration.verify.resend}"></button>
     </form>
 </div>
 

@@ -50,16 +50,18 @@ class CognitoUserServiceTest {
     }
 
     @Test
-    void createsAdminUserWithStoreAttributesAndEmailInvite() {
+    void createsAdminUserWithStoreAttributesAndSuppressedInvite() {
         // given
-        ArgumentCaptor<AdminCreateUserRequest> captor = ArgumentCaptor.forClass(AdminCreateUserRequest.class);
+        ArgumentCaptor<AdminCreateUserRequest> createCaptor = ArgumentCaptor.forClass(AdminCreateUserRequest.class);
+        ArgumentCaptor<AdminSetUserPasswordRequest> passwordCaptor = ArgumentCaptor.forClass(AdminSetUserPasswordRequest.class);
 
         // when
-        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4");
+        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4", "Tajne1!haslo", true);
 
         // then
-        verify(cognitoClient).adminCreateUser(captor.capture());
-        AdminCreateUserRequest request = captor.getValue();
+        verify(cognitoClient).adminCreateUser(createCaptor.capture());
+        verify(cognitoClient).adminSetUserPassword(passwordCaptor.capture());
+        AdminCreateUserRequest request = createCaptor.getValue();
         Map<String, String> attributes = request.userAttributes().stream()
                 .collect(Collectors.toMap(AttributeType::name, AttributeType::value));
         assertEquals(POOL_ID, request.userPoolId());
@@ -68,24 +70,24 @@ class CognitoUserServiceTest {
         assertEquals("abc123def4", attributes.get("custom:storeId"));
         assertEquals("true", attributes.get("email_verified"));
         assertEquals("user@example.com", attributes.get("name"));
-        assertNull(request.messageAction());
+        assertEquals(MessageActionType.SUPPRESS, request.messageAction());
+        assertEquals("Tajne1!haslo", passwordCaptor.getValue().password());
+        assertTrue(passwordCaptor.getValue().permanent());
     }
 
     @Test
-    void createsUserWithPermanentPasswordAndSuppressedInvite() {
+    void createsUnverifiedUserWhenEmailVerificationIsRequired() {
         // given
         ArgumentCaptor<AdminCreateUserRequest> createCaptor = ArgumentCaptor.forClass(AdminCreateUserRequest.class);
-        ArgumentCaptor<AdminSetUserPasswordRequest> passwordCaptor = ArgumentCaptor.forClass(AdminSetUserPasswordRequest.class);
 
         // when
-        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4", "Demo1!secret");
+        cognitoUserService.createStoreAdmin("user@example.com", "abc123def4", "Tajne1!haslo", false);
 
         // then
         verify(cognitoClient).adminCreateUser(createCaptor.capture());
-        verify(cognitoClient).adminSetUserPassword(passwordCaptor.capture());
-        assertEquals(MessageActionType.SUPPRESS, createCaptor.getValue().messageAction());
-        assertEquals("Demo1!secret", passwordCaptor.getValue().password());
-        assertTrue(passwordCaptor.getValue().permanent());
+        Map<String, String> attributes = createCaptor.getValue().userAttributes().stream()
+                .collect(Collectors.toMap(AttributeType::name, AttributeType::value));
+        assertEquals("false", attributes.get("email_verified"));
     }
 
     @Test
