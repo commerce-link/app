@@ -37,7 +37,7 @@ public class MarketplaceOfferExportEventListener {
     private final PricelistRepository pricelistRepository;
     private final Inventory inventory;
     private final MarketplaceProviderFactory providerFactory;
-    private final MarketplaceOfferExportRepository marketplaceOfferExportRepository;
+    private final MarketplaceExportRunService marketplaceExportRunService;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -64,44 +64,62 @@ public class MarketplaceOfferExportEventListener {
             return;
         }
 
+        MarketplaceExportRun run = new MarketplaceExportRun(
+                payload.getStoreId(), payload.getMarketplace(), payload.getCatalogId());
+
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(store.getStoreId());
 
-        List<MarketplaceOffer> offers = new LinkedList<>();
-        for (CategoryDefinition category : catalog.getCategories()) {
-            Optional<MarketplaceDefinition> op = category.getCategoryDefinition(payload.getMarketplace());
+        List<MarketplaceOffer> offers = collectOffersFromCatalog(
+                catalog, payload.getMarketplace(), enrichedInventory, pricelist);
 
-            if (op.isPresent()) {
-                MarketplaceDefinition marketplaceDefinition = op.get();
-
-                if (!marketplaceDefinition.isEnabled()) {
-                    continue;
-                }
-
-                offers.addAll(createMarketplaceOffers(category, marketplaceDefinition, enrichedInventory, pricelist));
-            }
-        }
-
-        handleMarketplaceExport(store, catalog, payload.getMarketplace(), offers);
+        handleMarketplaceExport(store, catalog, payload.getMarketplace(), offers, run);
     }
 
-    private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category, MarketplaceDefinition marketplaceDefinition, InventoryView inventory, Pricelist pricelist) {
+    private List<MarketplaceOffer> collectOffersFromCatalog(ProductCatalog catalog,
+                                                            String marketplace,
+                                                            InventoryView inventory,
+                                                            Pricelist pricelist) {
+        List<MarketplaceOffer> offers = new LinkedList<>();
+
+        for (CategoryDefinition category : catalog.getCategories()) {
+            Optional<MarketplaceDefinition> definitionForMarketplace = category.getCategoryDefinition(marketplace);
+
+            if (definitionForMarketplace.isEmpty()) {
+                continue;
+            }
+
+            MarketplaceDefinition marketplaceDefinition = definitionForMarketplace.get();
+            if (!marketplaceDefinition.isEnabled()) {
+                continue;
+            }
+
+            offers.addAll(createMarketplaceOffers(category, marketplaceDefinition, inventory, pricelist));
+        }
+        return offers;
+    }
+
+    private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category,
+                                                           MarketplaceDefinition marketplaceDefinition,
+                                                           InventoryView inventory,
+                                                           Pricelist pricelist) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
         String categoryName = category.getName();
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 
-            Optional<AvailabilityAndPrice> op = pricelist.findByPimId(product.getPimId());
+            Optional<AvailabilityAndPrice> priceInPricelist = pricelist.findByPimId(product.getPimId());
 
-            if (!op.isPresent()) {
+            if (priceInPricelist.isEmpty()) {
                 continue;
             }
 
-            if (marketplaceDefinition.isExportSelectedProducts() && !product.isApprovedForMarketplace(marketplaceDefinition.getName())) {
+            if (marketplaceDefinition.isExportSelectedProducts()
+                    && !product.isApprovedForMarketplace(marketplaceDefinition.getName())) {
                 continue;
             }
 
-            AvailabilityAndPrice availabilityAndPrice = op.get();
+            AvailabilityAndPrice availabilityAndPrice = priceInPricelist.get();
             MatchedInventory matchedInventory = inventory.findByProduct(product);
 
             long qtyToPublish;
@@ -129,9 +147,9 @@ public class MarketplaceOfferExportEventListener {
         return result;
     }
 
-    private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQty, String categoryName) {
+    private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQuantity, String categoryName) {
         long marketplacePrice = Math.round(availabilityAndPrice.getPrice() * marketplaceMarkup);
-        long marketplaceQty = Math.min(30, totalQty);
+        long marketplaceQuantity = Math.min(30, totalQuantity);
 
         return new MarketplaceOffer(
                 availabilityAndPrice.getPimId(),
@@ -141,12 +159,16 @@ public class MarketplaceOfferExportEventListener {
                 availabilityAndPrice.getName(),
                 categoryName,
                 marketplacePrice,
-                marketplaceQty,
+                marketplaceQuantity,
                 availabilityAndPrice.getEstimatedDeliveryDays()
         );
     }
 
-    private void handleMarketplaceExport(Store store, ProductCatalog catalog, String marketplace, List<MarketplaceOffer> currentOffers) {
+    private void handleMarketplaceExport(Store store,
+                                         ProductCatalog catalog,
+                                         String marketplace,
+                                         List<MarketplaceOffer> currentOffers,
+                                         MarketplaceExportRun run) {
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
         if (provider == null) {
             return;
@@ -156,22 +178,25 @@ public class MarketplaceOfferExportEventListener {
         List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, pimIdsOf(currentOffers));
         List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
-        if (!currentOffers.isEmpty() || !pendingRemovals.isEmpty()) {
-            provider.exportOffers(currentOffers, pendingRemovals);
+        boolean providerCalled = !currentOffers.isEmpty() || !pendingRemovals.isEmpty();
+        run.offers(buildNextSnapshot(retryableOrphans, currentOffers));
+
+        try {
+            if (providerCalled) {
+                provider.exportOffers(currentOffers, pendingRemovals, run::rejected);
+            }
+        } catch (RuntimeException exception) {
+            run.failed(exception);
+            marketplaceExportRunService.saveRun(run);
+            throw exception;
         }
 
-        saveCurrentSnapshot(store, catalog, marketplace, buildNextSnapshot(retryableOrphans, currentOffers));
+        marketplaceExportRunService.saveRun(run);
     }
 
     private List<MarketplaceOfferSnapshot> loadPreviousSnapshot(Store store, ProductCatalog catalog, String marketplace) {
-        return marketplaceOfferExportRepository.loadPreviousExport(
+        return marketplaceExportRunService.loadPreviousExport(
                 store.getStoreId(), catalog.getCatalogId(), marketplace
-        );
-    }
-
-    private void saveCurrentSnapshot(Store store, ProductCatalog catalog, String marketplace, List<MarketplaceOfferSnapshot> snapshot) {
-        marketplaceOfferExportRepository.saveCurrentExport(
-                store.getStoreId(), catalog.getCatalogId(), marketplace, snapshot
         );
     }
 
@@ -183,26 +208,27 @@ public class MarketplaceOfferExportEventListener {
 
     private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
         return previousSnapshots.stream()
-                .filter(ps -> !currentPimIds.contains(ps.getPimId()))
-                .filter(ps -> ps.getRemovalAttempts() < removalRetryCount)
+                .filter(snapshot -> !currentPimIds.contains(snapshot.pimId()))
+                .filter(snapshot -> snapshot.removalAttempts() < removalRetryCount)
                 .toList();
     }
 
     private List<MarketplaceOffer> toUnpublishOffers(List<MarketplaceOfferSnapshot> orphans) {
         return orphans.stream()
-                .map(ps -> new MarketplaceOffer(
-                        ps.getPimId(), null, null, null, null, null,
-                        ps.getPrice(), 0L, 0))
+                .map(snapshot -> new MarketplaceOffer(
+                        snapshot.pimId(), null, null, null, null, null,
+                        snapshot.price(), 0L, 0))
                 .toList();
     }
 
-    private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans, List<MarketplaceOffer> currentOffers) {
+    private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans,
+                                                             List<MarketplaceOffer> currentOffers) {
         Stream<MarketplaceOfferSnapshot> incrementedOrphans = retryableOrphans.stream()
-                .map(ps -> new MarketplaceOfferSnapshot(
-                        ps.getPimId(), ps.getPrice(), 0L, ps.getRemovalAttempts() + 1));
+                .map(snapshot -> MarketplaceOfferSnapshot.removalPending(
+                        snapshot.pimId(), snapshot.price(), snapshot.removalAttempts() + 1));
         Stream<MarketplaceOfferSnapshot> currentAsActive = currentOffers.stream()
-                .map(o -> new MarketplaceOfferSnapshot(
-                        o.productId(), o.price(), o.quantity(), 0));
+                .map(offer -> MarketplaceOfferSnapshot.published(
+                        offer.productId(), offer.price(), offer.quantity()));
         return Stream.concat(incrementedOrphans, currentAsActive).toList();
     }
 }

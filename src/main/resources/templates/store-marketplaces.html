@@ -13,6 +13,40 @@
 
             <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId}, false)}"></div>
 
+            <div class="box" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${form.store.storeId} : '/dashboard/store'">
+                <h2 class="title is-5" th:text="#{store.marketplaces.exports.title}"></h2>
+
+                <table class="table is-fullwidth is-narrow" th:if="${!exportRuns.isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{store.marketplaces.exports.column.date}"></th>
+                        <th th:text="#{store.marketplaces.exports.column.marketplace}"></th>
+                        <th th:text="#{store.marketplaces.exports.column.catalog}"></th>
+                        <th th:text="#{store.marketplaces.exports.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="run : ${exportRuns}">
+                        <td>
+                            <a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
+                               th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${run.runId()}"></a>
+                        </td>
+                        <td th:text="${run.marketplace()}"></td>
+                        <td th:text="${run.catalogId()}"></td>
+                        <td>
+                            <span class="tag is-success" th:unless="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                            <span class="tag is-danger" th:if="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <p th:if="${exportRuns.isEmpty()}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.empty}"></p>
+            </div>
+
         </div>
     </section>
 
