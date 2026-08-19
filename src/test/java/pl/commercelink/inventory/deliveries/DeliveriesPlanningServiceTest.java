@@ -11,6 +11,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -73,7 +75,7 @@ class DeliveriesPlanningServiceTest {
                 allocation("order-3", "4", "Acme", true)));
 
         // when
-        List<DropshipCandidate> candidates = service.dropshipCandidates(STORE_ID);
+        List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
 
         // then
         assertThat(candidates).hasSize(2);
@@ -92,7 +94,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
 
         // when
-        List<DropshipCandidate> candidates = service.dropshipCandidates(STORE_ID);
+        List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
         List<Delivery> deliveries = service.run(STORE_ID);
 
         // then
@@ -112,7 +114,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
 
         // when
-        List<DropshipCandidate> candidates = service.dropshipCandidates(STORE_ID);
+        List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
         List<Delivery> deliveries = service.run(STORE_ID);
 
         // then
@@ -127,6 +129,21 @@ class DeliveriesPlanningServiceTest {
                 allocation("order-1", "1", "Acme", false)));
 
         // when / then
-        assertThat(service.dropshipCandidates(STORE_ID)).isEmpty();
+        assertThat(service.plan(STORE_ID).dropshipCandidates()).isEmpty();
+    }
+
+    @Test
+    void planFetchesOrderAllocationsOnlyOnce() {
+        // given
+        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+
+        // when
+        DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);
+
+        // then
+        assertThat(planning.deliveries()).isEmpty();
+        assertThat(planning.dropshipCandidates()).isEmpty();
+        verify(orderAllocationsManager, times(1)).fetchAll(STORE_ID);
     }
 }

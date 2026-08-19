@@ -24,11 +24,18 @@ public class DeliveriesPlanningService {
     @Autowired
     private SupplierPurchaseService supplierPurchaseService;
 
-    public List<Delivery> run(String storeId) {
+    public record Planning(List<Delivery> deliveries, List<DropshipCandidate> dropshipCandidates) {
+    }
+
+    public Planning plan(String storeId) {
         Partition partition = partition(storeId);
         List<Allocation> allocations = new LinkedList<>(partition.batch());
         allocations.addAll(warehouseAllocationsManager.fetchAll(storeId));
-        return groupIntoDeliveries(storeId, allocations);
+        return new Planning(groupIntoDeliveries(storeId, allocations), partition.candidates());
+    }
+
+    public List<Delivery> run(String storeId) {
+        return plan(storeId).deliveries();
     }
 
     public Delivery run(String storeId, String provider) {
@@ -36,10 +43,6 @@ public class DeliveriesPlanningService {
                 .filter(d -> d.getProvider().equals(provider))
                 .findFirst()
                 .orElse(null);
-    }
-
-    public List<DropshipCandidate> dropshipCandidates(String storeId) {
-        return partition(storeId).candidates();
     }
 
     private record Partition(List<Allocation> batch, List<DropshipCandidate> candidates) {

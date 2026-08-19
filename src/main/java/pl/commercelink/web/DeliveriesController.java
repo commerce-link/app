@@ -428,10 +428,10 @@ public class DeliveriesController {
     }
 
     private String showDeliveriesPreview(String storeId, Model model) {
-        var deliveries = deliveriesPlanningService.run(storeId);
+        var planning = deliveriesPlanningService.plan(storeId);
 
-        model.addAttribute("deliveries", deliveries);
-        model.addAttribute("dropshipCandidates", deliveriesPlanningService.dropshipCandidates(storeId));
+        model.addAttribute("deliveries", planning.deliveries());
+        model.addAttribute("dropshipCandidates", planning.dropshipCandidates());
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
