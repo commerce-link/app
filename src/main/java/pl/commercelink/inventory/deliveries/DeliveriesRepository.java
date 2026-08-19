@@ -205,7 +205,8 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
         DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
                 .withHashKeyValues(deliveryKey)
-                .withFilterExpression("provider = :provider AND (attribute_not_exists(receivedAt) OR receivedAt = :null)")
+                .withFilterExpression("provider = :provider AND (attribute_not_exists(receivedAt) OR receivedAt = :null)"
+                        + " AND attribute_not_exists(dropshipOrderId)")
                 .withExpressionAttributeValues(expressionAttributeValues);
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)

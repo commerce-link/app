@@ -131,4 +131,14 @@ class DropshipTemplateTest {
         assertThat(html).contains("${dropshipShipment.type.name()}");
         assertThat(html).contains("${dropshipShipment.collectionPointCode}");
     }
+
+    @Test
+    void deliveryDetailsHideMergeAndSplitForDropshipDeliveries() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("!delivery.dropship and !mergeTargetDeliveries.isEmpty()");
+        assertThat(html).contains("(isAdmin or isSuperAdmin) and !delivery.dropship}\" value=\"splitSelectedAllocations\"");
+    }
 }

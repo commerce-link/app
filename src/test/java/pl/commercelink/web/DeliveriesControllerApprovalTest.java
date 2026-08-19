@@ -745,6 +745,65 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void mergeIsRefusedWhenEitherDeliveryIsDropship() {
+        // given
+        Delivery source = new Delivery(STORE_ID, null, PROVIDER);
+        source.setDeliveryId(DELIVERY_ID);
+        source.setDropshipOrderId("order-1");
+        Delivery target = new Delivery(STORE_ID, null, PROVIDER);
+        target.setDeliveryId("delivery-2");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
+        }
+    }
+
+    @Test
+    void splitIsRefusedForADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setDropshipOrderId("order-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
+        }
+    }
+
+    @Test
     void receivingAllocationsIsBlockedWhileAwaitingApproval() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());

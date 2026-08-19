@@ -311,6 +311,11 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.merge.error.approvalState", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
         }
+        if (source.isDropship() || target.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.merge.error.dropship", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
 
         deliveriesManager.reassignAllocations(
                 storeId,
@@ -329,16 +334,23 @@ public class DeliveriesController {
         if (isEditLocked(getStoreId(), form.getDeliveryId())) {
             return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
-        return splitAllocations(getStoreId(), form, redirectAttributes);
+        return splitAllocations(getStoreId(), form, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/splitSelectedAllocations")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String splitSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
-        return splitAllocations(storeId, form, redirectAttributes);
+    public String splitSelectedAllocationsForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute DeliveryAllocationsForm form,
+                                                        RedirectAttributes redirectAttributes, Locale locale) {
+        return splitAllocations(storeId, form, redirectAttributes, locale);
     }
 
-    private String splitAllocations(String storeId, DeliveryAllocationsForm form, RedirectAttributes redirectAttributes) {
+    private String splitAllocations(String storeId, DeliveryAllocationsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        if (delivery != null && delivery.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.merge.error.dropship", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
         if (StringUtils.isBlank(form.getTargetExternalDeliveryId())) {
             redirectAttributes.addFlashAttribute("errorMessage", "Target external delivery ID cannot be empty for split operation.");
         }
