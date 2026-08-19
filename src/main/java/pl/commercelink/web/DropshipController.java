@@ -155,43 +155,42 @@ public class DropshipController extends BaseController {
         return "dropshipCreate";
     }
 
-    private String showDropshipConfirmation(String storeId, String orderId, DeliveryCreationForm form, Model model) {
+    private Optional<Order> eligibleOrderMatching(String storeId, String orderId, DeliveryCreationForm form) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
-            return orderDetailsRedirect(storeId, orderId);
+            return Optional.empty();
         }
         Optional<String> provider = eligibleProviderFor(order);
         if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
-            return orderDetailsRedirect(storeId, orderId);
+            return Optional.empty();
         }
         form.setStoreId(storeId);
-        addConfirmationModel(model, storeId, order, form);
+        return Optional.of(order);
+    }
+
+    private String showDropshipConfirmation(String storeId, String orderId, DeliveryCreationForm form, Model model) {
+        Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
+        if (order.isEmpty()) {
+            return orderDetailsRedirect(storeId, orderId);
+        }
+        addConfirmationModel(model, storeId, order.get(), form);
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         return "dropshipConfirmation";
     }
 
     private String executeManualDropship(String storeId, String orderId, DeliveryCreationForm form,
                                          RedirectAttributes redirectAttributes, Locale locale) {
-        Order order = ordersRepository.findById(storeId, orderId);
-        if (order == null) {
+        Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
+        if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
-        Optional<String> provider = eligibleProviderFor(order);
-        if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
-            return orderDetailsRedirect(storeId, orderId);
-        }
-        form.setStoreId(storeId);
-        OperationResult<String> result = supplierPurchaseService.createManualDropship(storeId, order, form);
+        OperationResult<String> result = supplierPurchaseService.createManualDropship(storeId, order.get(), form);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
-            return isSuperAdmin()
-                    ? String.format("redirect:/dashboard/store/%s/orders/%s/dropship", storeId, orderId)
-                    : "redirect:/dashboard/orders/" + orderId + "/dropship";
+            return dropshipCreateRedirect(storeId, orderId);
         }
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, result.getPayload())
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + result.getPayload();
+        return deliveryDetailsRedirect(storeId, result.getPayload());
     }
 
     private Optional<String> eligibleProviderFor(Order order) {
@@ -240,34 +239,37 @@ public class DropshipController extends BaseController {
 
     private String executeDropship(String storeId, String orderId, String purchaseRef,
                                    DeliveryCreationForm form, Model model, Locale locale) {
-        Order order = ordersRepository.findById(storeId, orderId);
-        if (order == null) {
+        Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
+        if (order.isEmpty()) {
             return orderDetailsRedirect(storeId, orderId);
         }
-        Optional<String> provider = eligibleProviderFor(order);
-        if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
-            return orderDetailsRedirect(storeId, orderId);
-        }
-        form.setStoreId(storeId);
         OperationResult<PurchaseSubmission> result =
-                supplierPurchaseService.submitDropship(storeId, order, form, purchaseRef);
+                supplierPurchaseService.submitDropship(storeId, order.get(), form, purchaseRef);
 
         if (!result.isSuccess()) {
-            addConfirmationModel(model, storeId, order, form);
+            addConfirmationModel(model, storeId, order.get(), form);
             model.addAttribute("purchaseRef", purchaseRef);
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             return "dropshipConfirmation";
         }
-
-        String deliveryId = result.getPayload().deliveryId();
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        return deliveryDetailsRedirect(storeId, result.getPayload().deliveryId());
     }
 
     private String orderDetailsRedirect(String storeId, String orderId) {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/orders/%s", storeId, orderId)
                 : "redirect:/dashboard/orders/" + orderId;
+    }
+
+    private String deliveryDetailsRedirect(String storeId, String deliveryId) {
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
+                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+    }
+
+    private String dropshipCreateRedirect(String storeId, String orderId) {
+        return isSuperAdmin()
+                ? String.format("redirect:/dashboard/store/%s/orders/%s/dropship", storeId, orderId)
+                : "redirect:/dashboard/orders/" + orderId + "/dropship";
     }
 }
