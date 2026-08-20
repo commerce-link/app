@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -30,7 +31,7 @@ public class OrderIdRefreshService {
         if (delivery == null || !request.getPurchaseRef().equals(delivery.getPurchaseRef())) {
             return;
         }
-        SupplierProvider provider = resolveProvider(request);
+        SupplierProvider provider = resolveProvider(request.getStoreId(), request.getProvider());
         if (provider == null) {
             recordUnconfirmed(delivery);
             return;
@@ -46,9 +47,28 @@ public class OrderIdRefreshService {
         throw new ExternalOrderIdPendingException(request.getDeliveryId(), attempt);
     }
 
-    private SupplierProvider resolveProvider(OrderIdRefreshEventRequest request) {
+    public enum ManualRefreshOutcome { CONFIRMED, STILL_PENDING, UNAVAILABLE }
+
+    public ManualRefreshOutcome refreshManually(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || StringUtils.isBlank(delivery.getPurchaseRef())) {
+            return ManualRefreshOutcome.UNAVAILABLE;
+        }
+        SupplierProvider provider = resolveProvider(storeId, delivery.getProvider());
+        if (provider == null) {
+            return ManualRefreshOutcome.UNAVAILABLE;
+        }
+        Optional<String> confirmed = lookup(provider, delivery.getPurchaseRef());
+        if (confirmed.isEmpty()) {
+            return ManualRefreshOutcome.STILL_PENDING;
+        }
+        applyConfirmedId(delivery, confirmed.get());
+        return ManualRefreshOutcome.CONFIRMED;
+    }
+
+    private SupplierProvider resolveProvider(String storeId, String provider) {
         try {
-            return providerResolver.resolve(request.getStoreId(), request.getProvider());
+            return providerResolver.resolve(storeId, provider);
         } catch (RuntimeException e) {
             return null;
         }
@@ -63,11 +83,15 @@ public class OrderIdRefreshService {
     }
 
     private void applyConfirmedId(Delivery delivery, String confirmedId) {
-        if (confirmedId.equals(delivery.getExternalDeliveryId())) {
+        boolean idChanged = !confirmedId.equals(delivery.getExternalDeliveryId());
+        if (!idChanged && !delivery.isExternalDeliveryIdProvisional()) {
             return;
         }
         delivery.setExternalDeliveryId(confirmedId);
-        delivery.addEvent(new Event(EventType.action, ORDER_ID_CONFIRMED_EVENT, LocalDateTime.now()));
+        delivery.setExternalDeliveryIdProvisional(false);
+        if (idChanged) {
+            delivery.addEvent(new Event(EventType.action, ORDER_ID_CONFIRMED_EVENT, LocalDateTime.now()));
+        }
         deliveriesRepository.save(delivery);
     }
 

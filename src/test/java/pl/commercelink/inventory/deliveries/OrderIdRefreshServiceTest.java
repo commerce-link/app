@@ -11,6 +11,7 @@ import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -178,5 +179,99 @@ class OrderIdRefreshServiceTest {
         // then
         assertTrue(delivery.getEvents().stream().anyMatch(e -> "DELIVERY_ORDER_ID_UNCONFIRMED".equals(e.getName())));
         verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void confirmingClearsTheProvisionalFlag() {
+        // given
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+        when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
+        when(supplierProvider.confirmedOrderId("ref-1")).thenReturn(Optional.of("ZS-123456"));
+
+        // when
+        service.refresh(request(), 1);
+
+        // then
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void equalConfirmedIdStillClearsALingeringProvisionalFlag() {
+        // given
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryId("ZS-123456");
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+        when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
+        when(supplierProvider.confirmedOrderId("ref-1")).thenReturn(Optional.of("ZS-123456"));
+
+        // when
+        service.refresh(request(), 1);
+
+        // then
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertFalse(delivery.getEvents().stream().anyMatch(e -> "DELIVERY_ORDER_ID_CONFIRMED".equals(e.getName())));
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void manualRefreshConfirmsAndClearsFlag() {
+        // given
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+        when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
+        when(supplierProvider.confirmedOrderId("ref-1")).thenReturn(Optional.of("ZS-123456"));
+
+        // when
+        OrderIdRefreshService.ManualRefreshOutcome outcome = service.refreshManually("s1", "d1");
+
+        // then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.CONFIRMED, outcome);
+        assertEquals("ZS-123456", delivery.getExternalDeliveryId());
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+    }
+
+    @Test
+    void manualRefreshReportsStillPendingWithoutSaving() {
+        // given
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery());
+        when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
+        when(supplierProvider.confirmedOrderId("ref-1")).thenReturn(Optional.empty());
+
+        // when / then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.STILL_PENDING, service.refreshManually("s1", "d1"));
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void manualRefreshTreatsSupplierFailureAsStillPending() {
+        // given
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery());
+        when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
+        when(supplierProvider.confirmedOrderId("ref-1")).thenThrow(new SupplierOrderException("boom"));
+
+        // when / then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.STILL_PENDING, service.refreshManually("s1", "d1"));
+    }
+
+    @Test
+    void manualRefreshUnavailableForMissingDeliveryOrRefOrProvider() {
+        // given
+        Delivery noRef = delivery();
+        noRef.setPurchaseRef(null);
+        when(deliveriesRepository.findById("s1", "missing")).thenReturn(null);
+        when(deliveriesRepository.findById("s1", "noref")).thenReturn(noRef);
+        Delivery unresolvable = delivery();
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(unresolvable);
+        when(providerResolver.resolve("s1", "IncomGroup")).thenThrow(new RuntimeException("secret missing"));
+
+        // when / then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "missing"));
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "noref"));
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "d1"));
     }
 }
