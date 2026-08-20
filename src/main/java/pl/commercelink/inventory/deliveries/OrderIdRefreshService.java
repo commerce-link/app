@@ -30,7 +30,7 @@ public class OrderIdRefreshService {
         if (delivery == null || !request.getPurchaseRef().equals(delivery.getPurchaseRef())) {
             return;
         }
-        SupplierProvider provider = providerResolver.resolve(request.getStoreId(), request.getProvider());
+        SupplierProvider provider = resolveProvider(request);
         if (provider == null) {
             recordUnconfirmed(delivery);
             return;
@@ -44,6 +44,14 @@ public class OrderIdRefreshService {
             recordUnconfirmed(delivery);
         }
         throw new ExternalOrderIdPendingException(request.getDeliveryId(), attempt);
+    }
+
+    private SupplierProvider resolveProvider(OrderIdRefreshEventRequest request) {
+        try {
+            return providerResolver.resolve(request.getStoreId(), request.getProvider());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private Optional<String> lookup(SupplierProvider provider, String purchaseRef) {

@@ -96,6 +96,7 @@ class OrderIdRefreshServiceTest {
 
         // when / then
         assertThrows(ExternalOrderIdPendingException.class, () -> service.refresh(request(), 1));
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test
@@ -155,6 +156,21 @@ class OrderIdRefreshServiceTest {
         Delivery delivery = delivery();
         when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
         when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(null);
+
+        // when
+        service.refresh(request(), 1);
+
+        // then
+        assertTrue(delivery.getEvents().stream().anyMatch(e -> "DELIVERY_ORDER_ID_UNCONFIRMED".equals(e.getName())));
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void throwingProviderResolutionRecordsUnconfirmedEventAndConsumes() {
+        // given
+        Delivery delivery = delivery();
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+        when(providerResolver.resolve("s1", "IncomGroup")).thenThrow(new RuntimeException("secret missing"));
 
         // when
         service.refresh(request(), 1);

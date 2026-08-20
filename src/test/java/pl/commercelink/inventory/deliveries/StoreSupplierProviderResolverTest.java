@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +49,7 @@ class StoreSupplierProviderResolverTest {
 
         // when / then
         assertSame(supplierProvider, resolver.resolve("s1", "IncomGroup"));
+        verifyNoInteractions(supplierProviderFactory);
     }
 
     @Test
@@ -57,5 +59,28 @@ class StoreSupplierProviderResolverTest {
 
         // when / then
         assertNull(resolver.resolve("missing", "Acme"));
+    }
+
+    @Test
+    void returnsNullForManualConnection() {
+        // given
+        when(storesRepository.findById("s1")).thenReturn(store);
+        when(store.isOwnSupplier("Manual")).thenReturn(false);
+        when(store.isGlobalSupplier("Manual")).thenReturn(false);
+
+        // when / then
+        assertNull(resolver.resolve("s1", "Manual"));
+    }
+
+    @Test
+    void returnsNullWhenNoGlobalSecretExists() {
+        // given
+        when(storesRepository.findById("s1")).thenReturn(store);
+        when(store.isOwnSupplier("IncomGroup")).thenReturn(false);
+        when(store.isGlobalSupplier("IncomGroup")).thenReturn(true);
+        when(globalSupplierProviderFactory.get("IncomGroup")).thenReturn(Optional.empty());
+
+        // when / then
+        assertNull(resolver.resolve("s1", "IncomGroup"));
     }
 }
