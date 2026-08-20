@@ -356,6 +356,7 @@ class SupplierPurchaseServiceTest {
         verify(supplierProvider).placeOrder(argThat(request -> request.clientOrderRef().equals("ref-1")));
         verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
         verifyNoInteractions(orderIdRefreshEventPublisher);
     }
 
@@ -384,6 +385,7 @@ class SupplierPurchaseServiceTest {
                         && request.getDeliveryId().equals(DELIVERY_ID)
                         && request.getProvider().equals(PROVIDER)
                         && request.getPurchaseRef().equals("ref-1")));
+        assertTrue(delivery.isExternalDeliveryIdProvisional());
     }
 
     @Test

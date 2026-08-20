@@ -98,6 +98,8 @@ public class Delivery {
     private boolean synced;
     @DynamoDBAttribute(attributeName = "paid")
     private boolean paid;
+    @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
+    private boolean externalDeliveryIdProvisional;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -476,6 +478,14 @@ public class Delivery {
 
     public void setPaid(boolean paid) {
         this.paid = paid;
+    }
+
+    public boolean isExternalDeliveryIdProvisional() {
+        return externalDeliveryIdProvisional;
+    }
+
+    public void setExternalDeliveryIdProvisional(boolean externalDeliveryIdProvisional) {
+        this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
     }
 
     public List<Shipment> getShipments() {

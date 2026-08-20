@@ -180,6 +180,7 @@ public class SupplierPurchaseService {
             }
 
             applyOrderResult(form, validation, orderResult);
+            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             deliveryCreationService.completePending(storeId, delivery, form);
             if (orderResult.provisional()) {
