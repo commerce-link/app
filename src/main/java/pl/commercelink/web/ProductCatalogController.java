@@ -295,6 +295,7 @@ public class ProductCatalogController {
         // Add pagination parameters for filtering
         Map<String, Object> paginationParams = new HashMap<>();
         if (StringUtils.isNotBlank(brand)) paginationParams.put("brand", brand);
+        if (StringUtils.isNotBlank(label)) paginationParams.put("label", label);
         if (StringUtils.isNotBlank(pimId)) paginationParams.put("pimId", pimId);
         if (StringUtils.isNotBlank(ean)) paginationParams.put("ean", ean);
         if (StringUtils.isNotBlank(mfn)) paginationParams.put("mfn", mfn);
@@ -421,6 +422,7 @@ public class ProductCatalogController {
         Map<String, Object> paginationParams = new HashMap<>();
         if (StringUtils.isNotBlank(status)) paginationParams.put("status", status);
         if (StringUtils.isNotBlank(brand)) paginationParams.put("brand", brand);
+        if (StringUtils.isNotBlank(label)) paginationParams.put("label", label);
         if (StringUtils.isNotBlank(pimId)) paginationParams.put("pimId", pimId);
         if (StringUtils.isNotBlank(ean)) paginationParams.put("ean", ean);
         if (StringUtils.isNotBlank(mfn)) paginationParams.put("mfn", mfn);
