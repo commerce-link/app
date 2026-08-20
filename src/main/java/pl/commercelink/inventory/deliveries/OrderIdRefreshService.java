@@ -1,0 +1,70 @@
+package pl.commercelink.inventory.deliveries;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.supplier.api.SupplierOrderException;
+import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Component
+@RequiredArgsConstructor
+public class OrderIdRefreshService {
+
+    static final int MAX_SQS_ATTEMPTS = 6;
+
+    private static final String ORDER_ID_CONFIRMED_EVENT = "DELIVERY_ORDER_ID_CONFIRMED";
+    private static final String ORDER_ID_UNCONFIRMED_EVENT = "DELIVERY_ORDER_ID_UNCONFIRMED";
+
+    private final DeliveriesRepository deliveriesRepository;
+    private final StoreSupplierProviderResolver providerResolver;
+
+    public void refresh(OrderIdRefreshEventRequest request, int attempt) {
+        if (attempt > MAX_SQS_ATTEMPTS) {
+            return;
+        }
+        Delivery delivery = deliveriesRepository.findById(request.getStoreId(), request.getDeliveryId());
+        if (delivery == null || !request.getPurchaseRef().equals(delivery.getPurchaseRef())) {
+            return;
+        }
+        SupplierProvider provider = providerResolver.resolve(request.getStoreId(), request.getProvider());
+        if (provider == null) {
+            recordUnconfirmed(delivery);
+            return;
+        }
+        Optional<String> confirmed = lookup(provider, request.getPurchaseRef());
+        if (confirmed.isPresent()) {
+            applyConfirmedId(delivery, confirmed.get());
+            return;
+        }
+        if (attempt >= MAX_SQS_ATTEMPTS) {
+            recordUnconfirmed(delivery);
+        }
+        throw new ExternalOrderIdPendingException(request.getDeliveryId(), attempt);
+    }
+
+    private Optional<String> lookup(SupplierProvider provider, String purchaseRef) {
+        try {
+            return provider.confirmedOrderId(purchaseRef);
+        } catch (SupplierOrderException e) {
+            return Optional.empty();
+        }
+    }
+
+    private void applyConfirmedId(Delivery delivery, String confirmedId) {
+        if (confirmedId.equals(delivery.getExternalDeliveryId())) {
+            return;
+        }
+        delivery.setExternalDeliveryId(confirmedId);
+        delivery.addEvent(new Event(EventType.action, ORDER_ID_CONFIRMED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+    }
+
+    private void recordUnconfirmed(Delivery delivery) {
+        delivery.addEvent(new Event(EventType.action, ORDER_ID_UNCONFIRMED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+    }
+}
