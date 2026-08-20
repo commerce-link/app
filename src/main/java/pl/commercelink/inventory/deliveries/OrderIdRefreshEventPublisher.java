@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderIdRefreshEventPublisher {
 
-    static final int INITIAL_DELAY_SECONDS = 600;
+    static final int INITIAL_DELAY_SECONDS = 300;
     private static final String QUEUE_NAME = "supplier-order-refresh-queue";
 
     @Autowired
