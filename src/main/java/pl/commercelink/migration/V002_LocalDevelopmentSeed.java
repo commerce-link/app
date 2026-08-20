@@ -77,7 +77,7 @@ public class V002_LocalDevelopmentSeed {
         fulfilment.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
 
         BillingDetails billing = new BillingDetails();
-        billing.setCompanyName("Demo Store Sp. z o.o.");
+        billing.setCompanyName("Demo Store sp. z o.o.");
         billing.setTaxId("1234567890");
         billing.setStreetAndNumber("ul. Testowa 1");
         billing.setPostalCode("00-001");
