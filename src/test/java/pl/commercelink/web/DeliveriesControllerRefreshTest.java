@@ -131,14 +131,15 @@ class DeliveriesControllerRefreshTest {
     }
 
     @Test
-    void refreshOrderIdRefusesGlobalDeliveriesForStoreAdmin() {
+    void storeAdminRefreshesGlobalDeliveries() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setConnectionMode(ConnectionMode.GLOBAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.ENGLISH)))
-                .thenReturn("A global delivery can only be retried by the platform administrator.");
+        when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID))
+                .thenReturn(OrderIdRefreshService.ManualRefreshOutcome.CONFIRMED);
+        when(messageSource.getMessage(eq("deliveries.orderId.refresh.confirmed"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Fetched the final order number from the supplier");
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
@@ -148,8 +149,9 @@ class DeliveriesControllerRefreshTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-1");
-            verify(orderIdRefreshService, never()).refreshManually(any(), any());
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "A global delivery can only be retried by the platform administrator.");
+            verify(orderIdRefreshService).refreshManually(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("successMessage", "Fetched the final order number from the supplier");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
 }

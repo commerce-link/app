@@ -771,10 +771,6 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String refreshOrderId(@PathVariable("deliveryId") String deliveryId,
                                  RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
-        if (blocked.isPresent()) {
-            return blocked.get();
-        }
         return refreshOrderId(getStoreId(), deliveryId, redirectAttributes, locale);
     }
 

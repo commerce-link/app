@@ -31,6 +31,11 @@
                                 <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"></span>
                                 <span class="tag is-warning is-light ml-2" th:if="${delivery.externalDeliveryIdProvisional}"
                                       th:text="#{deliveries.externalId.provisional}"></span>
+                                <button type="submit" form="refresh-order-id-form" class="button is-white is-small p-1 ml-1"
+                                        th:if="${delivery.externalDeliveryIdProvisional and (isAdmin or isSuperAdmin)}"
+                                        th:title="#{deliveries.orderId.refresh.button}">
+                                    <span class="icon is-small has-text-grey"><i class="fas fa-sync-alt"></i></span>
+                                </button>
                             </div>
                         </div>
                         <div class="field">
@@ -139,11 +144,6 @@
                                 <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
                             </div>
                             <div class="control"
-                                 th:if="${delivery.externalDeliveryIdProvisional and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
-                                <button type="submit" form="refresh-order-id-form" class="button is-small is-warning is-light"
-                                        th:text="#{deliveries.orderId.refresh.button}"></button>
-                            </div>
-                            <div class="control"
                                  th:if="${delivery.orderFailed and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
                                 <button type="submit" form="retry-purchase-form" class="button is-warning"
                                         th:text="#{deliveries.purchase.retry.button}">Retry</button>
@@ -161,7 +161,7 @@
                         </div>
                     </form>
                     <form id="refresh-order-id-form" method="post"
-                          th:if="${delivery.externalDeliveryIdProvisional and !delivery.hasBeenReceived() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
+                          th:if="${delivery.externalDeliveryIdProvisional and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/refresh-order-id|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/refresh-order-id|}">
                     </form>
