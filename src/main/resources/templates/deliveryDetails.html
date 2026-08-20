@@ -29,6 +29,8 @@
                                    th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"
                                 ></a>
                                 <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"></span>
+                                <span class="tag is-warning is-light ml-2" th:if="${delivery.externalDeliveryIdProvisional}"
+                                      th:text="#{deliveries.externalId.provisional}"></span>
                             </div>
                         </div>
                         <div class="field">
@@ -152,6 +154,12 @@
                                    th:text="#{deliveries.approval.realize}">Order at supplier</a>
                             </div>
                         </div>
+                    </form>
+                    <form th:if="${delivery.externalDeliveryIdProvisional}" method="post"
+                          th:action="${isSuperAdmin} ? @{'/dashboard/store/' + ${delivery.storeId} + '/deliveries/' + ${delivery.deliveryId} + '/refresh-order-id'}
+                                                     : @{'/dashboard/deliveries/' + ${delivery.deliveryId} + '/refresh-order-id'}">
+                        <button type="submit" class="button is-small is-warning is-light"
+                                th:text="#{deliveries.orderId.refresh.button}"></button>
                     </form>
                     <form id="retry-purchase-form" method="post"
                           th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"

@@ -110,6 +110,9 @@ public class DeliveriesController {
     @Autowired
     private StoresRepository storesRepository;
 
+    @Autowired
+    private OrderIdRefreshService orderIdRefreshService;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -761,6 +764,34 @@ public class DeliveriesController {
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("deliveries.approval.rejected.success", null, locale));
         return "redirect:/dashboard/deliveries";
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/refresh-order-id")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String refreshOrderId(@PathVariable("deliveryId") String deliveryId,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        return refreshOrderId(getStoreId(), deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/refresh-order-id")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String refreshOrderIdForSuperAdmin(@PathVariable("storeId") String storeId,
+                                              @PathVariable("deliveryId") String deliveryId,
+                                              RedirectAttributes redirectAttributes, Locale locale) {
+        return refreshOrderId(storeId, deliveryId, redirectAttributes, locale);
+    }
+
+    private String refreshOrderId(String storeId, String deliveryId,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        switch (orderIdRefreshService.refreshManually(storeId, deliveryId)) {
+            case CONFIRMED -> redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("deliveries.orderId.refresh.confirmed", null, locale));
+            case STILL_PENDING -> redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.orderId.refresh.stillPending", null, locale));
+            case UNAVAILABLE -> redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.orderId.refresh.unavailable", null, locale));
+        }
+        return detailsRedirect(storeId, deliveryId);
     }
 
     @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/retry")
