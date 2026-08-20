@@ -49,6 +49,17 @@ class SupplierProviderResolverTest {
     }
 
     @Test
+    void manualConnectionReturnsNull() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.MANUAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when / then
+        assertNull(resolver.resolve(STORE_ID, PROVIDER));
+        verifyNoInteractions(supplierProviderFactory, globalSupplierProviderFactory);
+    }
+
+    @Test
     void ownConnectionReturnsTheOwnFactoryProvider() {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.OWN);

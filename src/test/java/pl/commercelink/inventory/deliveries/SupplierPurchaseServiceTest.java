@@ -77,6 +77,8 @@ class SupplierPurchaseServiceTest {
     @Mock
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     @Mock
+    private OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    @Mock
     private ExchangeRates exchangeRates;
     @Mock
     private SupplierProvider globalSupplierProvider;
@@ -112,6 +114,26 @@ class SupplierPurchaseServiceTest {
                 new StoreSupplierConnection(provider, mode, true, true)));
         store.setFulfilmentConfiguration(configuration);
         return store;
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsConnectedGlobally() {
+        // given
+        connectSupplier(ConnectionMode.GLOBAL);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
+        // given
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
     }
 
     @Test
@@ -238,6 +260,15 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void refusesOrderingForManualConnections() {
+        // given
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+
+        // when / then
+        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
+    }
+
+    @Test
     void validationMarksFullyAvailableWhenAllQuantitiesCovered() {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -326,6 +357,36 @@ class SupplierPurchaseServiceTest {
         verify(supplierProvider).placeOrder(argThat(request -> request.clientOrderRef().equals("ref-1")));
         verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        verifyNoInteractions(orderIdRefreshEventPublisher);
+    }
+
+    @Test
+    void processPendingSchedulesAnOrderIdRefreshWhenTheOrderIsProvisional() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")), true));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID);
+
+        // then
+        verify(orderIdRefreshEventPublisher).publish(argThat(request ->
+                request.getStoreId().equals(STORE_ID)
+                        && request.getDeliveryId().equals(DELIVERY_ID)
+                        && request.getProvider().equals(PROVIDER)
+                        && request.getPurchaseRef().equals("ref-1")));
+        assertTrue(delivery.isExternalDeliveryIdProvisional());
     }
 
     @Test
@@ -432,7 +493,7 @@ class SupplierPurchaseServiceTest {
         service.processPending(STORE_ID, DELIVERY_ID);
 
         // then
-        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
+        verify(supplierProviderResolver, never()).resolve(any(), any());
     }
 
     @Test
@@ -442,7 +503,7 @@ class SupplierPurchaseServiceTest {
 
         // when / then
         assertThrows(IllegalStateException.class, () -> service.processPending(STORE_ID, DELIVERY_ID));
-        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
+        verify(supplierProviderResolver, never()).resolve(any(), any());
     }
 
     @Test

@@ -52,6 +52,7 @@ public class SupplierPurchaseService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DropshipOrderCompletion dropshipOrderCompletion;
@@ -186,6 +187,7 @@ public class SupplierPurchaseService {
             }
 
             applyOrderResult(form, validation, orderResult);
+            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             if (delivery.isDropship()) {
                 dropshipOrderCompletion.markSuppliedByDropship(storeId,
@@ -193,6 +195,10 @@ public class SupplierPurchaseService {
                 deliveryCreationService.completeDropshipPending(storeId, delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);
+            }
+            if (orderResult.provisional()) {
+                orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                        storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
             }
         } catch (SupplierOrderException e) {
             delivery.setOrderStatus(DeliveryOrderStatus.FAILED);

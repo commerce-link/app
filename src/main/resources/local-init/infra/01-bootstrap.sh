@@ -37,6 +37,11 @@ awslocal sqs create-queue --queue-name pim-category-match-queue
 awslocal sqs create-queue --queue-name pim-category-matched-queue
 awslocal sqs create-queue --queue-name supplier-taxonomy-queue
 
+## Refresh queue with a DLQ + redrive so local retries mirror prod (short visibility for fast E2E)
+awslocal sqs create-queue --queue-name supplier-order-refresh-queue-dlq
+awslocal sqs create-queue --queue-name supplier-order-refresh-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-refresh-queue-dlq\",\"maxReceiveCount\":\"6\"}"}'
+
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,
 # PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
