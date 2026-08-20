@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -770,6 +771,10 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String refreshOrderId(@PathVariable("deliveryId") String deliveryId,
                                  RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
         return refreshOrderId(getStoreId(), deliveryId, redirectAttributes, locale);
     }
 
@@ -798,14 +803,23 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String retryPurchase(@PathVariable("deliveryId") String deliveryId,
                                 RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        return handleRetry(getStoreId(), deliveryId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    private Optional<String> blockGlobalDeliveryForStoreAdmin(String deliveryId,
+                                                               RedirectAttributes redirectAttributes, Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.purchase.retry.error.global", null, locale));
-            return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+            return Optional.of("redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId);
         }
-        return handleRetry(getStoreId(), deliveryId,
-                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+        return Optional.empty();
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/retry")

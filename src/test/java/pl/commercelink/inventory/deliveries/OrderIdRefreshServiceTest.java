@@ -233,12 +233,15 @@ class OrderIdRefreshServiceTest {
         assertEquals(OrderIdRefreshService.ManualRefreshOutcome.CONFIRMED, outcome);
         assertEquals("ZS-123456", delivery.getExternalDeliveryId());
         assertFalse(delivery.isExternalDeliveryIdProvisional());
+        verify(deliveriesRepository).save(delivery);
     }
 
     @Test
     void manualRefreshReportsStillPendingWithoutSaving() {
         // given
-        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery());
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
         when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
         when(supplierProvider.confirmedOrderId("ref-1")).thenReturn(Optional.empty());
 
@@ -250,7 +253,9 @@ class OrderIdRefreshServiceTest {
     @Test
     void manualRefreshTreatsSupplierFailureAsStillPending() {
         // given
-        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery());
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
         when(providerResolver.resolve("s1", "IncomGroup")).thenReturn(supplierProvider);
         when(supplierProvider.confirmedOrderId("ref-1")).thenThrow(new SupplierOrderException("boom"));
 
@@ -266,6 +271,7 @@ class OrderIdRefreshServiceTest {
         when(deliveriesRepository.findById("s1", "missing")).thenReturn(null);
         when(deliveriesRepository.findById("s1", "noref")).thenReturn(noRef);
         Delivery unresolvable = delivery();
+        unresolvable.setExternalDeliveryIdProvisional(true);
         when(deliveriesRepository.findById("s1", "d1")).thenReturn(unresolvable);
         when(providerResolver.resolve("s1", "IncomGroup")).thenThrow(new RuntimeException("secret missing"));
 
@@ -273,5 +279,28 @@ class OrderIdRefreshServiceTest {
         assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "missing"));
         assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "noref"));
         assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "d1"));
+    }
+
+    @Test
+    void manualRefreshUnavailableWhenDeliveryIsNotProvisional() {
+        // given
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(false);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+
+        // when / then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "d1"));
+        verifyNoInteractions(providerResolver);
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void manualRefreshUnavailableWhenRepositoryThrows() {
+        // given
+        when(deliveriesRepository.findById("s1", "d1")).thenThrow(new RuntimeException("boom"));
+
+        // when / then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, service.refreshManually("s1", "d1"));
+        verify(deliveriesRepository, never()).save(any());
     }
 }

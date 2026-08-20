@@ -50,20 +50,27 @@ public class OrderIdRefreshService {
     public enum ManualRefreshOutcome { CONFIRMED, STILL_PENDING, UNAVAILABLE }
 
     public ManualRefreshOutcome refreshManually(String storeId, String deliveryId) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || StringUtils.isBlank(delivery.getPurchaseRef())) {
+        try {
+            Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+            if (delivery == null || StringUtils.isBlank(delivery.getPurchaseRef())) {
+                return ManualRefreshOutcome.UNAVAILABLE;
+            }
+            if (!delivery.isExternalDeliveryIdProvisional()) {
+                return ManualRefreshOutcome.UNAVAILABLE;
+            }
+            SupplierProvider provider = resolveProvider(storeId, delivery.getProvider());
+            if (provider == null) {
+                return ManualRefreshOutcome.UNAVAILABLE;
+            }
+            Optional<String> confirmed = lookup(provider, delivery.getPurchaseRef());
+            if (confirmed.isEmpty()) {
+                return ManualRefreshOutcome.STILL_PENDING;
+            }
+            applyConfirmedId(delivery, confirmed.get());
+            return ManualRefreshOutcome.CONFIRMED;
+        } catch (RuntimeException e) {
             return ManualRefreshOutcome.UNAVAILABLE;
         }
-        SupplierProvider provider = resolveProvider(storeId, delivery.getProvider());
-        if (provider == null) {
-            return ManualRefreshOutcome.UNAVAILABLE;
-        }
-        Optional<String> confirmed = lookup(provider, delivery.getPurchaseRef());
-        if (confirmed.isEmpty()) {
-            return ManualRefreshOutcome.STILL_PENDING;
-        }
-        applyConfirmedId(delivery, confirmed.get());
-        return ManualRefreshOutcome.CONFIRMED;
     }
 
     private SupplierProvider resolveProvider(String storeId, String provider) {
