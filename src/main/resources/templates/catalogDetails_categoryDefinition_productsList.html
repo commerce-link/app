@@ -165,7 +165,7 @@
                     <div class="select is-small">
                         <select id="bulkAction" name="action" required>
                             <option th:if="${param.status == null || param.status[0] == 'Enabled'}" value="disable"  th:text="#{product.bulk.disable}"></option>
-                            <option th:if="${param.status[0] == 'Disabled'}" value="enable" th:text="#{product.bulk.enable}"></option>
+                            <option th:if="${param.status != null && param.status[0] == 'Disabled'}" value="enable" th:text="#{product.bulk.enable}"></option>
                             <option value="delete" th:text="#{product.bulk.delete}"></option>
                         </select>
                     </div>
