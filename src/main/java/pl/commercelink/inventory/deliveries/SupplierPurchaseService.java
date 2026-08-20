@@ -5,9 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
-import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
-import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
@@ -45,8 +43,7 @@ public class SupplierPurchaseService {
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
 
-    private final SupplierProviderFactory supplierProviderFactory;
-    private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
+    private final StoreSupplierProviderResolver storeSupplierProviderResolver;
     private final StoresRepository storesRepository;
     private final DeliveryCreationService deliveryCreationService;
     private final DeliveriesRepository deliveriesRepository;
@@ -408,16 +405,6 @@ public class SupplierPurchaseService {
     }
 
     private SupplierProvider getProvider(String storeId, String provider) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            return null;
-        }
-        if (store.isOwnSupplier(provider)) {
-            return supplierProviderFactory.get(store, provider);
-        }
-        if (store.isGlobalSupplier(provider)) {
-            return globalSupplierProviderFactory.get(provider).orElse(null);
-        }
-        return null;
+        return storeSupplierProviderResolver.resolve(storeId, provider);
     }
 }
