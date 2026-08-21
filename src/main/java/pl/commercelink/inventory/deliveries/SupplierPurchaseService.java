@@ -43,7 +43,7 @@ public class SupplierPurchaseService {
     static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
-    static final int MAX_SQS_ATTEMPTS = 6;
+    static final int MAX_SQS_ATTEMPTS = 3;
 
     private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -216,7 +216,7 @@ public class SupplierPurchaseService {
     }
 
     private String resolveDropshipOrderId(Delivery delivery, String payloadOrderId, int attempt) {
-        if (payloadOrderId != null) {
+        if (StringUtils.isNotBlank(payloadOrderId)) {
             return payloadOrderId;
         }
         Optional<String> located;
@@ -394,6 +394,7 @@ public class SupplierPurchaseService {
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setType(DeliveryType.WAREHOUSE);
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);

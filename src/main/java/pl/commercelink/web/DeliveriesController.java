@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
@@ -914,15 +915,23 @@ public class DeliveriesController {
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
-            var dropshipOrder = dropshipOrderLocator.locate(delivery.getDeliveryId())
-                    .map(orderId -> ordersRepository.findById(storeId, orderId))
-                    .orElse(null);
+            var dropshipOrder = resolveDropshipOrder(storeId, delivery);
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
             model.addAttribute("dropshipShipment", dropshipOrder != null
                     ? dropshipOrder.firstShipment().orElse(null)
                     : null);
         }
         return "deliveryDetails";
+    }
+
+    private Order resolveDropshipOrder(String storeId, Delivery delivery) {
+        try {
+            return dropshipOrderLocator.locate(delivery.getDeliveryId())
+                    .map(orderId -> ordersRepository.findById(storeId, orderId))
+                    .orElse(null);
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     private void addApprovalAddresses(String storeId, Delivery delivery, Model model) {

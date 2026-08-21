@@ -206,7 +206,7 @@ class SupplierPurchaseServiceDropshipTest {
 
     @Test
     void payloadOrderIdSkipsIndexDiscovery() throws Exception {
-        // given: dropship delivery pending, payload carries the order id
+        // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
@@ -222,26 +222,40 @@ class SupplierPurchaseServiceDropshipTest {
                 new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
-        // when: processPending(STORE_ID, DELIVERY_ID, ORDER_ID, 1)
+        // when
         service.processPending(STORE_ID, DELIVERY_ID, ORDER_ID, 1);
 
-        // then: dropshipOrderCompletion.markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID)
-        //       and verifyNoInteractions(dropshipOrderLocator)
+        // then
         verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID);
         verifyNoInteractions(dropshipOrderLocator);
     }
 
     @Test
-    void emptyLocatorAnswerBelowCapIsRetryable() {
-        // given: payload orderId null, locator returns Optional.empty(), attempt = 1
+    void blankPayloadOrderIdFallsBackToDiscovery() throws Exception {
+        // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
 
-        // when / then: assertThrows(DropshipOrderPendingException.class, ...)
-        //       and delivery NOT marked FAILED, no supplier call attempted
+        // when / then
+        assertThrows(DropshipOrderPendingException.class,
+                () -> service.processPending(STORE_ID, DELIVERY_ID, "  ", 1));
+        verify(dropshipOrderLocator).locate(DELIVERY_ID);
+        verify(dropshipPurchaseService, never()).placeDropshipOrder(any(), any(), any(), any());
+    }
+
+    @Test
+    void emptyLocatorAnswerBelowCapIsRetryable() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
+
+        // when / then
         assertThrows(DropshipOrderPendingException.class,
                 () -> service.processPending(STORE_ID, DELIVERY_ID, null, 1));
         assertNotEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
@@ -251,7 +265,7 @@ class SupplierPurchaseServiceDropshipTest {
 
     @Test
     void emptyLocatorAnswerAtCapFailsTheDelivery() {
-        // given: payload orderId null, locator empty, attempt = MAX_SQS_ATTEMPTS
+        // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
@@ -261,7 +275,7 @@ class SupplierPurchaseServiceDropshipTest {
         // when
         service.processPending(STORE_ID, DELIVERY_ID, null, SupplierPurchaseService.MAX_SQS_ATTEMPTS);
 
-        // then: delivery orderStatus FAILED with an error message, no exception propagated
+        // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("Dropship order could not be resolved for delivery " + DELIVERY_ID,
                 delivery.getOrderErrorMessage());
@@ -271,7 +285,7 @@ class SupplierPurchaseServiceDropshipTest {
 
     @Test
     void locatorInvariantViolationFailsHard() {
-        // given: locator throws IllegalStateException (two orders behind the delivery)
+        // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
@@ -279,10 +293,10 @@ class SupplierPurchaseServiceDropshipTest {
         when(dropshipOrderLocator.locate(DELIVERY_ID)).thenThrow(
                 new IllegalStateException("Dropship delivery " + DELIVERY_ID + " is claimed by orders [a, b]"));
 
-        // when: processPending(..., null, 1)
+        // when
         service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
-        // then: delivery FAILED, exception not retried
+        // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("Dropship delivery " + DELIVERY_ID + " is claimed by orders [a, b]",
                 delivery.getOrderErrorMessage());

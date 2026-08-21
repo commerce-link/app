@@ -330,6 +330,33 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorInvariantIsViolated() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenThrow(
+                new IllegalStateException("Dropship delivery " + DELIVERY_ID + " is claimed by orders [a, b]"));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
+        }
+    }
+
+    @Test
     void showDeliveryDetailsRedirectsToListWhenDeliveryIsGone() {
         // given
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(null);
