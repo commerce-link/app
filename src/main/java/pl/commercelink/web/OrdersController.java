@@ -349,6 +349,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
+        model.addAttribute("splitBlockedReason", order.splitBlockedReason(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
