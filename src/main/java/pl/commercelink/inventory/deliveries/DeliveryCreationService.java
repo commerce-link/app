@@ -127,6 +127,7 @@ public class DeliveryCreationService {
                 form.getTax()
         );
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(storeId, form.getProvider()));
+        delivery.setType(DeliveryType.WAREHOUSE);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }

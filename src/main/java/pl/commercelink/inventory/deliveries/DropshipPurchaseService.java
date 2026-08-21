@@ -134,6 +134,7 @@ public class DropshipPurchaseService {
     private Delivery newDropshipDelivery(String storeId, Store store, Order order, DeliveryCreationForm form) {
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setType(DeliveryType.DROPSHIP);
         delivery.setDropshipDetails(new Dropship(order.getOrderId()));
         delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());

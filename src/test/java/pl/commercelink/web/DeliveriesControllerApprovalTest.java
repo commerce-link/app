@@ -23,7 +23,7 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
-import pl.commercelink.inventory.deliveries.Dropship;
+import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.orders.ShippingDetails;
@@ -750,7 +750,7 @@ class DeliveriesControllerApprovalTest {
         // given
         Delivery source = new Delivery(STORE_ID, null, PROVIDER);
         source.setDeliveryId(DELIVERY_ID);
-        source.setDropshipDetails(new Dropship("order-1"));
+        source.setType(DeliveryType.DROPSHIP);
         Delivery target = new Delivery(STORE_ID, null, PROVIDER);
         target.setDeliveryId("delivery-2");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
@@ -781,7 +781,7 @@ class DeliveriesControllerApprovalTest {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setDropshipDetails(new Dropship("order-1"));
+        delivery.setType(DeliveryType.DROPSHIP);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("Dropshipping deliveries cannot be merged or split.");

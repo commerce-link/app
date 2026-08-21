@@ -202,11 +202,15 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
         expressionAttributeValues.put(":null", new AttributeValue().withNULL(true));
         expressionAttributeValues.put(":provider", new AttributeValue().withS(provider));
+        expressionAttributeValues.put(":dropship", new AttributeValue().withS(DeliveryType.DROPSHIP.name()));
+
+        Map<String, String> expressionAttributeNames = Map.of("#type", "type");
 
         DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
                 .withHashKeyValues(deliveryKey)
                 .withFilterExpression("provider = :provider AND (attribute_not_exists(receivedAt) OR receivedAt = :null)"
-                        + " AND attribute_not_exists(dropship)")
+                        + " AND (attribute_not_exists(#type) OR #type <> :dropship)")
+                .withExpressionAttributeNames(expressionAttributeNames)
                 .withExpressionAttributeValues(expressionAttributeValues);
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)

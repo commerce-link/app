@@ -71,6 +71,10 @@ public class Delivery {
     @DynamoDBTypeConvertedEnum
     private ConnectionMode connectionMode;
 
+    @DynamoDBAttribute(attributeName = "type")
+    @DynamoDBTypeConvertedEnum
+    private DeliveryType type;
+
     @DynamoDBAttribute(attributeName = "dropship")
     private Dropship dropshipDetails;
 
@@ -461,6 +465,14 @@ public class Delivery {
         this.connectionMode = connectionMode;
     }
 
+    public DeliveryType getType() {
+        return type == null ? DeliveryType.WAREHOUSE : type;
+    }
+
+    public void setType(DeliveryType type) {
+        this.type = type;
+    }
+
     @DynamoDBIgnore
     public boolean isOrderPending() {
         return orderStatus == DeliveryOrderStatus.ORDER_PENDING;
@@ -486,7 +498,7 @@ public class Delivery {
 
     @DynamoDBIgnore
     public boolean isDropship() {
-        return dropshipDetails != null && dropshipDetails.hasOrder();
+        return getType() == DeliveryType.DROPSHIP;
     }
 
     @DynamoDBIgnore

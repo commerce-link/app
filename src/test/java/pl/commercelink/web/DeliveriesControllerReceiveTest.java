@@ -12,7 +12,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
-import pl.commercelink.inventory.deliveries.Dropship;
+import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
@@ -49,7 +49,7 @@ class DeliveriesControllerReceiveTest {
     void receiveOnDropshipDeliveryRedirectsWithoutReceiving() {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
-        delivery.setDropshipDetails(new Dropship("order-1"));
+        delivery.setType(DeliveryType.DROPSHIP);
         when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
         when(messageSource.getMessage(eq("deliveries.receive.error.dropship"), any(), any()))
                 .thenReturn("blocked");

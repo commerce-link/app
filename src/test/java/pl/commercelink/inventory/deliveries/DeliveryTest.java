@@ -26,13 +26,24 @@ class DeliveryTest {
     }
 
     @Test
-    void isDropshipReturnsTrueWhenDropshipAspectCarriesOrderId() {
+    void isDropshipReturnsTrueForDropshipType() {
         // given
         Delivery delivery = new Delivery();
-        delivery.setDropshipDetails(new Dropship("order-1"));
+        delivery.setType(DeliveryType.DROPSHIP);
 
         // when / then
         assertTrue(delivery.isDropship());
+    }
+
+    @Test
+    void typeDefaultsToWarehouseWhenAttributeIsAbsent() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setType(null);
+
+        // when / then
+        assertEquals(DeliveryType.WAREHOUSE, delivery.getType());
+        assertFalse(delivery.isDropship());
     }
 
     @Test
@@ -60,6 +71,7 @@ class DeliveryTest {
     void dropshipOrderIdReturnsOrderIdForDropshipDelivery() {
         // given
         Delivery delivery = new Delivery();
+        delivery.setType(DeliveryType.DROPSHIP);
         delivery.setDropshipDetails(new Dropship("order-1"));
 
         // when / then
@@ -79,7 +91,7 @@ class DeliveryTest {
     void dropshipPropertyBindsToBooleanInSpel() {
         // given
         Delivery dropship = new Delivery();
-        dropship.setDropshipDetails(new Dropship("order-1"));
+        dropship.setType(DeliveryType.DROPSHIP);
         Delivery warehouse = new Delivery();
         SpelExpressionParser parser = new SpelExpressionParser();
 
