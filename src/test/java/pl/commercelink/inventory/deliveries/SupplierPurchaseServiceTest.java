@@ -493,7 +493,7 @@ class SupplierPurchaseServiceTest {
         service.processPending(STORE_ID, DELIVERY_ID);
 
         // then
-        verify(supplierProviderResolver, never()).resolve(any(), any());
+        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
     }
 
     @Test
@@ -503,7 +503,7 @@ class SupplierPurchaseServiceTest {
 
         // when / then
         assertThrows(IllegalStateException.class, () -> service.processPending(STORE_ID, DELIVERY_ID));
-        verify(supplierProviderResolver, never()).resolve(any(), any());
+        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
     }
 
     @Test
