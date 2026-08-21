@@ -541,9 +541,16 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSupplier(@PathVariable String orderId, @RequestParam String itemId,
                                  @RequestParam String manufacturerCode, @RequestParam double cost,
-                                 @RequestParam String supplier, Model model, Locale locale) {
+                                 @RequestParam String supplier, Model model,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
 
         orderItem.setManufacturerCode(manufacturerCode);
         orderItem.setCost(cost);

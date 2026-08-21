@@ -604,6 +604,58 @@ class OrdersControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
     }
 
+    @Test
+    void clearSupplierRefusesADeliveredItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("d-1");
+        item.setClaimedDeliveryId("d-1");
+        item.setStatus(FulfilmentStatus.Delivered);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(messageSource.getMessage(eq("order.item.clear.assign.blocked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("blocked");
+
+        // when
+        String view = ordersController.clearSupplier(ORDER_ID, item.getItemId(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(item.getDeliveryId()).isEqualTo("d-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void assignSupplierRefusesAnOrderedItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("d-1");
+        item.setClaimedDeliveryId("d-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(messageSource.getMessage(eq("order.item.assign.supplier.blocked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("blocked");
+
+        // when
+        String view = ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-2", 50.0, "d-2",
+                new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getManufacturerCode()).isEqualTo("MFN-1");
+        assertThat(item.getDeliveryId()).isEqualTo("d-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
     private OrderItem existingOrderItem(String category, boolean service) {
         OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
         item.setService(service);
