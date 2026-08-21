@@ -93,6 +93,25 @@
         .payment-method-recommended {
             align-self: flex-start;
         }
+
+        .payment-method-box.is-locked .payment-method-card {
+            cursor: not-allowed;
+            background-color: #f5f5f5;
+            opacity: 0.6;
+        }
+
+        .payment-method-box.is-locked .payment-method-card:hover {
+            border-color: #dbdbdb;
+            box-shadow: none;
+        }
+
+        .payment-submit-wrapper {
+            display: block;
+        }
+
+        .payment-submit-wrapper.cl-tooltip {
+            cursor: not-allowed;
+        }
     </style>
 
     <div th:if="${offer.expired}" class="notification is-danger" style="margin: 2rem auto; padding: 2rem; border-radius: 12px; text-align: center; max-width: 500px;">
@@ -349,19 +368,22 @@
                     </div>
                 </div>
 
-                <div th:if="${submitted && !isSplitPaymentRequired}">
+                <div th:if="${!isSplitPaymentRequired}">
                     <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
 
                         <div th:if="${#lists.size(paymentOptions) > 1}" class="box payment-method-box"
+                             th:classappend="${!submitted} ? 'is-locked' : ''"
                              th:style="'padding: 1.5rem; margin-top: 1rem; --payment-primary-color:' + ${branding.primaryColor}">
                             <p class="label" th:text="#{offer.payment.method.title}"></p>
                             <div class="columns is-multiline is-mobile is-variable is-2">
                                 <div class="column is-half" th:each="option : ${paymentOptions}">
                                     <label class="payment-method-card"
-                                           th:classappend="${option.name() == defaultPaymentOption} ? 'is-selected' : ''">
+                                           th:classappend="${(option.name() == defaultPaymentOption ? 'is-selected ' : '') + (!submitted ? 'cl-tooltip' : '')}"
+                                           th:attr="data-tooltip=${!submitted} ? #{offer.payment.locked.notice} : null">
                                         <input type="radio" name="paymentOptionId"
                                                th:value="${option.name()}"
-                                               th:checked="${option.name() == defaultPaymentOption}" />
+                                               th:checked="${option.name() == defaultPaymentOption}"
+                                               th:disabled="${!submitted}" />
                                         <span class="payment-method-card-body">
                                             <span class="payment-method-card-header">
                                                 <span class="icon"><i class="fas fa-credit-card"></i></span>
@@ -376,10 +398,15 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="button is-primary"
-                                th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%; margin-top: 1rem;'">
-                            <span th:text="#{offer.payment.btn.text}">Order and pay</span>
-                        </button>
+                        <span class="payment-submit-wrapper"
+                              th:classappend="${!submitted} ? 'cl-tooltip' : ''"
+                              th:attr="data-tooltip=${!submitted} ? #{offer.payment.locked.notice} : null">
+                            <button type="submit" class="button is-primary"
+                                    th:disabled="${!submitted}"
+                                    th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%; margin-top: 1rem;'">
+                                <span th:text="#{offer.payment.btn.text}">Order and pay</span>
+                            </button>
+                        </span>
 
                         <p class="is-size-7 has-text-grey mt-2 has-text-centered"
                            th:text="#{offer.payment.one.time.notice}"></p>
