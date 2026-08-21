@@ -43,6 +43,7 @@ public class SupplierPurchaseService {
     static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
+    static final int MAX_SQS_ATTEMPTS = 6;
 
     private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -58,6 +59,7 @@ public class SupplierPurchaseService {
     private final DropshipOrderCompletion dropshipOrderCompletion;
     private final DeliveriesQueryService deliveriesQueryService;
     private final DropshipPurchaseService dropshipPurchaseService;
+    private final DropshipOrderLocator dropshipOrderLocator;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -154,7 +156,7 @@ public class SupplierPurchaseService {
         return new LiveCostConversion(ExchangeRates.LOCAL_CURRENCY, sellRate);
     }
 
-    public void processPending(String storeId, String deliveryId) {
+    public void processPending(String storeId, String deliveryId, String orderId, int attempt) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (delivery == null) {
             throw new IllegalStateException("Delivery " + deliveryId + " not found for pending purchase");
@@ -167,6 +169,15 @@ public class SupplierPurchaseService {
         if (!delivery.isDropship()) {
             delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
         }
+
+        String dropshipOrderId = null;
+        if (delivery.isDropship()) {
+            dropshipOrderId = resolveDropshipOrderId(delivery, orderId, attempt);
+            if (dropshipOrderId == null) {
+                return;
+            }
+        }
+
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
             List<SupplierOrderLine> lines = validation.lines().stream()
@@ -177,7 +188,7 @@ public class SupplierPurchaseService {
             }
 
             SupplierOrderResult orderResult = delivery.isDropship()
-                    ? dropshipPurchaseService.placeDropshipOrder(storeId, delivery, lines)
+                    ? dropshipPurchaseService.placeDropshipOrder(storeId, delivery, lines, dropshipOrderId)
                     : getProvider(storeId, form.getProvider())
                             .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
                                     form.getDeliveryAddressId()));
@@ -190,8 +201,7 @@ public class SupplierPurchaseService {
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             if (delivery.isDropship()) {
-                dropshipOrderCompletion.markSuppliedByDropship(storeId,
-                        delivery.dropshipOrderId().orElseThrow(), delivery.getDeliveryId());
+                dropshipOrderCompletion.markSuppliedByDropship(storeId, dropshipOrderId, delivery.getDeliveryId());
                 deliveryCreationService.completeDropshipPending(storeId, delivery, form);
             } else {
                 deliveryCreationService.completePending(storeId, delivery, form);
@@ -201,10 +211,36 @@ public class SupplierPurchaseService {
                         storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
             }
         } catch (SupplierOrderException e) {
-            delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-            delivery.setOrderErrorMessage(e.getMessage());
-            deliveriesRepository.save(delivery);
+            failDelivery(delivery, e.getMessage());
         }
+    }
+
+    private String resolveDropshipOrderId(Delivery delivery, String payloadOrderId, int attempt) {
+        if (payloadOrderId != null) {
+            return payloadOrderId;
+        }
+        Optional<String> located;
+        try {
+            located = dropshipOrderLocator.locate(delivery.getDeliveryId());
+        } catch (IllegalStateException e) {
+            failDelivery(delivery, e.getMessage());
+            return null;
+        }
+        if (located.isPresent()) {
+            return located.get();
+        }
+        if (attempt >= MAX_SQS_ATTEMPTS) {
+            failDelivery(delivery, "Dropship order could not be resolved for delivery "
+                    + delivery.getDeliveryId());
+            return null;
+        }
+        throw new DropshipOrderPendingException(delivery.getDeliveryId(), attempt);
+    }
+
+    private void failDelivery(Delivery delivery, String message) {
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage(message);
+        deliveriesRepository.save(delivery);
     }
 
     private String resolveDeliveryAddressLabel(String storeId, DeliveryCreationForm form) {

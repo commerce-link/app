@@ -24,8 +24,11 @@ import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -40,6 +43,7 @@ import pl.commercelink.web.dtos.PickerOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +53,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,6 +98,12 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private DeliveryTaxResolver deliveryTaxResolver;
+
+    @Mock
+    private OrdersRepository ordersRepository;
+
+    @Mock
+    private DropshipOrderLocator dropshipOrderLocator;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -258,6 +269,63 @@ class DeliveriesControllerApprovalTest {
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
             assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsResolveTheContactThroughTheLocator() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order();
+        order.setOrderId("order-1");
+        ShippingDetails shippingDetails = new ShippingDetails();
+        shippingDetails.setName("Jan");
+        order.setShippingDetails(shippingDetails);
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isEqualTo(shippingDetails);
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorHasNoAnswerYet() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
         }
     }
 

@@ -47,4 +47,17 @@ class OrderItemClaimedDeliveryIdTest {
         // then
         assertNull(item.getClaimedDeliveryId());
     }
+
+    @Test
+    void removeFulfilmentClearsClaimedDeliveryId() {
+        // given
+        OrderItem item = new OrderItem();
+        item.markAsOrdered("d-8f3a", 10.0);
+
+        // when
+        item.removeFulfilment();
+
+        // then
+        assertNull(item.getClaimedDeliveryId());
+    }
 }

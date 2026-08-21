@@ -6,15 +6,22 @@ public class SupplierPurchaseEventRequest {
     private String deliveryId;
     private String provider;
     private String purchaseRef;
+    private String orderId;
 
     public SupplierPurchaseEventRequest() {
     }
 
     public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef) {
+        this(storeId, deliveryId, provider, purchaseRef, null);
+    }
+
+    public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef,
+                                         String orderId) {
         this.storeId = storeId;
         this.deliveryId = deliveryId;
         this.provider = provider;
         this.purchaseRef = purchaseRef;
+        this.orderId = orderId;
     }
 
     public String getStoreId() {
@@ -31,5 +38,9 @@ public class SupplierPurchaseEventRequest {
 
     public String getPurchaseRef() {
         return purchaseRef;
+    }
+
+    public String getOrderId() {
+        return orderId;
     }
 }

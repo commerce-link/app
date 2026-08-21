@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -74,9 +73,6 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
     private DeliveryType type;
-
-    @DynamoDBAttribute(attributeName = "dropship")
-    private Dropship dropshipDetails;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -488,22 +484,9 @@ public class Delivery {
         return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
     }
 
-    public Dropship getDropshipDetails() {
-        return dropshipDetails;
-    }
-
-    public void setDropshipDetails(Dropship dropshipDetails) {
-        this.dropshipDetails = dropshipDetails;
-    }
-
     @DynamoDBIgnore
     public boolean isDropship() {
         return getType() == DeliveryType.DROPSHIP;
-    }
-
-    @DynamoDBIgnore
-    public Optional<String> dropshipOrderId() {
-        return isDropship() ? Optional.of(dropshipDetails.getOrderId()) : Optional.empty();
     }
 
     public boolean isPaid() {

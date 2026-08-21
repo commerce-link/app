@@ -85,7 +85,7 @@ public class DropshipPurchaseService {
 
         if (!requiresApproval) {
             supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef, order.getOrderId()));
         }
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }
@@ -135,7 +135,6 @@ public class DropshipPurchaseService {
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
         delivery.setType(DeliveryType.DROPSHIP);
-        delivery.setDropshipDetails(new Dropship(order.getOrderId()));
         delivery.setDeliveryAddress(consigneeLabel(order.getShippingDetails()));
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         delivery.setShippingCost(form.getShippingCost());
@@ -146,9 +145,8 @@ public class DropshipPurchaseService {
         return delivery;
     }
 
-    SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines) {
-        String orderId = delivery.dropshipOrderId().orElseThrow(() -> new SupplierOrderException(
-                "Delivery " + delivery.getDeliveryId() + " is not a dropship delivery"));
+    SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines,
+                                           String orderId) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null || !order.hasShippingDetails()) {
             throw new SupplierOrderException("Order " + orderId

@@ -132,7 +132,6 @@ class DropshipPurchaseServiceTest {
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         delivery.setType(DeliveryType.DROPSHIP);
-        delivery.setDropshipDetails(new Dropship(ORDER_ID));
         return delivery;
     }
 
@@ -173,7 +172,6 @@ class DropshipPurchaseServiceTest {
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
-        assertEquals(Optional.of(ORDER_ID), saved.getValue().dropshipOrderId());
         assertTrue(saved.getValue().isDropship());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
@@ -197,7 +195,10 @@ class DropshipPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
-        verify(supplierPurchaseEventPublisher).publish(any());
+        ArgumentCaptor<SupplierPurchaseEventRequest> event =
+                ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        assertEquals(ORDER_ID, event.getValue().getOrderId());
     }
 
     @Test
@@ -283,7 +284,7 @@ class DropshipPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
         Delivery delivery = saved.getValue();
-        assertEquals(Optional.of(ORDER_ID), delivery.dropshipOrderId());
+        assertTrue(delivery.isDropship());
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
@@ -342,7 +343,7 @@ class DropshipPurchaseServiceTest {
         Delivery manual = saved.getAllValues().get(1);
         assertEquals(submitted.getProvider(), manual.getProvider());
         assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
-        assertEquals(submitted.dropshipOrderId(), manual.dropshipOrderId());
+        assertEquals(submitted.isDropship(), manual.isDropship());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
         assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());
@@ -390,7 +391,8 @@ class DropshipPurchaseServiceTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when / then
-        assertThrows(SupplierOrderException.class, () -> service.placeDropshipOrder(STORE_ID, delivery, lines));
+        assertThrows(SupplierOrderException.class,
+                () -> service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID));
     }
 
     @Test
@@ -403,7 +405,8 @@ class DropshipPurchaseServiceTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when / then
-        assertThrows(SupplierOrderException.class, () -> service.placeDropshipOrder(STORE_ID, delivery, lines));
+        assertThrows(SupplierOrderException.class,
+                () -> service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID));
     }
 
     @Test
@@ -417,7 +420,7 @@ class DropshipPurchaseServiceTest {
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN"))));
 
         // when
-        service.placeDropshipOrder(STORE_ID, delivery, lines);
+        service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID);
 
         // then
         ArgumentCaptor<SupplierDropshipRequest> request = ArgumentCaptor.forClass(SupplierDropshipRequest.class);

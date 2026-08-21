@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
@@ -258,6 +259,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         Delivery delivery = new Delivery(storeId, "DEMO-DELIV-001", ACME,
                 LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
         delivery.setDeliveryId("demo-delivery-001");
+        delivery.setType(DeliveryType.WAREHOUSE);
         Order third = demoOrder(storeId, ownerEmail, "Piotr", "Wisniewski", "demo-order-003");
         OrderItem orderedItem = allocationItem(third.getOrderId(), catalogRows.get(0), delivery.getDeliveryId(), 1, 1);
         orderedItem.setStatus(FulfilmentStatus.Ordered);

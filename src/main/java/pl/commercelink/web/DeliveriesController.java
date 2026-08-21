@@ -117,6 +117,9 @@ public class DeliveriesController {
     @Autowired
     private OrderIdRefreshService orderIdRefreshService;
 
+    @Autowired
+    private DropshipOrderLocator dropshipOrderLocator;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -911,7 +914,9 @@ public class DeliveriesController {
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
-            var dropshipOrder = ordersRepository.findById(storeId, delivery.dropshipOrderId().orElseThrow());
+            var dropshipOrder = dropshipOrderLocator.locate(delivery.getDeliveryId())
+                    .map(orderId -> ordersRepository.findById(storeId, orderId))
+                    .orElse(null);
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
             model.addAttribute("dropshipShipment", dropshipOrder != null
                     ? dropshipOrder.firstShipment().orElse(null)

@@ -4,8 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,38 +51,6 @@ class DeliveryTest {
 
         // when / then
         assertFalse(delivery.isDropship());
-    }
-
-    @Test
-    void isDropshipReturnsFalseWhenDropshipOrderIdIsBlank() {
-        // given
-        Delivery delivery = new Delivery();
-        Dropship dropship = new Dropship();
-        dropship.setOrderId(" ");
-        delivery.setDropshipDetails(dropship);
-
-        // when / then
-        assertFalse(delivery.isDropship());
-    }
-
-    @Test
-    void dropshipOrderIdReturnsOrderIdForDropshipDelivery() {
-        // given
-        Delivery delivery = new Delivery();
-        delivery.setType(DeliveryType.DROPSHIP);
-        delivery.setDropshipDetails(new Dropship("order-1"));
-
-        // when / then
-        assertEquals(Optional.of("order-1"), delivery.dropshipOrderId());
-    }
-
-    @Test
-    void dropshipOrderIdReturnsEmptyForWarehouseDelivery() {
-        // given
-        Delivery delivery = new Delivery();
-
-        // when / then
-        assertEquals(Optional.empty(), delivery.dropshipOrderId());
     }
 
     @Test
