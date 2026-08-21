@@ -6,6 +6,9 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentReason;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.invoicing.api.Price;
@@ -17,11 +20,22 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.event.OrderEvent;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMACenter;
+import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemStatus;
+import pl.commercelink.orders.rma.RMAResolutionType;
+import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -36,6 +50,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Parcel;
 import pl.commercelink.stores.RMAConfiguration;
@@ -45,17 +60,27 @@ import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.warehouse.builtin.CounterpartyDetails;
+import pl.commercelink.warehouse.builtin.DeliveryAddress;
+import pl.commercelink.warehouse.builtin.IssuerDetails;
+import pl.commercelink.warehouse.builtin.WarehouseDocument;
+import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
+import pl.commercelink.warehouse.builtin.WarehouseDocumentSequence;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Objects;
 
@@ -64,6 +89,33 @@ import java.util.Objects;
 public class DemoStoreSeeder implements StoreSeeder {
 
     public static final String CATALOG_ID = "cat-local-01";
+
+    static final String POS_ORDER_KEY = "demo-order-pos";
+    static final String MARKETPLACE_ORDER_KEY = "demo-order-marketplace-1";
+    static final String MARKETPLACE_ORDER_2_KEY = "demo-order-marketplace-2";
+    static final String WEBSTORE_ORDER_KEY = "demo-order-webstore";
+    static final String MARKETPLACE_EXTERNAL_KEY = "demo-external-allegro-1";
+    static final String MARKETPLACE_EXTERNAL_2_KEY = "demo-external-allegro-2";
+    static final String DEMO_WAREHOUSE_ID = "MAG-01";
+    static final String COMPLETED_ORDER_KEY = "demo-order-completed-1";
+    static final String COMPLETED_ORDER_2_KEY = "demo-order-completed-2";
+    static final String COMPLETED_EXTERNAL_KEY = "demo-external-allegro-3";
+
+    static String demoId(String storeId, String key) {
+        return UUID.nameUUIDFromBytes((storeId + "/" + key).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    static String demoExternalOrderNo(String storeId, String key) {
+        long hash = UUID.nameUUIDFromBytes((storeId + "/" + key).getBytes(StandardCharsets.UTF_8)).getMostSignificantBits();
+        return String.valueOf(1_000_000_000L + Math.floorMod(hash, 9_000_000_000L));
+    }
+
+    static String customerEmail(String storeId, String name, String surname) {
+        String localPart = (name + "." + surname).toLowerCase(Locale.ROOT);
+        long digits = Math.floorMod(
+                UUID.nameUUIDFromBytes((storeId + "/" + localPart).getBytes(StandardCharsets.UTF_8)).getMostSignificantBits(), 90) + 10;
+        return localPart + digits + "@test.com";
+    }
 
     private static final String ACME = "Acme";
     private static final String ACME_B = "AcmeB";
@@ -84,7 +136,14 @@ public class DemoStoreSeeder implements StoreSeeder {
     @Override
     public void seed(Store store) {
         applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
-        seedStoreData(store.getStoreId(), store.getDemo());
+        applyDemoWarehouseId(store);
+        applyDemoCompanyDetails(store);
+        applyDemoInvoicingConfiguration(store);
+        applyDemoFulfilmentDefaults(store);
+        seedStoreData(store.getStoreId());
+        saveSupplierRmaCenters(store.getStoreId());
+        saveCompletedOrders(store);
+        saveWarehouseStock(store);
     }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
@@ -92,11 +151,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
         mapper.save(store);
-        seedStoreData(storeId, demo);
+        seedStoreData(storeId);
         return store;
     }
 
-    private void seedStoreData(String storeId, DemoStoreMetadata demo) {
+    private void seedStoreData(String storeId) {
         List<CatalogSeedRow> rows = CatalogSeed.load();
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
 
@@ -114,7 +173,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         saveProducts(mapper, rows, storeId);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
-        saveOrders(mapper, clobber, storeId, ownerEmailOrFallback(demo), rows);
+        saveOrders(mapper, clobber, storeId, rows);
     }
 
     private boolean isAlreadySeeded(DynamoDBMapper mapper, String storeId) {
@@ -162,6 +221,44 @@ public class DemoStoreSeeder implements StoreSeeder {
         store.setRmaConfiguration(rma);
     }
 
+    static void applyDemoWarehouseId(Store store) {
+        store.getWarehouseConfiguration().setWarehouseId(DEMO_WAREHOUSE_ID);
+    }
+
+    static void applyDemoCompanyDetails(Store store) {
+        BillingDetails billing = Objects.requireNonNullElseGet(store.getBillingDetails(), BillingDetails::new);
+        billing.setCompanyName("Demo Store sp. z o.o.");
+        billing.setTaxId("1234567890");
+        billing.setStreetAndNumber("ul. Testowa 1");
+        billing.setPostalCode("00-001");
+        billing.setCity("Warszawa");
+        billing.setCountry("PL");
+        billing.setPhone("+48123123123");
+        if (billing.getEmail() == null) {
+            billing.setEmail(ownerEmailOrFallback(store.getDemo()));
+        }
+        store.setBillingDetails(billing);
+
+        ShippingDetails warehouseShipping = warehouseAddress();
+        warehouseShipping.setId("demo-warehouse-ship-01");
+        store.setShippingDetails(new LinkedList<>(List.of(warehouseShipping)));
+    }
+
+    static void applyDemoInvoicingConfiguration(Store store) {
+        InvoicingConfiguration invoicing = Objects.requireNonNullElseGet(store.getInvoicingConfiguration(), InvoicingConfiguration::new);
+        invoicing.setPaymentTerms(7);
+        invoicing.setSendInvoicesAsAttachment(true);
+        invoicing.setSplitPaymentsEnabled(true);
+        store.setInvoicingConfiguration(invoicing);
+    }
+
+    static void applyDemoFulfilmentDefaults(Store store) {
+        FulfilmentConfiguration fulfilment = Objects.requireNonNullElseGet(store.getFulfilmentConfiguration(), FulfilmentConfiguration::new);
+        fulfilment.setOrderAssemblyDays(1);
+        fulfilment.setOrderRealizationDays(0);
+        store.setFulfilmentConfiguration(fulfilment);
+    }
+
     private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId) {
         List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId);
 
@@ -199,7 +296,7 @@ public class DemoStoreSeeder implements StoreSeeder {
             double unitCost = Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN);
             WarehouseItem item = new WarehouseItem(storeId, "Unknown", row.category(), row.name(),
                     row.ean(), row.mfn(), unitCost, WAREHOUSE_QTY);
-            item.setItemId("local-wh-" + row.pimId());
+            item.setItemId(demoId(storeId, "local-wh-" + row.pimId()));
             item.setStatus(FulfilmentStatus.Delivered);
             item.setComment("seed-local");
             items.add(item);
@@ -221,6 +318,421 @@ public class DemoStoreSeeder implements StoreSeeder {
         mapper.save(center, clobber);
     }
 
+    private void saveSupplierRmaCenters(String storeId) {
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build();
+        buildSupplierRmaCenters(storeId).forEach(center -> mapper.save(center, clobber));
+    }
+
+    static List<RMACenter> buildSupplierRmaCenters(String storeId) {
+        return List.of(
+                supplierRmaCenter(storeId, ACME, "demo-rma-center-acme", "demo-rma-addr-acme",
+                        "Acme sp. z o.o.", "ul. Dystrybucyjna 10", "02-100", "Warszawa", "rma@acme.local"),
+                supplierRmaCenter(storeId, ACME_B, "demo-rma-center-acmeb", "demo-rma-addr-acmeb",
+                        "AcmeB sp. z o.o.", "ul. Hurtowa 7", "26-600", "Radom", "rma@acmeb.local"));
+    }
+
+    private static RMACenter supplierRmaCenter(String storeId, String provider, String rmaCenterId, String addressId,
+                                               String companyName, String street, String postalCode, String city, String email) {
+        RMACenter center = new RMACenter();
+        center.setStoreId(storeId);
+        center.setRmaCenterId(rmaCenterId);
+        center.setProvider(provider);
+        ShippingDetails address = new ShippingDetails();
+        address.setId(addressId);
+        address.setName("Centrum");
+        address.setSurname("Zwrotow");
+        address.setCompanyName(companyName);
+        address.setStreetAndNumber(street);
+        address.setPostalCode(postalCode);
+        address.setCity(city);
+        address.setCountry("PL");
+        address.setEmail(email);
+        address.setPhone("+48123123123");
+        center.setShippingDetails(address);
+        return center;
+    }
+
+    private void saveCompletedOrders(Store store) {
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build();
+        CompletedDemoOrders completed = buildCompletedDemoOrders(
+                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), CatalogSeed.load());
+        completed.orders().forEach(order -> mapper.save(order, clobber));
+        completed.itemsByOrderId().values().forEach(mapper::batchSave);
+        completed.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
+        completed.documents().forEach(document -> mapper.save(document, clobber));
+        mapper.batchSave(completed.documentItems());
+        completed.sequences().forEach(sequence -> mapper.save(sequence, clobber));
+        completed.events().forEach(event -> mapper.save(event, clobber));
+        mapper.save(completed.rma(), clobber);
+        completed.rmaItems().forEach(rmaItem -> mapper.save(rmaItem, clobber));
+    }
+
+    static CompletedDemoOrders buildCompletedDemoOrders(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+        List<CatalogSeedRow> catalogRows = rows.stream().filter(CatalogSeedRow::inCatalog).toList();
+        List<CatalogSeedRow> acmeRows = catalogRows.stream().filter(row -> row.soldBy(ACME)).toList();
+        List<CatalogSeedRow> acmeBRows = catalogRows.stream().filter(row -> row.soldBy(ACME_B)).toList();
+        String warehouseId = DEMO_WAREHOUSE_ID;
+        String pzSequenceKey = DocumentType.GoodsReceipt.getSequenceKey(warehouseId);
+        String wzSequenceKey = DocumentType.GoodsIssue.getSequenceKey(warehouseId);
+
+        CompletedOrderBundle first = completedOrderBundle(storeId, ownerEmail, "Tomasz", "Lis",
+                COMPLETED_ORDER_KEY, new OrderSource("Sklep internetowy", OrderSourceType.WebStore), null,
+                List.of(acmeRows.get(3), acmeRows.get(4)), ACME, ConnectionMode.GLOBAL, acmeOrderRef(104496),
+                acmeCounterparty(), 8, warehouseId, pzSequenceKey + "/000001", wzSequenceKey + "/000001", "1");
+        CompletedOrderBundle second = completedOrderBundle(storeId, ownerEmail, "Ewa", "Mazur",
+                COMPLETED_ORDER_2_KEY, new OrderSource("Allegro", OrderSourceType.Marketplace),
+                demoExternalOrderNo(storeId, COMPLETED_EXTERNAL_KEY),
+                List.of(acmeBRows.get(3)), ACME_B, ConnectionMode.OWN, acmeBOrderRef(88203),
+                acmeBCounterparty(), 15, warehouseId, pzSequenceKey + "/000002", wzSequenceKey + "/000002", "2");
+
+        Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
+        itemsByOrderId.put(first.order().getOrderId(), first.items());
+        itemsByOrderId.put(second.order().getOrderId(), second.items());
+
+        List<WarehouseDocument> documents = new ArrayList<>(first.documents());
+        documents.addAll(second.documents());
+        List<WarehouseDocumentItem> documentItems = new ArrayList<>(first.documentItems());
+        documentItems.addAll(second.documentItems());
+        List<OrderEvent> events = new ArrayList<>(first.events());
+        events.addAll(second.events());
+
+        RMA rma = demoRma(storeId, first.order());
+        List<RMAItem> rmaItems = List.of(demoRmaItem(storeId, rma.getRmaId(), first.items().getFirst()));
+
+        return new CompletedDemoOrders(
+                List.of(first.order(), second.order()),
+                itemsByOrderId,
+                List.of(first.delivery(), second.delivery()),
+                documents,
+                documentItems,
+                List.of(new WarehouseDocumentSequence(storeId, pzSequenceKey, 2),
+                        new WarehouseDocumentSequence(storeId, wzSequenceKey, 2)),
+                events,
+                rma,
+                rmaItems);
+    }
+
+    private static RMA demoRma(String storeId, Order order) {
+        RMA rma = new RMA(storeId);
+        rma.setRmaId(demoId(storeId, "demo-rma-1"));
+        rma.setOrderId(order.getOrderId());
+        rma.setEmail(order.getBillingDetails().getEmail());
+        rma.setStatus(RMAStatus.Approved);
+        rma.setCreatedAt(LocalDateTime.now().minusDays(2));
+        rma.setEmailNotificationsEnabled(false);
+        rma.setShippingDetails(customerShippingDetails(
+                order.getBillingDetails().getName(), order.getBillingDetails().getSurname(),
+                order.getBillingDetails().getEmail()));
+        rma.addEvent(new Event(EventType.email,
+                EmailNotificationType.RMA_CARRIER_ARRANGEMENT.name(), rma.getCreatedAt().plusMinutes(10)));
+        return rma;
+    }
+
+    private static RMAItem demoRmaItem(String storeId, String rmaId, OrderItem orderItem) {
+        RMAItem item = new RMAItem();
+        item.setRmaId(rmaId);
+        item.setRmaItemId(demoId(storeId, "demo-rma-1-item-1"));
+        item.setItemId(orderItem.getItemId());
+        item.setDesiredResolution(RMAResolutionType.Repair);
+        item.setReason("Produkt nie uruchamia się po podłączeniu zasilania");
+        item.setQty(1);
+        item.setStatus(RMAItemStatus.New);
+        item.setName(orderItem.getName());
+        item.setDeliveryId(orderItem.getDeliveryId());
+        item.setEan(orderItem.getEan());
+        item.setMfn(orderItem.getManufacturerCode());
+        item.setPrice(orderItem.getPrice());
+        item.setCost(orderItem.getCost());
+        item.setTax(orderItem.getTax());
+        return item;
+    }
+
+    private record CompletedOrderBundle(Order order, List<OrderItem> items, Delivery delivery,
+                                        List<WarehouseDocument> documents, List<WarehouseDocumentItem> documentItems,
+                                        List<OrderEvent> events) {
+    }
+
+    private static CompletedOrderBundle completedOrderBundle(String storeId, String ownerEmail, String name, String surname,
+                                                             String orderKey, OrderSource source, String externalOrderId,
+                                                             List<CatalogSeedRow> rows, String supplier, ConnectionMode connectionMode,
+                                                             String externalDeliveryId, CounterpartyDetails supplierCounterparty,
+                                                             int orderedDayOfPreviousMonth, String warehouseId, String pzNumber, String wzNumber,
+                                                             String paymentSuffix) {
+        LocalDateTime orderedAt = LocalDate.now().minusMonths(1).withDayOfMonth(orderedDayOfPreviousMonth).atTime(10, 30);
+        LocalDateTime receivedAt = orderedAt.plusDays(2);
+        LocalDateTime shippedAt = orderedAt.plusDays(3);
+
+        Order order = demoOrder(storeId,name, surname, demoId(storeId, orderKey), source);
+        order.setExternalOrderId(externalOrderId);
+        order.setStatus(OrderStatus.Completed);
+        order.setOrderedAt(orderedAt);
+        order.setEstimatedAssemblyAt(receivedAt.toLocalDate());
+        order.setEstimatedShippingAt(shippedAt.toLocalDate());
+
+        Delivery delivery = new Delivery(storeId, externalDeliveryId, supplier,
+                receivedAt.toLocalDate(), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
+        delivery.setDeliveryId(demoId(storeId, orderKey + "-delivery"));
+        delivery.setConnectionMode(connectionMode);
+        delivery.setOrderedAt(orderedAt);
+        delivery.setReceivedAt(receivedAt);
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_RECEIVED", receivedAt));
+
+        List<OrderItem> items = new ArrayList<>();
+        int position = 0;
+        for (CatalogSeedRow row : rows) {
+            OrderItem item = allocationItem(order.getOrderId(), row, delivery.getDeliveryId(), 1, ++position);
+            item.setStatus(FulfilmentStatus.Delivered);
+            items.add(item);
+        }
+        order.setTotalPrice(items.stream().mapToDouble(OrderItem::getTotalPrice).sum());
+        order.setPayments(new ArrayList<>(List.of(Payment.bankTransfer(
+                "DEMO-PAY-C" + paymentSuffix, name + " " + surname, order.getTotalPrice()))));
+
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DHL");
+        shipment.setTrackingNo(demoExternalOrderNo(storeId, orderKey + "-tracking"));
+        shipment.setShippedAt(shippedAt);
+        shipment.setDeliveredAt(shippedAt.plusDays(1));
+        order.setShipments(new ArrayList<>(List.of(shipment)));
+        order.addDocument(new Document(demoId(storeId, orderKey + "-receipt"),
+                "PAR/" + LocalDate.now().getYear() + "/DEMO/00" + paymentSuffix, null, DocumentType.Receipt));
+
+        delivery.increaseTotalCost(items.stream().mapToDouble(item -> item.getCost() * item.getQty()).sum());
+        delivery.addPayment(Payment.outgoingBankTransfer(
+                "DEMO-PAY-DELIV-" + paymentSuffix, "Demo Store sp. z o.o.", delivery.getTotalCostGross()));
+
+        WarehouseDocument goodsReceipt = warehouseDocument(storeId, orderKey + "-pz", pzNumber, DocumentType.GoodsReceipt,
+                warehouseId, receivedAt, ownerEmail, DocumentReason.SupplierDelivery, supplierCounterparty);
+        goodsReceipt.setDeliveryId(delivery.getDeliveryId());
+        delivery.addDocument(new Document(goodsReceipt.getDocumentId(), goodsReceipt.getDocumentNo(), null, DocumentType.GoodsReceipt));
+
+        WarehouseDocument goodsIssue = warehouseDocument(storeId, orderKey + "-wz", wzNumber, DocumentType.GoodsIssue,
+                warehouseId, shippedAt, ownerEmail, DocumentReason.CustomerOrder, customerCounterparty(order));
+        goodsIssue.setOrderId(order.getOrderId());
+        goodsIssue.setDeliveryAddress(deliveryAddress(order.getShippingDetails()));
+        order.addDocument(new Document(goodsIssue.getDocumentId(), goodsIssue.getDocumentNo(), null, DocumentType.GoodsIssue));
+
+        List<WarehouseDocumentItem> documentItems = new ArrayList<>();
+        documentItems.addAll(documentItems(storeId, goodsReceipt, delivery.getDeliveryId(), items));
+        documentItems.addAll(documentItems(storeId, goodsIssue, delivery.getDeliveryId(), items));
+
+        List<OrderEvent> events = List.of(
+                orderEvent(storeId, order, EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), orderedAt),
+                orderEvent(storeId, order, EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name(), orderedAt.plusHours(2)),
+                orderEvent(storeId, order, EventType.email, EmailNotificationType.ORDER_ASSEMBLED.name(), receivedAt),
+                orderEvent(storeId, order, EventType.email, EmailNotificationType.ORDER_SHIPPING.name(), shippedAt),
+                orderEvent(storeId, order, EventType.action, "SHIPMENT_COLLECTED", shippedAt.plusHours(4)),
+                orderEvent(storeId, order, EventType.action, "SHIPMENT_DELIVERED", shipment.getDeliveredAt()));
+
+        return new CompletedOrderBundle(order, items, delivery, List.of(goodsReceipt, goodsIssue), documentItems, events);
+    }
+
+    private void saveWarehouseStock(Store store) {
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build();
+        WarehouseStock stock = buildWarehouseStock(
+                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), CatalogSeed.load());
+        mapper.batchSave(stock.items());
+        stock.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
+        stock.documents().forEach(document -> mapper.save(document, clobber));
+        mapper.batchSave(stock.documentItems());
+        stock.sequences().forEach(sequence -> mapper.save(sequence, clobber));
+    }
+
+    static WarehouseStock buildWarehouseStock(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+        List<CatalogSeedRow> warehouseRows = rows.stream().filter(CatalogSeedRow::inWarehouse).toList();
+        String warehouseId = DEMO_WAREHOUSE_ID;
+        String pzSequenceKey = DocumentType.GoodsReceipt.getSequenceKey(warehouseId);
+
+        Delivery first = receivedWarehouseDelivery(storeId, "demo-delivery-wh-1", acmeOrderRef(104432), ACME, ConnectionMode.GLOBAL, 21);
+        Delivery second = receivedWarehouseDelivery(storeId, "demo-delivery-wh-2", acmeBOrderRef(88144), ACME_B, ConnectionMode.OWN, 14);
+        Delivery third = receivedWarehouseDelivery(storeId, "demo-delivery-wh-3", acmeOrderRef(104501), ACME, ConnectionMode.GLOBAL, 5);
+        Delivery pending = pendingWarehouseDelivery(storeId, "demo-delivery-wh-4", acmeBOrderRef(88229), ACME_B);
+        List<Delivery> deliveries = List.of(first, second, third, pending);
+
+        Map<String, List<WarehouseItem>> itemsByDeliveryId = new HashMap<>();
+        List<WarehouseItem> items = new ArrayList<>();
+        for (int i = 0; i < warehouseRows.size(); i++) {
+            Delivery delivery = deliveries.get(i % deliveries.size());
+            WarehouseItem item = warehouseItem(storeId, warehouseRows.get(i), delivery);
+            items.add(item);
+            itemsByDeliveryId.computeIfAbsent(delivery.getDeliveryId(), key -> new ArrayList<>()).add(item);
+        }
+
+        List<WarehouseDocument> documents = new ArrayList<>();
+        List<WarehouseDocumentItem> documentItems = new ArrayList<>();
+        List<Delivery> received = List.of(first, second, third);
+        for (int i = 0; i < received.size(); i++) {
+            Delivery delivery = received.get(i);
+            int number = i + 1;
+            List<WarehouseItem> deliveryItems = itemsByDeliveryId.get(delivery.getDeliveryId());
+            delivery.increaseTotalCost(deliveryItems.stream().mapToDouble(item -> item.getCost() * item.getQty()).sum());
+            delivery.addPayment(Payment.outgoingBankTransfer(
+                    "DEMO-PAY-WH-" + number, "Demo Store sp. z o.o.", delivery.getTotalCostGross()));
+
+            CounterpartyDetails counterparty = ACME.equals(delivery.getProvider()) ? acmeCounterparty() : acmeBCounterparty();
+            WarehouseDocument goodsReceipt = warehouseDocument(storeId, "demo-doc-pz-wh-" + number,
+                    pzSequenceKey + "/" + String.format("%06d", number + 2), DocumentType.GoodsReceipt,
+                    warehouseId, delivery.getReceivedAt(), ownerEmail, DocumentReason.SupplierDelivery, counterparty);
+            goodsReceipt.setDeliveryId(delivery.getDeliveryId());
+            delivery.addDocument(new Document(goodsReceipt.getDocumentId(), goodsReceipt.getDocumentNo(), null, DocumentType.GoodsReceipt));
+            delivery.addDocument(new Document(demoId(storeId, "demo-invoice-wh-" + number),
+                    "FV/" + LocalDate.now().getYear() + "/DEMO/" + String.format("%03d", number), null, DocumentType.InvoiceVat));
+            documents.add(goodsReceipt);
+            documentItems.addAll(warehouseDocumentItems(storeId, goodsReceipt, delivery.getDeliveryId(), deliveryItems));
+        }
+
+        pending.increaseTotalCost(itemsByDeliveryId.get(pending.getDeliveryId()).stream()
+                .mapToDouble(item -> item.getCost() * item.getQty()).sum());
+
+        return new WarehouseStock(items, deliveries, documents, documentItems,
+                List.of(new WarehouseDocumentSequence(storeId, pzSequenceKey, 5)));
+    }
+
+    private static WarehouseItem warehouseItem(String storeId, CatalogSeedRow row, Delivery delivery) {
+        double unitCost = Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN);
+        WarehouseItem item = new WarehouseItem(storeId, delivery.getDeliveryId(), row.category(), row.name(),
+                row.ean(), row.mfn(), unitCost, WAREHOUSE_QTY);
+        item.setItemId(demoId(storeId, "local-wh-" + row.pimId()));
+        item.setStatus(delivery.hasBeenReceived() ? FulfilmentStatus.Delivered : FulfilmentStatus.Ordered);
+        return item;
+    }
+
+    private static Delivery receivedWarehouseDelivery(String storeId, String key, String externalDeliveryId,
+                                                      String supplier, ConnectionMode connectionMode, int receivedDaysAgo) {
+        LocalDateTime receivedAt = LocalDateTime.now().minusDays(receivedDaysAgo);
+        Delivery delivery = warehouseDelivery(storeId, key, externalDeliveryId, supplier, connectionMode,
+                receivedAt.minusDays(2), receivedAt.toLocalDate());
+        delivery.setReceivedAt(receivedAt);
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_RECEIVED", receivedAt));
+        return delivery;
+    }
+
+    private static Delivery pendingWarehouseDelivery(String storeId, String key, String externalDeliveryId, String supplier) {
+        return warehouseDelivery(storeId, key, externalDeliveryId, supplier, ConnectionMode.OWN,
+                LocalDateTime.now().minusDays(1), LocalDate.now().plusDays(3));
+    }
+
+    private static String acmeOrderRef(int number) {
+        return "ZS/" + number + "/" + LocalDate.now().getYear();
+    }
+
+    private static String acmeBOrderRef(int number) {
+        return "ZK/" + number + "/" + LocalDate.now().getYear();
+    }
+
+    private static Delivery warehouseDelivery(String storeId, String key, String externalDeliveryId, String supplier,
+                                              ConnectionMode connectionMode, LocalDateTime orderedAt, LocalDate estimatedDeliveryAt) {
+        Delivery delivery = new Delivery(storeId, externalDeliveryId, supplier, estimatedDeliveryAt,
+                15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
+        delivery.setDeliveryId(demoId(storeId, key));
+        delivery.setConnectionMode(connectionMode);
+        delivery.setOrderedAt(orderedAt);
+        return delivery;
+    }
+
+    private static List<WarehouseDocumentItem> warehouseDocumentItems(String storeId, WarehouseDocument document,
+                                                                      String deliveryId, List<WarehouseItem> items) {
+        List<WarehouseDocumentItem> documentItems = new ArrayList<>();
+        for (WarehouseItem item : items) {
+            WarehouseDocumentItem documentItem = new WarehouseDocumentItem(document.getDocumentId(), document.getType(),
+                    document.getCreatedAt(), deliveryId, item.getEan(), item.getManufacturerCode(), item.getName(),
+                    item.getQty(), item.getCost());
+            documentItem.setItemId(demoId(storeId, document.getDocumentId() + "-item-" + item.getItemId()));
+            documentItems.add(documentItem);
+        }
+        return documentItems;
+    }
+
+    private static WarehouseDocument warehouseDocument(String storeId, String key, String documentNo, DocumentType type,
+                                                       String warehouseId, LocalDateTime createdAt, String createdBy,
+                                                       DocumentReason reason, CounterpartyDetails counterparty) {
+        WarehouseDocument document = new WarehouseDocument(storeId, documentNo, type);
+        document.setDocumentId(demoId(storeId, key));
+        document.setWarehouseId(warehouseId);
+        document.setCreatedAt(createdAt);
+        document.setCreatedBy(createdBy);
+        document.setReason(reason);
+        document.setIssuer(demoIssuer());
+        document.setCounterparty(counterparty);
+        return document;
+    }
+
+    private static List<WarehouseDocumentItem> documentItems(String storeId, WarehouseDocument document,
+                                                             String deliveryId, List<OrderItem> items) {
+        List<WarehouseDocumentItem> documentItems = new ArrayList<>();
+        for (OrderItem item : items) {
+            WarehouseDocumentItem documentItem = new WarehouseDocumentItem(document.getDocumentId(), document.getType(),
+                    document.getCreatedAt(), deliveryId, item.getEan(), item.getManufacturerCode(), item.getName(),
+                    item.getQty(), item.getCost());
+            documentItem.setItemId(demoId(storeId, document.getDocumentId() + "-item-" + item.getPosition()));
+            documentItems.add(documentItem);
+        }
+        return documentItems;
+    }
+
+    private static IssuerDetails demoIssuer() {
+        IssuerDetails issuer = new IssuerDetails();
+        issuer.setCompanyName("Demo Store sp. z o.o.");
+        issuer.setStreetAndNumber("ul. Testowa 1");
+        issuer.setPostalCode("00-001");
+        issuer.setCity("Warszawa");
+        issuer.setCountry("PL");
+        issuer.setTaxId("1234567890");
+        return issuer;
+    }
+
+    private static CounterpartyDetails acmeCounterparty() {
+        return supplierCounterparty("Acme sp. z o.o.", "ul. Dystrybucyjna 10", "02-100", "Warszawa", "5213000001");
+    }
+
+    private static CounterpartyDetails acmeBCounterparty() {
+        return supplierCounterparty("AcmeB sp. z o.o.", "ul. Hurtowa 7", "26-600", "Radom", "9482000002");
+    }
+
+    private static CounterpartyDetails supplierCounterparty(String companyName, String street, String postalCode,
+                                                            String city, String taxId) {
+        CounterpartyDetails details = new CounterpartyDetails();
+        details.setCompanyName(companyName);
+        details.setStreetAndNumber(street);
+        details.setPostalCode(postalCode);
+        details.setCity(city);
+        details.setCountry("PL");
+        details.setTaxId(taxId);
+        return details;
+    }
+
+    private static CounterpartyDetails customerCounterparty(Order order) {
+        CounterpartyDetails details = new CounterpartyDetails();
+        details.setName(order.getBillingDetails().getName());
+        details.setSurname(order.getBillingDetails().getSurname());
+        details.setStreetAndNumber(order.getBillingDetails().getStreetAndNumber());
+        details.setPostalCode(order.getBillingDetails().getPostalCode());
+        details.setCity(order.getBillingDetails().getCity());
+        details.setCountry(order.getBillingDetails().getCountry());
+        return details;
+    }
+
+    private static DeliveryAddress deliveryAddress(ShippingDetails shipping) {
+        DeliveryAddress address = new DeliveryAddress();
+        address.setName(shipping.getName());
+        address.setSurname(shipping.getSurname());
+        address.setCompanyName(shipping.getCompanyName());
+        address.setStreetAndNumber(shipping.getStreetAndNumber());
+        address.setPostalCode(shipping.getPostalCode());
+        address.setCity(shipping.getCity());
+        address.setCountry(shipping.getCountry());
+        return address;
+    }
+
     private void savePricelist(String storeId) {
         try (InputStream template = DemoStoreSeeder.class.getResourceAsStream(PRICELIST_TEMPLATE)) {
             if (template == null) {
@@ -232,40 +744,50 @@ public class DemoStoreSeeder implements StoreSeeder {
         }
     }
 
-    private void saveOrders(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
-        DemoOrders demoOrders = buildDemoOrders(storeId, ownerEmail, rows);
+    private void saveOrders(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, String storeId, List<CatalogSeedRow> rows) {
+        DemoOrders demoOrders = buildDemoOrders(storeId, rows);
         demoOrders.orders().forEach(order -> mapper.save(order, clobber));
         demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
         mapper.save(demoOrders.delivery(), clobber);
+        demoOrders.events().forEach(event -> mapper.save(event, clobber));
     }
 
     private static String ownerEmailOrFallback(DemoStoreMetadata demo) {
         return demo != null ? demo.getOwnerEmail() : "demo@commercelink.local";
     }
 
-    static DemoOrders buildDemoOrders(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+    static DemoOrders buildDemoOrders(String storeId, List<CatalogSeedRow> rows) {
         List<CatalogSeedRow> catalogRows = rows.stream().filter(CatalogSeedRow::inCatalog).toList();
         List<Order> orders = new ArrayList<>();
         Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
 
-        Order first = demoOrder(storeId, ownerEmail, "Jan", "Kowalski", "demo-order-001");
+        Order first = demoOrder(storeId,"Jan", "Kowalski", demoId(storeId, POS_ORDER_KEY),
+                new OrderSource("Demo", OrderSourceType.PointOfSale));
         itemsByOrderId.put(first.getOrderId(), List.of(
                 unassignedItem(first.getOrderId(), catalogRows.get(0), 1, 1),
                 unassignedItem(first.getOrderId(), catalogRows.get(1), 2, 2)));
-        Order second = demoOrder(storeId, ownerEmail, "Anna", "Nowak", "demo-order-002");
+        Order second = demoOrder(storeId,"Anna", "Nowak", demoId(storeId, MARKETPLACE_ORDER_KEY),
+                new OrderSource("Allegro", OrderSourceType.Marketplace));
+        second.setExternalOrderId(demoExternalOrderNo(storeId, MARKETPLACE_EXTERNAL_KEY));
         itemsByOrderId.put(second.getOrderId(), List.of(
                 allocationItem(second.getOrderId(), catalogRows.get(2), ACME, 1, 1)));
 
-        Delivery delivery = new Delivery(storeId, "DEMO-DELIV-001", ACME,
+        Delivery delivery = new Delivery(storeId, acmeOrderRef(104518), ACME,
                 LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
-        delivery.setDeliveryId("demo-delivery-001");
+        delivery.setDeliveryId(demoId(storeId, "demo-delivery-open"));
         delivery.setType(DeliveryType.WAREHOUSE);
-        Order third = demoOrder(storeId, ownerEmail, "Piotr", "Wisniewski", "demo-order-003");
+        Order third = demoOrder(storeId,"Piotr", "Wisniewski", demoId(storeId, MARKETPLACE_ORDER_2_KEY),
+                new OrderSource("Allegro", OrderSourceType.Marketplace));
+        third.setExternalOrderId(demoExternalOrderNo(storeId, MARKETPLACE_EXTERNAL_2_KEY));
         OrderItem orderedItem = allocationItem(third.getOrderId(), catalogRows.get(0), delivery.getDeliveryId(), 1, 1);
         orderedItem.setStatus(FulfilmentStatus.Ordered);
         itemsByOrderId.put(third.getOrderId(), List.of(orderedItem));
+        third.setStatus(OrderStatus.Assembly);
+        third.setEstimatedAssemblyAt(delivery.getEstimatedDeliveryAt());
+        delivery.increaseTotalCost(orderedItem.getCost() * orderedItem.getQty());
 
-        Order fourth = demoOrder(storeId, ownerEmail, "Maria", "Zielinska", "demo-order-004");
+        Order fourth = demoOrder(storeId,"Maria", "Zielinska", demoId(storeId, WEBSTORE_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
         itemsByOrderId.put(fourth.getOrderId(), List.of(
                 allocationItem(fourth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
 
@@ -279,7 +801,19 @@ public class DemoStoreSeeder implements StoreSeeder {
                 Payment.bankTransfer("DEMO-PAY-001", "Jan Kowalski", Math.round(first.getTotalPrice() / 2.0)))));
         second.setPayments(new ArrayList<>(List.of(
                 Payment.bankTransfer("DEMO-PAY-002", "Anna Nowak", second.getTotalPrice()))));
-        return new DemoOrders(orders, itemsByOrderId, delivery);
+
+        List<OrderEvent> events = new ArrayList<>();
+        orders.forEach(order -> events.add(orderEvent(storeId, order,
+                EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt())));
+        events.add(orderEvent(storeId, third,
+                EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name(), third.getOrderedAt().plusHours(1)));
+        return new DemoOrders(orders, itemsByOrderId, delivery, events);
+    }
+
+    private static OrderEvent orderEvent(String storeId, Order order, EventType type, String name, LocalDateTime createdAt) {
+        OrderEvent event = new OrderEvent(order.getOrderId(), type, name, createdAt);
+        event.setEventId(demoId(storeId, order.getOrderId() + "-event-" + name));
+        return event;
     }
 
     private static CatalogSeedRow acmeBExclusiveRow(List<CatalogSeedRow> catalogRows) {
@@ -289,20 +823,21 @@ public class DemoStoreSeeder implements StoreSeeder {
                 .orElseThrow(() -> new IllegalStateException("No catalog row sold only by " + ACME_B));
     }
 
-    private static Order demoOrder(String storeId, String ownerEmail, String name, String surname, String orderId) {
+    private static Order demoOrder(String storeId, String name, String surname, String orderId,
+                                   OrderSource source) {
         Order order = new Order(storeId);
         order.setOrderId(orderId);
         BillingDetails billing = new BillingDetails();
         billing.setName(name);
         billing.setSurname(surname);
-        billing.setEmail(ownerEmail);
+        billing.setEmail(customerEmail(storeId, name, surname));
         billing.setStreetAndNumber("ul. Przykladowa 5");
         billing.setPostalCode("00-002");
         billing.setCity("Warszawa");
         billing.setCountry("PL");
         order.setBillingDetails(billing);
-        order.setShippingDetails(warehouseAddress());
-        order.setSource(new OrderSource("Demo", OrderSourceType.PointOfSale));
+        order.setShippingDetails(customerShippingDetails(name, surname, billing.getEmail()));
+        order.setSource(source);
         order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
         order.setEstimatedShippingAt(LocalDate.now().plusDays(3));
         return order;
@@ -358,12 +893,25 @@ public class DemoStoreSeeder implements StoreSeeder {
         return rows.stream().map(CatalogSeedRow::category).distinct().toList();
     }
 
+    private static ShippingDetails customerShippingDetails(String name, String surname, String email) {
+        ShippingDetails address = new ShippingDetails();
+        address.setName(name);
+        address.setSurname(surname);
+        address.setStreetAndNumber("ul. Przykladowa 5");
+        address.setPostalCode("00-002");
+        address.setCity("Warszawa");
+        address.setCountry("PL");
+        address.setEmail(email);
+        address.setPhone("+48601234567");
+        return address;
+    }
+
     private static ShippingDetails warehouseAddress() {
         ShippingDetails address = new ShippingDetails();
         address.setId("local-pickup-01");
         address.setName("Demo");
         address.setSurname("Magazynier");
-        address.setCompanyName("Demo Store Sp. z o.o.");
+        address.setCompanyName("Demo Store sp. z o.o.");
         address.setStreetAndNumber("ul. Testowa 1");
         address.setPostalCode("00-001");
         address.setCity("Warszawa");
@@ -421,7 +969,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         account.setId("local-bank-01");
         account.setBankName("Demo Bank");
         account.setIban("PL61109010140000071219812874");
-        account.setAccountHolder("Demo Store Sp. z o.o.");
+        account.setAccountHolder("Demo Store sp. z o.o.");
         account.setSwiftCode("WBKPPLPP");
         account.setCurrency("PLN");
         account.set_default(true);
