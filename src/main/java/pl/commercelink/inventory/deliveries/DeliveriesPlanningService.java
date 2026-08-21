@@ -95,6 +95,7 @@ public class DeliveriesPlanningService {
         return allocationsByProvider.entrySet().stream()
                 .map(entry -> {
                     var delivery = new Delivery(storeId, null, entry.getKey());
+                    delivery.setType(DeliveryType.WAREHOUSE);
                     delivery.setAllocations(entry.getValue());
                     delivery.setItems(groupAndUnify(entry.getValue()));
                     return delivery;

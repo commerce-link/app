@@ -1320,9 +1320,11 @@ class SupplierPurchaseServiceTest {
         assertNull(failed.getOrderErrorMessage());
         verify(deliveriesRepository).save(failed);
         ArgumentCaptor<SupplierPurchaseEventRequest> event = ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
-        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        ArgumentCaptor<String> dedupId = ArgumentCaptor.forClass(String.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture(), dedupId.capture());
         assertEquals("ref-1", event.getValue().getPurchaseRef());
         assertEquals(failed.getDeliveryId(), event.getValue().getDeliveryId());
+        assertNotEquals("ref-1", dedupId.getValue());
     }
 
     @Test

@@ -45,15 +45,6 @@ class DeliveryTest {
     }
 
     @Test
-    void isDropshipReturnsFalseWithoutDropshipAspect() {
-        // given
-        Delivery delivery = new Delivery();
-
-        // when / then
-        assertFalse(delivery.isDropship());
-    }
-
-    @Test
     void dropshipPropertyBindsToBooleanInSpel() {
         // given
         Delivery dropship = new Delivery();

@@ -25,16 +25,18 @@ public class V010_AddClaimedDeliveryIdIndex {
 
     @Execution
     public void execute() {
-        boolean indexExists = dynamoDB.describeTable("OrderItems").getTable()
-                .getGlobalSecondaryIndexes() != null
-                && dynamoDB.describeTable("OrderItems").getTable().getGlobalSecondaryIndexes().stream()
+        var table = dynamoDB.describeTable("OrderItems").getTable();
+        boolean indexExists = table.getGlobalSecondaryIndexes() != null
+                && table.getGlobalSecondaryIndexes().stream()
                         .anyMatch(index -> "ClaimedDeliveryIdIndex".equals(index.getIndexName()));
         if (indexExists) {
             return;
         }
         dynamoDB.updateTable(new UpdateTableRequest()
                 .withTableName("OrderItems")
-                .withAttributeDefinitions(new AttributeDefinition("claimedDeliveryId", ScalarAttributeType.S))
+                .withAttributeDefinitions(
+                        new AttributeDefinition("claimedDeliveryId", ScalarAttributeType.S),
+                        new AttributeDefinition("itemId", ScalarAttributeType.S))
                 .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
                         .withCreate(new CreateGlobalSecondaryIndexAction()
                                 .withIndexName("ClaimedDeliveryIdIndex")

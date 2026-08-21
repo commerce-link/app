@@ -343,7 +343,8 @@ class DropshipPurchaseServiceTest {
         Delivery manual = saved.getAllValues().get(1);
         assertEquals(submitted.getProvider(), manual.getProvider());
         assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
-        assertEquals(submitted.isDropship(), manual.isDropship());
+        assertTrue(submitted.isDropship());
+        assertTrue(manual.isDropship());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
         assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());

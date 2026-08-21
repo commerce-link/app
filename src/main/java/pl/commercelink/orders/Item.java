@@ -89,13 +89,16 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public void removeFulfilment() {
+        boolean wasDelivered = isDelivered();
         this.ean = null;
         this.manufacturerCode = null;
         this.cost = 0;
         this.deliveryId = null;
         this.serialNo = null;
         this.status = FulfilmentStatus.New;
-        this.claimedDeliveryId = null;
+        if (!wasDelivered) {
+            this.claimedDeliveryId = null;
+        }
     }
 
     public void removeSerialNumbers(String sns) {

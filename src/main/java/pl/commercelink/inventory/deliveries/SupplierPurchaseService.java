@@ -327,7 +327,8 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
         supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+                        storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()),
+                delivery.getPurchaseRef() + ":" + UUID.randomUUID());
         return OperationResult.success(delivery.getDeliveryId());
     }
 

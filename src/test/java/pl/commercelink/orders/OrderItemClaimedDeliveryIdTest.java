@@ -49,7 +49,7 @@ class OrderItemClaimedDeliveryIdTest {
     }
 
     @Test
-    void removeFulfilmentClearsClaimedDeliveryId() {
+    void removeFulfilmentClearsClaimedDeliveryIdForAnOrderedItem() {
         // given
         OrderItem item = new OrderItem();
         item.markAsOrdered("d-8f3a", 10.0);
@@ -59,5 +59,19 @@ class OrderItemClaimedDeliveryIdTest {
 
         // then
         assertNull(item.getClaimedDeliveryId());
+    }
+
+    @Test
+    void removeFulfilmentRetainsClaimedDeliveryIdForADeliveredItem() {
+        // given
+        OrderItem item = new OrderItem();
+        item.markAsOrdered("d-8f3a", 10.0);
+        item.markAsReceived();
+
+        // when
+        item.removeFulfilment();
+
+        // then
+        assertEquals("d-8f3a", item.getClaimedDeliveryId());
     }
 }
