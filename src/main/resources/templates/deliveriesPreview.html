@@ -10,8 +10,50 @@
         <div class="container">
             <h1 th:text="#{deliveries.preview.title}">Pending Deliveries</h1>
 
-            <div th:if="${deliveries.isEmpty()}" class="notification is-info">
+            <div th:if="${deliveries.isEmpty() and dropshipCandidates.isEmpty()}" class="notification is-info">
                 <span th:text="#{deliveries.preview.empty}">No pending deliveries. All items have been allocated to deliveries.</span>
+            </div>
+
+            <div th:each="candidate : ${dropshipCandidates}" class="box mb-5">
+                <div class="level">
+                    <div class="level-left">
+                        <div class="level-item">
+                            <h2 class="title is-4 mb-0" th:text="${candidate.provider}"></h2>
+                        </div>
+                        <div class="level-item">
+                            <span class="tag is-info" th:text="#{deliveries.dropship.badge}">Dropshipping</span>
+                        </div>
+                    </div>
+                    <div class="level-right">
+                        <div class="level-item">
+                            <a th:href="${isSuperAdmin}
+                                    ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship(storeId=${storeId}, orderId=${candidate.orderId})}
+                                    : @{/dashboard/orders/{orderId}/dropship(orderId=${candidate.orderId})}"
+                               class="button is-primary" th:text="#{deliveries.preview.create}">Create Delivery</a>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="table is-fullwidth is-narrow">
+                    <thead>
+                    <tr>
+                        <th th:text="#{general.name}">Name</th>
+                        <th th:text="#{deliveries.orderedQty}">Qty</th>
+                        <th th:text="#{general.ean}">EAN</th>
+                        <th th:text="#{general.manufacturer.code}">MFN</th>
+                        <th th:text="#{general.net.cost}">Unit Cost</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${candidate.items}">
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.orderedQty}"></td>
+                        <td th:text="${item.ean}"></td>
+                        <td th:text="${item.mfn}"></td>
+                        <td th:text="${#numbers.formatDecimal(item.unitCost, 1, 2)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
             </div>
 
             <div th:each="delivery, deliveryStat : ${deliveries}" class="box mb-5">

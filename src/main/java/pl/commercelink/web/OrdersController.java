@@ -349,6 +349,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
+        model.addAttribute("splitBlockedReason", order.splitBlockedReason(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
@@ -541,9 +542,16 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSupplier(@PathVariable String orderId, @RequestParam String itemId,
                                  @RequestParam String manufacturerCode, @RequestParam double cost,
-                                 @RequestParam String supplier, Model model, Locale locale) {
+                                 @RequestParam String supplier, Model model,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
 
         orderItem.setManufacturerCode(manufacturerCode);
         orderItem.setCost(cost);
@@ -566,8 +574,14 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/clear-supplier")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId) {
+    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.clear.assign.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         orderItem.removeFulfilment();
         orderItemsRepository.save(orderItem);
         return "redirect:/dashboard/orders/" + orderId;

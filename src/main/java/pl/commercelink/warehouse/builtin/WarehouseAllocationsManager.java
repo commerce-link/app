@@ -98,6 +98,7 @@ public class WarehouseAllocationsManager {
         for (Allocation allocation : allocations) {
             WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
             warehouseItem.setDeliveryId(targetDeliveryId);
+            warehouseItem.setClaimedDeliveryId(targetDeliveryId);
             warehouseRepository.save(warehouseItem);
         }
     }

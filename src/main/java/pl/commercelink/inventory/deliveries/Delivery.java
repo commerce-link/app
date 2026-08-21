@@ -70,6 +70,10 @@ public class Delivery {
     @DynamoDBTypeConvertedEnum
     private ConnectionMode connectionMode;
 
+    @DynamoDBAttribute(attributeName = "type")
+    @DynamoDBTypeConvertedEnum
+    private DeliveryType type;
+
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
     @DynamoDBAttribute(attributeName = "paymentCost")
@@ -457,6 +461,14 @@ public class Delivery {
         this.connectionMode = connectionMode;
     }
 
+    public DeliveryType getType() {
+        return type == null ? DeliveryType.WAREHOUSE : type;
+    }
+
+    public void setType(DeliveryType type) {
+        this.type = type;
+    }
+
     @DynamoDBIgnore
     public boolean isOrderPending() {
         return orderStatus == DeliveryOrderStatus.ORDER_PENDING;
@@ -470,6 +482,11 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isAwaitingApproval() {
         return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
+    }
+
+    @DynamoDBIgnore
+    public boolean isDropship() {
+        return getType() == DeliveryType.DROPSHIP;
     }
 
     public boolean isPaid() {

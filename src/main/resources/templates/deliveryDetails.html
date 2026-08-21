@@ -65,6 +65,8 @@
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
+                                <span class="tag ml-1 is-info" th:if="${delivery.dropship}"
+                                      th:text="#{deliveries.dropship.badge}"></span>
                             </div>
                         </div>
                         <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : null">
@@ -92,6 +94,28 @@
                             <label class="label" th:text="#{deliveries.deliveryAddress}"></label>
                             <div class="control">
                                 <span th:text="${delivery.deliveryAddress}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${delivery.dropship and dropshipContact != null and not #strings.isEmpty(dropshipContact.phone)}">
+                            <label class="label" th:text="#{order.address.phone}"></label>
+                            <div class="control">
+                                <span th:text="${dropshipContact.phone}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${delivery.dropship and dropshipContact != null and not #strings.isEmpty(dropshipContact.email)}">
+                            <label class="label" th:text="#{order.address.email}"></label>
+                            <div class="control">
+                                <span th:text="${dropshipContact.email}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${delivery.dropship and dropshipShipment != null and dropshipShipment.type != null}">
+                            <label class="label" th:text="#{order.shipment.type}"></label>
+                            <div class="control">
+                                <span th:text="#{'ShipmentType.' + ${dropshipShipment.type.name()}}"></span>
+                                <span th:if="${not #strings.isEmpty(dropshipShipment.carrier)}"
+                                      th:text="' · ' + ${dropshipShipment.carrier}"></span>
+                                <span th:if="${not #strings.isEmpty(dropshipShipment.collectionPointCode)}"
+                                      th:text="' · ' + ${dropshipShipment.collectionPointCode}"></span>
                             </div>
                         </div>
                         <div class="field">
@@ -333,10 +357,10 @@
                     <div class="control">
                         <div class="select is-small" >
                             <select id="delivery-action-select">
-                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin or delivery.dropship}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>

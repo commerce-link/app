@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
+import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
@@ -58,7 +59,7 @@ class SupplierPurchaseServiceTest {
     private static final String DELIVERY_ID = "delivery-1";
 
     @Mock
-    private StoreSupplierProviderResolver storeSupplierProviderResolver;
+    private SupplierProviderResolver supplierProviderResolver;
     @Mock
     private StoresRepository storesRepository;
     @Mock
@@ -95,7 +96,7 @@ class SupplierPurchaseServiceTest {
     void setUp() {
         connectSupplier(ConnectionMode.OWN);
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        lenient().when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(supplierProvider);
+        lenient().when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(supplierProvider);
         lenient().when(supplierSkuResolver.forStore(anyString(), anyString())).thenReturn((ean, mfn) -> null);
     }
 
@@ -119,7 +120,7 @@ class SupplierPurchaseServiceTest {
     void orderingUnavailableWhenSupplierIsConnectedGlobally() {
         // given
         connectSupplier(ConnectionMode.GLOBAL);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -129,7 +130,7 @@ class SupplierPurchaseServiceTest {
     void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
         // given
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -211,7 +212,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void orderingUnavailableWhenProviderMissing() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -220,7 +221,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void orderingUnavailableWhenFactoryThrows() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenThrow(new RuntimeException("no credentials"));
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenThrow(new RuntimeException("no credentials"));
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -229,7 +230,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void ordersThroughTheGlobalProviderWhenTheConnectionIsGlobal() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.supportsOrdering()).thenReturn(true);
 
         // when
@@ -242,7 +243,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void refusesOrderingWhenTheGlobalSecretCarriesNoOrderingCredentials() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.supportsOrdering()).thenReturn(false);
 
         // when / then
@@ -252,7 +253,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void refusesOrderingWhenNoGlobalSecretExists() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -261,7 +262,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void refusesOrderingForManualConnections() {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -350,7 +351,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         verify(supplierProvider).placeOrder(argThat(request -> request.clientOrderRef().equals("ref-1")));
@@ -377,7 +378,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         verify(orderIdRefreshEventPublisher).publish(argThat(request ->
@@ -406,7 +407,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
@@ -449,7 +450,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         ArgumentCaptor<SupplierPurchaseRequest> request = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
@@ -471,7 +472,7 @@ class SupplierPurchaseServiceTest {
                 .thenThrow(new SupplierOrderException("No Elko code found for EAN 4006381333931"));
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         verify(deliveryCreationService, never()).releaseAllocations(any(), any());
@@ -489,10 +490,10 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
-        verify(storeSupplierProviderResolver, never()).resolve(any(), any());
+        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
     }
 
     @Test
@@ -501,8 +502,8 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(null);
 
         // when / then
-        assertThrows(IllegalStateException.class, () -> service.processPending(STORE_ID, DELIVERY_ID));
-        verify(storeSupplierProviderResolver, never()).resolve(any(), any());
+        assertThrows(IllegalStateException.class, () -> service.processPending(STORE_ID, DELIVERY_ID, null, 1));
+        verify(supplierProviderResolver, never()).resolve(anyString(), anyString());
     }
 
     @Test
@@ -513,7 +514,7 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
@@ -540,7 +541,7 @@ class SupplierPurchaseServiceTest {
                 .when(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
 
         // when / then
-        assertThrows(RuntimeException.class, () -> service.processPending(STORE_ID, DELIVERY_ID));
+        assertThrows(RuntimeException.class, () -> service.processPending(STORE_ID, DELIVERY_ID, null, 1));
     }
 
     @Test
@@ -555,7 +556,7 @@ class SupplierPurchaseServiceTest {
                 "", 180.0, "PLN", List.of()));
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
@@ -598,7 +599,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
@@ -623,7 +624,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         ArgumentCaptor<SupplierPurchaseRequest> captor = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
@@ -656,7 +657,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.OWN);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(supplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(supplierProvider);
         when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithOneOrderableItem();
 
@@ -799,7 +800,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals("ul. Łobzowska 22/1, 31-140 Kraków, PL", delivery.getDeliveryAddress());
@@ -825,7 +826,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals("99999999", delivery.getDeliveryAddress());
@@ -850,7 +851,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals("17200617", delivery.getDeliveryAddress());
@@ -873,7 +874,7 @@ class SupplierPurchaseServiceTest {
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertNull(delivery.getDeliveryAddress());
@@ -895,7 +896,7 @@ class SupplierPurchaseServiceTest {
                 .thenThrow(new SupplierOrderException("No Elko code found for EAN 4006381333931"));
 
         // when
-        service.processPending(STORE_ID, DELIVERY_ID);
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
@@ -997,7 +998,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
@@ -1016,7 +1017,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
         Delivery delivery = awaitingApprovalDelivery();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
@@ -1051,7 +1052,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("5900000000001", "MFN-1", 0, 9.5, "PLN")));
         Delivery delivery = awaitingApprovalDelivery();
@@ -1073,7 +1074,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
         Delivery delivery = awaitingApprovalDelivery();
@@ -1093,7 +1094,7 @@ class SupplierPurchaseServiceTest {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.checkAvailability(anyList()))
                 .thenThrow(new SupplierOrderException("503 Service Unavailable"));
         Delivery delivery = awaitingApprovalDelivery();
@@ -1127,7 +1128,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
         verify(deliveriesRepository, never()).save(any());
         verifyNoInteractions(supplierPurchaseEventPublisher);
-        verifyNoInteractions(storeSupplierProviderResolver);
+        verifyNoInteractions(supplierProviderResolver);
     }
 
     @Test
@@ -1244,7 +1245,7 @@ class SupplierPurchaseServiceTest {
     @Test
     void revalidatesThePendingFormAgainstTheSupplierAtApprovalTime() throws Exception {
         // given
-        when(storeSupplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         Delivery delivery = awaitingApprovalDelivery();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierSkuResolver.forStore(STORE_ID, PROVIDER))
@@ -1319,9 +1320,11 @@ class SupplierPurchaseServiceTest {
         assertNull(failed.getOrderErrorMessage());
         verify(deliveriesRepository).save(failed);
         ArgumentCaptor<SupplierPurchaseEventRequest> event = ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
-        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        ArgumentCaptor<String> dedupId = ArgumentCaptor.forClass(String.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture(), dedupId.capture());
         assertEquals("ref-1", event.getValue().getPurchaseRef());
         assertEquals(failed.getDeliveryId(), event.getValue().getDeliveryId());
+        assertNotEquals("ref-1", dedupId.getValue());
     }
 
     @Test

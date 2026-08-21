@@ -1,6 +1,7 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
@@ -43,6 +44,19 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
                 .withExpressionAttributeValues(eav);
 
         return scanAndSort(scanExpression);
+    }
+
+    public List<OrderItem> findByClaimedDeliveryId(String deliveryId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":deliveryId", new AttributeValue().withS(deliveryId));
+
+        DynamoDBQueryExpression<OrderItem> queryExpression = new DynamoDBQueryExpression<OrderItem>()
+                .withIndexName("ClaimedDeliveryIdIndex")
+                .withConsistentRead(false)
+                .withKeyConditionExpression("claimedDeliveryId = :deliveryId")
+                .withExpressionAttributeValues(eav);
+
+        return dynamoDBMapper.query(OrderItem.class, queryExpression);
     }
 
     public List<OrderItem> findByOrderIdAndStatus(String orderId, FulfilmentStatus status) {

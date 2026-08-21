@@ -10,6 +10,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
@@ -774,6 +775,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         Delivery delivery = new Delivery(storeId, acmeOrderRef(104518), ACME,
                 LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
         delivery.setDeliveryId(demoId(storeId, "demo-delivery-open"));
+        delivery.setType(DeliveryType.WAREHOUSE);
         Order third = demoOrder(storeId,"Piotr", "Wisniewski", demoId(storeId, MARKETPLACE_ORDER_2_KEY),
                 new OrderSource("Allegro", OrderSourceType.Marketplace));
         third.setExternalOrderId(demoExternalOrderNo(storeId, MARKETPLACE_EXTERNAL_2_KEY));

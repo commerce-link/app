@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 
@@ -26,7 +27,7 @@ class OrderIdRefreshServiceTest {
     @Mock
     private DeliveriesRepository deliveriesRepository;
     @Mock
-    private StoreSupplierProviderResolver providerResolver;
+    private SupplierProviderResolver providerResolver;
     @Mock
     private SupplierProvider supplierProvider;
     @InjectMocks
