@@ -412,12 +412,12 @@
                                            th:text="#{order.item.assign.warehouse}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.assign.warehouse}"></span>
-                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                        <a th:if="${item.isReleasable() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="submitClearSupplier(this); return false;"
                                            th:text="#{order.item.clear.assign}"></a>
-                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isReleasable() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
                                         <a th:if="${item.isNew() and item.group and item.product}" class="dropdown-item"
                                            href="#"

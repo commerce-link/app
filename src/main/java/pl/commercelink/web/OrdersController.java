@@ -566,8 +566,14 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/clear-supplier")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId) {
+    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.clear.assign.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         orderItem.removeFulfilment();
         orderItemsRepository.save(orderItem);
         return "redirect:/dashboard/orders/" + orderId;

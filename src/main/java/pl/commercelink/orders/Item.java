@@ -151,6 +151,11 @@ public abstract class Item implements Delivered {
     }
 
     @DynamoDBIgnore
+    public boolean isReleasable() {
+        return isNew() || hasOneOfTheStatuses(FulfilmentStatus.Allocation);
+    }
+
+    @DynamoDBIgnore
     public boolean isReadyForAllocation() {
         return hasOneOfTheStatuses(FulfilmentStatus.New) && hasAllocationDetails();
     }
