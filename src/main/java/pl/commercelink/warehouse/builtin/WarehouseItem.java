@@ -31,6 +31,9 @@ public class WarehouseItem extends Item {
     @DynamoDBAttribute(attributeName = "purchaseClaimQty")
     private int purchaseClaimQty;
 
+    @DynamoDBAttribute(attributeName = "unitSystemCost")
+    private double unitSystemCost;
+
     // required for DynamoDB
     public WarehouseItem() {
     }
@@ -62,6 +65,7 @@ public class WarehouseItem extends Item {
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
+        this.setUnitSystemCost(other.getUnitSystemCost());
 
         if (hasOneOfTheStatuses(FulfilmentStatus.New)) {
             setDeliveryId(other.getDeliveryId());
@@ -126,6 +130,11 @@ public class WarehouseItem extends Item {
     }
 
     @DynamoDBIgnore
+    public double getEffectiveUnitSystemCost() {
+        return unitSystemCost > 0 ? unitSystemCost : getCost();
+    }
+
+    @DynamoDBIgnore
     public WarehouseItem splitOff(int qtyToSplit) {
         if (qtyToSplit <= 0 || qtyToSplit >= getQty()) {
             throw new IllegalArgumentException("Split quantity must be between 1 and " + (getQty() - 1));
@@ -141,6 +150,7 @@ public class WarehouseItem extends Item {
         splitItem.setEan(getEan());
         splitItem.setManufacturerCode(getManufacturerCode());
         splitItem.setCost(getCost());
+        splitItem.setUnitSystemCost(getUnitSystemCost());
         splitItem.setTax(getTax());
         splitItem.setDeliveryId(getDeliveryId());
         splitItem.setStatus(getStatus());
@@ -180,5 +190,13 @@ public class WarehouseItem extends Item {
 
     public void setPurchaseClaimQty(int purchaseClaimQty) {
         this.purchaseClaimQty = purchaseClaimQty;
+    }
+
+    public double getUnitSystemCost() {
+        return unitSystemCost;
+    }
+
+    public void setUnitSystemCost(double unitSystemCost) {
+        this.unitSystemCost = unitSystemCost;
     }
 }

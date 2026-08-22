@@ -55,7 +55,7 @@ class BuiltInStockQueryService implements StockQueryService {
                 warehouseItem.getItemId(),
                 warehouseItem.getEan(),
                 warehouseItem.getManufacturerCode(),
-                Price.fromNet(warehouseItem.getCost(), warehouseItem.getTax()),
+                Price.fromNet(warehouseItem.getEffectiveUnitSystemCost(), warehouseItem.getTax()),
                 warehouseItem.getQty(),
                 warehouseItem.getStatus()
         );
