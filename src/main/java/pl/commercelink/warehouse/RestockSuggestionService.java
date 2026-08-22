@@ -48,7 +48,7 @@ public class RestockSuggestionService {
                 .map(ProductCatalog::getCatalogId)
                 .collect(Collectors.toList());
 
-        List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedMfns)
+        List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedMfns, true)
                 .stream()
                 .filter(s -> s.getPriceCategory() != null)
                 .sorted(Comparator.comparing(RestockSuggestion::getPriceCategory)
@@ -61,7 +61,7 @@ public class RestockSuggestionService {
 
     public List<RestockSuggestion> suggestForRestock(String storeId, String catalogId, String categoryId, RestockScope scope,
                                                      boolean onlyMissingItems, RestockPriceCategory budget) {
-        List<RestockSuggestion> suggestions = suggest(storeId, List.of(catalogId), categoryId, scope, onlyMissingItems, null, Collections.emptySet());
+        List<RestockSuggestion> suggestions = suggest(storeId, List.of(catalogId), categoryId, scope, onlyMissingItems, null, Collections.emptySet(), false);
         if (budget == null) {
             return suggestions;
         }
@@ -71,13 +71,14 @@ public class RestockSuggestionService {
     }
 
     private List<RestockSuggestion> suggest(String storeId, List<String> catalogIds, String categoryId, RestockScope scope,
-                                            boolean onlyMissingItems, String supplier, Set<String> excludedMfns) {
+                                            boolean onlyMissingItems, String supplier, Set<String> excludedMfns,
+                                            boolean onlyDeliverySuggestionCategories) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 
         Map<String, RestockSuggestion> suggestionsByMfn = new LinkedHashMap<>();
 
         for (String catalogId : catalogIds) {
-            for (StockProductLevel level : stockLevels.calculate(storeId, catalogId, categoryId, scope, onlyMissingItems)) {
+            for (StockProductLevel level : stockLevels.calculate(storeId, catalogId, categoryId, scope, onlyMissingItems, onlyDeliverySuggestionCategories)) {
                 String mfn = level.getManufacturerCode().toLowerCase();
                 if (excludedMfns.contains(mfn) || suggestionsByMfn.containsKey(mfn)) {
                     continue;
