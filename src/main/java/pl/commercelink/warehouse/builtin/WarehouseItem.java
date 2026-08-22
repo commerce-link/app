@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
@@ -132,6 +133,16 @@ public class WarehouseItem extends Item {
     @DynamoDBIgnore
     public double getEffectiveUnitSystemCost() {
         return unitSystemCost > 0 ? unitSystemCost : getCost();
+    }
+
+    @DynamoDBIgnore
+    public boolean hasUnitSystemCost() {
+        return unitSystemCost > 0;
+    }
+
+    @DynamoDBIgnore
+    public Price systemCost() {
+        return Price.fromNet(unitSystemCost, getTax());
     }
 
     @DynamoDBIgnore

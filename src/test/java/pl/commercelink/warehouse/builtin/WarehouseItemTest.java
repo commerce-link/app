@@ -1,10 +1,13 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.taxonomy.Categories;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WarehouseItemTest {
 
@@ -63,6 +66,34 @@ class WarehouseItemTest {
         // then
         assertEquals(150.0, splitItem.getUnitSystemCost());
         assertEquals(20.0, splitItem.getCost());
+    }
+
+    @Test
+    void reportsNoUnitSystemCostWhenItWasNeverSet() {
+        // given
+        WarehouseItem item = anItem(20.0);
+
+        // when
+        boolean hasUnitSystemCost = item.hasUnitSystemCost();
+
+        // then
+        assertFalse(hasUnitSystemCost);
+    }
+
+    @Test
+    void exposesUnitSystemCostAsNetAndGrossPriceForTheWarehouseList() {
+        // given
+        WarehouseItem item = anItem(20.0);
+        item.setTax(1.23);
+        item.setUnitSystemCost(150.0);
+
+        // when
+        Price systemCost = item.systemCost();
+
+        // then
+        assertTrue(item.hasUnitSystemCost());
+        assertEquals(150.0, systemCost.netValue());
+        assertEquals(184.5, systemCost.grossValue());
     }
 
     private WarehouseItem anItem(double unitCost) {
