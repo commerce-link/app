@@ -40,7 +40,6 @@ public class DropshipPurchaseService {
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final SupplierProviderResolver supplierProviderResolver;
     private final OrdersRepository ordersRepository;
-    private final DropshipOrderCompletion dropshipOrderCompletion;
 
     public boolean isDropshipAvailable(String storeId, String provider) {
         try {
@@ -104,7 +103,6 @@ public class DropshipPurchaseService {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         deliveriesRepository.save(delivery);
-        dropshipOrderCompletion.markSuppliedByDropship(storeId, order.getOrderId(), delivery.getDeliveryId());
 
         return OperationResult.success(delivery.getDeliveryId());
     }

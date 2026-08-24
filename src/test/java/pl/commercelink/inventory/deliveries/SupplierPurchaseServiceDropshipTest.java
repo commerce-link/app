@@ -77,8 +77,6 @@ class SupplierPurchaseServiceDropshipTest {
     @Mock
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Mock
-    private DropshipOrderCompletion dropshipOrderCompletion;
-    @Mock
     private DeliveriesQueryService deliveriesQueryService;
     @Mock
     private DropshipPurchaseService dropshipPurchaseService;
@@ -151,7 +149,7 @@ class SupplierPurchaseServiceDropshipTest {
     }
 
     @Test
-    void processPendingRoutesDropshipPlacementAndCompletion() throws Exception {
+    void processPendingRoutesDropshipPlacementWithoutCompletingTheOrder() throws Exception {
         // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
@@ -176,7 +174,6 @@ class SupplierPurchaseServiceDropshipTest {
         verify(supplierProvider, never()).placeOrder(any());
         verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
-        verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID);
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
     }
 
@@ -200,7 +197,6 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("Order " + ORDER_ID + " has no complete shipping details for a dropship purchase",
                 delivery.getOrderErrorMessage());
-        verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
         verify(deliveryCreationService, never()).releaseAllocations(any(), any());
     }
 
@@ -226,7 +222,7 @@ class SupplierPurchaseServiceDropshipTest {
         service.processPending(STORE_ID, DELIVERY_ID, ORDER_ID, 1);
 
         // then
-        verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, DELIVERY_ID);
+        verify(dropshipPurchaseService).placeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
         verifyNoInteractions(dropshipOrderLocator);
     }
 

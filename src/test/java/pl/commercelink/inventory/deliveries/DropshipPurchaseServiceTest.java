@@ -69,8 +69,6 @@ class DropshipPurchaseServiceTest {
     @Mock
     private OrdersRepository ordersRepository;
     @Mock
-    private DropshipOrderCompletion dropshipOrderCompletion;
-    @Mock
     private SupplierProvider supplierProvider;
 
     @InjectMocks
@@ -269,7 +267,7 @@ class DropshipPurchaseServiceTest {
     }
 
     @Test
-    void createManualDropshipCreatesASettledDeliveryAndMarksItemsSupplied() {
+    void createManualDropshipCreatesASettledDeliveryWithoutCompletingTheOrder() {
         // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
@@ -288,7 +286,6 @@ class DropshipPurchaseServiceTest {
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
-        verify(dropshipOrderCompletion).markSuppliedByDropship(STORE_ID, ORDER_ID, delivery.getDeliveryId());
         verify(supplierPurchaseEventPublisher, never()).publish(any());
         verify(supplierProvider, never()).placeDropshipOrder(any());
     }
@@ -307,7 +304,6 @@ class DropshipPurchaseServiceTest {
         // then
         assertFalse(result.isSuccess());
         verify(deliveriesRepository, never()).save(any());
-        verify(dropshipOrderCompletion, never()).markSuppliedByDropship(any(), any(), any());
     }
 
     @Test
