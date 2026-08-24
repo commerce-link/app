@@ -226,6 +226,47 @@ class OrderTest {
                 .isEqualTo("order.items.action.split.blocked.singleItem");
     }
 
+    @Test
+    @DisplayName("canChangeFulfilmentType allows the change while every product item is New")
+    void canChangeFulfilmentTypeWhenAllProductsAreNew() {
+        // given
+        Order order = splittableOrder();
+        OrderItem product = new OrderItem();
+        product.setStatus(FulfilmentStatus.New);
+
+        // when / then
+        assertThat(order.canChangeFulfilmentType(java.util.List.of(product))).isTrue();
+    }
+
+    @Test
+    @DisplayName("canChangeFulfilmentType ignores service items that are delivered from the start")
+    void canChangeFulfilmentTypeIgnoresServices() {
+        // given
+        Order order = splittableOrder();
+        OrderItem product = new OrderItem();
+        product.setStatus(FulfilmentStatus.New);
+        OrderItem service = new OrderItem();
+        service.setService(true);
+        service.setStatus(FulfilmentStatus.Delivered);
+
+        // when / then
+        assertThat(order.canChangeFulfilmentType(java.util.List.of(product, service))).isTrue();
+    }
+
+    @Test
+    @DisplayName("canChangeFulfilmentType blocks the change once a product item left the New status")
+    void canChangeFulfilmentTypeBlockedByAllocatedProduct() {
+        // given
+        Order order = splittableOrder();
+        OrderItem fresh = new OrderItem();
+        fresh.setStatus(FulfilmentStatus.New);
+        OrderItem allocated = new OrderItem();
+        allocated.setStatus(FulfilmentStatus.Allocation);
+
+        // when / then
+        assertThat(order.canChangeFulfilmentType(java.util.List.of(fresh, allocated))).isFalse();
+    }
+
     private Order splittableOrder() {
         Order order = new Order("store-1");
         order.setOrderId("order-1");

@@ -186,11 +186,12 @@
                                     <label class="label" th:text="#{offers.fulfilment.type}"></label>
                                     <div class="control">
                                         <div class="select">
-                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder}">
+                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder or fulfilmentTypeLocked}">
                                                 <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
                                             </select>
                                         </div>
                                     </div>
+                                    <p class="help" th:if="${fulfilmentTypeLocked and !isCompletedOrder}" th:text="#{order.fulfilment.type.locked}"></p>
                                 </div>
                                 <div class="field">
                                     <label class="label" th:text="#{order.affiliate.id}"></label>

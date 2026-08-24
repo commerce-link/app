@@ -350,6 +350,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
         model.addAttribute("splitBlockedReason", order.splitBlockedReason(orderItems));
+        model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
@@ -467,6 +468,15 @@ public class OrdersController extends BaseController {
             return "redirect:/dashboard/orders/" + orderId;
         }
 
+        FulfilmentType requestedFulfilmentType = updatedOrder.getFulfilmentType();
+        boolean fulfilmentTypeChanged = requestedFulfilmentType != null
+                && requestedFulfilmentType != existingOrder.getFulfilmentType();
+        if (fulfilmentTypeChanged
+                && !existingOrder.canChangeFulfilmentType(orderItemsRepository.findByOrderId(orderId))) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.fulfilment.type.locked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
         existingOrder.setStatus(updatedOrder.getStatus());
         existingOrder.setEmailNotificationsEnabled(updatedOrder.isEmailNotificationsEnabled());
         existingOrder.setEstimatedAssemblyAt(updatedOrder.getEstimatedAssemblyAt());
@@ -474,7 +484,9 @@ public class OrdersController extends BaseController {
         existingOrder.setAffiliateId(updatedOrder.getAffiliateId());
         existingOrder.setGclid(updatedOrder.getGclid());
         existingOrder.setComment(updatedOrder.getComment());
-        existingOrder.setFulfilmentType(updatedOrder.getFulfilmentType());
+        if (fulfilmentTypeChanged) {
+            existingOrder.setFulfilmentType(requestedFulfilmentType);
+        }
         return save(existingOrder);
     }
 

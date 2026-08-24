@@ -656,6 +656,79 @@ class OrdersControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
     }
 
+    @Test
+    @DisplayName("updateOrderInfo rejects a fulfilment type change once a product item is allocated")
+    void updateOrderInfoRejectsFulfilmentTypeChangeWhenAnItemIsAllocated() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+        OrderItem allocated = new OrderItem();
+        allocated.setStatus(FulfilmentStatus.Allocation);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocated));
+        when(messageSource.getMessage(eq("order.fulfilment.type.locked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Locked");
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+
+        // when
+        String view = ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Locked");
+        verify(orderLifecycle, never()).update(any());
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo applies a fulfilment type change while every product item is New")
+    void updateOrderInfoAppliesFulfilmentTypeChangeWhenAllProductsAreNew() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+        OrderItem fresh = new OrderItem();
+        fresh.setStatus(FulfilmentStatus.New);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(fresh));
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+
+        // when
+        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        verify(orderLifecycle).update(existingOrder);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo keeps the fulfilment type when the disabled field is absent from the form")
+    void updateOrderInfoKeepsFulfilmentTypeWhenTheFieldIsAbsent() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(null);
+
+        // when
+        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        verifyNoInteractions(orderItemsRepository);
+    }
+
     private OrderItem existingOrderItem(String category, boolean service) {
         OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
         item.setService(service);
