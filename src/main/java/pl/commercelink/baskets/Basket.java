@@ -12,6 +12,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -75,7 +76,7 @@ public class Basket {
         this.storeId = storeId;
         this.basketId = UUID.randomUUID().toString();
         this.createdAt = LocalDateTime.now();
-        this.expiresAt = LocalDateTime.now().plusDays(3);
+        this.expiresAt = LocalDateTime.now().plusDays(3).with(LocalTime.of(23, 59));
     }
 
     public String getStoreId() {
