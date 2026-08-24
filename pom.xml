@@ -79,7 +79,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>supplier-api</artifactId>
-            <version>0.3.2</version>
+            <version>0.4.1</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -119,7 +119,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>rest-client</artifactId>
-            <version>0.1.5</version>
+            <version>0.1.6</version>
         </dependency>
 
         <dependency>
@@ -338,7 +338,7 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
-                    <version>0.1.12</version>
+                    <version>0.2.2</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>

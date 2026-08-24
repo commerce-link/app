@@ -17,7 +17,7 @@ public class SupplierPurchaseEventPublisher {
                 .queue(QUEUE_NAME)
                 .payload(request)
                 .messageGroupId(request.getStoreId() + ":" + request.getProvider())
-                .messageDeduplicationId(request.getPurchaseRef())
+                .messageDeduplicationId(request.getPurchaseRef() + ":" + request.getAttempt())
         );
     }
 }

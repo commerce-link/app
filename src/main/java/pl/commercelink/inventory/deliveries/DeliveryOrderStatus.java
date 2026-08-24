@@ -1,5 +1,5 @@
 package pl.commercelink.inventory.deliveries;
 
 public enum DeliveryOrderStatus {
-    ORDER_PENDING, FAILED, AWAITING_APPROVAL
+    ORDER_PENDING, ORDER_DISPATCHED, FAILED, AWAITING_APPROVAL
 }
