@@ -309,6 +309,14 @@ public class SupplierPurchaseService {
         return OperationResult.success(deliveryId);
     }
 
+    public LocalDate suggestEstimatedDeliveryAt(Delivery delivery) {
+        if (delivery.getEstimatedDeliveryAt() != null) {
+            return delivery.getEstimatedDeliveryAt();
+        }
+        ShippingTerms terms = supplierRegistry.get(delivery.getProvider()).shippingTermsFor("PL");
+        return LocalDate.now().plusDays(terms.arrivalDays());
+    }
+
     private boolean canRecoverFailedPurchase(Delivery delivery) {
         return delivery != null && delivery.isOrderFailed()
                 && !delivery.hasBeenReceived() && delivery.getDocuments().isEmpty();

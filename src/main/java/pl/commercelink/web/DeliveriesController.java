@@ -931,6 +931,9 @@ public class DeliveriesController {
         model.addAttribute("supplierRegistry", supplierRegistry);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
+        if (delivery.isOrderFailed()) {
+            model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
+        }
         return "deliveryDetails";
     }
 

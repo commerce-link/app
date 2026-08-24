@@ -1572,6 +1572,35 @@ class SupplierPurchaseServiceTest {
         verifyNoInteractions(orderAllocationsManager);
     }
 
+    @Test
+    void suggestEstimatedDeliveryAtKeepsDateAlreadySetOnDelivery() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        delivery.setEstimatedDeliveryAt(ESTIMATED_DELIVERY_AT);
+
+        // when
+        LocalDate suggested = service.suggestEstimatedDeliveryAt(delivery);
+
+        // then
+        assertEquals(ESTIMATED_DELIVERY_AT, suggested);
+        verifyNoInteractions(supplierRegistry);
+    }
+
+    @Test
+    void suggestEstimatedDeliveryAtFallsBackToSupplierShippingTerms() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.Free()))));
+
+        // when
+        LocalDate suggested = service.suggestEstimatedDeliveryAt(delivery);
+
+        // then
+        assertEquals(LocalDate.now().plusDays(3), suggested);
+    }
+
     private Delivery failedDelivery(DeliveryCreationForm form, String purchaseRef) {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);
