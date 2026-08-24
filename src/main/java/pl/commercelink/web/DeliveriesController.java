@@ -799,7 +799,8 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String retryPurchase(@PathVariable("deliveryId") String deliveryId,
                                 RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
@@ -807,12 +808,12 @@ public class DeliveriesController {
                 "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
     }
 
-    private Optional<String> blockGlobalDeliveryForStoreAdmin(String deliveryId,
+    private Optional<String> blockGlobalDeliveryForStoreAdmin(String deliveryId, String messageKey,
                                                                RedirectAttributes redirectAttributes, Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.purchase.retry.error.global", null, locale));
+                    messageSource.getMessage(messageKey, null, locale));
             return Optional.of("redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId);
         }
         return Optional.empty();
@@ -830,6 +831,43 @@ public class DeliveriesController {
                                RedirectAttributes redirectAttributes, Locale locale) {
         OperationResult<String> result = supplierPurchaseService.retry(storeId, deliveryId);
         if (!result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String completePurchase(@PathVariable("deliveryId") String deliveryId,
+                                   @RequestParam("externalOrderId") String externalOrderId,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.complete.error.global", redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        return handleComplete(getStoreId(), deliveryId, externalOrderId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/complete")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String completePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                @PathVariable("deliveryId") String deliveryId,
+                                                @RequestParam("externalOrderId") String externalOrderId,
+                                                RedirectAttributes redirectAttributes, Locale locale) {
+        return handleComplete(storeId, deliveryId, externalOrderId,
+                storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleComplete(String storeId, String deliveryId, String externalOrderId, String redirect,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.completeManually(storeId, deliveryId, externalOrderId);
+        if (result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("deliveries.purchase.complete.success", null, locale));
+        } else {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
         }

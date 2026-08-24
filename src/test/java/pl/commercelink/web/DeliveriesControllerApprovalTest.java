@@ -502,6 +502,118 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void completePurchaseRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawa oznaczona jako zamowiona.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617");
+            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void completePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze ukonczyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).completeManually(any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze ukonczyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void completePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+                .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot complete - the delivery is not in a failed order state.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+                    redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Cannot complete - the delivery is not in a failed order state.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+        }
+    }
+
+    @Test
+    void completePurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawa oznaczona jako zamowiona.");
+
+        // when
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617",
+                redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617");
+        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+    }
+
+    @Test
+    void completePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+                .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.number"));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.number"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Enter the supplier order number.");
+
+        // when
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617",
+                redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the supplier order number.");
+    }
+
+    @Test
     void backEndpointReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
