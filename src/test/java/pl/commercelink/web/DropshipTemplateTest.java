@@ -62,6 +62,8 @@ class DropshipTemplateTest {
         assertThat(html).contains("deliveries.dropship.badge");
         assertThat(html).contains("deliveries.preview.create");
         assertThat(html).contains("/dropship");
+        assertThat(html).contains("${candidate.allocations}");
+        assertThat(html).contains("deliveries.allocations");
         assertThat(html).doesNotContain("deliveries.preview.dropship.order");
     }
 

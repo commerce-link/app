@@ -108,6 +108,9 @@ class DeliveriesPlanningServiceTest {
                 .filter(c -> c.orderId().equals("order-2")).findFirst().orElseThrow();
         assertThat(first.provider()).isEqualTo("Acme");
         assertThat(first.items()).hasSize(2);
+        assertThat(first.allocations()).hasSize(2);
+        assertThat(first.allocations())
+                .allMatch(allocation -> allocation.getKey().getOrderId().equals("order-2"));
     }
 
     @Test

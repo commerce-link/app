@@ -65,7 +65,8 @@ public class DeliveriesPlanningService {
         List<DropshipCandidate> candidates = new LinkedList<>();
         directToConsumerByOrderId.forEach((orderId, allocations) ->
                 eligibleProvider(storeId, orderId).ifPresent(provider ->
-                        candidates.add(new DropshipCandidate(orderId, provider, groupAndUnify(allocations)))));
+                        candidates.add(new DropshipCandidate(orderId, provider, groupAndUnify(allocations),
+                                List.copyOf(allocations)))));
 
         Set<String> candidateOrderIds = candidates.stream()
                 .map(DropshipCandidate::orderId)
