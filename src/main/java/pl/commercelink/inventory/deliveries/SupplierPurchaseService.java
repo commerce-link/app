@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -12,6 +13,7 @@ import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOutcomeUnknownException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
@@ -36,6 +38,7 @@ import java.util.stream.IntStream;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SupplierPurchaseService {
 
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
@@ -157,28 +160,41 @@ public class SupplierPurchaseService {
             throw new IllegalStateException("Delivery " + deliveryId + " not found for pending purchase");
         }
         if (!delivery.isOrderPending()) {
+            // Covers SQS redelivery after a crash mid-placement: an ORDER_DISPATCHED
+            // delivery must never trigger a second placement.
             return;
         }
 
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
         delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
+        PurchaseValidation validation;
+        List<SupplierOrderLine> lines;
         try {
-            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
-            List<SupplierOrderLine> lines = validation.lines().stream()
+            validation = validate(storeId, form, delivery.getPurchaseRef());
+            lines = validation.lines().stream()
                     .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
                     .toList();
             if (lines.isEmpty()) {
                 throw new SupplierOrderException("No orderable lines in pending purchase");
             }
+        } catch (SupplierOrderException e) {
+            failDelivery(delivery, e);
+            log.error("Supplier purchase validation failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), e);
+            return;
+        }
 
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        deliveriesRepository.save(delivery);
+
+        try {
             SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
                     .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
                             form.getDeliveryAddressId()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
-                throw new SupplierOrderException(
+                throw new SupplierOrderOutcomeUnknownException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
             }
-
             applyOrderResult(form, validation, orderResult);
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
@@ -187,11 +203,26 @@ public class SupplierPurchaseService {
                 orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
                         storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
             }
-        } catch (SupplierOrderException e) {
-            delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+            log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
+                    orderResult.externalOrderId());
+        } catch (SupplierOrderOutcomeUnknownException e) {
             delivery.setOrderErrorMessage(e.getMessage());
-            deliveriesRepository.save(delivery);
+            deliveriesRepository.save(delivery); // stays ORDER_DISPATCHED
+            log.error("Supplier purchase outcome UNKNOWN - order may exist at the supplier: "
+                            + "store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
+        } catch (SupplierOrderException e) {
+            failDelivery(delivery, e);
+            log.error("Supplier purchase failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
         }
+    }
+
+    private void failDelivery(Delivery delivery, SupplierOrderException e) {
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage(e.getMessage());
+        deliveriesRepository.save(delivery);
     }
 
     private String resolveDeliveryAddressLabel(String storeId, DeliveryCreationForm form) {
@@ -245,9 +276,7 @@ public class SupplierPurchaseService {
         try {
             validation = validate(storeId, form, delivery.getPurchaseRef());
         } catch (Exception e) {
-            System.err.println("[SupplierPurchase] availability re-check failed for store " + storeId
-                    + ", delivery " + deliveryId + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("Supplier availability re-check failed: store={} delivery={}", storeId, deliveryId, e);
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
         if (!validation.fullyAvailable()) {
@@ -258,10 +287,17 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, PURCHASE_APPROVED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
 
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        publishPurchase(delivery);
 
         return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    private void publishPurchase(Delivery delivery) {
+        delivery.setPurchaseAttempts(delivery.getPurchaseAttempts() + 1);
+        deliveriesRepository.save(delivery);
+        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(),
+                delivery.getPurchaseRef(), delivery.getPurchaseAttempts()));
     }
 
     public OperationResult<String> retry(String storeId, String deliveryId) {
@@ -274,8 +310,7 @@ public class SupplierPurchaseService {
         delivery.setOrderErrorMessage(null);
         delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        publishPurchase(delivery);
         return OperationResult.success(delivery.getDeliveryId());
     }
 
@@ -353,8 +388,7 @@ public class SupplierPurchaseService {
         deliveriesRepository.save(delivery);
 
         if (!requiresApproval) {
-            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+            publishPurchase(delivery);
         }
 
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
