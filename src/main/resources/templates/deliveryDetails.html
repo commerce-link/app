@@ -358,6 +358,7 @@
                         <div class="select is-small" >
                             <select id="delivery-action-select">
                                 <option th:unless="${delivery.awaitingApproval or isSuperAdmin or delivery.dropship}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:if="${delivery.dropship and !isSuperAdmin and delivery.orderStatus == null}" value="markSelectedAsReceived" th:text="#{deliveries.dropship.confirmDelivered}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
@@ -590,8 +591,8 @@
         }
 
         const actionMessages = {
-            'markSelectedAsReceived': /*[[#{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
-            'deleteSelectedAllocations': /*[[#{deliveries.confirm.deleteAllocation}]]*/ 'Are you sure you want to delete selected allocations?'
+            'markSelectedAsReceived': /*[[${delivery.dropship} ? #{deliveries.dropship.confirm.delivered} : #{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
+            'deleteSelectedAllocations': /*[[${delivery.dropship} ? #{deliveries.dropship.confirm.deleteAllocation} : #{deliveries.confirm.deleteAllocation}]]*/ 'Are you sure you want to delete selected allocations?'
         };
 
         let pendingAction = null;

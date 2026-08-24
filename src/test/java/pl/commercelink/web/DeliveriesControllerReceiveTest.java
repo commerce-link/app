@@ -8,11 +8,12 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.documents.Document;
-import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.deliveries.DropshipDeliveryCompletion;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
@@ -21,7 +22,9 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +40,9 @@ class DeliveriesControllerReceiveTest {
     private DeliveryReceptionService deliveryReceptionService;
 
     @Mock
+    private DropshipDeliveryCompletion dropshipDeliveryCompletion;
+
+    @Mock
     private MessageSource messageSource;
 
     @Mock
@@ -45,17 +51,48 @@ class DeliveriesControllerReceiveTest {
     @InjectMocks
     private DeliveriesController controller;
 
-    @Test
-    void receiveOnDropshipDeliveryRedirectsWithoutReceiving() {
-        // given
+    private static Delivery dropshipDelivery() {
         Delivery delivery = new Delivery("store-1", null, "Acme");
         delivery.setType(DeliveryType.DROPSHIP);
-        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
-        when(messageSource.getMessage(eq("deliveries.receive.error.dropship"), any(), any()))
-                .thenReturn("blocked");
+        return delivery;
+    }
+
+    private static DeliveryAllocationsForm formFor(Delivery delivery) {
         DeliveryAllocationsForm form = new DeliveryAllocationsForm();
         form.setStoreId("store-1");
         form.setDeliveryId(delivery.getDeliveryId());
+        return form;
+    }
+
+    @Test
+    void receiveOnDropshipDeliveryConfirmsDeliveryToTheCustomerWithoutGoodsIn() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
+        DeliveryAllocationsForm form = formFor(delivery);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+            verify(dropshipDeliveryCompletion).confirmDelivered(eq("store-1"), same(delivery), anyList(), anyList());
+            verifyNoInteractions(deliveryReceptionService);
+        }
+    }
+
+    @Test
+    void receiveOnDropshipDeliveryWithSupplierOrderInFlightIsRejected() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.dropship.confirm.unavailable"), any(), any()))
+                .thenReturn("blocked");
+        DeliveryAllocationsForm form = formFor(delivery);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
@@ -66,7 +103,7 @@ class DeliveriesControllerReceiveTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
             verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
-            verifyNoInteractions(deliveryReceptionService);
+            verifyNoInteractions(dropshipDeliveryCompletion, deliveryReceptionService);
         }
     }
 
@@ -77,9 +114,7 @@ class DeliveriesControllerReceiveTest {
         when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
         when(deliveryReceptionService.receive(any(), any(), any(), any(), any(), any()))
                 .thenReturn(OperationResult.success(null));
-        DeliveryAllocationsForm form = new DeliveryAllocationsForm();
-        form.setStoreId("store-1");
-        form.setDeliveryId(delivery.getDeliveryId());
+        DeliveryAllocationsForm form = formFor(delivery);
 
         // when
         String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
@@ -87,5 +122,6 @@ class DeliveriesControllerReceiveTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
         verify(deliveryReceptionService).receive(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(dropshipDeliveryCompletion);
     }
 }

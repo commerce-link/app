@@ -142,4 +142,16 @@ class DropshipTemplateTest {
         assertThat(html).contains("!delivery.dropship and !mergeTargetDeliveries.isEmpty()");
         assertThat(html).contains("!delivery.orderPending and !delivery.dropship}\" value=\"splitSelectedAllocations\"");
     }
+
+    @Test
+    void deliveryDetailsOffersDropshipConfirmationInsteadOfWarehouseReceipt() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("deliveries.dropship.confirmDelivered");
+        assertThat(html).contains("deliveries.dropship.confirm.delivered");
+        assertThat(html).contains("deliveries.dropship.confirm.deleteAllocation");
+        assertThat(html).contains("${delivery.dropship and !isSuperAdmin and delivery.orderStatus == null}");
+    }
 }

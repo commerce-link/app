@@ -121,6 +121,9 @@ public class DeliveriesController {
     @Autowired
     private DropshipOrderLocator dropshipOrderLocator;
 
+    @Autowired
+    private DropshipDeliveryCompletion dropshipDeliveryCompletion;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -251,9 +254,7 @@ public class DeliveriesController {
             return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
         if (delivery != null && delivery.isDropship()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
-            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+            return confirmDropshipDelivered(delivery, form, redirectAttributes, locale);
         }
         OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
@@ -271,6 +272,18 @@ public class DeliveriesController {
         }
 
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+    }
+
+    private String confirmDropshipDelivered(Delivery delivery, DeliveryAllocationsForm form,
+                                            RedirectAttributes redirectAttributes, Locale locale) {
+        if (delivery.getOrderStatus() != null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.dropship.confirm.unavailable", null, locale));
+            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+        }
+        dropshipDeliveryCompletion.confirmDelivered(form.getStoreId(), delivery,
+                form.getSelectedOrderAllocations(), form.getRemainingAllocations());
+        return detailsRedirect(form.getStoreId(), form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/deleteSelectedAllocations")
