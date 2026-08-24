@@ -502,6 +502,311 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void reconcilePurchaseAddsFlashSuccessMessageOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.found"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawca potwierdzil zamowienie.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void reconcilePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).reconcile(any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void reconcilePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.reconcile.notFound"));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.notFound"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The supplier does not see an order with this reference number.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "The supplier does not see an order with this reference number.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+        }
+    }
+
+    @Test
+    void reconcilePurchaseForSuperAdminAddsFlashSuccessMessageOnSuccess() {
+        // given
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.found"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawca potwierdzil zamowienie.");
+
+        // when
+        String view = deliveriesController.reconcilePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
+        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+    }
+
+    @Test
+    void reconcilePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.reconcile.error.failed"));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.error.failed"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Failed to check the order with the supplier.");
+
+        // when
+        String view = deliveriesController.reconcilePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Failed to check the order with the supplier.");
+    }
+
+    @Test
+    void forcePurchaseRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).forceRetry(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void forcePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).forceRetry(any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void forcePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+        }
+    }
+
+    @Test
+    void forcePurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.forcePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).forceRetry(STORE_ID, DELIVERY_ID);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void forcePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        // when
+        String view = deliveriesController.forcePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+    }
+
+    @Test
+    void confirmPurchaseManuallyRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.confirmManually(STORE_ID, DELIVERY_ID, "SUP-123"))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.confirmPurchaseManually(DELIVERY_ID, "SUP-123", redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).confirmManually(STORE_ID, DELIVERY_ID, "SUP-123");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void confirmPurchaseManuallyRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.confirmPurchaseManually(DELIVERY_ID, "SUP-123", redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).confirmManually(any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void confirmPurchaseManuallyFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.confirmManually(STORE_ID, DELIVERY_ID, ""))
+                .thenReturn(OperationResult.failure("deliveries.purchase.manual.error.blank"));
+        when(messageSource.getMessage(eq("deliveries.purchase.manual.error.blank"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Please provide the supplier order number.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.confirmPurchaseManually(DELIVERY_ID, "", redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Please provide the supplier order number.");
+        }
+    }
+
+    @Test
+    void confirmPurchaseManuallyForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.confirmManually(STORE_ID, DELIVERY_ID, "SUP-123"))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.confirmPurchaseManuallyForSuperAdmin(STORE_ID, DELIVERY_ID, "SUP-123", redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).confirmManually(STORE_ID, DELIVERY_ID, "SUP-123");
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void confirmPurchaseManuallyForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.confirmManually(STORE_ID, DELIVERY_ID, "SUP-123"))
+                .thenReturn(OperationResult.failure("deliveries.purchase.manual.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.manual.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be assigned a number manually.");
+
+        // when
+        String view = deliveriesController.confirmPurchaseManuallyForSuperAdmin(STORE_ID, DELIVERY_ID, "SUP-123", redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be assigned a number manually.");
+    }
+
+    @Test
     void backEndpointReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);

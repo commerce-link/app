@@ -24,7 +24,7 @@
                         <div class="field">
                             <label class="label" th:text="#{deliveries.order.no}"></label>
                             <div class="control" th:with="partnerSiteUrl=${supplierRegistry.getPartnerSiteUrl(delivery.provider, delivery.externalDeliveryId)},
-                                                          externalId=${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})">
+                                                          externalId=${delivery.orderPending} ? #{deliveries.externalId.pending} : (${delivery.orderDispatched} ? #{deliveries.externalId.dispatched} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId}))">
                                 <a th:if="${not #strings.isEmpty(partnerSiteUrl)}" th:href="${partnerSiteUrl}" target="_blank"
                                    th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"
                                 ></a>
@@ -170,6 +170,45 @@
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
                     </form>
+
+                    <div class="box" th:if="${delivery.orderDispatched}">
+                        <div class="notification is-warning">
+                            <p th:text="#{deliveries.purchase.dispatched.banner}"></p>
+                            <p th:if="${not #strings.isEmpty(delivery.orderErrorMessage)}" th:text="${delivery.orderErrorMessage}"></p>
+                        </div>
+                        <div class="field is-grouped"
+                             th:if="${!delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                            <div class="control">
+                                <form method="post"
+                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/reconcile|}
+                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/reconcile|}">
+                                    <button type="submit" class="button is-info" th:text="#{deliveries.purchase.reconcile.button}">Check with supplier</button>
+                                </form>
+                            </div>
+                            <div class="control">
+                                <form method="post"
+                                      onsubmit="return confirm(this.dataset.confirm)"
+                                      th:attr="data-confirm=#{deliveries.purchase.force.confirm}"
+                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/force|}
+                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/force|}">
+                                    <button type="submit" class="button is-warning" th:text="#{deliveries.purchase.force.button}">Order anyway</button>
+                                </form>
+                            </div>
+                            <div class="control">
+                                <form method="post" class="field has-addons"
+                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/confirm-manually|}
+                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/confirm-manually|}">
+                                    <div class="control">
+                                        <input class="input" type="text" name="externalOrderId" required="required"
+                                               th:placeholder="#{deliveries.purchase.manual.button}"/>
+                                    </div>
+                                    <div class="control">
+                                        <button type="submit" class="button is-link" th:text="#{deliveries.purchase.manual.button}">Enter number manually</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="column is-half">
