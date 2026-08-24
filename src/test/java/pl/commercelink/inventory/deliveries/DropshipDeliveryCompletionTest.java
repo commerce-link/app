@@ -107,6 +107,7 @@ class DropshipDeliveryCompletionTest {
         assertThat(remaining.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
         verify(orderItemsRepository, never()).save(remaining);
         assertThat(delivery.hasBeenReceived()).isFalse();
+        assertThat(delivery.hasEvent("DROPSHIP_DELIVERY_CONFIRMED")).isTrue();
         verify(deliveriesRepository).save(delivery);
     }
 

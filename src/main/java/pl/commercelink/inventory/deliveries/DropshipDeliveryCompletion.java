@@ -7,8 +7,10 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class DropshipDeliveryCompletion {
+
+    static final String DROPSHIP_DELIVERY_CONFIRMED_EVENT = "DROPSHIP_DELIVERY_CONFIRMED";
 
     private final DeliveriesRepository deliveriesRepository;
     private final OrdersRepository ordersRepository;
@@ -41,6 +45,7 @@ public class DropshipDeliveryCompletion {
         if (remainingAllocations.stream().noneMatch(Allocation::isInAllocation)) {
             delivery.markAsReceived();
         }
+        delivery.addEvent(new Event(EventType.action, DROPSHIP_DELIVERY_CONFIRMED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
     }
 
@@ -60,7 +65,6 @@ public class DropshipDeliveryCompletion {
                 orderItemsRepository.save(orderItem);
             }
         }
-        order.updateEstimatedAssemblyAt(LocalDate.now());
         orderLifecycle.update(order, orderItems);
     }
 }
