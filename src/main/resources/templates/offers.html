@@ -81,18 +81,37 @@
                     <table class="table is-fullwidth is-striped">
                         <tr>
                             <th th:text="#{source.basket.id.label}"></th>
-                            <th th:text="#{catalog.name}"></th>
                             <th th:text="#{offers.type}"></th>
-                            <th th:text="#{offers.created.at}"></th>
-                            <th th:text="#{offers.expired.at}"></th>
+                            <th th:text="#{catalog.name}"></th>
+                            <th th:text="#{offers.validity}"></th>
                             <th th:text="#{general.actions}"></th>
                         </tr>
                         <tr th:each="offer : ${offers}">
-                            <td th:text="${offer.basketId}"></td>
-                            <td th:text="${offer.name}"></td>
+                            <td class="is-vcentered" style="white-space: nowrap;">
+                                <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
+                                   th:href="@{/dashboard/basket/view/{basketId}(basketId=${offer.basketId})}"
+                                   th:text="${offer.shortenedBasketId}" th:title="${offer.basketId}"></a>
+                                <a th:unless="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
+                                   th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}"
+                                   th:text="${offer.shortenedBasketId}" th:title="${offer.basketId}"></a>
+                                <button th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}"
+                                        type="button" class="button is-small is-white has-text-info ml-1 copy-offer-link cl-tooltip"
+                                        style="cursor: pointer;"
+                                        th:data-copy="${offer.createOfferUrl(backofficeDomain)}"
+                                        th:attr="data-tooltip=#{offers.link.for.client} + ' — ' + #{general.copy}"
+                                        onclick="copyOfferLink(this)">
+                                    <span class="icon is-small"><i class="fas fa-copy"></i></span>
+                                </button>
+                            </td>
                             <td th:text="${offer.type}"></td>
-                            <td th:text="${#temporals.format(offer.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                            <td th:text="${#temporals.format(offer.expiresAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            <td th:text="${offer.name}"></td>
+                            <td th:title="${offer.expiresAt != null ? #temporals.format(offer.expiresAt, 'yyyy-MM-dd HH:mm') : ''}">
+                                <th:block th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
+                                    <span th:if="${offer.expired}" class="tag is-danger is-light" th:text="#{offers.expired}"></span>
+                                    <span th:if="${!offer.expired && offer.daysToExpiry > 0}" th:text="#{offers.expires.in.days(${offer.daysToExpiry})}"></span>
+                                    <span th:if="${!offer.expired && offer.daysToExpiry == 0}" class="has-text-warning-dark" th:text="#{offers.expires.in.hours(${offer.hoursToExpiry})}"></span>
+                                </th:block>
+                            </td>
                             <td>
                                 <div class="buttons">
                                     <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}"
@@ -156,6 +175,24 @@
 
         </div>
     </section>
+
+    <div id="copyNotification" style="display:none; position:fixed; top:32px; right:32px; z-index:9999; background:#48c774; color:#fff; padding:16px 32px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); font-size:1.1em; transition: opacity 0.3s;">
+        <span th:text="#{general.copied}">Skopiowano!</span>
+    </div>
+
+    <script>
+        function copyOfferLink(button) {
+            navigator.clipboard.writeText(button.getAttribute('data-copy')).then(function () {
+                const notification = document.getElementById('copyNotification');
+                notification.style.display = 'block';
+                notification.style.opacity = '1';
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => notification.style.display = 'none', 300);
+                }, 2000);
+            });
+        }
+    </script>
 
 </div>
 
