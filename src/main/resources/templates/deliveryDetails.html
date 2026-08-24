@@ -495,6 +495,12 @@
                                     <input class="input" type="text" name="externalOrderId" required="required"/>
                                 </div>
                             </div>
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.purchase.complete.modal.estimatedDeliveryAt}"></label>
+                                <div class="control">
+                                    <input class="input" type="date" name="estimatedDeliveryAt" required="required"/>
+                                </div>
+                            </div>
                         </section>
                         <footer class="modal-card-foot">
                             <button type="submit" class="button is-info" th:text="#{general.save}">Complete</button>

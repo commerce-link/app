@@ -52,6 +52,7 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -278,7 +279,8 @@ public class SupplierPurchaseService {
         return OperationResult.success(delivery.getDeliveryId());
     }
 
-    public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId) {
+    public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId,
+                                                    LocalDate estimatedDeliveryAt) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (!canRecoverFailedPurchase(delivery)) {
             return OperationResult.failure("deliveries.purchase.complete.error.state");
@@ -286,20 +288,23 @@ public class SupplierPurchaseService {
         if (StringUtils.isBlank(externalOrderId)) {
             return OperationResult.failure("deliveries.purchase.complete.error.number");
         }
+        if (estimatedDeliveryAt == null) {
+            return OperationResult.failure("deliveries.purchase.complete.error.date");
+        }
 
-        DeliveryCreationForm form = rebuildForm(storeId, delivery);
-        form.setExternalDeliveryId(externalOrderId.trim());
-        form.setSourceCurrency(ExchangeRates.LOCAL_CURRENCY);
-        form.setTax(deliveryTaxResolver.resolveFor(delivery.getProvider()));
-        double totalNet = form.getItems().stream()
-                .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
-                .sum();
-        applyShippingTerms(form, totalNet);
-
-        delivery.setExternalDeliveryIdProvisional(false);
+        delivery.setExternalDeliveryId(externalOrderId.trim());
+        delivery.setEstimatedDeliveryAt(estimatedDeliveryAt);
+        delivery.setOrderStatus(null);
         delivery.setOrderErrorMessage(null);
+        delivery.setExternalDeliveryIdProvisional(false);
         delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
-        deliveryCreationService.completePending(storeId, delivery, form);
+        deliveriesRepository.save(delivery);
+
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        withAllocations.getItems().forEach(item -> item.getAllocations().stream()
+                .filter(allocation -> allocation.getType() == AllocationType.Order)
+                .forEach(allocation -> allocation.setSelected(true)));
+        orderAllocationsManager.commit(storeId, deliveryId, estimatedDeliveryAt, withAllocations.getItems());
 
         return OperationResult.success(deliveryId);
     }
@@ -417,16 +422,12 @@ public class SupplierPurchaseService {
             }
         });
 
+        ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNetForShipping = orderResult.totalNet() > 0
                 ? orderResult.totalNet() * conversion.sellRate()
                 : validation.totalNet();
-        applyShippingTerms(form, totalNetForShipping);
-    }
-
-    private void applyShippingTerms(DeliveryCreationForm form, double totalNet) {
-        ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
-        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
-        form.setShippingCost(terms.costPolicy().calculate(totalNet));
+        form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
     }
 
     private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote,

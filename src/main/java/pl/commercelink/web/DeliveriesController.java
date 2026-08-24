@@ -841,13 +841,15 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String completePurchase(@PathVariable("deliveryId") String deliveryId,
                                    @RequestParam("externalOrderId") String externalOrderId,
+                                   @RequestParam("estimatedDeliveryAt")
+                                   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate estimatedDeliveryAt,
                                    RedirectAttributes redirectAttributes, Locale locale) {
         Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
                 "deliveries.purchase.complete.error.global", redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        return handleComplete(getStoreId(), deliveryId, externalOrderId,
+        return handleComplete(getStoreId(), deliveryId, externalOrderId, estimatedDeliveryAt,
                 "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
     }
 
@@ -856,14 +858,18 @@ public class DeliveriesController {
     public String completePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
                                                 @PathVariable("deliveryId") String deliveryId,
                                                 @RequestParam("externalOrderId") String externalOrderId,
+                                                @RequestParam("estimatedDeliveryAt")
+                                                @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate estimatedDeliveryAt,
                                                 RedirectAttributes redirectAttributes, Locale locale) {
-        return handleComplete(storeId, deliveryId, externalOrderId,
+        return handleComplete(storeId, deliveryId, externalOrderId, estimatedDeliveryAt,
                 storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
     }
 
-    private String handleComplete(String storeId, String deliveryId, String externalOrderId, String redirect,
+    private String handleComplete(String storeId, String deliveryId, String externalOrderId,
+                                  LocalDate estimatedDeliveryAt, String redirect,
                                   RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<String> result = supplierPurchaseService.completeManually(storeId, deliveryId, externalOrderId);
+        OperationResult<String> result = supplierPurchaseService.completeManually(
+                storeId, deliveryId, externalOrderId, estimatedDeliveryAt);
         if (result.isSuccess()) {
             redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage("deliveries.purchase.complete.success", null, locale));

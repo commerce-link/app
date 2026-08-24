@@ -36,6 +36,7 @@ import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -55,6 +56,7 @@ class DeliveriesControllerApprovalTest {
 
     private static final String STORE_ID = "store-1";
     private static final String DELIVERY_ID = "delivery-1";
+    private static final LocalDate ESTIMATED_DELIVERY_AT = LocalDate.of(2026, 9, 1);
     private static final String PROVIDER = "Action";
 
     @Mock
@@ -508,7 +510,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setConnectionMode(ConnectionMode.OWN);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
         when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
                 .thenReturn("Dostawa oznaczona jako zamowiona.");
@@ -517,12 +519,12 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
                     redirectAttributes, Locale.forLanguageTag("pl"));
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
-            verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617");
+            verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
             verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
@@ -542,12 +544,12 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
                     redirectAttributes, Locale.forLanguageTag("pl"));
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
-            verify(supplierPurchaseService, never()).completeManually(any(), any(), any());
+            verify(supplierPurchaseService, never()).completeManually(any(), any(), any(), any());
             verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze ukonczyc tylko administrator platformy.");
         }
     }
@@ -559,7 +561,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setConnectionMode(ConnectionMode.OWN);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
                 .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.state"));
         when(messageSource.getMessage(eq("deliveries.purchase.complete.error.state"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("Cannot complete - the delivery is not in a failed order state.");
@@ -568,7 +570,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617",
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
                     redirectAttributes, Locale.ENGLISH);
 
             // then
@@ -581,31 +583,31 @@ class DeliveriesControllerApprovalTest {
     @Test
     void completePurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
         // given
-        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
         when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
                 .thenReturn("Dostawa oznaczona jako zamowiona.");
 
         // when
-        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617",
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
                 redirectAttributes, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-        verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617");
+        verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
         verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
     }
 
     @Test
     void completePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
         // given
-        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
                 .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.number"));
         when(messageSource.getMessage(eq("deliveries.purchase.complete.error.number"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("Enter the supplier order number.");
 
         // when
-        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617",
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
                 redirectAttributes, Locale.ENGLISH);
 
         // then
