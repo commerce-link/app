@@ -30,8 +30,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.documents.Document;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1181,7 +1183,7 @@ class SupplierPurchaseServiceTest {
     void rejectionIsRefusedWhenTheDeliveryHasAlreadyBeenReceived() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -1200,7 +1202,7 @@ class SupplierPurchaseServiceTest {
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         Delivery delivery = awaitingApprovalDelivery();
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -1346,7 +1348,7 @@ class SupplierPurchaseServiceTest {
         Delivery failed = new Delivery();
         failed.setDeliveryId(DELIVERY_ID);
         failed.setOrderStatus(DeliveryOrderStatus.FAILED);
-        failed.setReceivedAt(java.time.LocalDateTime.now());
+        failed.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, failed.getDeliveryId())).thenReturn(failed);
 
         // when
@@ -1406,7 +1408,7 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
                 PROVIDER, SupplierType.Distributor, 5, "PL",
-                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.FlatRate(1000, 50)))));
+                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.FlatRate(400, 50)))));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.0);
 
         // when
@@ -1416,8 +1418,48 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<DeliveryCreationForm> captor = ArgumentCaptor.forClass(DeliveryCreationForm.class);
         verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), captor.capture());
         assertEquals(LocalDate.now().plusDays(3), captor.getValue().getEstimatedDeliveryAt());
-        assertEquals(50.0, captor.getValue().getShippingCost());
+        assertEquals(0.0, captor.getValue().getShippingCost());
         assertEquals(1.0, captor.getValue().getTax());
+    }
+
+    @Test
+    void completeManuallyChargesShippingBelowFreeThreshold() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.FlatRate(600, 50)))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.0);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> captor = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), captor.capture());
+        assertEquals(50.0, captor.getValue().getShippingCost());
+    }
+
+    @Test
+    void completeManuallyTrimsOrderNumber() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "  PO-1  ");
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> captor = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), captor.capture());
+        assertEquals("PO-1", captor.getValue().getExternalDeliveryId());
     }
 
     @Test
@@ -1457,6 +1499,8 @@ class SupplierPurchaseServiceTest {
         // then
         verifyNoInteractions(storeSupplierProviderResolver);
         verifyNoInteractions(supplierProvider);
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+        verifyNoInteractions(orderIdRefreshEventPublisher);
     }
 
     @Test
@@ -1483,7 +1527,7 @@ class SupplierPurchaseServiceTest {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -1502,7 +1546,7 @@ class SupplierPurchaseServiceTest {
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-        delivery.getDocuments().add(new pl.commercelink.documents.Document());
+        delivery.getDocuments().add(new Document());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
