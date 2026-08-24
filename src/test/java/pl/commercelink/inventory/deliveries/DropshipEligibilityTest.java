@@ -17,8 +17,10 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DropshipEligibilityTest {
@@ -28,6 +30,9 @@ class DropshipEligibilityTest {
 
     @Mock
     private DropshipPurchaseService dropshipPurchaseService;
+
+    @Mock
+    private DeliveriesRepository deliveriesRepository;
 
     @InjectMocks
     private DropshipEligibility eligibility;
@@ -80,6 +85,7 @@ class DropshipEligibilityTest {
 
         // then
         assertEquals(Optional.of(PROVIDER), provider);
+        verifyNoInteractions(deliveriesRepository);
     }
 
     @Test
@@ -130,5 +136,47 @@ class DropshipEligibilityTest {
         // when / then
         assertTrue(eligibility.eligibleProvider(order,
                 List.of(item(null, FulfilmentStatus.Delivered))).isEmpty());
+    }
+
+    @Test
+    void orderedItemOnADropshipDeliveryCountsAsSettled() {
+        // given
+        Delivery dropshipDelivery = new Delivery();
+        dropshipDelivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(dropshipDelivery);
+
+        // when
+        Optional<String> provider = eligibility.eligibleProvider(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
+
+        // then
+        assertEquals(Optional.of(PROVIDER), provider);
+    }
+
+    @Test
+    void orderedItemOnAWarehouseDeliveryStillBlocksEligibility() {
+        // given
+        Delivery warehouseDelivery = new Delivery();
+        when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(warehouseDelivery);
+
+        // when
+        Optional<String> provider = eligibility.eligibleProvider(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
+
+        // then
+        assertTrue(provider.isEmpty());
+    }
+
+    @Test
+    void orderedItemWhoseDeliveryIsGoneBlocksEligibility() {
+        // given
+        when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(null);
+
+        // when
+        Optional<String> provider = eligibility.eligibleProvider(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
+
+        // then
+        assertTrue(provider.isEmpty());
     }
 }
