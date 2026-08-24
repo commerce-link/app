@@ -342,8 +342,13 @@ public class SupplierPurchaseService {
             delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
             deliveryCreationService.completePending(storeId, delivery, form);
             if (orderResult.provisional()) {
-                orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
-                        storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+                try {
+                    orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                            storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+                } catch (RuntimeException e) {
+                    log.error("Order id refresh publish failed after reconcile: store={} delivery={}",
+                            storeId, deliveryId, e);
+                }
             }
             log.info("Reconcile confirmed supplier order: store={} delivery={} provider={} ref={} externalOrderId={}",
                     storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(),

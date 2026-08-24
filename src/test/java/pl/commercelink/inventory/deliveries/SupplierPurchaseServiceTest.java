@@ -1527,6 +1527,33 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void reconcileSucceedsWhenRefreshPublishFailsAfterCompletion() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any())).thenReturn(Optional.of(new SupplierOrderResult(
+                "555", 180.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")), true)));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        doThrow(new RuntimeException("SQS unavailable")).when(orderIdRefreshEventPublisher).publish(any());
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(orderIdRefreshEventPublisher).publish(any());
+    }
+
+    @Test
     void reconcileReportsNotFoundWhenSupplierSeesNothing() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
