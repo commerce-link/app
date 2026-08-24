@@ -276,7 +276,7 @@ public class DeliveriesController {
 
     private String confirmDropshipDelivered(Delivery delivery, DeliveryAllocationsForm form,
                                             RedirectAttributes redirectAttributes, Locale locale) {
-        if (delivery.getOrderStatus() != null) {
+        if (delivery.getOrderStatus() != null || delivery.hasBeenReceived()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.dropship.confirm.unavailable", null, locale));
             return detailsRedirect(form.getStoreId(), form.getDeliveryId());

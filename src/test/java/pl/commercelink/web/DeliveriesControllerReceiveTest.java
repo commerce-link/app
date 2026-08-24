@@ -108,6 +108,29 @@ class DeliveriesControllerReceiveTest {
     }
 
     @Test
+    void receiveOnAlreadyReceivedDropshipDeliveryIsRejected() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        delivery.markAsReceived();
+        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.dropship.confirm.unavailable"), any(), any()))
+                .thenReturn("blocked");
+        DeliveryAllocationsForm form = formFor(delivery);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+            verifyNoInteractions(dropshipDeliveryCompletion, deliveryReceptionService);
+        }
+    }
+
+    @Test
     void receiveOnRegularDeliveryReachesReceptionService() {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
