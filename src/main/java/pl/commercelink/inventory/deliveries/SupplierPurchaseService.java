@@ -8,7 +8,6 @@ import pl.commercelink.inventory.SupplierSkuResolver;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
-import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
@@ -267,8 +266,7 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> retry(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderFailed()
-                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+        if (!canRecoverFailedPurchase(delivery)) {
             return OperationResult.failure("deliveries.purchase.retry.error.state");
         }
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
@@ -282,27 +280,21 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderFailed()
-                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+        if (!canRecoverFailedPurchase(delivery)) {
             return OperationResult.failure("deliveries.purchase.complete.error.state");
         }
         if (StringUtils.isBlank(externalOrderId)) {
             return OperationResult.failure("deliveries.purchase.complete.error.number");
         }
-        String trimmedOrderId = externalOrderId.trim();
 
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
-        form.setExternalDeliveryId(trimmedOrderId);
+        form.setExternalDeliveryId(externalOrderId.trim());
         form.setSourceCurrency(ExchangeRates.LOCAL_CURRENCY);
         form.setTax(deliveryTaxResolver.resolveFor(delivery.getProvider()));
-
-        SupplierInfo supplierInfo = supplierRegistry.get(delivery.getProvider());
-        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
-        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNet = form.getItems().stream()
                 .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
                 .sum();
-        form.setShippingCost(terms.costPolicy().calculate(totalNet));
+        applyShippingTerms(form, totalNet);
 
         delivery.setExternalDeliveryIdProvisional(false);
         delivery.setOrderErrorMessage(null);
@@ -310,6 +302,11 @@ public class SupplierPurchaseService {
         deliveryCreationService.completePending(storeId, delivery, form);
 
         return OperationResult.success(deliveryId);
+    }
+
+    private boolean canRecoverFailedPurchase(Delivery delivery) {
+        return delivery != null && delivery.isOrderFailed()
+                && !delivery.hasBeenReceived() && delivery.getDocuments().isEmpty();
     }
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
@@ -420,13 +417,16 @@ public class SupplierPurchaseService {
             }
         });
 
-        SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
-        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
-        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNetForShipping = orderResult.totalNet() > 0
                 ? orderResult.totalNet() * conversion.sellRate()
                 : validation.totalNet();
-        form.setShippingCost(terms.costPolicy().calculate(totalNetForShipping));
+        applyShippingTerms(form, totalNetForShipping);
+    }
+
+    private void applyShippingTerms(DeliveryCreationForm form, double totalNet) {
+        ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
+        form.setShippingCost(terms.costPolicy().calculate(totalNet));
     }
 
     private PurchaseValidation.Line toValidationLine(DeliveryItem item, String sku, SupplierQuote quote,
