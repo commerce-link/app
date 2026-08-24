@@ -317,7 +317,7 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.merge.error.statusMismatch", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
         }
-        if (source.isOrderPending()) {
+        if (source.isOrderPending() || source.isOrderDispatched()) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
 
@@ -392,7 +392,7 @@ public class DeliveriesController {
         if (delivery != null && delivery.isAwaitingApproval()) {
             return redirectEditLocked(storeId, deliveryId, redirectAttributes, locale);
         }
-        if (delivery != null && delivery.isOrderPending()) {
+        if (delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched())) {
             return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
         }
         deliveriesRepository.delete(delivery);
@@ -1147,7 +1147,7 @@ public class DeliveriesController {
 
     private boolean isOrderingInProgress(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        return delivery != null && delivery.isOrderPending();
+        return delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched());
     }
 
     private String redirectOrderingInProgress(String storeId, String deliveryId,

@@ -62,6 +62,7 @@
                                       th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.orderDispatched}" th:text="#{deliveries.orderStatus.dispatched}"></span>
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
@@ -373,9 +374,9 @@
                         <div class="select is-small" >
                             <select id="delivery-action-select">
                                 <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>

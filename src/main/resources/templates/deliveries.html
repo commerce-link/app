@@ -107,6 +107,7 @@
                                 <a th:href="@{${detailPath + '/deliveries/details'}(deliveryId=${delivery.deliveryId})}"
                                    th:text="${delivery.shortenedDeliveryId}"></a>
                                 <span class="tag is-warning ml-1" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                <span class="tag is-warning ml-1" th:if="${delivery.orderDispatched}" th:text="#{deliveries.orderStatus.dispatched}"></span>
                                 <span class="tag is-danger ml-1" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag is-warning ml-1" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>

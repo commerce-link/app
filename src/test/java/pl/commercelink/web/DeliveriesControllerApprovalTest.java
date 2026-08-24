@@ -1314,6 +1314,96 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void splitIsBlockedForStoreAdminWhileOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-1");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminIsBlockedWhileOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).deleteAllocations(any(), any(), any());
+        }
+    }
+
+    @Test
+    void mergeIsBlockedWhenSourceAndTargetAreBothOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(dispatchedDelivery("delivery-2"));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void deleteDeliveryIsBlockedWhileOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        }
+    }
+
+    @Test
     void mergeTargetsExcludeDeliveriesWithADifferentOrderStatus() {
         // given
         Delivery delivery = failedDelivery(DELIVERY_ID);
@@ -1348,6 +1438,13 @@ class DeliveriesControllerApprovalTest {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(deliveryId);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        return delivery;
+    }
+
+    private Delivery dispatchedDelivery(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
         return delivery;
     }
 

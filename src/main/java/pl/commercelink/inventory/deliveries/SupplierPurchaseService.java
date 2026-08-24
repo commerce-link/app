@@ -201,13 +201,13 @@ public class SupplierPurchaseService {
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
             deliveryCreationService.completePending(storeId, delivery, form);
+            log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
+                    orderResult.externalOrderId());
             if (orderResult.provisional()) {
                 orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
                         storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
             }
-            log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
-                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
-                    orderResult.externalOrderId());
         } catch (SupplierOrderOutcomeUnknownException e) {
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery); // stays ORDER_DISPATCHED
@@ -318,7 +318,8 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> reconcile(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderDispatched()) {
+        if (delivery == null || !delivery.isOrderDispatched()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.purchase.reconcile.error.state");
         }
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
@@ -379,7 +380,8 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> confirmManually(String storeId, String deliveryId, String externalOrderId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderDispatched()) {
+        if (delivery == null || !delivery.isOrderDispatched()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.purchase.manual.error.state");
         }
         if (StringUtils.isBlank(externalOrderId)) {

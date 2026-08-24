@@ -97,7 +97,7 @@ public class DeliveriesManager {
                 source.getTax()
         );
         target.setConnectionMode(source.getConnectionMode());
-        if (source.isAwaitingApproval() || source.isOrderFailed()) {
+        if (source.isAwaitingApproval() || source.isOrderFailed() || source.isOrderDispatched()) {
             target.setOrderStatus(source.getOrderStatus());
             target.setPurchaseRef(UUID.randomUUID().toString());
             target.setDeliveryAddressId(source.getDeliveryAddressId());

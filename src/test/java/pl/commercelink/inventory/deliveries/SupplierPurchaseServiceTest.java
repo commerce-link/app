@@ -1592,6 +1592,24 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void reconcileRefusesDeliveryThatHasAlreadyBeenReceived() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.reconcile.error.state", result.getMessage());
+        verifyNoInteractions(supplierProvider);
+    }
+
+    @Test
     void reconcileSurvivesProbeFailure() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -1679,6 +1697,24 @@ class SupplierPurchaseServiceTest {
         assertNull(delivery.getOrderStatus());
         assertTrue(delivery.hasEvent("DELIVERY_ORDER_MANUALLY_CONFIRMED"));
         verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void confirmManuallyRejectsReceivedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "22039725");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.manual.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test
