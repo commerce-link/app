@@ -41,7 +41,14 @@
                         <td th:text="${item.name}"></td>
                         <td th:text="${item.qty}"></td>
                         <td th:text="${item.unitCost.netValue}"></td>
-                        <td th:text="${item.unitCost.grossValue}"></td>
+                        <td>
+                            <span th:text="${item.unitCost.grossValue}"></span>
+                            <span class="has-text-info cl-tooltip" th:if="${item.hasUnitSystemCost()}"
+                                  style="font-size: 0.7em; vertical-align: middle; margin-left: 0.4em;"
+                                  th:attr="data-tooltip=#{warehouse.item.system.cost.tooltip(${item.systemCost.netValue}, ${item.systemCost.grossValue})}">
+                                <i class="fas fa-tag"></i>
+                            </span>
+                        </td>
                         <td>
                             <a th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
                         </td>

@@ -118,6 +118,11 @@
         <i class="fas fa-exclamation-circle" style="font-size: 48px; margin-bottom: 1rem;"></i>
         <h2 class="title is-4" th:text="#{offers.expiration.title}"></h2>
         <p th:text="#{offers.expiration.message}"></p>
+        <p class="mt-3" th:if="${canEdit}">
+            <strong th:text="#{offers.id} + ':'"></strong>
+            <span th:text="${offer.basketId}"></span>
+            <span>(<a th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}" th:text="#{offers.client.edit.link}"></a>)</span>
+        </p>
     </div>
 
     <div class="container" th:if="${!offer.expired}">
@@ -126,6 +131,7 @@
             <label class="label" style="display: inline;"><strong th:text="#{offers.id} + ':'"></strong></label>
             <div class="control" style="display: inline;">
                 <span th:text="${offer.basketId}"></span>
+                <span th:if="${canEdit}">(<a th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}" th:text="#{offers.client.edit.link}"></a>)</span>
             </div>
         </div>
 

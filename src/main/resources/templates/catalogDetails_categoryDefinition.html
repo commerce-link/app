@@ -44,6 +44,13 @@
 
         <div class="field">
             <label class="checkbox">
+                <input type="checkbox" th:field="*{includedInDeliverySuggestions}">
+                <span th:text="#{catalog.category.included.in.delivery.suggestions}"></span>
+            </label>
+        </div>
+
+        <div class="field">
+            <label class="checkbox">
                 <input type="checkbox" th:field="*{deletionProtection}">
                 <span th:text="#{catalog.category.deletion.protection}"></span>
             </label>
