@@ -1374,6 +1374,178 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void completeManuallyClearsFailedStateAndSetsOrderNumber() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-999");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DELIVERY_ID, result.getPayload());
+        ArgumentCaptor<DeliveryCreationForm> captor = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), captor.capture());
+        assertEquals("PO-999", captor.getValue().getExternalDeliveryId());
+        assertEquals(ExchangeRates.LOCAL_CURRENCY, captor.getValue().getSourceCurrency());
+        assertNull(delivery.getOrderErrorMessage());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
+    }
+
+    @Test
+    void completeManuallyAppliesShippingTermsAndTax() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.FlatRate(1000, 50)))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.0);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> captor = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), captor.capture());
+        assertEquals(LocalDate.now().plusDays(3), captor.getValue().getEstimatedDeliveryAt());
+        assertEquals(50.0, captor.getValue().getShippingCost());
+        assertEquals(1.0, captor.getValue().getTax());
+    }
+
+    @Test
+    void completeManuallySetsProvisionalFalseAndKeepsPurchaseRef() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertEquals("ref-1", delivery.getPurchaseRef());
+    }
+
+    @Test
+    void completeManuallyDoesNotCallSupplierProvider() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = failedDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        verifyNoInteractions(storeSupplierProviderResolver);
+        verifyNoInteractions(supplierProvider);
+    }
+
+    @Test
+    void completeManuallyRejectsNonFailedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
+    void completeManuallyRejectsReceivedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
+    void completeManuallyRejectsDeliveryWithDocuments() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.getDocuments().add(new pl.commercelink.documents.Document());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
+    void completeManuallyRejectsBlankOrderNumber() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "   ");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.number", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    private Delivery failedDelivery(DeliveryCreationForm form, String purchaseRef) {
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage("boom");
+        delivery.setPurchaseRef(purchaseRef);
+        delivery.setProvider(form.getProvider());
+        lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenReturn(deliveryWithAllocations(form, DELIVERY_ID));
+        return delivery;
+    }
+
+    @Test
     void stampsTheGlobalConnectionModeOnADeliveryRaisedForApproval() {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);

@@ -42,6 +42,7 @@ public class SupplierPurchaseService {
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
+    private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
 
     private final StoreSupplierProviderResolver storeSupplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -277,6 +278,38 @@ public class SupplierPurchaseService {
         supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
                 storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
         return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderFailed()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.complete.error.state");
+        }
+        if (StringUtils.isBlank(externalOrderId)) {
+            return OperationResult.failure("deliveries.purchase.complete.error.number");
+        }
+        String trimmedOrderId = externalOrderId.trim();
+
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        form.setExternalDeliveryId(trimmedOrderId);
+        form.setSourceCurrency(ExchangeRates.LOCAL_CURRENCY);
+        form.setTax(deliveryTaxResolver.resolveFor(delivery.getProvider()));
+
+        SupplierInfo supplierInfo = supplierRegistry.get(delivery.getProvider());
+        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
+        double totalNet = form.getItems().stream()
+                .mapToDouble(item -> item.getRequestedQty() * item.getUnitCost())
+                .sum();
+        form.setShippingCost(terms.costPolicy().calculate(totalNet));
+
+        delivery.setExternalDeliveryIdProvisional(false);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
+        deliveryCreationService.completePending(storeId, delivery, form);
+
+        return OperationResult.success(deliveryId);
     }
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
