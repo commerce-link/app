@@ -1501,6 +1501,177 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void reconcileCompletesDeliveryWhenSupplierReportsOrder() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any())).thenReturn(Optional.of(new SupplierOrderResult(
+                "555", 180.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDER_RECONCILED"));
+    }
+
+    @Test
+    void reconcileReportsNotFoundWhenSupplierSeesNothing() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any())).thenReturn(Optional.empty());
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.reconcile.notFound", result.getMessage());
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
+    void reconcileRejectsNonDispatchedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.reconcile.error.state", result.getMessage());
+        verifyNoInteractions(supplierProvider);
+    }
+
+    @Test
+    void reconcileSurvivesProbeFailure() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any()))
+                .thenThrow(new SupplierOrderException("503 Service Unavailable"));
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.reconcile.error.failed", result.getMessage());
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+    }
+
+    @Test
+    void forceRetryRequeuesDispatchedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setOrderErrorMessage("outcome unknown");
+        delivery.setProvider(PROVIDER);
+        delivery.setPurchaseRef("ref-1");
+        delivery.setPurchaseAttempts(1);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.forceRetry(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
+        assertNull(delivery.getOrderErrorMessage());
+        assertEquals(2, delivery.getPurchaseAttempts());
+        ArgumentCaptor<SupplierPurchaseEventRequest> event = ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        assertEquals(2, event.getValue().getAttempt());
+    }
+
+    @Test
+    void forceRetryRejectsReceivedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.forceRetry(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.retry.error.state", result.getMessage());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void confirmManuallySetsNumberAndClearsState() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setProvider(PROVIDER);
+        delivery.setPurchaseRef("ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "22039725");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals("22039725", delivery.getExternalDeliveryId());
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertNull(delivery.getOrderStatus());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDER_MANUALLY_CONFIRMED"));
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void confirmManuallyRejectsBlankNumber() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "  ");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.manual.error.blank", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void stampsTheGlobalConnectionModeOnADeliveryRaisedForApproval() {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);

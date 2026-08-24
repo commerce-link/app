@@ -45,6 +45,8 @@ public class SupplierPurchaseService {
     private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
+    private static final String ORDER_RECONCILED_EVENT = "DELIVERY_ORDER_RECONCILED";
+    private static final String ORDER_MANUALLY_CONFIRMED_EVENT = "DELIVERY_ORDER_MANUALLY_CONFIRMED";
 
     private final StoreSupplierProviderResolver storeSupplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -311,6 +313,84 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
         publishPurchase(delivery);
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> reconcile(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderDispatched()) {
+            return OperationResult.failure("deliveries.purchase.reconcile.error.state");
+        }
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        try {
+            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
+            List<SupplierOrderLine> lines = validation.lines().stream()
+                    .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
+                    .toList();
+            Optional<SupplierOrderResult> placed = getProvider(storeId, delivery.getProvider())
+                    .findPlacedOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
+                            form.getDeliveryAddressId()));
+            if (placed.isEmpty()) {
+                log.info("Reconcile found no supplier order: store={} delivery={} provider={} ref={}",
+                        storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef());
+                return OperationResult.failure("deliveries.purchase.reconcile.notFound");
+            }
+            SupplierOrderResult orderResult = placed.get();
+            applyOrderResult(form, validation, orderResult);
+            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
+            delivery.setOrderErrorMessage(null);
+            delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
+            deliveryCreationService.completePending(storeId, delivery, form);
+            if (orderResult.provisional()) {
+                orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                        storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+            }
+            log.info("Reconcile confirmed supplier order: store={} delivery={} provider={} ref={} externalOrderId={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(),
+                    orderResult.externalOrderId());
+            return OperationResult.success(delivery.getDeliveryId());
+        } catch (Exception e) {
+            log.error("Reconcile failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), e);
+            return OperationResult.failure("deliveries.purchase.reconcile.error.failed");
+        }
+    }
+
+    public OperationResult<String> forceRetry(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderDispatched()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.retry.error.state");
+        }
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
+        publishPurchase(delivery);
+        log.info("Force retry of unconfirmed purchase: store={} delivery={} provider={} ref={} attempt={}",
+                storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(),
+                delivery.getPurchaseAttempts());
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> confirmManually(String storeId, String deliveryId, String externalOrderId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderDispatched()) {
+            return OperationResult.failure("deliveries.purchase.manual.error.state");
+        }
+        if (StringUtils.isBlank(externalOrderId)) {
+            return OperationResult.failure("deliveries.purchase.manual.error.blank");
+        }
+        delivery.setExternalDeliveryId(externalOrderId.trim());
+        delivery.setExternalDeliveryIdProvisional(false);
+        delivery.setOrderStatus(null);
+        delivery.setOrderErrorMessage(null);
+        delivery.setTax(deliveryTaxResolver.resolveFor(delivery.getProvider()));
+        ShippingTerms terms = supplierRegistry.get(delivery.getProvider()).shippingTermsFor("PL");
+        delivery.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
+        delivery.addEvent(new Event(EventType.action, ORDER_MANUALLY_CONFIRMED_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+        log.info("Supplier order id entered manually: store={} delivery={} provider={} ref={} externalOrderId={}",
+                storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());
         return OperationResult.success(delivery.getDeliveryId());
     }
 
