@@ -115,6 +115,7 @@ public class StoreCopyService {
                 newCategory.setPimCategoryIds(new LinkedList<>(sourceCategory.getPimCategoryIds()));
                 newCategory.setType(sourceCategory.getType());
                 newCategory.setRequiredDuringOrder(sourceCategory.isRequiredDuringOrder());
+                newCategory.setIncludedInDeliverySuggestions(sourceCategory.isIncludedInDeliverySuggestions());
                 newCategory.setSequenceNumber(sourceCategory.getSequenceNumber());
                 newCategory.setGroupingOrder(sourceCategory.getGroupingOrder());
                 newCategory.setMaxQty(sourceCategory.getMaxQty());

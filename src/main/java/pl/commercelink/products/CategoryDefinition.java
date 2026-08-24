@@ -23,6 +23,8 @@ public class CategoryDefinition implements DeletionProtection {
     private CategoryDefinitionType type = CategoryDefinitionType.Managed;
     @DynamoDBAttribute(attributeName = "requiredDuringOrder")
     private boolean requiredDuringOrder;
+    @DynamoDBAttribute(attributeName = "includedInDeliverySuggestions")
+    private boolean includedInDeliverySuggestions;
     @DynamoDBAttribute(attributeName = "sequenceNumber")
     private int sequenceNumber;
     @DynamoDBAttribute(attributeName = "groupingOrder")
@@ -168,6 +170,14 @@ public class CategoryDefinition implements DeletionProtection {
 
     public void setRequiredDuringOrder(boolean requiredDuringOrder) {
         this.requiredDuringOrder = requiredDuringOrder;
+    }
+
+    public boolean isIncludedInDeliverySuggestions() {
+        return includedInDeliverySuggestions;
+    }
+
+    public void setIncludedInDeliverySuggestions(boolean includedInDeliverySuggestions) {
+        this.includedInDeliverySuggestions = includedInDeliverySuggestions;
     }
 
     public int getSequenceNumber() {

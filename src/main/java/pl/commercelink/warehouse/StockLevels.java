@@ -47,17 +47,23 @@ public class StockLevels {
     @Autowired
     private Inventory inventory;
 
-    public List<StockProductLevel> calculate(String storeId, String catalogId, String categoryId, RestockScope scope, boolean onlyMissingItems) {
+    public List<StockProductLevel> calculate(String storeId, String catalogId, String categoryId, RestockScope scope,
+                                             boolean onlyMissingItems, boolean onlyDeliverySuggestionCategories) {
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
         if (catalog == null) {
             return Collections.emptyList();
         }
 
-        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
-
         List<CategoryDefinition> categories = catalog.getCategories().stream()
                 .filter(c -> categoryId == null || categoryId.isEmpty() || categoryId.equals(c.getCategoryId()))
+                .filter(c -> !onlyDeliverySuggestionCategories || c.isIncludedInDeliverySuggestions())
                 .toList();
+
+        if (categories.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
 
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 

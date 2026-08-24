@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
@@ -30,6 +31,9 @@ public class WarehouseItem extends Item {
 
     @DynamoDBAttribute(attributeName = "purchaseClaimQty")
     private int purchaseClaimQty;
+
+    @DynamoDBAttribute(attributeName = "unitSystemCost")
+    private double unitSystemCost;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -62,6 +66,7 @@ public class WarehouseItem extends Item {
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
+        this.setUnitSystemCost(other.getUnitSystemCost());
 
         if (hasOneOfTheStatuses(FulfilmentStatus.New)) {
             setDeliveryId(other.getDeliveryId());
@@ -128,6 +133,21 @@ public class WarehouseItem extends Item {
     }
 
     @DynamoDBIgnore
+    public double getEffectiveUnitSystemCost() {
+        return unitSystemCost > 0 ? unitSystemCost : getCost();
+    }
+
+    @DynamoDBIgnore
+    public boolean hasUnitSystemCost() {
+        return unitSystemCost > 0;
+    }
+
+    @DynamoDBIgnore
+    public Price systemCost() {
+        return Price.fromNet(unitSystemCost, getTax());
+    }
+
+    @DynamoDBIgnore
     public WarehouseItem splitOff(int qtyToSplit) {
         if (qtyToSplit <= 0 || qtyToSplit >= getQty()) {
             throw new IllegalArgumentException("Split quantity must be between 1 and " + (getQty() - 1));
@@ -143,6 +163,7 @@ public class WarehouseItem extends Item {
         splitItem.setEan(getEan());
         splitItem.setManufacturerCode(getManufacturerCode());
         splitItem.setCost(getCost());
+        splitItem.setUnitSystemCost(getUnitSystemCost());
         splitItem.setTax(getTax());
         splitItem.setDeliveryId(getDeliveryId());
         splitItem.setClaimedDeliveryId(getClaimedDeliveryId());
@@ -183,5 +204,13 @@ public class WarehouseItem extends Item {
 
     public void setPurchaseClaimQty(int purchaseClaimQty) {
         this.purchaseClaimQty = purchaseClaimQty;
+    }
+
+    public double getUnitSystemCost() {
+        return unitSystemCost;
+    }
+
+    public void setUnitSystemCost(double unitSystemCost) {
+        this.unitSystemCost = unitSystemCost;
     }
 }
