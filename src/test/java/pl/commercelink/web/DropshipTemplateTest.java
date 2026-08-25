@@ -155,6 +155,8 @@ class DropshipTemplateTest {
         assertThat(html).contains("deliveries.dropship.confirmShipment");
         assertThat(html).contains("${delivery.dropship and delivery.orderStatus == null and (isAdmin or isSuperAdmin)}");
         assertThat(html).contains("id=\"confirmShipmentModal\"");
+        assertThat(html).contains("id=\"dsConfirmButton\"");
+        assertThat(html).contains("function updateDropshipShipmentButton()");
         assertThat(html).contains("*{shipmentTrackingNo}");
         assertThat(html).contains("*{shipmentShippedAt}");
         assertThat(html).contains("deliveries.dropship.confirm.deleteAllocation");

@@ -501,38 +501,38 @@
                             <label class="label" th:text="#{order.shipment.carrier}"></label>
                             <div class="control">
                                 <div th:if="${!carrierOptions.isEmpty()}" class="select is-fullwidth">
-                                    <select id="dsCarrier">
+                                    <select id="dsCarrier" onchange="updateDropshipShipmentButton()">
                                         <option value=""></option>
                                         <option th:each="option : ${carrierOptions}" th:value="${option}" th:text="${option}"
                                                 th:selected="${dropshipShipment != null and option == dropshipShipment.carrier}"></option>
                                     </select>
                                 </div>
-                                <input th:if="${carrierOptions.isEmpty()}" id="dsCarrier" class="input" type="text"
+                                <input th:if="${carrierOptions.isEmpty()}" id="dsCarrier" class="input" type="text" oninput="updateDropshipShipmentButton()"
                                        th:value="${dropshipShipment != null ? dropshipShipment.carrier : ''}"/>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{order.shipment.tracking.no}"></label>
                             <div class="control">
-                                <input id="dsTrackingNo" class="input" type="text"/>
+                                <input id="dsTrackingNo" class="input" type="text" oninput="updateDropshipShipmentButton()"/>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{order.collection.point}"></label>
                             <div class="control">
-                                <input id="dsCollectionPoint" class="input" type="text"
+                                <input id="dsCollectionPoint" class="input" type="text" oninput="updateDropshipShipmentButton()"
                                        th:value="${dropshipShipment != null ? dropshipShipment.collectionPointCode : ''}"/>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label" th:text="#{order.shipment.shipped.at}"></label>
                             <div class="control">
-                                <input id="dsShippedAt" class="input" type="datetime-local"/>
+                                <input id="dsShippedAt" class="input" type="datetime-local" oninput="updateDropshipShipmentButton()" onchange="updateDropshipShipmentButton()"/>
                             </div>
                         </div>
                     </section>
                     <footer class="modal-card-foot">
-                        <button class="button is-primary" type="button" onclick="confirmDropshipShipment()" th:text="#{deliveries.dropship.confirmShipment.submit}"></button>
+                        <button id="dsConfirmButton" class="button is-primary" type="button" disabled onclick="confirmDropshipShipment()" th:text="#{deliveries.dropship.confirmShipment.submit}"></button>
                         <button class="button" type="button" onclick="toggleConfirmShipmentModal(false)" th:text="#{general.cancel}"></button>
                     </footer>
                 </div>
@@ -782,6 +782,19 @@
             }
         }
 
+        function dropshipShipmentComplete() {
+            const type = document.getElementById('dsShipmentType').value;
+            const carrier = document.getElementById('dsCarrier').value.trim();
+            const trackingNo = document.getElementById('dsTrackingNo').value.trim();
+            const collectionPoint = document.getElementById('dsCollectionPoint').value.trim();
+            const shippedAt = document.getElementById('dsShippedAt').value;
+            return !!carrier && !!trackingNo && !!shippedAt && (type !== 'PickupPoint' || !!collectionPoint);
+        }
+
+        function updateDropshipShipmentButton() {
+            document.getElementById('dsConfirmButton').disabled = !dropshipShipmentComplete();
+        }
+
         function onDropshipShipmentTypeChange() {
             const isPickupPoint = document.getElementById('dsShipmentType').value === 'PickupPoint';
             const collectionPoint = document.getElementById('dsCollectionPoint');
@@ -789,6 +802,7 @@
             if (!isPickupPoint) {
                 collectionPoint.value = '';
             }
+            updateDropshipShipmentButton();
         }
 
         function confirmDropshipShipment() {
@@ -797,7 +811,7 @@
             const trackingNo = document.getElementById('dsTrackingNo').value.trim();
             const collectionPoint = document.getElementById('dsCollectionPoint').value.trim();
             const shippedAt = document.getElementById('dsShippedAt').value;
-            if (!carrier || !trackingNo || !shippedAt || (type === 'PickupPoint' && !collectionPoint)) {
+            if (!dropshipShipmentComplete()) {
                 alert(/*[[#{deliveries.dropship.shipment.fillAllFields}]]*/ 'Fill in all shipment fields.');
                 return;
             }
