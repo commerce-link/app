@@ -65,26 +65,6 @@ class DeliveriesControllerReceiveTest {
     }
 
     @Test
-    void receiveOnDropshipDeliveryConfirmsDeliveryToTheCustomerWithoutGoodsIn() {
-        // given
-        Delivery delivery = dropshipDelivery();
-        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
-        DeliveryAllocationsForm form = formFor(delivery);
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
-
-            // when
-            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
-            verify(dropshipDeliveryCompletion).confirmDelivered(eq("store-1"), same(delivery), anyList(), anyList());
-            verifyNoInteractions(deliveryReceptionService);
-        }
-    }
-
-    @Test
     void receiveOnDropshipDeliveryWithSupplierOrderInFlightIsRejected() {
         // given
         Delivery delivery = dropshipDelivery();

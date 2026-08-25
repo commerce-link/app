@@ -281,8 +281,8 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.dropship.confirm.unavailable", null, locale));
             return detailsRedirect(form.getStoreId(), form.getDeliveryId());
         }
-        dropshipDeliveryCompletion.confirmDelivered(form.getStoreId(), delivery,
-                form.getSelectedOrderAllocations(), form.getRemainingAllocations());
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
         return detailsRedirect(form.getStoreId(), form.getDeliveryId());
     }
 

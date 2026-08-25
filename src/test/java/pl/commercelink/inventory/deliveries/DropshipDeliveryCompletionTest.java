@@ -11,8 +11,15 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderLifecycleEventPublisher;
+import pl.commercelink.orders.OrderLifecycleEventType;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.starter.util.OperationResult;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +35,9 @@ class DropshipDeliveryCompletionTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
+    private static final LocalDateTime SHIPPED_AT = LocalDateTime.of(2026, 8, 25, 10, 30);
+    private static final DropshipShipment COURIER =
+            new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT);
 
     @Mock
     private DeliveriesRepository deliveriesRepository;
@@ -37,6 +47,8 @@ class DropshipDeliveryCompletionTest {
     private OrderItemsRepository orderItemsRepository;
     @Mock
     private OrderLifecycle orderLifecycle;
+    @Mock
+    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
 
     @InjectMocks
     private DropshipDeliveryCompletion completion;
@@ -44,6 +56,7 @@ class DropshipDeliveryCompletionTest {
     private static Order order() {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Assembly);
         BillingDetails billingDetails = new BillingDetails();
         billingDetails.setEmail("customer@example.com");
         order.setBillingDetails(billingDetails);
@@ -66,8 +79,21 @@ class DropshipDeliveryCompletionTest {
         return delivery;
     }
 
+    private static Shipment marketplaceShipment() {
+        Shipment shipment = new Shipment();
+        shipment.setType(ShipmentType.PickupPoint);
+        shipment.setCollectionPointCode("WAW04A");
+        return shipment;
+    }
+
+    private static Shipment shippedParcel(String trackingNo) {
+        Shipment shipment = new Shipment();
+        new DropshipShipment(ShipmentType.Courier, "DPD", trackingNo, null, SHIPPED_AT).applyTo(shipment);
+        return shipment;
+    }
+
     @Test
-    void confirmsSelectedOrderedItemsAndReceivesTheDeliveryWhenNothingRemains() {
+    void confirmingEveryItemShipsTheOrderAndReceivesTheDelivery() {
         // given
         Delivery delivery = dropshipDelivery();
         Order order = order();
@@ -76,19 +102,29 @@ class DropshipDeliveryCompletionTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(selected));
 
         // when
-        completion.confirmDelivered(STORE_ID, delivery,
-                List.of(Allocation.fromOrderItem(order, selected)), List.of());
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
+                List.of(Allocation.fromOrderItem(order, selected)), List.of(), COURIER);
 
         // then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getPayload()).isEqualTo(DropshipShipmentResult.COMPLETED);
         assertThat(selected.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         verify(orderItemsRepository).save(selected);
+        assertThat(order.getShipments()).hasSize(1);
+        Shipment shipment = order.getShipments().get(0);
+        assertThat(shipment.getCarrier()).isEqualTo("DPD");
+        assertThat(shipment.getTrackingNo()).isEqualTo("PKG-1");
+        assertThat(shipment.getShippedAt()).isEqualTo(SHIPPED_AT);
+        assertThat(shipment.hasShippingData()).isTrue();
         verify(orderLifecycle).update(same(order), anyList());
+        verify(orderLifecycleEventPublisher).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
         assertThat(delivery.hasBeenReceived()).isTrue();
+        assertThat(delivery.hasEvent("DROPSHIP_SHIPMENT_CONFIRMED")).isTrue();
         verify(deliveriesRepository).save(delivery);
     }
 
     @Test
-    void leavesTheDeliveryOpenWhileUnconfirmedAllocationsRemain() {
+    void partialConfirmationAddsAParcelButLeavesTheDeliveryOpen() {
         // given
         Delivery delivery = dropshipDelivery();
         Order order = order();
@@ -98,21 +134,84 @@ class DropshipDeliveryCompletionTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(selected, remaining));
 
         // when
-        completion.confirmDelivered(STORE_ID, delivery,
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
                 List.of(Allocation.fromOrderItem(order, selected)),
-                List.of(Allocation.fromOrderItem(order, remaining)));
+                List.of(Allocation.fromOrderItem(order, remaining)), COURIER);
 
         // then
+        assertThat(result.getPayload()).isEqualTo(DropshipShipmentResult.PARTIAL);
         assertThat(selected.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(remaining.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
         verify(orderItemsRepository, never()).save(remaining);
+        assertThat(order.getShipments()).hasSize(1);
+        verify(orderLifecycle).update(same(order), anyList());
+        verify(orderLifecycleEventPublisher).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
         assertThat(delivery.hasBeenReceived()).isFalse();
-        assertThat(delivery.hasEvent("DROPSHIP_DELIVERY_CONFIRMED")).isTrue();
+        assertThat(delivery.hasEvent("DROPSHIP_SHIPMENT_CONFIRMED")).isTrue();
         verify(deliveriesRepository).save(delivery);
     }
 
     @Test
-    void ignoresItemsClaimedByAnotherDeliveryOrAlreadyDelivered() {
+    void firstConfirmationFillsTheShipmentBroughtByTheMarketplace() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        Order order = order();
+        order.addShipment(marketplaceShipment());
+        OrderItem selected = item("1", delivery.getDeliveryId(), FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(selected));
+        DropshipShipment pickup = new DropshipShipment(ShipmentType.PickupPoint, "InPost", "PKG-1", "WAW04A", SHIPPED_AT);
+
+        // when
+        completion.confirmShipped(STORE_ID, delivery, List.of(Allocation.fromOrderItem(order, selected)), List.of(), pickup);
+
+        // then
+        assertThat(order.getShipments()).hasSize(1);
+        assertThat(order.getShipments().get(0).getTrackingNo()).isEqualTo("PKG-1");
+        assertThat(order.getShipments().get(0).getCollectionPointCode()).isEqualTo("WAW04A");
+    }
+
+    @Test
+    void secondParcelIsAddedNextToTheAlreadyShippedOne() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        Order order = order();
+        order.addShipment(shippedParcel("PKG-1"));
+        OrderItem selected = item("2", delivery.getDeliveryId(), FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(selected));
+        DropshipShipment second = new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-2", null, SHIPPED_AT);
+
+        // when
+        completion.confirmShipped(STORE_ID, delivery, List.of(Allocation.fromOrderItem(order, selected)), List.of(), second);
+
+        // then
+        assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1", "PKG-2");
+    }
+
+    @Test
+    void cancelledOrderIsRejectedBeforeAnythingChanges() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        OrderItem selected = item("1", delivery.getDeliveryId(), FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
+                List.of(Allocation.fromOrderItem(order, selected)), List.of(), COURIER);
+
+        // then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("deliveries.dropship.shipment.error.orderCancelled");
+        assertThat(selected.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(order.getShipments()).isEmpty();
+        verifyNoInteractions(orderItemsRepository, orderLifecycle, orderLifecycleEventPublisher, deliveriesRepository);
+    }
+
+    @Test
+    void nothingConfirmedWhenSelectedItemsBelongElsewhereOrAreAlreadyDelivered() {
         // given
         Delivery delivery = dropshipDelivery();
         Order order = order();
@@ -122,20 +221,21 @@ class DropshipDeliveryCompletionTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(fromOtherDelivery, alreadyDelivered));
 
         // when
-        completion.confirmDelivered(STORE_ID, delivery,
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
                 List.of(Allocation.fromOrderItem(order, fromOtherDelivery),
                         Allocation.fromOrderItem(order, alreadyDelivered)),
-                List.of());
+                List.of(), COURIER);
 
         // then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("deliveries.dropship.shipment.error.nothingToConfirm");
         assertThat(fromOtherDelivery.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
-        verify(orderItemsRepository, never()).save(fromOtherDelivery);
-        verify(orderItemsRepository, never()).save(alreadyDelivered);
-        verify(orderLifecycle).update(same(order), anyList());
+        assertThat(order.getShipments()).isEmpty();
+        verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, deliveriesRepository);
     }
 
     @Test
-    void skipsAnOrderThatIsGoneButStillSavesTheDelivery() {
+    void missingOrderIsReportedAsNothingToConfirm() {
         // given
         Delivery delivery = dropshipDelivery();
         Order order = order();
@@ -143,11 +243,12 @@ class DropshipDeliveryCompletionTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when
-        completion.confirmDelivered(STORE_ID, delivery,
-                List.of(Allocation.fromOrderItem(order, selected)), List.of());
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
+                List.of(Allocation.fromOrderItem(order, selected)), List.of(), COURIER);
 
         // then
-        verifyNoInteractions(orderItemsRepository, orderLifecycle);
-        verify(deliveriesRepository).save(delivery);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("deliveries.dropship.shipment.error.nothingToConfirm");
+        verifyNoInteractions(orderItemsRepository, orderLifecycle, orderLifecycleEventPublisher, deliveriesRepository);
     }
 }
