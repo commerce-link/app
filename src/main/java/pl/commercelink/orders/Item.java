@@ -95,6 +95,17 @@ public abstract class Item implements Delivered {
         this.status = FulfilmentStatus.New;
     }
 
+    public void appendSerialNumbers(String sns) {
+        if (StringUtils.isBlank(sns)) {
+            return;
+        }
+        if (StringUtils.isBlank(serialNo)) {
+            serialNo = sns;
+            return;
+        }
+        serialNo = serialNo + "," + sns;
+    }
+
     public void removeSerialNumbers(String sns) {
         String serialNo = getSerialNo();
 

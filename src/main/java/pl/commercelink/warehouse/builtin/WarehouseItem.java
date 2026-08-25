@@ -5,11 +5,13 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
+import pl.commercelink.warehouse.api.ItemCondition;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -34,6 +36,10 @@ public class WarehouseItem extends Item {
 
     @DynamoDBAttribute(attributeName = "unitSystemCost")
     private double unitSystemCost;
+
+    @DynamoDBAttribute(attributeName = "condition")
+    @DynamoDBTypeConvertedEnum
+    private ItemCondition condition = ItemCondition.Sealed;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -67,6 +73,7 @@ public class WarehouseItem extends Item {
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
         this.setUnitSystemCost(other.getUnitSystemCost());
+        this.setCondition(other.getCondition());
 
         if (hasOneOfTheStatuses(FulfilmentStatus.New)) {
             setDeliveryId(other.getDeliveryId());
@@ -127,7 +134,20 @@ public class WarehouseItem extends Item {
         return Objects.equals(this.getEan(), other.getEan()) &&
                Objects.equals(this.getManufacturerCode(), other.getManufacturerCode()) &&
                Objects.equals(this.getCost(), other.getCost()) &&
-               Objects.equals(this.getDeliveryId(), other.getDeliveryId());
+               Objects.equals(this.getDeliveryId(), other.getDeliveryId()) &&
+               this.condition == other.condition;
+    }
+
+    @DynamoDBIgnore
+    public void absorb(WarehouseItem other) {
+        setQty(getQty() + other.getQty());
+        appendSerialNumbers(other.getSerialNo());
+        appendComment(other.getComment());
+    }
+
+    @DynamoDBIgnore
+    public boolean isSealed() {
+        return condition == ItemCondition.Sealed;
     }
 
     @DynamoDBIgnore
@@ -165,6 +185,7 @@ public class WarehouseItem extends Item {
         splitItem.setTax(getTax());
         splitItem.setDeliveryId(getDeliveryId());
         splitItem.setStatus(getStatus());
+        splitItem.setCondition(getCondition());
 
         this.setQty(getQty() - qtyToSplit);
 
@@ -209,5 +230,13 @@ public class WarehouseItem extends Item {
 
     public void setUnitSystemCost(double unitSystemCost) {
         this.unitSystemCost = unitSystemCost;
+    }
+
+    public ItemCondition getCondition() {
+        return condition;
+    }
+
+    public void setCondition(ItemCondition condition) {
+        this.condition = condition;
     }
 }
