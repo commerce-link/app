@@ -129,6 +129,9 @@ public class DeliveriesController {
     @Autowired
     private ShipmentCarrierOptions shipmentCarrierOptions;
 
+    @Autowired
+    private DropshipTrackingService dropshipTrackingService;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -878,6 +881,36 @@ public class DeliveriesController {
             case UNAVAILABLE -> redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.orderId.refresh.unavailable", null, locale));
         }
+        return detailsRedirect(storeId, deliveryId);
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/tracking/check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String checkTracking(@PathVariable("deliveryId") String deliveryId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        return checkTracking(getStoreId(), deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/tracking/check")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String checkTrackingForSuperAdmin(@PathVariable("storeId") String storeId,
+                                             @PathVariable("deliveryId") String deliveryId,
+                                             RedirectAttributes redirectAttributes, Locale locale) {
+        return checkTracking(storeId, deliveryId, redirectAttributes, locale);
+    }
+
+    private String checkTracking(String storeId, String deliveryId,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        ManualTrackingOutcome outcome = dropshipTrackingService.checkManually(storeId, deliveryId);
+        String key = switch (outcome) {
+            case CONFIRMED -> "deliveries.dropship.tracking.result.confirmed";
+            case STILL_PROCESSING -> "deliveries.dropship.tracking.result.stillProcessing";
+            case CANCELLED -> "deliveries.dropship.tracking.result.cancelled";
+            case NO_DATA -> "deliveries.dropship.tracking.result.noData";
+            case UNAVAILABLE -> "deliveries.dropship.tracking.result.unavailable";
+        };
+        redirectAttributes.addFlashAttribute(outcome == ManualTrackingOutcome.CONFIRMED ? "successMessage" : "errorMessage",
+                messageSource.getMessage(key, null, locale));
         return detailsRedirect(storeId, deliveryId);
     }
 
