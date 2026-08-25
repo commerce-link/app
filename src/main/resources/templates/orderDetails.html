@@ -373,6 +373,9 @@
                                   th:text="${enumI18n.localize(item.status)}"
                                   th:id="'status-tag-' + ${iterStat.index}"
                                   th:attr="data-status=${item.status}"></span>
+                            <span class="tag ml-1" th:unless="${item.sealed}"
+                                  th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
+                                  th:text="${enumI18n.localize(item.condition)}"></span>
                         </td>
                         <td>
                             <span th:if="${item.consolidated}" class="icon has-text-success"><i class="fas fa-check"></i></span>

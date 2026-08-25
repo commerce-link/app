@@ -10,7 +10,9 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.Reservation;
+import pl.commercelink.warehouse.api.ReservationConfirmation;
 import pl.commercelink.warehouse.api.ReservationItem;
+import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.util.List;
 
@@ -141,6 +143,76 @@ class BuiltInReservationServiceTest {
         // then
         assertEquals(1, reservationItem.getConfirmations().size());
         assertEquals(0, openBox.getQty());
+    }
+
+    @Test
+    void confirmationCarriesConditionOfTheReservedItem() {
+        // given
+        WarehouseItem damaged = anAvailableItem(20.0);
+        damaged.setCondition(ItemCondition.Damaged);
+        when(warehouseRepository.findById("store-1", damaged.getItemId())).thenReturn(damaged);
+
+        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, damaged.getItemId());
+        Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory).create(reservation);
+
+        // then
+        assertEquals(ItemCondition.Damaged, reservationItem.getConfirmations().get(0).condition());
+    }
+
+    @Test
+    void returnsItemToStockOnlyIntoWarehouseItemWithTheSameCondition() {
+        // given
+        WarehouseItem sealed = anAvailableItem(20.0);
+        when(warehouseRepository.findByDeliveryIdAndStatuses(any(), any(), any())).thenReturn(List.of(sealed));
+
+        OrderItem orderItem = anOrderItemFulfilledFrom(sealed);
+        orderItem.setCondition(ItemCondition.OpenBox);
+        ReservationRemovalItem removalItem = ReservationRemovalItem.from(orderItem);
+        WarehouseItem created = anAvailableItem(20.0);
+        when(warehouseItemFactory.create("store-1", removalItem)).thenReturn(created);
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory)
+                .remove(Reservation.orderFulfilmentToStock("store-1", removalItem));
+
+        // then
+        assertEquals(1, sealed.getQty());
+        verify(warehouseRepository).save(created);
+    }
+
+    @Test
+    void returnsItemToStockIntoWarehouseItemWithMatchingCondition() {
+        // given
+        WarehouseItem openBox = anAvailableItem(20.0);
+        openBox.setCondition(ItemCondition.OpenBox);
+        when(warehouseRepository.findByDeliveryIdAndStatuses(any(), any(), any())).thenReturn(List.of(openBox));
+
+        OrderItem orderItem = anOrderItemFulfilledFrom(openBox);
+        orderItem.setCondition(ItemCondition.OpenBox);
+        orderItem.setSerialNo("SN-9");
+        ReservationRemovalItem removalItem = ReservationRemovalItem.from(orderItem);
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory)
+                .remove(Reservation.orderFulfilmentToStock("store-1", removalItem));
+
+        // then
+        assertEquals(2, openBox.getQty());
+        assertEquals("SN-9", openBox.getSerialNo());
+        verify(warehouseRepository).save(openBox);
+        verify(warehouseItemFactory, never()).create(any(), any(ReservationRemovalItem.class));
+    }
+
+    private OrderItem anOrderItemFulfilledFrom(WarehouseItem warehouseItem) {
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 1, 199.0, "MFN-1", false);
+        orderItem.copyFulfilmentFrom(new ReservationConfirmation(
+                warehouseItem.getDeliveryId(), warehouseItem.getEan(), warehouseItem.getManufacturerCode(),
+                warehouseItem.unitCost(), 1, true, null, warehouseItem.getCondition()
+        ));
+        return orderItem;
     }
 
     private WarehouseItem anAvailableItem(double unitCost) {

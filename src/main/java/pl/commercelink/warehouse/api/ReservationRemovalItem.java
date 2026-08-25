@@ -15,6 +15,7 @@ public class ReservationRemovalItem {
     private String serialNo;
     private String comment;
     private boolean delivered;
+    private ItemCondition condition = ItemCondition.Sealed;
 
     public static ReservationRemovalItem from(OrderItem orderItem) {
         ReservationRemovalItem item = new ReservationRemovalItem();
@@ -29,7 +30,12 @@ public class ReservationRemovalItem {
         item.serialNo = orderItem.getSerialNo();
         item.comment = orderItem.getComment();
         item.delivered = orderItem.isDelivered();
+        item.condition = orderItem.getCondition();
         return item;
+    }
+
+    public ItemCondition getCondition() {
+        return condition;
     }
 
     public String getDeliveryId() {

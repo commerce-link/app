@@ -31,6 +31,7 @@ class WarehouseItemFactory {
         warehouseItem.setSerialNo(item.getSerialNo());
         warehouseItem.setComment(item.getComment());
         warehouseItem.setStatus(item.isDelivered() ? FulfilmentStatus.Delivered : FulfilmentStatus.Ordered);
+        warehouseItem.setCondition(item.getCondition());
         return warehouseItem;
     }
 

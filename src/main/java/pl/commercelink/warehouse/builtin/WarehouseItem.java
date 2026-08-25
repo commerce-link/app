@@ -5,13 +5,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -36,10 +35,6 @@ public class WarehouseItem extends Item {
 
     @DynamoDBAttribute(attributeName = "unitSystemCost")
     private double unitSystemCost;
-
-    @DynamoDBAttribute(attributeName = "condition")
-    @DynamoDBTypeConvertedEnum
-    private ItemCondition condition = ItemCondition.Sealed;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -135,19 +130,23 @@ public class WarehouseItem extends Item {
                Objects.equals(this.getManufacturerCode(), other.getManufacturerCode()) &&
                Objects.equals(this.getCost(), other.getCost()) &&
                Objects.equals(this.getDeliveryId(), other.getDeliveryId()) &&
-               this.condition == other.condition;
+               this.getCondition() == other.getCondition();
     }
 
     @DynamoDBIgnore
     public void absorb(WarehouseItem other) {
-        setQty(getQty() + other.getQty());
-        appendSerialNumbers(other.getSerialNo());
-        appendComment(other.getComment());
+        absorb(other.getQty(), other.getSerialNo(), other.getComment());
     }
 
     @DynamoDBIgnore
-    public boolean isSealed() {
-        return condition == ItemCondition.Sealed;
+    public void absorb(ReservationRemovalItem other) {
+        absorb(other.getQty(), other.getSerialNo(), other.getComment());
+    }
+
+    private void absorb(int qty, String serialNo, String comment) {
+        setQty(getQty() + qty);
+        appendSerialNumbers(serialNo);
+        appendComment(comment);
     }
 
     @DynamoDBIgnore
@@ -230,13 +229,5 @@ public class WarehouseItem extends Item {
 
     public void setUnitSystemCost(double unitSystemCost) {
         this.unitSystemCost = unitSystemCost;
-    }
-
-    public ItemCondition getCondition() {
-        return condition;
-    }
-
-    public void setCondition(ItemCondition condition) {
-        this.condition = condition;
     }
 }
