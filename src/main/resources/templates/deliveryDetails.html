@@ -148,6 +148,12 @@
                                 <button type="submit" form="retry-purchase-form" class="button is-warning"
                                         th:text="#{deliveries.purchase.retry.button}">Retry</button>
                             </div>
+                            <div class="control"
+                                 th:if="${delivery.orderFailed and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                                <button type="button" id="complete-purchase-button" class="button is-info"
+                                        onclick="toggleCompletePurchaseModal(true)"
+                                        th:text="#{deliveries.purchase.complete.button}">Complete</button>
+                            </div>
                             <div class="control" th:if="${delivery.awaitingApproval and isSuperAdmin}">
                                 <button type="button" id="reject-purchase-button" class="button is-danger"
                                         onclick="toggleRejectModal(true)"
@@ -471,6 +477,40 @@
                 </div>
             </div>
 
+            <div id="completePurchaseModal" class="modal"
+                 th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                <div class="modal-background" onclick="toggleCompletePurchaseModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.purchase.complete.modal.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleCompletePurchaseModal(false)"></button>
+                    </header>
+                    <form th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/complete|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/complete|}" method="post">
+                        <section class="modal-card-body">
+                            <p th:text="#{deliveries.purchase.complete.modal.info}"></p>
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.purchase.complete.modal.number}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="externalOrderId" required="required"/>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label" th:text="#{deliveries.purchase.complete.modal.estimatedDeliveryAt}"></label>
+                                <div class="control">
+                                    <input class="input" type="date" name="estimatedDeliveryAt" required="required"
+                                           th:value="${suggestedEstimatedDeliveryAt}"/>
+                                </div>
+                            </div>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-info" th:text="#{general.save}">Complete</button>
+                            <button type="button" class="button" onclick="toggleCompletePurchaseModal(false)" th:text="#{general.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
             <div id="confirmActionModal" class="modal">
                 <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
                 <div class="modal-card">
@@ -523,6 +563,12 @@
 
         function toggleRejectModal(show) {
             const modal = document.getElementById('rejectPurchaseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function toggleCompletePurchaseModal(show) {
+            const modal = document.getElementById('completePurchaseModal');
             if (!modal) return;
             modal.classList.toggle('is-active', show);
         }
