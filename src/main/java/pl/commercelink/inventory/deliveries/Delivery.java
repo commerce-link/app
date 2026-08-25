@@ -104,6 +104,23 @@ public class Delivery {
     private boolean paid;
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
+
+    @DynamoDBAttribute(attributeName = "trackingState")
+    @DynamoDBTypeConvertedEnum
+    private DeliveryTrackingState trackingState;
+    @DynamoDBAttribute(attributeName = "trackingLastCheckedAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime trackingLastCheckedAt;
+    @DynamoDBAttribute(attributeName = "trackingNextCheckAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime trackingNextCheckAt;
+    @DynamoDBAttribute(attributeName = "trackingAttempts")
+    private int trackingAttempts;
+    @DynamoDBAttribute(attributeName = "trackingConsecutiveErrors")
+    private int trackingConsecutiveErrors;
+    @DynamoDBAttribute(attributeName = "trackingLastError")
+    private String trackingLastError;
+
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -373,6 +390,54 @@ public class Delivery {
         this.externalDeliveryId = externalDeliveryId;
     }
 
+    public DeliveryTrackingState getTrackingState() {
+        return trackingState;
+    }
+
+    public void setTrackingState(DeliveryTrackingState trackingState) {
+        this.trackingState = trackingState;
+    }
+
+    public LocalDateTime getTrackingLastCheckedAt() {
+        return trackingLastCheckedAt;
+    }
+
+    public void setTrackingLastCheckedAt(LocalDateTime trackingLastCheckedAt) {
+        this.trackingLastCheckedAt = trackingLastCheckedAt;
+    }
+
+    public LocalDateTime getTrackingNextCheckAt() {
+        return trackingNextCheckAt;
+    }
+
+    public void setTrackingNextCheckAt(LocalDateTime trackingNextCheckAt) {
+        this.trackingNextCheckAt = trackingNextCheckAt;
+    }
+
+    public int getTrackingAttempts() {
+        return trackingAttempts;
+    }
+
+    public void setTrackingAttempts(int trackingAttempts) {
+        this.trackingAttempts = trackingAttempts;
+    }
+
+    public int getTrackingConsecutiveErrors() {
+        return trackingConsecutiveErrors;
+    }
+
+    public void setTrackingConsecutiveErrors(int trackingConsecutiveErrors) {
+        this.trackingConsecutiveErrors = trackingConsecutiveErrors;
+    }
+
+    public String getTrackingLastError() {
+        return trackingLastError;
+    }
+
+    public void setTrackingLastError(String trackingLastError) {
+        this.trackingLastError = trackingLastError;
+    }
+
     public String getComment() {
         return comment;
     }
@@ -487,6 +552,21 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isDropship() {
         return getType() == DeliveryType.DROPSHIP;
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackable() {
+        return isDropship() && orderStatus == null && !hasBeenReceived() && StringUtils.isNotBlank(externalDeliveryId);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackingPending() {
+        return trackingState == null || trackingState == DeliveryTrackingState.PENDING;
+    }
+
+    @DynamoDBIgnore
+    public DeliveryTrackingState getEffectiveTrackingState() {
+        return trackingState == null ? DeliveryTrackingState.PENDING : trackingState;
     }
 
     public boolean isPaid() {

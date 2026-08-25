@@ -58,4 +58,58 @@ class DeliveryTest {
         assertEquals(Boolean.FALSE, parser.parseExpression("dropship and true")
                 .getValue(new StandardEvaluationContext(warehouse), Boolean.class));
     }
+
+    @Test
+    void trackableRequiresOpenDropshipWithSupplierOrderNumber() {
+        // given
+        Delivery delivery = new Delivery("s1", "ACME-DS-1", "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+
+        // when / then
+        assertTrue(delivery.isTrackable());
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        assertFalse(delivery.isTrackable());
+        delivery.setOrderStatus(null);
+        delivery.markAsReceived();
+        assertFalse(delivery.isTrackable());
+    }
+
+    @Test
+    void trackableRejectsWarehouseAndMissingExternalId() {
+        // given
+        Delivery warehouse = new Delivery("s1", "PO-1", "Acme");
+        Delivery noNumber = new Delivery("s1", " ", "Acme");
+        noNumber.setType(DeliveryType.DROPSHIP);
+
+        // when / then
+        assertFalse(warehouse.isTrackable());
+        assertFalse(noNumber.isTrackable());
+    }
+
+    @Test
+    void trackingPendingWhenStateMissingOrPending() {
+        // given
+        Delivery delivery = new Delivery();
+
+        // when / then
+        assertTrue(delivery.isTrackingPending());
+        assertEquals(DeliveryTrackingState.PENDING, delivery.getEffectiveTrackingState());
+        delivery.setTrackingState(DeliveryTrackingState.PENDING);
+        assertTrue(delivery.isTrackingPending());
+        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        assertFalse(delivery.isTrackingPending());
+        assertEquals(DeliveryTrackingState.GIVEN_UP, delivery.getEffectiveTrackingState());
+    }
+
+    @Test
+    void trackablePropertyBindsToBooleanInSpel() {
+        // given
+        Delivery delivery = new Delivery("s1", "ACME-DS-1", "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        SpelExpressionParser parser = new SpelExpressionParser();
+
+        // when / then
+        assertEquals(Boolean.TRUE, parser.parseExpression("trackable and trackingPending")
+                .getValue(new StandardEvaluationContext(delivery), Boolean.class));
+    }
 }
