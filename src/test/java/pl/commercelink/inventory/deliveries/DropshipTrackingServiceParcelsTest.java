@@ -248,6 +248,49 @@ class DropshipTrackingServiceParcelsTest {
     }
 
     @Test
+    void parcelsAlreadyOnTheOrderWithNothingLeftOpenCompleteTheDelivery() {
+        // given: a previous check confirmed PKG-1 on the order side, but the delivery write was lost
+        first.setInAllocation(false);
+        second.setInAllocation(false);
+        Shipment confirmed = new Shipment();
+        confirmed.setTrackingNo("PKG-1");
+        order.addShipment(confirmed);
+        supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
+        assertThat(delivery.hasBeenReceived()).isTrue();
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getEvents()).extracting(e -> e.getName())
+                .contains("DELIVERY_RECEIVED", "DROPSHIP_TRACKING_APPLIED");
+        verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void deallocatedDeliveryWithParcelAlreadyOnTheOrderKeepsPolling() {
+        // given: the operator removed every allocation, the order still carries a manual shipment
+        delivery.setAllocations(List.of());
+        Shipment manual = new Shipment();
+        manual.setTrackingNo("PKG-1");
+        order.addShipment(manual);
+        supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
+        assertThat(delivery.hasBeenReceived()).isFalse();
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+    }
+
+    @Test
     void nothingToConfirmSkipsParcelWithoutFailing() {
         // given
         supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));

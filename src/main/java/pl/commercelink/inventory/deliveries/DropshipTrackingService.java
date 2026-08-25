@@ -211,8 +211,32 @@ public class DropshipTrackingService {
             }
         }
         if (applied == 0) {
+            if (alreadyFulfilled(snapshot, delivery, open, pending)) {
+                return completeAlreadyConfirmed(delivery, now);
+            }
             return scheduleNext(delivery, now, manual);
         }
+        return TrackingOutcome.APPLIED;
+    }
+
+    /**
+     * Every parcel the supplier reports is already on the order and no allocation is left open: the order side of an
+     * earlier confirmation was committed while the delivery write was lost (version conflict, crash before the save).
+     * A delivery without any order allocation is a different case — the operator removed them — and keeps polling.
+     */
+    private static boolean alreadyFulfilled(SupplierOrderTracking snapshot, Delivery delivery,
+                                            List<Allocation> open, List<SupplierParcel> pending) {
+        return snapshot.state() == SupplierOrderState.SHIPPED
+                && pending.isEmpty()
+                && open.isEmpty()
+                && delivery.getAllocations().stream().anyMatch(allocation -> allocation.getType() == AllocationType.Order);
+    }
+
+    private TrackingOutcome completeAlreadyConfirmed(Delivery delivery, LocalDateTime now) {
+        delivery.markAsReceived();
+        finish(delivery, DeliveryTrackingState.COMPLETED, TRACKING_APPLIED_EVENT, now);
+        log.warn("Dropship delivery reconciled with the already shipped order: store={} delivery={} provider={} externalOrderId={}",
+                delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(), delivery.getExternalDeliveryId());
         return TrackingOutcome.APPLIED;
     }
 
