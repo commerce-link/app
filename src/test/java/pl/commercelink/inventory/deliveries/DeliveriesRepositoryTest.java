@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,6 +98,35 @@ class DeliveriesRepositoryTest {
         ArgumentCaptor<DynamoDBQueryExpression<Delivery>> captured = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
         verify(dynamoDBMapper).query(eq(Delivery.class), captured.capture());
         assertThat(captured.getValue().getFilterExpression()).doesNotContain("connectionMode");
+    }
+
+    @Test
+    void trackableDropshipQueryFiltersOnTypeReceivedOrderStatusExternalIdAndTrackingState() {
+        // given
+        Delivery withNumber = new Delivery("store-1", "ACME-DS-1", "Acme");
+        withNumber.setType(DeliveryType.DROPSHIP);
+        Delivery blankNumber = new Delivery("store-1", " ", "Acme");
+        blankNumber.setType(DeliveryType.DROPSHIP);
+        when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
+        when(paginatedQueryList.stream()).thenReturn(Stream.of(blankNumber, withNumber));
+
+        // when
+        List<Delivery> result = deliveriesRepository.findTrackableDropshipDeliveries("store-1");
+
+        // then
+        assertThat(result).containsExactly(withNumber);
+        ArgumentCaptor<DynamoDBQueryExpression<Delivery>> captured = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
+        verify(dynamoDBMapper).query(eq(Delivery.class), captured.capture());
+        DynamoDBQueryExpression<Delivery> expression = captured.getValue();
+        assertThat(expression.getFilterExpression())
+                .contains("#type = :dropship")
+                .contains("attribute_not_exists(receivedAt) OR receivedAt = :null")
+                .contains("attribute_not_exists(orderStatus) OR orderStatus = :null")
+                .contains("attribute_exists(externalDeliveryId)")
+                .contains("attribute_not_exists(trackingState) OR trackingState = :pending");
+        assertThat(expression.getExpressionAttributeNames()).containsEntry("#type", "type");
+        assertThat(expression.getExpressionAttributeValues().get(":pending").getS()).isEqualTo("PENDING");
+        assertThat(expression.getExpressionAttributeValues().get(":dropship").getS()).isEqualTo("DROPSHIP");
     }
 
     private Delivery delivery(String deliveryId, LocalDate estimatedDeliveryAt) {
