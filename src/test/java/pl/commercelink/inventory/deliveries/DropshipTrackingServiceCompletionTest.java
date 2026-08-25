@@ -156,6 +156,26 @@ class DropshipTrackingServiceCompletionTest {
     }
 
     @Test
+    void parcelsSharingOneTrackingNumberProduceASingleShipment() {
+        // given: the supplier reports one row per physical package under the same label
+        supplierReports(SupplierOrderState.SHIPPED,
+                parcel("PKG-1", new SupplierOrderLine(null, "5900000000001", null, 1)),
+                parcel("PKG-1", new SupplierOrderLine(null, "5900000000002", null, 1)));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, DELIVERY_ID, false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
+        assertThat(first.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(second.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1");
+        assertThat(lastFetched.hasBeenReceived()).isTrue();
+        assertThat(lastFetched.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        verify(orderLifecycleEventPublisher, times(1)).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
+    }
+
+    @Test
     void lostDeliveryWriteAfterTheOrderWasShippedIsReconciledByTheNextCheck() {
         // given: the delivery save conflicts with a concurrent write once, after the order side is already committed
         supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));

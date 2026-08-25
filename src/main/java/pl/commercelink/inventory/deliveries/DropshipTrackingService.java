@@ -23,7 +23,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -165,7 +167,13 @@ public class DropshipTrackingService {
         List<Allocation> open = delivery.getAllocations().stream()
                 .filter(allocation -> allocation.getType() == AllocationType.Order && allocation.isInAllocation())
                 .toList();
-        List<SupplierParcel> pending = snapshot.parcels().stream()
+        // one shipment per tracking number: a supplier listing one row per physical package under the same
+        // label must not add the same shipment twice, so only the first row of a number is applied
+        Map<String, SupplierParcel> firstByTrackingNo = new LinkedHashMap<>();
+        for (SupplierParcel parcel : snapshot.parcels()) {
+            firstByTrackingNo.putIfAbsent(parcel.trackingNo(), parcel);
+        }
+        List<SupplierParcel> pending = firstByTrackingNo.values().stream()
                 .filter(parcel -> order == null
                         || order.getShipments().stream().noneMatch(shipment -> shipment.hasTrackingNo(parcel.trackingNo())))
                 .toList();
