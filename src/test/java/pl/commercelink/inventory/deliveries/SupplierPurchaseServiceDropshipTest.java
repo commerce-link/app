@@ -21,6 +21,8 @@ import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.starter.util.OperationResult;
+
+import java.time.LocalDate;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -32,7 +34,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -82,6 +86,8 @@ class SupplierPurchaseServiceDropshipTest {
     private DropshipPurchaseService dropshipPurchaseService;
     @Mock
     private DropshipOrderLocator dropshipOrderLocator;
+    @Mock
+    private OrderAllocationsManager orderAllocationsManager;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -319,4 +325,29 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
         verify(supplierPurchaseEventPublisher).publish(any());
     }
+
+    @Test
+    void completeManuallyOnFailedDropshipReopensTheShipmentConfirmation() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage("boom");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 1);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "ACME-PHONE-1", estimatedDeliveryAt);
+
+        // then
+        assertTrue(result.isSuccess());
+        assertTrue(delivery.isDropship());
+        assertNull(delivery.getOrderStatus());
+        assertNull(delivery.getOrderErrorMessage());
+        assertFalse(delivery.hasBeenReceived());
+        assertEquals("ACME-PHONE-1", delivery.getExternalDeliveryId());
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(estimatedDeliveryAt), anyList());
+        verifyNoInteractions(supplierProvider, dropshipPurchaseService, supplierPurchaseEventPublisher);
+    }
+
 }

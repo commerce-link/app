@@ -221,6 +221,21 @@ class DeliveriesControllerDropshipShipmentTest {
     }
 
     @Test
+    void failedSupplierOrderIsRejectedUntilCompletedManually() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+
+        // when
+        controller.confirmDropshipShipment(formFor(delivery, true), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.dropship.confirm.unavailable");
+        verifyNoInteractions(dropshipDeliveryCompletion);
+    }
+
+    @Test
     void alreadyReceivedDeliveryIsRejected() {
         // given
         Delivery delivery = dropshipDelivery();
