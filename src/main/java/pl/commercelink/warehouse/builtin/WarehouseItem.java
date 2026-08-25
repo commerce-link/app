@@ -10,6 +10,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
+import pl.commercelink.warehouse.api.GoodsReceiptItem;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
@@ -141,6 +142,11 @@ public class WarehouseItem extends Item {
     @DynamoDBIgnore
     public void absorb(ReservationRemovalItem other) {
         absorb(other.getQty(), other.getSerialNo(), other.getComment());
+    }
+
+    @DynamoDBIgnore
+    public void absorb(GoodsReceiptItem other) {
+        absorb(other.getQty(), other.getSerialNo(), null);
     }
 
     private void absorb(int qty, String serialNo, String comment) {

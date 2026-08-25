@@ -20,6 +20,7 @@ import pl.commercelink.orders.rma.RmaGoodsInService;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
+import pl.commercelink.warehouse.api.ItemCondition;
 
 import java.util.List;
 
@@ -67,11 +68,11 @@ class OrdersRMAManagerTest {
         OrderItem item2 = orderItem("item-2", 100.0, 1);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1, item2));
-        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false)))
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.success());
 
         // when
-        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1), rmaItemFor(item2)));
+        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1), rmaItemFor(item2)), ItemCondition.Sealed);
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -92,11 +93,11 @@ class OrdersRMAManagerTest {
         Document goodsInDocument = new Document("doc-1", "GI/1/2026", "https://example.com/gi/1", DocumentType.GoodsReceipt);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
-        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false)))
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.success(goodsInDocument));
 
         // when
-        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)));
+        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)), ItemCondition.Sealed);
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -112,11 +113,11 @@ class OrdersRMAManagerTest {
         OrderItem item1 = orderItem("item-1", 100.0, 1);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
-        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false)))
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.failure("warehouse unavailable"));
 
         // when
-        OperationResult<Document> result = ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)));
+        OperationResult<Document> result = ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)), ItemCondition.Sealed);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -132,11 +133,11 @@ class OrdersRMAManagerTest {
         OrderItem item1 = orderItem("item-1", 100.0, 1);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
-        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true)))
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true), any()))
                 .thenReturn(OperationResult.success());
 
         // when
-        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(item1)), true);
+        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(item1)), true, ItemCondition.Damaged);
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -159,11 +160,11 @@ class OrdersRMAManagerTest {
         serviceItem.setService(true);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(serviceItem));
-        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true)))
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true), any()))
                 .thenReturn(OperationResult.success());
 
         // when
-        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(serviceItem)), true);
+        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(serviceItem)), true, ItemCondition.Damaged);
 
         // then
         @SuppressWarnings("unchecked")

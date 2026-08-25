@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.io.IOException;
@@ -171,6 +172,7 @@ public class RMAController {
                 .collect(Collectors.toList());
 
         model.addAttribute("rma", rma);
+        model.addAttribute("itemConditions", ItemCondition.values());
         model.addAttribute("rmaStatusTypes", RMAStatus.values());
         model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
         model.addAttribute("rmaItemsForm", rmaItemsForm);
@@ -333,7 +335,13 @@ public class RMAController {
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/replaceItems")
-    public String replaceItems(@PathVariable String rmaId, @RequestParam boolean broken, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+    public String replaceItems(@PathVariable String rmaId, @RequestParam boolean broken,
+                               @RequestParam(required = false) ItemCondition condition,
+                               @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        if (condition == null) {
+            return redirectWithMissingCondition(rmaId, redirectAttributes, locale);
+        }
+
         RMAManager.OperationResult op = rmaManager.replaceSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -346,7 +354,8 @@ public class RMAController {
                 getStoreId(),
                 op.getRma(),
                 op.getRmaItems(),
-                broken
+                broken,
+                condition
         );
 
         if (!result.isSuccess()) {
@@ -358,7 +367,12 @@ public class RMAController {
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/acceptReturn")
-    public String acceptReturn(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+    public String acceptReturn(@PathVariable String rmaId, @RequestParam(required = false) ItemCondition condition,
+                               @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        if (condition == null) {
+            return redirectWithMissingCondition(rmaId, redirectAttributes, locale);
+        }
+
         RMAManager.OperationResult op = rmaManager.returnSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -370,7 +384,8 @@ public class RMAController {
         OperationResult<?> result = ordersRMAManager.acceptReturn(
                 getStoreId(),
                 op.getRma(),
-                op.getRmaItems()
+                op.getRmaItems(),
+                condition
         );
 
         if (!result.isSuccess()) {
@@ -378,6 +393,12 @@ public class RMAController {
                     messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
         }
 
+        return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private String redirectWithMissingCondition(String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage("rma.item.condition.required", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 

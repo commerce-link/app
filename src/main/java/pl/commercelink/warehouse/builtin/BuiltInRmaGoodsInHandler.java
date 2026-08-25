@@ -62,7 +62,7 @@ class BuiltInRmaGoodsInHandler implements RmaGoodsInHandler {
 
         if (existing.isPresent()) {
             WarehouseItem warehouseItem = existing.get();
-            warehouseItem.setQty(warehouseItem.getQty() + goodsReceiptItem.getQty());
+            warehouseItem.absorb(goodsReceiptItem);
             warehouseRepository.save(warehouseItem);
         } else {
             warehouseRepository.save(warehouseItemFactory.create(storeId, goodsReceiptItem));

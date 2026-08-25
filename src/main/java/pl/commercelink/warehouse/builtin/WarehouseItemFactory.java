@@ -44,6 +44,7 @@ class WarehouseItemFactory {
         warehouseItem.setTax(item.getTax());
         warehouseItem.setSerialNo(item.getSerialNo());
         warehouseItem.setStatus(FulfilmentStatus.Delivered);
+        warehouseItem.setCondition(item.getCondition());
         return warehouseItem;
     }
 

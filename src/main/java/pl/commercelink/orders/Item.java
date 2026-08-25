@@ -221,7 +221,8 @@ public abstract class Item implements Delivered {
     public boolean hasSameFulfilmentAs(GoodsReceiptItem goodsReceiptItem) {
         return this.deliveryId.equalsIgnoreCase(goodsReceiptItem.getDeliveryId())
                 && areEansEq(this.ean, goodsReceiptItem.getEan())
-                && areMfnsEq(this.manufacturerCode, goodsReceiptItem.getMfn());
+                && areMfnsEq(this.manufacturerCode, goodsReceiptItem.getMfn())
+                && this.condition == goodsReceiptItem.getCondition();
     }
 
     @DynamoDBIgnore
