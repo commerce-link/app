@@ -799,7 +799,8 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String retryPurchase(@PathVariable("deliveryId") String deliveryId,
                                 RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
@@ -807,12 +808,12 @@ public class DeliveriesController {
                 "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
     }
 
-    private Optional<String> blockGlobalDeliveryForStoreAdmin(String deliveryId,
+    private Optional<String> blockGlobalDeliveryForStoreAdmin(String deliveryId, String messageKey,
                                                                RedirectAttributes redirectAttributes, Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (delivery != null && delivery.getConnectionMode() == ConnectionMode.GLOBAL) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.purchase.retry.error.global", null, locale));
+                    messageSource.getMessage(messageKey, null, locale));
             return Optional.of("redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId);
         }
         return Optional.empty();
@@ -840,7 +841,8 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String reconcilePurchase(@PathVariable("deliveryId") String deliveryId,
                                     RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
@@ -869,11 +871,55 @@ public class DeliveriesController {
         return redirect;
     }
 
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String completePurchase(@PathVariable("deliveryId") String deliveryId,
+                                   @RequestParam("externalOrderId") String externalOrderId,
+                                   @RequestParam("estimatedDeliveryAt")
+                                   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate estimatedDeliveryAt,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.complete.error.global", redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        return handleComplete(getStoreId(), deliveryId, externalOrderId, estimatedDeliveryAt,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/complete")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String completePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                @PathVariable("deliveryId") String deliveryId,
+                                                @RequestParam("externalOrderId") String externalOrderId,
+                                                @RequestParam("estimatedDeliveryAt")
+                                                @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate estimatedDeliveryAt,
+                                                RedirectAttributes redirectAttributes, Locale locale) {
+        return handleComplete(storeId, deliveryId, externalOrderId, estimatedDeliveryAt,
+                storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleComplete(String storeId, String deliveryId, String externalOrderId,
+                                  LocalDate estimatedDeliveryAt, String redirect,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.completeManually(
+                storeId, deliveryId, externalOrderId, estimatedDeliveryAt);
+        if (result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("deliveries.purchase.complete.success", null, locale));
+        } else {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/force")
     @PreAuthorize("hasRole('ADMIN')")
     public String forcePurchase(@PathVariable("deliveryId") String deliveryId,
                                 RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
@@ -892,39 +938,6 @@ public class DeliveriesController {
     private String handleForce(String storeId, String deliveryId, String redirect,
                                RedirectAttributes redirectAttributes, Locale locale) {
         OperationResult<String> result = supplierPurchaseService.forceRetry(storeId, deliveryId);
-        if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage(result.getMessage(), null, locale));
-        }
-        return redirect;
-    }
-
-    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/confirm-manually")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String confirmPurchaseManually(@PathVariable("deliveryId") String deliveryId,
-                                          @RequestParam("externalOrderId") String externalOrderId,
-                                          RedirectAttributes redirectAttributes, Locale locale) {
-        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId, redirectAttributes, locale);
-        if (blocked.isPresent()) {
-            return blocked.get();
-        }
-        return handleConfirmManually(getStoreId(), deliveryId, externalOrderId,
-                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/confirm-manually")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String confirmPurchaseManuallyForSuperAdmin(@PathVariable("storeId") String storeId,
-                                                        @PathVariable("deliveryId") String deliveryId,
-                                                        @RequestParam("externalOrderId") String externalOrderId,
-                                                        RedirectAttributes redirectAttributes, Locale locale) {
-        return handleConfirmManually(storeId, deliveryId, externalOrderId,
-                storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
-    }
-
-    private String handleConfirmManually(String storeId, String deliveryId, String externalOrderId, String redirect,
-                                         RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<String> result = supplierPurchaseService.confirmManually(storeId, deliveryId, externalOrderId);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
@@ -983,6 +996,9 @@ public class DeliveriesController {
         model.addAttribute("supplierRegistry", supplierRegistry);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
+        if (delivery.isOrderFailed()) {
+            model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
+        }
         return "deliveryDetails";
     }
 

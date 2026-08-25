@@ -49,6 +49,15 @@ class BuiltInStockQueryService implements StockQueryService {
         return fromInternal(warehouseItem);
     }
 
+    @Override
+    public WarehouseItemView findById(String storeId, String itemId) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        if (warehouseItem == null) {
+            return null;
+        }
+        return fromInternal(warehouseItem);
+    }
+
     private WarehouseItemView fromInternal(WarehouseItem warehouseItem) {
         return new WarehouseItemView(
                 warehouseItem.getStoreId(),

@@ -108,6 +108,7 @@ public class OfferController {
         model.addAttribute("catalogs", catalogs);
         model.addAttribute("searchParams", searchParams);
         model.addAttribute("basketTypes", BasketType.values());
+        model.addAttribute("backofficeDomain", appDomain);
 
         return "offers";
     }

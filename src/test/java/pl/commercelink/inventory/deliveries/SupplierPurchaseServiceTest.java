@@ -33,8 +33,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.documents.Document;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +63,7 @@ class SupplierPurchaseServiceTest {
     private static final String STORE_ID = "store-1";
     private static final String PROVIDER = "Acme";
     private static final String DELIVERY_ID = "delivery-1";
+    private static final LocalDate ESTIMATED_DELIVERY_AT = LocalDate.of(2026, 9, 1);
 
     @Mock
     private StoreSupplierProviderResolver storeSupplierProviderResolver;
@@ -90,6 +93,8 @@ class SupplierPurchaseServiceTest {
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
+    @Mock
+    private OrderAllocationsManager orderAllocationsManager;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -1287,7 +1292,7 @@ class SupplierPurchaseServiceTest {
     void rejectionIsRefusedWhenTheDeliveryHasAlreadyBeenReceived() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -1306,7 +1311,7 @@ class SupplierPurchaseServiceTest {
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         Delivery delivery = awaitingApprovalDelivery();
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -1473,7 +1478,7 @@ class SupplierPurchaseServiceTest {
         Delivery failed = new Delivery();
         failed.setDeliveryId(DELIVERY_ID);
         failed.setOrderStatus(DeliveryOrderStatus.FAILED);
-        failed.setReceivedAt(java.time.LocalDateTime.now());
+        failed.setReceivedAt(LocalDateTime.now());
         when(deliveriesRepository.findById(STORE_ID, failed.getDeliveryId())).thenReturn(failed);
 
         // when
@@ -1674,64 +1679,280 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void confirmManuallySetsNumberAndClearsState() {
+    void completeManuallyClearsFailedStateAndSetsOrderNumber() {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
-        delivery.setProvider(PROVIDER);
-        delivery.setPurchaseRef("ref-1");
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
-                PROVIDER, SupplierType.Distributor, 5, "PL",
-                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
 
         // when
-        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "22039725");
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-999", ESTIMATED_DELIVERY_AT);
 
         // then
         assertTrue(result.isSuccess());
-        assertEquals("22039725", delivery.getExternalDeliveryId());
-        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertEquals(DELIVERY_ID, result.getPayload());
+        assertEquals("PO-999", delivery.getExternalDeliveryId());
+        assertEquals(ESTIMATED_DELIVERY_AT, delivery.getEstimatedDeliveryAt());
         assertNull(delivery.getOrderStatus());
-        assertTrue(delivery.hasEvent("DELIVERY_ORDER_MANUALLY_CONFIRMED"));
+        assertNull(delivery.getOrderErrorMessage());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
         verify(deliveriesRepository).save(delivery);
     }
 
     @Test
-    void confirmManuallyRejectsReceivedDelivery() {
+    void completeManuallyAcceptsDispatchedDelivery() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
-        delivery.setReceivedAt(java.time.LocalDateTime.now());
+        delivery.setOrderErrorMessage("outcome unknown");
+        delivery.setProvider(PROVIDER);
+        delivery.setPurchaseRef("ref-1");
+        Delivery withAllocations = deliveryWithOrderAllocation(DELIVERY_ID, 100.0);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
-        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "22039725");
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-999", ESTIMATED_DELIVERY_AT);
 
         // then
-        assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.manual.error.state", result.getMessage());
-        verify(deliveriesRepository, never()).save(any());
+        assertTrue(result.isSuccess());
+        assertEquals("PO-999", delivery.getExternalDeliveryId());
+        assertEquals(ESTIMATED_DELIVERY_AT, delivery.getEstimatedDeliveryAt());
+        assertNull(delivery.getOrderStatus());
+        assertNull(delivery.getOrderErrorMessage());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(ESTIMATED_DELIVERY_AT), same(withAllocations.getItems()));
     }
 
     @Test
-    void confirmManuallyRejectsBlankNumber() {
+    void completeManuallyLeavesCostsAndTaxUntouched() {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        delivery.updateShippingCost(25.0);
+        delivery.updatePaymentCost(4.0);
+        delivery.setPaymentTerms(30);
+        delivery.setTax(1.0);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
-        OperationResult<String> result = service.confirmManually(STORE_ID, DELIVERY_ID, "  ");
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertEquals(25.0, delivery.getShippingCost());
+        assertEquals(4.0, delivery.getPaymentCost());
+        assertEquals(30, delivery.getPaymentTerms());
+        assertEquals(1.0, delivery.getTax());
+        verifyNoInteractions(supplierRegistry, deliveryTaxResolver, deliveryCreationService);
+    }
+
+    @Test
+    void completeManuallyStampsLinkedOrdersWithEstimatedDeliveryAt() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 2, 100.0), "ref-1");
+        Delivery withAllocations = deliveryWithOrderAllocation(DELIVERY_ID, 100.0);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        ArgumentCaptor<List<DeliveryItem>> items = ArgumentCaptor.forClass(List.class);
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(ESTIMATED_DELIVERY_AT), items.capture());
+        assertSame(withAllocations.getItems(), items.getValue());
+        assertEquals(1, items.getValue().get(0).getSelectedAllocations(AllocationType.Order).size());
+        assertEquals(100.0, items.getValue().get(0).getUnitCost());
+    }
+
+    @Test
+    void completeManuallyTrimsOrderNumber() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "  PO-1  ", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertEquals("PO-1", delivery.getExternalDeliveryId());
+    }
+
+    @Test
+    void completeManuallySetsProvisionalFalseAndKeepsPurchaseRef() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertEquals("ref-1", delivery.getPurchaseRef());
+    }
+
+    @Test
+    void completeManuallyDoesNotCallSupplierProvider() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        verifyNoInteractions(storeSupplierProviderResolver, supplierProvider,
+                supplierPurchaseEventPublisher, orderIdRefreshEventPublisher);
+    }
+
+    @Test
+    void completeManuallyRejectsNonFailedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
 
         // then
         assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.manual.error.blank", result.getMessage());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(orderAllocationsManager);
+    }
+
+    @Test
+    void completeManuallyRejectsReceivedDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setReceivedAt(LocalDateTime.now());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(orderAllocationsManager);
+    }
+
+    @Test
+    void completeManuallyRejectsDeliveryWithDocuments() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.getDocuments().add(new Document());
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(orderAllocationsManager);
+    }
+
+    @Test
+    void completeManuallyRejectsBlankOrderNumber() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "   ", ESTIMATED_DELIVERY_AT);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.number", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(orderAllocationsManager);
+    }
+
+    @Test
+    void completeManuallyRejectsMissingEstimatedDeliveryDate() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", null);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.complete.error.date", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verifyNoInteractions(orderAllocationsManager);
+    }
+
+    @Test
+    void suggestEstimatedDeliveryAtKeepsDateAlreadySetOnDelivery() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        delivery.setEstimatedDeliveryAt(ESTIMATED_DELIVERY_AT);
+
+        // when
+        LocalDate suggested = service.suggestEstimatedDeliveryAt(delivery);
+
+        // then
+        assertEquals(ESTIMATED_DELIVERY_AT, suggested);
+        verifyNoInteractions(supplierRegistry);
+    }
+
+    @Test
+    void suggestEstimatedDeliveryAtFallsBackToSupplierShippingTerms() {
+        // given
+        Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(3, new ShippingCostPolicy.Free()))));
+
+        // when
+        LocalDate suggested = service.suggestEstimatedDeliveryAt(delivery);
+
+        // then
+        assertEquals(LocalDate.now().plusDays(3), suggested);
+    }
+
+    private Delivery failedDelivery(DeliveryCreationForm form, String purchaseRef) {
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage("boom");
+        delivery.setPurchaseRef(purchaseRef);
+        delivery.setProvider(form.getProvider());
+        lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenReturn(deliveryWithAllocations(form, DELIVERY_ID));
+        return delivery;
+    }
+
+    private Delivery deliveryWithOrderAllocation(String deliveryId, double unitCost) {
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey("order-1", "item-1", "client@example.com"));
+        allocation.setType(AllocationType.Order);
+        allocation.setName("Product EAN-1");
+        allocation.setEan("EAN-1");
+        allocation.setMfn("MFN-1");
+        allocation.setUnitCost(unitCost);
+        allocation.setQty(2);
+        Delivery withAllocations = new Delivery();
+        withAllocations.setDeliveryId(deliveryId);
+        withAllocations.setProvider(PROVIDER);
+        withAllocations.setItems(DeliveryItem.groupAndUnify(List.of(allocation)));
+        return withAllocations;
     }
 
     @Test
