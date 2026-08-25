@@ -20,6 +20,7 @@ import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationService;
 import pl.commercelink.warehouse.api.StockQueryService;
@@ -537,7 +538,7 @@ class OrdersManagerTest {
         // given
         OrderItem orderItem = orderItem("item-1", 100.0);
         WarehouseItemView warehouseItem = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
         );
         when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
@@ -558,7 +559,7 @@ class OrdersManagerTest {
     void assignFromWarehouseRejectsUnavailableWarehouseItem() {
         // given
         WarehouseItemView reserved = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved, ItemCondition.Sealed
         );
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(reserved);

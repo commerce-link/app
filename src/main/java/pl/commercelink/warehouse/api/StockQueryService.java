@@ -7,6 +7,8 @@ public interface StockQueryService {
 
     List<WarehouseItemView> searchAvailableByMfns(String storeId, Collection<String> mfns);
 
+    List<WarehouseItemView> searchNotSealedAvailableByMfns(String storeId, Collection<String> mfns);
+
     List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns);
 
     WarehouseItemView findBySerialNo(String storeId, String serialNo);

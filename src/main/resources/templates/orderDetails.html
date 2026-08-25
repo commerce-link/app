@@ -753,7 +753,7 @@
 
                     <div class="assign-sku-scroll">
                         <table class="table is-fullwidth is-hoverable assign-sku-table mb-0"
-                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered}">
+                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered},data-condition-openbox=#{ItemCondition.OpenBox},data-condition-damaged=#{ItemCondition.Damaged}">
                             <thead>
                             <tr>
                                 <th style="width: 36px;"></th>
@@ -1943,6 +1943,7 @@
                 const picked = i.itemId === assignWarehouseSelectedId;
                 const delivered = i.status === 'Delivered';
                 const statusLabel = table.getAttribute(delivered ? 'data-status-delivered' : 'data-status-ordered');
+                const conditionTag = renderAssignWarehouseConditionTag(table, i.condition);
                 const row = document.createElement('tr');
                 row.classList.toggle('is-picked', picked);
                 row.innerHTML = `
@@ -1951,7 +1952,7 @@
                     <td class="mono"></td>
                     <td class="mono"></td>
                     <td class="has-text-right">${i.qty}</td>
-                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span></td>`;
+                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span>${conditionTag}</td>`;
                 row.children[1].textContent = i.name || '';
                 row.children[2].textContent = i.mfn || '';
                 row.children[3].textContent = i.serialNo || '';
@@ -1963,6 +1964,13 @@
                 tbody.appendChild(row);
             });
             document.getElementById('assignWarehouseNoResults').style.display = rows.length ? 'none' : 'block';
+        }
+
+        function renderAssignWarehouseConditionTag(table, condition) {
+            if (!condition || condition === 'Sealed') return '';
+            const label = table.getAttribute('data-condition-' + condition.toLowerCase()) || condition;
+            const color = condition === 'Damaged' ? 'is-danger' : 'is-warning';
+            return ` <span class="tag ${color}">${label}</span>`;
         }
 
         function renderAssignWarehouseFooter() {
