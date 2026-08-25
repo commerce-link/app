@@ -335,26 +335,6 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public String splitBlockedReason(List<OrderItem> orderItems) {
-        if (!hasStatus(OrderStatus.New)) {
-            return "order.items.action.split.blocked.status";
-        }
-        if (getPaidAmount() != 0) {
-            return "order.items.action.split.blocked.payment";
-        }
-        if (getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
-            return "order.items.action.split.blocked.goodsIssue";
-        }
-        if (isInvoiced()) {
-            return "order.items.action.split.blocked.invoice";
-        }
-        if (orderItems.size() <= 1) {
-            return "order.items.action.split.blocked.singleItem";
-        }
-        return null;
-    }
-
-    @DynamoDBIgnore
     public boolean canChangeFulfilmentType(List<OrderItem> orderItems) {
         return orderItems.stream()
                 .filter(OrderItem::isProduct)

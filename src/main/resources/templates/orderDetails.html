@@ -454,10 +454,7 @@
                             <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
                             <option value="moveSelectedItemsToTheWarehouse" th:text="#{order.items.action.move.warehouse}"></option>
                             <option value="moveSelectedItemsToTheWarehouseForRMA" th:text="#{order.items.action.move.warehouse.rma}"></option>
-                            <option value="splitOrder" th:disabled="${!canSplitOrder}"
-                                    th:text="${canSplitOrder}
-                                        ? #{order.items.action.split}
-                                        : #{order.items.action.split.blocked(${#messages.msg(splitBlockedReason)})}"></option>
+                            <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>

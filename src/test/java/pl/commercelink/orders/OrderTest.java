@@ -169,64 +169,6 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("splitBlockedReason returns null for a splittable order")
-    void splitBlockedReasonIsNullWhenSplittable() {
-        // given
-        Order order = splittableOrder();
-
-        // when / then
-        assertThat(order.splitBlockedReason(twoItems())).isNull();
-    }
-
-    @Test
-    @DisplayName("splitBlockedReason reports a booked payment")
-    void splitBlockedReasonReportsPayment() {
-        // given
-        Order order = splittableOrder();
-        order.setPayments(new java.util.LinkedList<>(java.util.List.of(
-                Payment.bankTransfer("REF-1", "Jan Kowalski", 100))));
-
-        // when / then
-        assertThat(order.splitBlockedReason(twoItems()))
-                .isEqualTo("order.items.action.split.blocked.payment");
-    }
-
-    @Test
-    @DisplayName("splitBlockedReason reports a status other than New")
-    void splitBlockedReasonReportsStatus() {
-        // given
-        Order order = splittableOrder();
-        order.setStatus(OrderStatus.Assembly);
-
-        // when / then
-        assertThat(order.splitBlockedReason(twoItems()))
-                .isEqualTo("order.items.action.split.blocked.status");
-    }
-
-    @Test
-    @DisplayName("splitBlockedReason reports an issued goods issue document")
-    void splitBlockedReasonReportsGoodsIssue() {
-        // given
-        Order order = splittableOrder();
-        order.getDocuments().add(new Document("wz-1", "WZ/1/2026", null, DocumentType.GoodsIssue));
-
-        // when / then
-        assertThat(order.splitBlockedReason(twoItems()))
-                .isEqualTo("order.items.action.split.blocked.goodsIssue");
-    }
-
-    @Test
-    @DisplayName("splitBlockedReason reports a single-item order")
-    void splitBlockedReasonReportsSingleItem() {
-        // given
-        Order order = splittableOrder();
-
-        // when / then
-        assertThat(order.splitBlockedReason(java.util.List.of(new OrderItem())))
-                .isEqualTo("order.items.action.split.blocked.singleItem");
-    }
-
-    @Test
     @DisplayName("canChangeFulfilmentType allows the change while every product item is New")
     void canChangeFulfilmentTypeWhenAllProductsAreNew() {
         // given
@@ -273,9 +215,5 @@ class OrderTest {
         order.setBillingDetails(new BillingDetails());
         order.setStatus(OrderStatus.New);
         return order;
-    }
-
-    private java.util.List<OrderItem> twoItems() {
-        return java.util.List.of(new OrderItem(), new OrderItem());
     }
 }
