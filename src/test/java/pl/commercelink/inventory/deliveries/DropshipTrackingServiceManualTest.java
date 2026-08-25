@@ -213,7 +213,7 @@ class DropshipTrackingServiceManualTest {
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
         assertThat(delivery.getTrackingState()).isNull();
-        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(5);
+        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(4);
     }
 
     @Test

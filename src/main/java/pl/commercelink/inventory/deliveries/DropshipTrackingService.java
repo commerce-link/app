@@ -21,8 +21,11 @@ import pl.commercelink.starter.util.OperationResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -162,19 +165,21 @@ public class DropshipTrackingService {
         List<Allocation> open = delivery.getAllocations().stream()
                 .filter(allocation -> allocation.getType() == AllocationType.Order && allocation.isInAllocation())
                 .toList();
-        List<SupplierParcel> parcels = snapshot.parcels();
+        List<SupplierParcel> pending = snapshot.parcels().stream()
+                .filter(parcel -> order == null
+                        || order.getShipments().stream().noneMatch(shipment -> shipment.hasTrackingNo(parcel.trackingNo())))
+                .toList();
         int applied = 0;
-        for (int i = 0; i < parcels.size(); i++) {
-            SupplierParcel parcel = parcels.get(i);
-            if (order != null && order.getShipments().stream().anyMatch(shipment -> shipment.hasTrackingNo(parcel.trackingNo()))) {
-                continue;
-            }
-            boolean absorbRemaining = snapshot.state() == SupplierOrderState.SHIPPED && i == parcels.size() - 1;
+        for (int i = 0; i < pending.size(); i++) {
+            SupplierParcel parcel = pending.get(i);
+            boolean absorbRemaining = snapshot.state() == SupplierOrderState.SHIPPED && i == pending.size() - 1;
             List<Allocation> selected = DropshipParcelMatcher.select(parcel, open, absorbRemaining);
             if (selected.isEmpty()) {
                 continue;
             }
-            List<Allocation> remaining = open.stream().filter(allocation -> !selected.contains(allocation)).toList();
+            Set<Allocation> taken = Collections.newSetFromMap(new IdentityHashMap<>());
+            taken.addAll(selected);
+            List<Allocation> remaining = open.stream().filter(allocation -> !taken.contains(allocation)).toList();
             DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, parcel.carrier(), parcel.trackingNo(),
                     null, parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl());
             OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment,
@@ -223,7 +228,9 @@ public class DropshipTrackingService {
     private TrackingOutcome recordError(Delivery delivery, LocalDateTime now, boolean manual, RuntimeException e) {
         delivery.setTrackingLastCheckedAt(now);
         delivery.setTrackingAttempts(delivery.getTrackingAttempts() + 1);
-        delivery.setTrackingConsecutiveErrors(delivery.getTrackingConsecutiveErrors() + 1);
+        if (!manual) {
+            delivery.setTrackingConsecutiveErrors(delivery.getTrackingConsecutiveErrors() + 1);
+        }
         delivery.setTrackingLastError(StringUtils.abbreviate(e.getMessage(), MAX_ERROR_LENGTH));
         if (!manual && delivery.getTrackingConsecutiveErrors() >= properties.maxConsecutiveErrors()) {
             finish(delivery, DeliveryTrackingState.GIVEN_UP, TRACKING_GIVEN_UP_EVENT, now);

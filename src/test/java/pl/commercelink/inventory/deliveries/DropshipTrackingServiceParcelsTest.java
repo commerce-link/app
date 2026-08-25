@@ -293,4 +293,52 @@ class DropshipTrackingServiceParcelsTest {
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
     }
+
+    @Test
+    void twoAllocationsOfTheSameProductAreConfirmedIndependently() {
+        // given
+        Allocation firstTwin = allocation("3", "5900000000009", "MFN-9");
+        Allocation secondTwin = allocation("4", "5900000000009", "MFN-9");
+        delivery.setAllocations(List.of(firstTwin, secondTwin));
+        supplierReports(SupplierOrderState.PARTIALLY_SHIPPED,
+                parcel("PKG-1", new SupplierOrderLine(null, "5900000000009", null, 1)));
+        when(completion.confirmShipped(any(), any(), anyList(), anyList(), any(), any()))
+                .thenAnswer(confirmedAs(DropshipShipmentResult.COMPLETED));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
+        ArgumentCaptor<List<Allocation>> selected = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<Allocation>> remaining = ArgumentCaptor.forClass(List.class);
+        verify(completion).confirmShipped(any(), any(), selected.capture(), remaining.capture(), any(), any());
+        assertThat(selected.getValue()).containsExactlyInAnyOrder(firstTwin, secondTwin);
+        assertThat(remaining.getValue()).isEmpty();
+    }
+
+    @Test
+    void absorbRuleAppliesToLastParcelNotAlreadyOnTheOrder() {
+        // given
+        Shipment already = new Shipment();
+        already.setTrackingNo("PKG-2");
+        order.addShipment(already);
+        supplierReports(SupplierOrderState.SHIPPED,
+                parcel("PKG-1", new SupplierOrderLine(null, "5900000000001", null, 1)),
+                parcel("PKG-2", new SupplierOrderLine(null, "5900000000002", null, 1)));
+        when(completion.confirmShipped(any(), any(), anyList(), anyList(), any(), any()))
+                .thenAnswer(confirmedAs(DropshipShipmentResult.COMPLETED));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
+        ArgumentCaptor<List<Allocation>> selected = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<DropshipShipment> shipment = ArgumentCaptor.forClass(DropshipShipment.class);
+        verify(completion, times(1)).confirmShipped(any(), any(), selected.capture(), anyList(), shipment.capture(), any());
+        assertThat(shipment.getValue().trackingNo()).isEqualTo("PKG-1");
+        assertThat(selected.getValue()).containsExactlyInAnyOrder(first, second);
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+    }
 }
