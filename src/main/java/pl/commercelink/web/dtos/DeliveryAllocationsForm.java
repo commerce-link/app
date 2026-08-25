@@ -3,8 +3,11 @@ package pl.commercelink.web.dtos;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationType;
+import pl.commercelink.inventory.deliveries.DropshipShipment;
+import pl.commercelink.orders.ShipmentType;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,6 +21,12 @@ public class DeliveryAllocationsForm {
     private String targetExternalDeliveryId;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate targetEstimatedDeliveryAt;
+    private ShipmentType shipmentType;
+    private String shipmentCarrier;
+    private String shipmentTrackingNo;
+    private String shipmentCollectionPointCode;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime shipmentShippedAt;
     private List<Allocation> allocations = new ArrayList<>();
 
     public DeliveryAllocationsForm() {}
@@ -75,6 +84,51 @@ public class DeliveryAllocationsForm {
 
     public void setTargetEstimatedDeliveryAt(LocalDate targetEstimatedDeliveryAt) {
         this.targetEstimatedDeliveryAt = targetEstimatedDeliveryAt;
+    }
+
+    public ShipmentType getShipmentType() {
+        return shipmentType;
+    }
+
+    public void setShipmentType(ShipmentType shipmentType) {
+        this.shipmentType = shipmentType;
+    }
+
+    public String getShipmentCarrier() {
+        return shipmentCarrier;
+    }
+
+    public void setShipmentCarrier(String shipmentCarrier) {
+        this.shipmentCarrier = shipmentCarrier;
+    }
+
+    public String getShipmentTrackingNo() {
+        return shipmentTrackingNo;
+    }
+
+    public void setShipmentTrackingNo(String shipmentTrackingNo) {
+        this.shipmentTrackingNo = shipmentTrackingNo;
+    }
+
+    public String getShipmentCollectionPointCode() {
+        return shipmentCollectionPointCode;
+    }
+
+    public void setShipmentCollectionPointCode(String shipmentCollectionPointCode) {
+        this.shipmentCollectionPointCode = shipmentCollectionPointCode;
+    }
+
+    public LocalDateTime getShipmentShippedAt() {
+        return shipmentShippedAt;
+    }
+
+    public void setShipmentShippedAt(LocalDateTime shipmentShippedAt) {
+        this.shipmentShippedAt = shipmentShippedAt;
+    }
+
+    public DropshipShipment toDropshipShipment() {
+        return new DropshipShipment(shipmentType, shipmentCarrier, shipmentTrackingNo,
+                shipmentCollectionPointCode, shipmentShippedAt);
     }
 
     public List<Allocation> getAllocations() {

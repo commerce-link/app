@@ -10,7 +10,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipDeliveryCompletion;
@@ -22,9 +21,7 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,13 +62,12 @@ class DeliveriesControllerReceiveTest {
     }
 
     @Test
-    void receiveOnDropshipDeliveryWithSupplierOrderInFlightIsRejected() {
+    void receiveOnDropshipDeliveryPointsToTheShipmentConfirmation() {
         // given
         Delivery delivery = dropshipDelivery();
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
-        when(messageSource.getMessage(eq("deliveries.dropship.confirm.unavailable"), any(), any()))
-                .thenReturn("blocked");
+        when(messageSource.getMessage(eq("deliveries.receive.error.dropship"), any(), any()))
+                .thenReturn("use the shipment confirmation");
         DeliveryAllocationsForm form = formFor(delivery);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
@@ -82,30 +78,7 @@ class DeliveriesControllerReceiveTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
-            verifyNoInteractions(dropshipDeliveryCompletion, deliveryReceptionService);
-        }
-    }
-
-    @Test
-    void receiveOnAlreadyReceivedDropshipDeliveryIsRejected() {
-        // given
-        Delivery delivery = dropshipDelivery();
-        delivery.markAsReceived();
-        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
-        when(messageSource.getMessage(eq("deliveries.dropship.confirm.unavailable"), any(), any()))
-                .thenReturn("blocked");
-        DeliveryAllocationsForm form = formFor(delivery);
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
-
-            // when
-            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "use the shipment confirmation");
             verifyNoInteractions(dropshipDeliveryCompletion, deliveryReceptionService);
         }
     }

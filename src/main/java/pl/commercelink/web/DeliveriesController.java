@@ -16,6 +16,8 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
@@ -123,6 +125,9 @@ public class DeliveriesController {
 
     @Autowired
     private DropshipDeliveryCompletion dropshipDeliveryCompletion;
+
+    @Autowired
+    private ShipmentCarrierOptions shipmentCarrierOptions;
 
     private static final int DELIVERY_PAGE_SIZE = 25;
 
@@ -254,7 +259,9 @@ public class DeliveriesController {
             return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
         if (delivery != null && delivery.isDropship()) {
-            return confirmDropshipDelivered(delivery, form, redirectAttributes, locale);
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
+            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
         }
         OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
@@ -274,16 +281,55 @@ public class DeliveriesController {
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
     }
 
-    private String confirmDropshipDelivered(Delivery delivery, DeliveryAllocationsForm form,
-                                            RedirectAttributes redirectAttributes, Locale locale) {
-        if (delivery.getOrderStatus() != null || delivery.hasBeenReceived()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("deliveries.dropship.confirm.unavailable", null, locale));
-            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+    @PostMapping("/dashboard/deliveries/confirmDropshipShipment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String confirmDropshipShipment(@ModelAttribute DeliveryAllocationsForm form,
+                                          RedirectAttributes redirectAttributes, Locale locale) {
+        return confirmDropshipShipment(getStoreId(), form, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/confirmDropshipShipment")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String confirmDropshipShipmentForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                       @ModelAttribute DeliveryAllocationsForm form,
+                                                       RedirectAttributes redirectAttributes, Locale locale) {
+        return confirmDropshipShipment(storeId, form, redirectAttributes, locale);
+    }
+
+    private String confirmDropshipShipment(String storeId, DeliveryAllocationsForm form,
+                                           RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        if (delivery == null || !delivery.isDropship()) {
+            return flashError("deliveries.dropship.shipment.error.notDropship", storeId, form, redirectAttributes, locale);
         }
-        redirectAttributes.addFlashAttribute("errorMessage",
-                messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
-        return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+        if (delivery.getOrderStatus() != null || delivery.hasBeenReceived()) {
+            return flashError("deliveries.dropship.confirm.unavailable", storeId, form, redirectAttributes, locale);
+        }
+        List<Allocation> selected = form.getSelectedOrderAllocations();
+        if (selected.isEmpty()) {
+            return flashError("deliveries.select.at.least.one", storeId, form, redirectAttributes, locale);
+        }
+        DropshipShipment shipment = form.toDropshipShipment();
+        String validationError = shipment.validationError();
+        if (validationError != null) {
+            return flashError(validationError, storeId, form, redirectAttributes, locale);
+        }
+        OperationResult<DropshipShipmentResult> result = dropshipDeliveryCompletion.confirmShipped(
+                storeId, delivery, selected, form.getRemainingAllocations(), shipment);
+        if (!result.isSuccess()) {
+            return flashError(result.getMessage(), storeId, form, redirectAttributes, locale);
+        }
+        String successKey = result.getPayload() == DropshipShipmentResult.COMPLETED
+                ? "deliveries.dropship.shipment.success"
+                : "deliveries.dropship.shipment.success.partial";
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(successKey, null, locale));
+        return detailsRedirect(storeId, form.getDeliveryId());
+    }
+
+    private String flashError(String messageKey, String storeId, DeliveryAllocationsForm form,
+                              RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(messageKey, null, locale));
+        return detailsRedirect(storeId, form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/deleteSelectedAllocations")
@@ -929,10 +975,15 @@ public class DeliveriesController {
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
             var dropshipOrder = resolveDropshipOrder(storeId, delivery);
+            Store store = storesRepository.findById(storeId);
             model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
             model.addAttribute("dropshipShipment", dropshipOrder != null
                     ? dropshipOrder.firstShipment().orElse(null)
                     : null);
+            model.addAttribute("shipmentTypes", List.of(ShipmentType.Courier, ShipmentType.PickupPoint));
+            model.addAttribute("carrierOptions", dropshipOrder != null && store != null
+                    ? shipmentCarrierOptions.forOrder(dropshipOrder, store)
+                    : List.<String>of());
         }
         return "deliveryDetails";
     }
