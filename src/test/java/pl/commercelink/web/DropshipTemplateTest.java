@@ -146,14 +146,20 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveryDetailsOffersDropshipConfirmationInsteadOfWarehouseReceipt() throws Exception {
+    void deliveryDetailsOffersDropshipShipmentConfirmationInsteadOfWarehouseReceipt() throws Exception {
         // when
         String html = read("deliveryDetails.html");
 
         // then
-        assertThat(html).contains("deliveries.dropship.confirmDelivered");
-        assertThat(html).contains("deliveries.dropship.confirm.delivered");
+        assertThat(html).contains("value=\"confirmDropshipShipment\"");
+        assertThat(html).contains("deliveries.dropship.confirmShipment");
+        assertThat(html).contains("${delivery.dropship and delivery.orderStatus == null}");
+        assertThat(html).contains("id=\"confirmShipmentModal\"");
+        assertThat(html).contains("*{shipmentTrackingNo}");
+        assertThat(html).contains("*{shipmentShippedAt}");
         assertThat(html).contains("deliveries.dropship.confirm.deleteAllocation");
-        assertThat(html).contains("${delivery.dropship and !isSuperAdmin and delivery.orderStatus == null}");
+        assertThat(html).doesNotContain("deliveries.dropship.confirmDelivered");
+        assertThat(html).doesNotContain("deliveries.dropship.confirm.delivered");
+        assertThat(html).doesNotContain("PersonalCollection");
     }
 }

@@ -309,6 +309,11 @@
                 <input type="hidden" th:field="*{targetDeliveryId}" id="targetDeliveryId"/>
                 <input type="hidden" th:field="*{targetExternalDeliveryId}" id="targetExternalDeliveryId"/>
                 <input type="hidden" th:field="*{targetEstimatedDeliveryAt}" id="targetEstimatedDeliveryAtInput"/>
+                <input type="hidden" th:field="*{shipmentType}" id="shipmentType"/>
+                <input type="hidden" th:field="*{shipmentCarrier}" id="shipmentCarrier"/>
+                <input type="hidden" th:field="*{shipmentTrackingNo}" id="shipmentTrackingNo"/>
+                <input type="hidden" th:field="*{shipmentCollectionPointCode}" id="shipmentCollectionPointCode"/>
+                <input type="hidden" th:field="*{shipmentShippedAt}" id="shipmentShippedAt"/>
 
                 <table class="table">
                     <thead>
@@ -358,7 +363,7 @@
                         <div class="select is-small" >
                             <select id="delivery-action-select">
                                 <option th:unless="${delivery.awaitingApproval or isSuperAdmin or delivery.dropship}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
-                                <option th:if="${delivery.dropship and !isSuperAdmin and delivery.orderStatus == null}" value="markSelectedAsReceived" th:text="#{deliveries.dropship.confirmDelivered}"></option>
+                                <option th:if="${delivery.dropship and delivery.orderStatus == null}" value="confirmDropshipShipment" th:text="#{deliveries.dropship.confirmShipment}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
@@ -468,6 +473,67 @@
                     <footer class="modal-card-foot">
                         <button class="button is-primary" type="button" onclick="confirmSplit()" th:text="#{deliveries.split.confirm}"></button>
                         <button class="button" type="button" onclick="toggleSplitModal(false)" th:text="#{general.cancel}"></button>
+                    </footer>
+                </div>
+            </div>
+
+            <div id="confirmShipmentModal" class="modal" th:if="${delivery.dropship}">
+                <div class="modal-background" onclick="toggleConfirmShipmentModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.dropship.confirmShipment}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleConfirmShipmentModal(false)"></button>
+                    </header>
+                    <section class="modal-card-body">
+                        <div class="field">
+                            <label class="label" th:text="#{order.shipment.type}"></label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select id="dsShipmentType" onchange="onDropshipShipmentTypeChange()">
+                                        <option th:each="type : ${shipmentTypes}" th:value="${type.name()}"
+                                                th:text="#{'ShipmentType.' + ${type.name()}}"
+                                                th:selected="${dropshipShipment != null and dropshipShipment.type == type}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{order.shipment.carrier}"></label>
+                            <div class="control">
+                                <div th:if="${!carrierOptions.isEmpty()}" class="select is-fullwidth">
+                                    <select id="dsCarrier">
+                                        <option value=""></option>
+                                        <option th:each="option : ${carrierOptions}" th:value="${option}" th:text="${option}"
+                                                th:selected="${dropshipShipment != null and option == dropshipShipment.carrier}"></option>
+                                    </select>
+                                </div>
+                                <input th:if="${carrierOptions.isEmpty()}" id="dsCarrier" class="input" type="text"
+                                       th:value="${dropshipShipment != null ? dropshipShipment.carrier : ''}"/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{order.shipment.tracking.no}"></label>
+                            <div class="control">
+                                <input id="dsTrackingNo" class="input" type="text"/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{order.collection.point}"></label>
+                            <div class="control">
+                                <input id="dsCollectionPoint" class="input" type="text"
+                                       th:value="${dropshipShipment != null ? dropshipShipment.collectionPointCode : ''}"/>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{order.shipment.shipped.at}"></label>
+                            <div class="control">
+                                <input id="dsShippedAt" class="input" type="datetime-local"/>
+                            </div>
+                        </div>
+                    </section>
+                    <footer class="modal-card-foot">
+                        <button class="button is-primary" type="button" onclick="confirmDropshipShipment()" th:text="#{deliveries.dropship.confirmShipment.submit}"></button>
+                        <button class="button" type="button" onclick="toggleConfirmShipmentModal(false)" th:text="#{general.cancel}"></button>
                     </footer>
                 </div>
             </div>
@@ -591,7 +657,7 @@
         }
 
         const actionMessages = {
-            'markSelectedAsReceived': /*[[${delivery.dropship} ? #{deliveries.dropship.confirm.delivered} : #{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
+            'markSelectedAsReceived': /*[[#{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
             'deleteSelectedAllocations': /*[[${delivery.dropship} ? #{deliveries.dropship.confirm.deleteAllocation} : #{deliveries.confirm.deleteAllocation}]]*/ 'Are you sure you want to delete selected allocations?'
         };
 
@@ -615,6 +681,8 @@
                 toggleMergeModal(true);
             } else if (selectedAction === 'splitSelectedAllocations') {
                 toggleSplitModal(true);
+            } else if (selectedAction === 'confirmDropshipShipment') {
+                toggleConfirmShipmentModal(true);
             } else {
                 pendingAction = selectedAction;
                 const message = actionMessages[selectedAction] || 'Are you sure?';
@@ -695,6 +763,51 @@
 
             const baseUrl = form.dataset.baseUrl;
             form.action = baseUrl + '/splitSelectedAllocations';
+            form.submit();
+        }
+
+        function toggleConfirmShipmentModal(show) {
+            const modal = document.getElementById('confirmShipmentModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+            if (show) {
+                const shippedAt = document.getElementById('dsShippedAt');
+                if (!shippedAt.value) {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    shippedAt.value = now.toISOString().slice(0, 16);
+                }
+                onDropshipShipmentTypeChange();
+                document.getElementById('dsTrackingNo').focus();
+            }
+        }
+
+        function onDropshipShipmentTypeChange() {
+            const isPickupPoint = document.getElementById('dsShipmentType').value === 'PickupPoint';
+            const collectionPoint = document.getElementById('dsCollectionPoint');
+            collectionPoint.disabled = !isPickupPoint;
+            if (!isPickupPoint) {
+                collectionPoint.value = '';
+            }
+        }
+
+        function confirmDropshipShipment() {
+            const type = document.getElementById('dsShipmentType').value;
+            const carrier = document.getElementById('dsCarrier').value.trim();
+            const trackingNo = document.getElementById('dsTrackingNo').value.trim();
+            const collectionPoint = document.getElementById('dsCollectionPoint').value.trim();
+            const shippedAt = document.getElementById('dsShippedAt').value;
+            if (!carrier || !trackingNo || !shippedAt || (type === 'PickupPoint' && !collectionPoint)) {
+                alert(/*[[#{deliveries.dropship.shipment.fillAllFields}]]*/ 'Fill in all shipment fields.');
+                return;
+            }
+            document.getElementById('shipmentType').value = type;
+            document.getElementById('shipmentCarrier').value = carrier;
+            document.getElementById('shipmentTrackingNo').value = trackingNo;
+            document.getElementById('shipmentCollectionPointCode').value = type === 'PickupPoint' ? collectionPoint : '';
+            document.getElementById('shipmentShippedAt').value = shippedAt;
+            const form = document.getElementById('allocationsForm');
+            form.action = form.dataset.baseUrl + '/confirmDropshipShipment';
             form.submit();
         }
     </script>
