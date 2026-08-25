@@ -10,4 +10,6 @@ public interface StockQueryService {
     List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns);
 
     WarehouseItemView findBySerialNo(String storeId, String serialNo);
+
+    WarehouseItemView findById(String storeId, String itemId);
 }

@@ -608,8 +608,15 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String mfn) {
-        ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, mfn);
+    public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId,
+                                      @RequestParam String warehouseItemId,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, warehouseItemId);
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+        }
         return "redirect:/dashboard/orders/" + orderId;
     }
 

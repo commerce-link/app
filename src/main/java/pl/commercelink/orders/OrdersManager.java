@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
+import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
@@ -13,6 +14,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 import pl.commercelink.warehouse.api.Warehouse;
+import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -35,6 +37,8 @@ public class OrdersManager {
     private OrderFulfilmentEventPublisher orderFulfilmentEventPublisher;
     @Autowired
     private AutomatedOrderFulfilment automatedOrderFulfilment;
+    @Autowired
+    private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
@@ -97,12 +101,17 @@ public class OrdersManager {
         automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
     }
 
-    public void assignFromWarehouse(String storeId, String orderId, String itemId, String mfn) {
+    public void assignFromWarehouse(String storeId, String orderId, String itemId, String warehouseItemId) {
+        WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findById(storeId, warehouseItemId);
+        if (warehouseItem == null || !(warehouseItem.isInStock() || warehouseItem.isInDelivery())) {
+            throw new IllegalStateException("warehouse.item.not.available");
+        }
+
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
-        orderItem.setSku(mfn);
+        orderItem.setSku(warehouseItem.getMfn());
         orderItemsRepository.save(orderItem);
 
-        automatedOrderFulfilment.run(storeId, List.of(orderItem));
+        manualWarehouseItemFulfilment.run(storeId, orderItem, warehouseItem);
     }
 
     public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {

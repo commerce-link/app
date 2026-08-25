@@ -9,7 +9,6 @@ import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
-import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
@@ -44,6 +43,7 @@ public class SupplierPurchaseService {
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
     static final int MAX_SQS_ATTEMPTS = 3;
+    private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
 
     private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -54,6 +54,7 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -316,8 +317,7 @@ public class SupplierPurchaseService {
 
     public OperationResult<String> retry(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderFailed()
-                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+        if (!canRecoverFailedPurchase(delivery)) {
             return OperationResult.failure("deliveries.purchase.retry.error.state");
         }
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
@@ -328,6 +328,49 @@ public class SupplierPurchaseService {
                         storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()),
                 delivery.getPurchaseRef() + ":" + UUID.randomUUID());
         return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId,
+                                                    LocalDate estimatedDeliveryAt) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (!canRecoverFailedPurchase(delivery)) {
+            return OperationResult.failure("deliveries.purchase.complete.error.state");
+        }
+        if (StringUtils.isBlank(externalOrderId)) {
+            return OperationResult.failure("deliveries.purchase.complete.error.number");
+        }
+        if (estimatedDeliveryAt == null) {
+            return OperationResult.failure("deliveries.purchase.complete.error.date");
+        }
+
+        delivery.setExternalDeliveryId(externalOrderId.trim());
+        delivery.setEstimatedDeliveryAt(estimatedDeliveryAt);
+        delivery.setOrderStatus(null);
+        delivery.setOrderErrorMessage(null);
+        delivery.setExternalDeliveryIdProvisional(false);
+        delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        withAllocations.getItems().forEach(item -> item.getAllocations().stream()
+                .filter(allocation -> allocation.getType() == AllocationType.Order)
+                .forEach(allocation -> allocation.setSelected(true)));
+        orderAllocationsManager.commit(storeId, deliveryId, estimatedDeliveryAt, withAllocations.getItems());
+
+        return OperationResult.success(deliveryId);
+    }
+
+    public LocalDate suggestEstimatedDeliveryAt(Delivery delivery) {
+        if (delivery.getEstimatedDeliveryAt() != null) {
+            return delivery.getEstimatedDeliveryAt();
+        }
+        ShippingTerms terms = supplierRegistry.get(delivery.getProvider()).shippingTermsFor("PL");
+        return LocalDate.now().plusDays(terms.arrivalDays());
+    }
+
+    private boolean canRecoverFailedPurchase(Delivery delivery) {
+        return delivery != null && delivery.isOrderFailed()
+                && !delivery.hasBeenReceived() && delivery.getDocuments().isEmpty();
     }
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
@@ -439,8 +482,7 @@ public class SupplierPurchaseService {
             }
         });
 
-        SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
-        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
+        ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNetForShipping = orderResult.totalNet() > 0
                 ? orderResult.totalNet() * conversion.sellRate()

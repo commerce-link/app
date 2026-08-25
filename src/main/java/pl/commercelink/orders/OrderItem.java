@@ -34,6 +34,8 @@ public class OrderItem extends Item {
 
     @DynamoDBIgnore
     private boolean selected;
+    @DynamoDBIgnore
+    private String warehouseItemId;
 
     // required for DynamoDB
     public OrderItem() {
@@ -80,6 +82,16 @@ public class OrderItem extends Item {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
+    }
+
+    @DynamoDBIgnore
+    public void requestWarehouseItem(String warehouseItemId) {
+        this.warehouseItemId = warehouseItemId;
+    }
+
+    @DynamoDBIgnore
+    public String getWarehouseItemId() {
+        return warehouseItemId;
     }
 
     @DynamoDBIgnore
