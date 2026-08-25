@@ -16,12 +16,15 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
+import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationService;
+import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
+import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +66,10 @@ class OrdersManagerTest {
     private MatchedInventory matchedInventory;
     @Mock
     private ReservationService reservationService;
+    @Mock
+    private StockQueryService stockQueryService;
+    @Mock
+    private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -522,6 +529,45 @@ class OrdersManagerTest {
         assertThat(item.getDeliveryId()).isEqualTo("Acme");
         assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("assignFromWarehouse assigns the exact warehouse item picked by the user")
+    void assignFromWarehouseAssignsTheExactWarehouseItem() {
+        // given
+        OrderItem orderItem = orderItem("item-1", 100.0);
+        WarehouseItemView warehouseItem = new WarehouseItemView(
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered
+        );
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(warehouseItem);
+
+        // when
+        ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1");
+
+        // then
+        assertThat(orderItem.getSku()).isEqualTo("MFN-1");
+        verify(orderItemsRepository).save(orderItem);
+        verify(manualWarehouseItemFulfilment).run(STORE_ID, orderItem, warehouseItem);
+        verify(automatedOrderFulfilment, never()).run(any(), any());
+    }
+
+    @Test
+    @DisplayName("assignFromWarehouse rejects a warehouse item that is no longer available")
+    void assignFromWarehouseRejectsUnavailableWarehouseItem() {
+        // given
+        WarehouseItemView reserved = new WarehouseItemView(
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved
+        );
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(reserved);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("warehouse.item.not.available");
+        verify(manualWarehouseItemFulfilment, never()).run(any(), any(), any());
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

@@ -14,7 +14,10 @@ import pl.commercelink.warehouse.api.ReservationItem;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +50,60 @@ class BuiltInReservationServiceTest {
 
         // then
         assertEquals(20.0, orderItem.getCost());
+    }
+
+    @Test
+    void reservesExactlyTheRequestedWarehouseItemInsteadOfFifoStock() {
+        // given
+        WarehouseItem requested = anAvailableItem(20.0);
+        when(warehouseRepository.findById("store-1", requested.getItemId())).thenReturn(requested);
+
+        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, requested.getItemId());
+        Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory).create(reservation);
+
+        // then
+        assertEquals(1, reservationItem.getConfirmations().size());
+        assertEquals(0, requested.getQty());
+        verify(warehouseRepository).delete(requested);
+        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
+    }
+
+    @Test
+    void leavesItemUnfulfilledWhenRequestedWarehouseItemIsNoLongerAvailable() {
+        // given
+        when(warehouseRepository.findById("store-1", "missing-item")).thenReturn(null);
+
+        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, "missing-item");
+        Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory).create(reservation);
+
+        // then
+        assertFalse(reservationItem.hasConfirmations());
+        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
+    }
+
+    @Test
+    void reservesOnlyAvailableQuantityOfTheRequestedWarehouseItem() {
+        // given
+        WarehouseItem requested = anAvailableItem(20.0);
+        requested.setQty(2);
+        when(warehouseRepository.findById("store-1", requested.getItemId())).thenReturn(requested);
+
+        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 5, requested.getItemId());
+        Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory).create(reservation);
+
+        // then
+        assertEquals(2, reservationItem.getConfirmations().get(0).qty());
+        assertEquals(3, reservationItem.getRemainingQty());
+        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
     }
 
     private WarehouseItem anAvailableItem(double unitCost) {

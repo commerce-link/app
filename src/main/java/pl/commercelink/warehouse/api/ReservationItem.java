@@ -8,6 +8,7 @@ public class ReservationItem {
     private String itemId;
     private String mfn;
     private int qty;
+    private String warehouseItemId;
 
     private final List<ReservationConfirmation> confirmations = new LinkedList<>();
 
@@ -26,8 +27,17 @@ public class ReservationItem {
         this.qty = qty;
     }
 
+    public ReservationItem(String itemId, String mfn, int qty, String warehouseItemId) {
+        this(itemId, mfn, qty);
+        this.warehouseItemId = warehouseItemId;
+    }
+
     public void add(ReservationConfirmation item) {
         confirmations.add(item);
+    }
+
+    public boolean hasWarehouseItemId() {
+        return warehouseItemId != null && !warehouseItemId.isBlank();
     }
 
     public int getRemainingQty() {
@@ -64,5 +74,13 @@ public class ReservationItem {
 
     public void setQty(int qty) {
         this.qty = qty;
+    }
+
+    public String getWarehouseItemId() {
+        return warehouseItemId;
+    }
+
+    public void setWarehouseItemId(String warehouseItemId) {
+        this.warehouseItemId = warehouseItemId;
     }
 }

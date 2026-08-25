@@ -715,7 +715,7 @@
                   onsubmit="return prepareAssignWarehouseSubmit()">
                 <section class="modal-card-body">
                     <input type="hidden" id="assignWarehouseItemId" name="itemId"/>
-                    <input type="hidden" id="assignWarehouseMfn" name="mfn"/>
+                    <input type="hidden" id="assignWarehouseStockItemId" name="warehouseItemId"/>
 
                     <div class="box has-background-white-ter mb-4 py-3">
                         <div class="columns is-vcentered is-mobile">
@@ -1973,8 +1973,8 @@
 
         function prepareAssignWarehouseSubmit() {
             const selected = (assignWarehouseData || []).find(i => i.itemId === assignWarehouseSelectedId);
-            if (!selected || !selected.mfn) return false;
-            document.getElementById('assignWarehouseMfn').value = selected.mfn;
+            if (!selected || !selected.itemId) return false;
+            document.getElementById('assignWarehouseStockItemId').value = selected.itemId;
             return true;
         }
 
