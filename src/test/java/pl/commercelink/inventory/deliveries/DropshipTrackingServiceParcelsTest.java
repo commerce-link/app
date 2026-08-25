@@ -207,9 +207,15 @@ class DropshipTrackingServiceParcelsTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
+        ArgumentCaptor<List<Allocation>> selected = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<Allocation>> remaining = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<DropshipShipment> shipments = ArgumentCaptor.forClass(DropshipShipment.class);
-        verify(completion, times(2)).confirmShipped(any(), any(), anyList(), anyList(), shipments.capture(), any());
+        verify(completion, times(2)).confirmShipped(any(), any(), selected.capture(), remaining.capture(), shipments.capture(), any());
         assertThat(shipments.getAllValues()).extracting(DropshipShipment::trackingNo).containsExactly("PKG-1", "PKG-2");
+        assertThat(selected.getAllValues().get(0)).containsExactly(first);
+        assertThat(remaining.getAllValues().get(0)).containsExactly(second);
+        assertThat(selected.getAllValues().get(1)).containsExactly(second);
+        assertThat(remaining.getAllValues().get(1)).isEmpty();
         assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
     }
 
