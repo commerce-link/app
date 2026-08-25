@@ -169,6 +169,7 @@ class DropshipDeliveryCompletionTest {
         assertThat(order.getShipments()).hasSize(1);
         assertThat(order.getShipments().get(0).getTrackingNo()).isEqualTo("PKG-1");
         assertThat(order.getShipments().get(0).getCollectionPointCode()).isEqualTo("WAW04A");
+        verify(orderLifecycleEventPublisher).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
     }
 
     @Test
@@ -187,6 +188,7 @@ class DropshipDeliveryCompletionTest {
 
         // then
         assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1", "PKG-2");
+        verifyNoInteractions(orderLifecycleEventPublisher);
     }
 
     @Test

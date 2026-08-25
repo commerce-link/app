@@ -7,6 +7,7 @@ import pl.commercelink.orders.ShipmentType;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class DropshipShipmentTest {
 
@@ -108,5 +109,19 @@ class DropshipShipmentTest {
         assertThat(shipment.getType()).isEqualTo(ShipmentType.PickupPoint);
         assertThat(shipment.getCollectionPointCode()).isEqualTo("WAW04A");
         assertThat(shipment.hasShippingData()).isTrue();
+    }
+
+    @Test
+    void applyToToleratesMissingValues() {
+        // given
+        Shipment shipment = new Shipment();
+        DropshipShipment courierWithoutData = new DropshipShipment(ShipmentType.Courier, null, null, null, null);
+
+        // when
+        assertThatCode(() -> courierWithoutData.applyTo(shipment)).doesNotThrowAnyException();
+
+        // then
+        assertThat(shipment.getCarrier()).isNull();
+        assertThat(shipment.getTrackingNo()).isNull();
     }
 }

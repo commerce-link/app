@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -136,6 +137,25 @@ class DeliveriesControllerDropshipShipmentTest {
         assertThat(shipment.getValue())
                 .isEqualTo(new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT));
         verify(redirectAttributes).addFlashAttribute("successMessage", "deliveries.dropship.shipment.success");
+    }
+
+    @Test
+    void storeAdminRouteIgnoresTheStoreIdCarriedByTheForm() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        when(dropshipDeliveryCompletion.confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), any()))
+                .thenReturn(OperationResult.success(DropshipShipmentResult.COMPLETED));
+        DeliveryAllocationsForm form = formFor(delivery, true);
+        form.setStoreId("other-store");
+
+        // when
+        controller.confirmDropshipShipment(form, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        verify(deliveriesRepository).findById(STORE_ID, delivery.getDeliveryId());
+        verify(deliveriesRepository, never()).findById(eq("other-store"), any());
+        verify(dropshipDeliveryCompletion).confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), any());
     }
 
     @Test

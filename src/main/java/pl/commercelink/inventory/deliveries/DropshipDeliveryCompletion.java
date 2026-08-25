@@ -91,9 +91,13 @@ public class DropshipDeliveryCompletion {
         if (confirmed == 0) {
             return 0;
         }
-        shipment.applyTo(shipmentToFill(order));
+        Shipment target = shipmentToFill(order);
+        boolean firstTrackedParcel = order.getShipments().stream().noneMatch(Shipment::hasShippingData);
+        shipment.applyTo(target);
         orderLifecycle.update(order, orderItems);
-        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
+        if (firstTrackedParcel) {
+            orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
         return confirmed;
     }
 

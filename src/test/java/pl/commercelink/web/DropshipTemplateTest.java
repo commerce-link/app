@@ -153,7 +153,7 @@ class DropshipTemplateTest {
         // then
         assertThat(html).contains("value=\"confirmDropshipShipment\"");
         assertThat(html).contains("deliveries.dropship.confirmShipment");
-        assertThat(html).contains("${delivery.dropship and delivery.orderStatus == null}");
+        assertThat(html).contains("${delivery.dropship and delivery.orderStatus == null and (isAdmin or isSuperAdmin)}");
         assertThat(html).contains("id=\"confirmShipmentModal\"");
         assertThat(html).contains("*{shipmentTrackingNo}");
         assertThat(html).contains("*{shipmentShippedAt}");

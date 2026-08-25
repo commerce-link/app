@@ -30,9 +30,9 @@ public record DropshipShipment(ShipmentType type, String carrier, String trackin
 
     public void applyTo(Shipment shipment) {
         shipment.setType(type);
-        shipment.setCarrier(carrier.trim());
-        shipment.setTrackingNo(trackingNo.trim());
-        shipment.setCollectionPointCode(type == ShipmentType.PickupPoint ? collectionPointCode.trim() : null);
+        shipment.setCarrier(StringUtils.trimToNull(carrier));
+        shipment.setTrackingNo(StringUtils.trimToNull(trackingNo));
+        shipment.setCollectionPointCode(type == ShipmentType.PickupPoint ? StringUtils.trimToNull(collectionPointCode) : null);
         shipment.setShippedAt(shippedAt);
     }
 }
