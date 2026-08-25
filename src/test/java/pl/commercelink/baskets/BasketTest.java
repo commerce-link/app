@@ -3,12 +3,43 @@ package pl.commercelink.baskets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BasketTest {
+
+    @Test
+    @DisplayName("hoursToExpiry counts whole hours left until expiry")
+    void hoursToExpiryCountsWholeHoursLeftUntilExpiry() {
+        // given
+        Basket basket = new Basket();
+        basket.setExpiresAt(LocalDateTime.now().plusDays(2).plusHours(5).plusMinutes(30));
+
+        // when
+        long hours = basket.getHoursToExpiry();
+        long days = basket.getDaysToExpiry();
+
+        // then
+        assertThat(hours).isEqualTo(53);
+        assertThat(days).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("hoursToExpiry is zero for an already expired or undated basket")
+    void hoursToExpiryIsZeroForExpiredOrUndatedBasket() {
+        // given
+        Basket expired = new Basket();
+        expired.setExpiresAt(LocalDateTime.now().minusHours(3));
+        Basket undated = new Basket();
+
+        // when / then
+        assertThat(expired.getHoursToExpiry()).isZero();
+        assertThat(undated.getHoursToExpiry()).isZero();
+        assertThat(undated.getDaysToExpiry()).isZero();
+    }
 
     @Test
     @DisplayName("setBasketItems assigns zero-based positions following the list order")
