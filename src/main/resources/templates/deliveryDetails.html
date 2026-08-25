@@ -108,6 +108,20 @@
                                 <span th:text="${dropshipContact.email}"></span>
                             </div>
                         </div>
+                        <div class="field" th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived()}">
+                            <label class="label" th:text="#{deliveries.dropship.tracking.label}"></label>
+                            <div class="control">
+                                <span class="tag is-light"
+                                      th:text="#{${'deliveries.dropship.tracking.state.' + delivery.effectiveTrackingState.name()}}"></span>
+                                <span class="ml-2 has-text-grey is-size-7" th:if="${delivery.trackingLastCheckedAt != null}"
+                                      th:text="#{deliveries.dropship.tracking.lastChecked} + ': ' + ${#temporals.format(delivery.trackingLastCheckedAt, 'yyyy-MM-dd HH:mm')}"></span>
+                                <button type="submit" form="tracking-check-form" class="button is-white is-small p-1 ml-1"
+                                        th:if="${delivery.effectiveTrackingState.name() != 'UNSUPPORTED' and (isAdmin or isSuperAdmin)}"
+                                        th:title="#{deliveries.dropship.tracking.check}">
+                                    <span class="icon is-small has-text-grey"><i class="fas fa-truck"></i></span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="field" th:if="${delivery.dropship and dropshipShipment != null and dropshipShipment.type != null}">
                             <label class="label" th:text="#{order.shipment.type}"></label>
                             <div class="control">
@@ -195,6 +209,11 @@
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/refresh-order-id|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/refresh-order-id|}">
                     </form>
+                    <form id="tracking-check-form" method="post"
+                          th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
+                          th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/tracking/check|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/tracking/check|}">
+                    </form>
                     <form id="retry-purchase-form" method="post"
                           th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
@@ -259,6 +278,13 @@
             </div>
 
             <h2 th:text="#{deliveries.items}"></h2>
+
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingState != null and delivery.trackingState.name() == 'CANCELLED_BY_SUPPLIER'}"
+                 th:text="#{deliveries.dropship.tracking.notice.cancelled}"></div>
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingState != null and delivery.trackingState.name() == 'SHIPPED_WITHOUT_DATA'}"
+                 th:text="#{deliveries.dropship.tracking.notice.noData}"></div>
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingState != null and delivery.trackingState.name() == 'GIVEN_UP'}"
+                 th:text="#{deliveries.dropship.tracking.notice.givenUp}"></div>
 
             <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
                 <table class="table">

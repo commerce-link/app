@@ -164,4 +164,57 @@ class DropshipTemplateTest {
         assertThat(html).doesNotContain("deliveries.dropship.confirm.delivered");
         assertThat(html).doesNotContain("PersonalCollection");
     }
+
+    @Test
+    void deliveryDetailsShowSupplierTrackingRowWithManualCheck() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("deliveries.dropship.tracking.label");
+        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + delivery.effectiveTrackingState.name()}}");
+        assertThat(html).contains("deliveries.dropship.tracking.lastChecked");
+        assertThat(html).contains("form=\"tracking-check-form\"");
+        assertThat(html).contains("id=\"tracking-check-form\"");
+        assertThat(html).contains("/tracking/check");
+        assertThat(html).contains("deliveries.dropship.tracking.check");
+        assertThat(html).contains("fa-truck");
+    }
+
+    @Test
+    void deliveryDetailsWarnAboutTerminalTrackingStates() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("deliveries.dropship.tracking.notice.cancelled");
+        assertThat(html).contains("deliveries.dropship.tracking.notice.noData");
+        assertThat(html).contains("deliveries.dropship.tracking.notice.givenUp");
+        assertThat(html).contains("'CANCELLED_BY_SUPPLIER'");
+        assertThat(html).contains("'SHIPPED_WITHOUT_DATA'");
+        assertThat(html).contains("'GIVEN_UP'");
+    }
+
+    @Test
+    void trackingMessagesExistInBothLanguages() throws Exception {
+        // given
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
+
+        // then
+        for (String key : List.of(
+                "deliveries.dropship.tracking.label", "deliveries.dropship.tracking.lastChecked",
+                "deliveries.dropship.tracking.check",
+                "deliveries.dropship.tracking.state.PENDING", "deliveries.dropship.tracking.state.COMPLETED",
+                "deliveries.dropship.tracking.state.UNSUPPORTED", "deliveries.dropship.tracking.state.SHIPPED_WITHOUT_DATA",
+                "deliveries.dropship.tracking.state.CANCELLED_BY_SUPPLIER", "deliveries.dropship.tracking.state.GIVEN_UP",
+                "deliveries.dropship.tracking.notice.cancelled", "deliveries.dropship.tracking.notice.noData",
+                "deliveries.dropship.tracking.notice.givenUp",
+                "deliveries.dropship.tracking.result.confirmed", "deliveries.dropship.tracking.result.stillProcessing",
+                "deliveries.dropship.tracking.result.cancelled", "deliveries.dropship.tracking.result.noData",
+                "deliveries.dropship.tracking.result.unavailable")) {
+            assertThat(pl).as(key + " in pl").contains("\n" + key + "=");
+            assertThat(en).as(key + " in en").contains("\n" + key + "=");
+        }
+    }
 }
