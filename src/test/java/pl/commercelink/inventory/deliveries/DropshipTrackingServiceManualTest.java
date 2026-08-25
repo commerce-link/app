@@ -13,6 +13,10 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderState;
 import pl.commercelink.inventory.supplier.api.SupplierOrderTracking;
 import pl.commercelink.inventory.supplier.api.SupplierParcel;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
+import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.util.OperationResult;
 
@@ -21,10 +25,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +41,7 @@ import static org.mockito.Mockito.when;
 class DropshipTrackingServiceManualTest {
 
     private static final String STORE_ID = "store-1";
+    private static final String ORDER_ID = "order-1";
     private static final ZoneId ZONE = ZoneId.of("Europe/Warsaw");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 25, 12, 0);
 
@@ -109,7 +117,47 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.STILL_PROCESSING);
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
+    }
+
+    @Test
+    void manualCheckOnGivenUpAppliesParcelsAndConfirms() {
+        // given
+        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("customer@example.com");
+        order.setBillingDetails(billingDetails);
+        OrderItem item = new OrderItem(ORDER_ID, "Category", "Product 1", 1, 100.0, null, false);
+        item.setItemId("1");
+        item.setDeliveryId(delivery.getDeliveryId());
+        item.setStatus(FulfilmentStatus.Ordered);
+        item.setEan("5900000000001");
+        item.setManufacturerCode("MFN-1");
+        Allocation allocation = Allocation.fromOrderItem(order, item);
+        allocation.setInAllocation(true);
+        delivery.setAllocations(List.of(allocation));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(provider.trackOrder(any())).thenReturn(Optional.of(new SupplierOrderTracking(SupplierOrderState.SHIPPED,
+                List.of(new SupplierParcel("DPD", "PKG-1", null, null, null)))));
+        when(completion.confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), any(), any()))
+                .thenAnswer(invocation -> {
+                    BiConsumer<Delivery, DropshipShipmentResult> beforeSave = invocation.getArgument(5);
+                    beforeSave.accept(invocation.getArgument(1), DropshipShipmentResult.COMPLETED);
+                    return OperationResult.success(DropshipShipmentResult.COMPLETED);
+                });
+
+        // when
+        ManualTrackingOutcome outcome = service.checkManually(STORE_ID, delivery.getDeliveryId());
+
+        // then
+        assertThat(outcome).isEqualTo(ManualTrackingOutcome.CONFIRMED);
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_APPLIED");
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test
@@ -138,12 +186,17 @@ class DropshipTrackingServiceManualTest {
         Delivery pending = new Delivery(STORE_ID, "X", "Acme");
         pending.setType(DeliveryType.DROPSHIP);
         pending.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Delivery received = new Delivery(STORE_ID, "X", "Acme");
+        received.setType(DeliveryType.DROPSHIP);
+        received.markAsReceived();
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, unsupported.getDeliveryId())).thenReturn(unsupported);
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, pending.getDeliveryId())).thenReturn(pending);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, received.getDeliveryId())).thenReturn(received);
 
         // when / then
         assertThat(service.checkManually(STORE_ID, unsupported.getDeliveryId())).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
         assertThat(service.checkManually(STORE_ID, pending.getDeliveryId())).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
+        assertThat(service.checkManually(STORE_ID, received.getDeliveryId())).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
         assertThat(service.checkManually(STORE_ID, "missing")).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
         verify(provider, never()).trackOrder(any());
     }
