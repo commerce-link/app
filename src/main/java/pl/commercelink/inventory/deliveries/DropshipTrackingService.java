@@ -177,7 +177,17 @@ public class DropshipTrackingService {
             List<Allocation> remaining = open.stream().filter(allocation -> !selected.contains(allocation)).toList();
             DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, parcel.carrier(), parcel.trackingNo(),
                     null, parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl());
-            OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment);
+            OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment,
+                    (d, r) -> {
+                        d.addEvent(new Event(EventType.action, TRACKING_APPLIED_EVENT, now));
+                        if (r == DropshipShipmentResult.COMPLETED) {
+                            d.setTrackingState(DeliveryTrackingState.COMPLETED);
+                            d.setTrackingNextCheckAt(null);
+                        } else {
+                            d.setTrackingState(DeliveryTrackingState.PENDING);
+                            d.setTrackingNextCheckAt(now.plus(properties.intervalFor(ageOf(d, now))));
+                        }
+                    });
             if (!result.isSuccess()) {
                 if (ORDER_CANCELLED_MESSAGE.equals(result.getMessage())) {
                     finish(delivery, DeliveryTrackingState.GIVEN_UP, TRACKING_GIVEN_UP_EVENT, now);
@@ -188,23 +198,16 @@ public class DropshipTrackingService {
             }
             applied++;
             open = remaining;
-            delivery.addEvent(new Event(EventType.action, TRACKING_APPLIED_EVENT, now));
             log.info("Dropship parcel applied: store={} delivery={} provider={} externalOrderId={} trackingNo={} result={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getExternalDeliveryId(),
                     parcel.trackingNo(), result.getPayload());
             if (result.getPayload() == DropshipShipmentResult.COMPLETED) {
-                delivery.setTrackingState(DeliveryTrackingState.COMPLETED);
-                delivery.setTrackingNextCheckAt(null);
-                deliveriesRepository.save(delivery);
                 return TrackingOutcome.APPLIED;
             }
         }
         if (applied == 0) {
             return scheduleNext(delivery, now, manual);
         }
-        delivery.setTrackingState(DeliveryTrackingState.PENDING);
-        delivery.setTrackingNextCheckAt(now.plus(properties.intervalFor(ageOf(delivery, now))));
-        deliveriesRepository.save(delivery);
         return TrackingOutcome.APPLIED;
     }
 
