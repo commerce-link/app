@@ -258,7 +258,7 @@ class DropshipTemplateTest {
 
         // then
         assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
-        assertThat(fragment).contains("orders.dropship.confirm.consignee");
+        assertThat(fragment).contains("orders.dropship.consignee.address");
         for (String field : List.of("${consignee.displayName}", "${consignee.streetAndNumber}", "${consignee.postalCode}",
                 "${consignee.city}", "${consignee.country}", "${consignee.phone}", "${consignee.email}")) {
             assertThat(fragment).contains(field);
