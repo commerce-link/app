@@ -20,8 +20,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -65,6 +67,10 @@ public class Delivery {
     private String deliveryAddress;
     @DynamoDBAttribute(attributeName = "deliveryAddressId")
     private String deliveryAddressId;
+    @DynamoDBAttribute(attributeName = "supplierOptions")
+    private Map<String, String> supplierOptions = new HashMap<>();
+    @DynamoDBAttribute(attributeName = "supplierOptionsLabel")
+    private String supplierOptionsLabel;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
@@ -487,6 +493,22 @@ public class Delivery {
 
     public void setDeliveryAddressId(String deliveryAddressId) {
         this.deliveryAddressId = deliveryAddressId;
+    }
+
+    public Map<String, String> getSupplierOptions() {
+        return supplierOptions;
+    }
+
+    public void setSupplierOptions(Map<String, String> supplierOptions) {
+        this.supplierOptions = supplierOptions == null ? new HashMap<>() : supplierOptions;
+    }
+
+    public String getSupplierOptionsLabel() {
+        return supplierOptionsLabel;
+    }
+
+    public void setSupplierOptionsLabel(String supplierOptionsLabel) {
+        this.supplierOptionsLabel = supplierOptionsLabel;
     }
 
     public ConnectionMode getConnectionMode() {

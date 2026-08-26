@@ -9,6 +9,7 @@ import pl.commercelink.inventory.supplier.api.SupplierConsignee;
 import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -43,6 +44,7 @@ public class DropshipPurchaseService {
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final SupplierProviderResolver supplierProviderResolver;
     private final OrdersRepository ordersRepository;
+    private final DropshipOrderLocator dropshipOrderLocator;
 
     public boolean isDropshipAvailable(String storeId, String provider) {
         try {
@@ -125,6 +127,16 @@ public class DropshipPurchaseService {
     /** The order's first shipment, when it is a pickup-point delivery. */
     public static Optional<Shipment> pickupShipment(Order order) {
         return order.firstShipment().filter(shipment -> shipment.getType() == ShipmentType.PickupPoint);
+    }
+
+    public static SupplierOrderOptionsContext optionsContext(Order order) {
+        return SupplierOrderOptionsContext.dropship(toPickupPoint(order).orElse(null));
+    }
+
+    /** The order claiming a dropship delivery's allocations, resolved the same way placement does. */
+    public Optional<Order> orderOf(String storeId, Delivery delivery) {
+        return dropshipOrderLocator.locate(delivery.getDeliveryId())
+                .map(orderId -> ordersRepository.findById(storeId, orderId));
     }
 
     public OperationResult<String> createManualDropship(String storeId, Order order, DeliveryCreationForm form) {

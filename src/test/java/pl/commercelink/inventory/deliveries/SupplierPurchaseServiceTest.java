@@ -20,6 +20,9 @@ import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOutcomeUnknownException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderRejectedException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
@@ -49,6 +52,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -65,6 +69,8 @@ class SupplierPurchaseServiceTest {
     private static final String PROVIDER = "Acme";
     private static final String DELIVERY_ID = "delivery-1";
     private static final LocalDate ESTIMATED_DELIVERY_AT = LocalDate.of(2026, 9, 1);
+    private static final List<SupplierOrderOption> LANE_OPTION = List.of(new SupplierOrderOption("lane", "Lane",
+            List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true));
 
     @Mock
     private SupplierProviderResolver supplierProviderResolver;
@@ -185,6 +191,77 @@ class SupplierPurchaseServiceTest {
 
         // when / then
         assertThrows(SupplierOrderException.class, () -> service.deliveryAddresses(STORE_ID, PROVIDER));
+    }
+
+    @Test
+    void orderOptionsComeFromTheProvider() {
+        // given
+        when(supplierProvider.orderOptions(SupplierOrderOptionsContext.warehouse())).thenReturn(LANE_OPTION);
+
+        // when / then
+        assertEquals(LANE_OPTION, service.orderOptions(STORE_ID, PROVIDER, SupplierOrderOptionsContext.warehouse()));
+    }
+
+    @Test
+    void orderOptionsFailureIsNotSwallowed() {
+        // given
+        when(supplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+
+        // when / then
+        assertThrows(SupplierOrderException.class,
+                () -> service.orderOptions(STORE_ID, PROVIDER, SupplierOrderOptionsContext.warehouse()));
+    }
+
+    @Test
+    void purchaseRefusedWhenRequiredOptionMissing() {
+        // given
+        when(supplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.options", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void submitPurchaseStoresChosenOptionsAndLabelOnDelivery() {
+        // given
+        when(supplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.getSupplierOptions().put("lane", "fast");
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+
+        // when
+        service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
+        assertEquals("Lane: Fast", saved.getValue().getSupplierOptionsLabel());
+    }
+
+    @Test
+    void globalSubmissionDoesNotRequireOptionsUpFront() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertTrue(result.getPayload().awaitingApproval());
+        verify(deliveriesRepository).save(any());
     }
 
     @Test
@@ -468,6 +545,31 @@ class SupplierPurchaseServiceTest {
         assertEquals(1, request.getValue().lines().size());
         assertEquals(2, request.getValue().lines().getFirst().quantity());
         assertEquals("addr-7", request.getValue().deliveryAddressId());
+    }
+
+    @Test
+    void processPendingCarriesTheChosenOptionsThroughTheQueue() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setSupplierOptions(Map.of("lane", "fast"));
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 180.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
+
+        // then
+        ArgumentCaptor<SupplierPurchaseRequest> request = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).placeOrder(request.capture());
+        assertEquals(Map.of("lane", "fast"), request.getValue().options());
     }
 
     @Test
@@ -1124,6 +1226,48 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void approveStoresChosenOptionsOnDelivery() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(globalSupplierProvider.orderOptions(SupplierOrderOptionsContext.warehouse())).thenReturn(LANE_OPTION);
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "addr-9", Map.of("lane", "fast"));
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        assertEquals("Lane: Fast", delivery.getSupplierOptionsLabel());
+    }
+
+    @Test
+    void approvalIsRefusedWhenARequiredOptionIsMissing() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(globalSupplierProvider.orderOptions(SupplierOrderOptionsContext.warehouse())).thenReturn(LANE_OPTION);
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "addr-9", Map.of());
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.options", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+    }
+
+    @Test
     void approvalIsRefusedWhenTheSupplierRequiresAnAddressAndNoneWasChosen() throws Exception {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
@@ -1532,6 +1676,33 @@ class SupplierPurchaseServiceTest {
         assertTrue(result.isSuccess());
         verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDER_RECONCILED"));
+    }
+
+    @Test
+    void reconcileCarriesTheChosenOptions() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setSupplierOptions(Map.of("lane", "fast"));
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any())).thenReturn(Optional.of(new SupplierOrderResult(
+                "555", 180.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        ArgumentCaptor<SupplierPurchaseRequest> request = ArgumentCaptor.forClass(SupplierPurchaseRequest.class);
+        verify(supplierProvider).findPlacedOrder(request.capture());
+        assertEquals(Map.of("lane", "fast"), request.getValue().options());
     }
 
     @Test
