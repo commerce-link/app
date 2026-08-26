@@ -599,6 +599,29 @@ class DropshipPurchaseServiceTest {
     }
 
     @Test
+    void submitDropshipAcceptsPickupPointOrdersWhenTheProviderSupportsThem() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("5900000000001", "MFN-1", 1, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, pickupPointOrder(), form, "ref-1");
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertThat(saved.getValue().getOrderStatus()).isEqualTo(DeliveryOrderStatus.ORDER_PENDING);
+        ArgumentCaptor<SupplierPurchaseEventRequest> event =
+                ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture());
+        assertThat(event.getValue().getOrderId()).isEqualTo(ORDER_ID);
+    }
+
+    @Test
     void createManualDropshipAcceptsPickupPointOrdersRegardlessOfTheProvider() {
         // given
         connectSupplier(ConnectionMode.OWN);

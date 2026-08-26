@@ -301,4 +301,30 @@ class DropshipTemplateTest {
         assertThat(read("dropshipConfirmation.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
         assertThat(read("deliveryApproval.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
     }
+
+    @Test
+    void confirmationScreenShowsThePurchaseBlockedReasonAndDisablesTheSubmitButton() throws Exception {
+        // when
+        String html = read("dropshipConfirmation.html");
+
+        // then
+        assertThat(html).contains("th:if=\"${purchaseBlockedReason != null}\"");
+        assertThat(html).contains("#{${purchaseBlockedReason}}");
+        assertThat(html).contains("id=\"purchase-confirm-submit\"");
+        assertThat(html).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
+    }
+
+    @Test
+    void pickupPointMessagesExistInBothLanguages() throws Exception {
+        // given
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
+
+        // then
+        for (String key : List.of("orders.dropship.error.pickupPointUnsupported",
+                "orders.dropship.error.pickupPointIncomplete", "orders.dropship.confirm.pickupPoint")) {
+            assertThat(pl).as(key + " in pl").contains("\n" + key + "=");
+            assertThat(en).as(key + " in en").contains("\n" + key + "=");
+        }
+    }
 }

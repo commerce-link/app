@@ -75,15 +75,9 @@ public class DropshipPurchaseService {
         if (!isDropshipAvailable(storeId, form.getProvider())) {
             return OperationResult.failure("orders.dropship.error.unsupported");
         }
-        if (requiresPickupPoint(order)) {
-            if (!isPickupPointDropshipAvailable(storeId, form.getProvider())) {
-                return OperationResult.failure("orders.dropship.error.pickupPointUnsupported");
-            }
-            try {
-                toPickupPoint(order);
-            } catch (IllegalArgumentException e) {
-                return OperationResult.failure("orders.dropship.error.pickupPointIncomplete");
-            }
+        String blocked = purchaseBlockedReason(storeId, order, form.getProvider());
+        if (blocked != null) {
+            return OperationResult.failure(blocked);
         }
         Store store = storesRepository.findById(storeId);
         if (store == null) {
@@ -214,14 +208,13 @@ public class DropshipPurchaseService {
 
     /** The customer's pickup point, when the order's first shipment is a pickup-point delivery. */
     static Optional<SupplierPickupPoint> toPickupPoint(Order order) {
-        return order.firstShipment()
-                .filter(shipment -> shipment.getType() == ShipmentType.PickupPoint)
+        return pickupShipment(order)
                 .map(shipment -> new SupplierPickupPoint(shipment.getCarrier(), shipment.getCollectionPointCode(),
                         null, null, null, null));
     }
 
     static boolean requiresPickupPoint(Order order) {
-        return order.firstShipment().map(shipment -> shipment.getType() == ShipmentType.PickupPoint).orElse(false);
+        return pickupShipment(order).isPresent();
     }
 
     static SupplierConsignee toConsignee(ShippingDetails details) {

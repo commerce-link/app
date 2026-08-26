@@ -391,7 +391,7 @@ class DropshipTrackingServiceParcelsTest {
     }
 
     @Test
-    void pickupPointOrderWithBlankCollectionPointCodeFailsValidationAndRecordsAnError() {
+    void pickupPointOrderWithBlankCollectionPointCodeIsFinishedAsShippedWithoutData() {
         // given
         Shipment chosen = new Shipment();
         chosen.setType(ShipmentType.PickupPoint);
@@ -403,10 +403,12 @@ class DropshipTrackingServiceParcelsTest {
         TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
 
         // then
-        assertThat(outcome).isEqualTo(TrackingOutcome.ERROR);
+        assertThat(outcome).isEqualTo(TrackingOutcome.NO_DATA);
+        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
+        assertThat(delivery.getTrackingNextCheckAt()).isNull();
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
         assertThat(delivery.getTrackingLastError()).contains("deliveries.dropship.shipment.error.collectionPoint");
-        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(1);
+        assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_NO_DATA");
     }
 
     @Test

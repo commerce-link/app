@@ -192,6 +192,9 @@ public class DropshipTrackingService {
             Set<Allocation> taken = Collections.newSetFromMap(new IdentityHashMap<>());
             taken.addAll(selected);
             List<Allocation> remaining = open.stream().filter(allocation -> !taken.contains(allocation)).toList();
+            // The supplier's parcel carrier overwrites the customer-chosen carrier on the reused PickupPoint
+            // shipment (e.g. DPD delivering to an InPost point): the waybill carrier is what marketplaces need,
+            // while the point code stays the customer's own.
             ShipmentType type = pickup != null ? ShipmentType.PickupPoint : ShipmentType.Courier;
             String collectionPointCode = pickup != null ? pickup.getCollectionPointCode() : null;
             LocalDateTime shippedAt = parcel.shippedAt() != null ? parcel.shippedAt() : now;
@@ -199,8 +202,13 @@ public class DropshipTrackingService {
                     collectionPointCode, shippedAt, parcel.trackingUrl());
             String invalidShipment = shipment.validationError();
             if (invalidShipment != null) {
-                return recordError(delivery, now, manual,
-                        new IllegalStateException("Supplier parcel cannot be applied: " + invalidShipment));
+                delivery.setTrackingLastError("Supplier parcel cannot be applied: " + invalidShipment);
+                finish(delivery, DeliveryTrackingState.SHIPPED_WITHOUT_DATA, TRACKING_NO_DATA_EVENT, now);
+                log.error("Supplier parcel failed validation, dropship delivery finished as shipped without data: "
+                                + "store={} delivery={} provider={} externalOrderId={} error={}",
+                        storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getExternalDeliveryId(),
+                        invalidShipment);
+                return TrackingOutcome.NO_DATA;
             }
             OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment,
                     (d, r) -> {
