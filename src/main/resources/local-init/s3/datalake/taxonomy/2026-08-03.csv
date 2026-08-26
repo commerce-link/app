@@ -153,3 +153,8 @@ ean;mfn;brand;name;category;category_id;data_accuracy_score;net_weight_g;gross_w
 5900000000152;82XF004YPB;Lenovo;Lenovo IdeaPad Slim 5 14 Ryzen 5;Notebooki/laptopy;151;1;1800;2500
 5900000000153;X1504ZA-BQ456;ASUS;ASUS VivoBook 15 i5;Notebooki/laptopy;151;1;1800;2500
 5900000000154;85A08EA;HP;HP 255 G10 Ryzen 5;Notebooki/laptopy;151;1;1800;2500
+5900000000901;SIM-OK;Acme;Symulacja: zakup OK;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
+5900000000902;SIM-UNKNOWN-PLACED;Acme;Symulacja: timeout, zamówienie u dostawcy istnieje;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
+5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502, zamówienia nie ma;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
+5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie przez dostawcę;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
+5900000000905;SIM-BLANK-ID;Acme;Symulacja: odpowiedź bez numeru zamówienia;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150

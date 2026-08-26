@@ -20,6 +20,7 @@ import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.Product;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderSourceType;
@@ -814,5 +815,100 @@ class DemoStoreSeederTest {
         firstRun.itemsByOrderId().forEach((orderId, items) ->
                 assertEquals(items.stream().map(OrderItem::getItemId).toList(),
                         secondRun.itemsByOrderId().get(orderId).stream().map(OrderItem::getItemId).toList()));
+    }
+
+    @Test
+    void seedsOneOrderPerSimProductPerSupplierWhenAcmeIsRegistered() {
+        // given
+        List<CatalogSeedRow> allRows = CatalogSeed.load();
+        List<CatalogSeedRow> rows = DemoStoreSeeder.filterSimulationRows(allRows, true);
+
+        // when
+        SimOrders simOrders = DemoStoreSeeder.buildSimOrders("store-1", rows);
+
+        // then
+        assertEquals(10, simOrders.orders().size());
+        simOrders.orders().forEach(order -> {
+            List<OrderItem> items = simOrders.itemsByOrderId().get(order.getOrderId());
+            assertEquals(1, items.size());
+            OrderItem item = items.getFirst();
+            assertTrue(item.getManufacturerCode().startsWith("SIM-"));
+            assertEquals(FulfilmentStatus.Allocation, item.getStatus());
+            assertTrue(item.getDeliveryId().equals("Acme") || item.getDeliveryId().equals("AcmeB"));
+            assertEquals("Symulacja", order.getBillingDetails().getName());
+            CatalogSeedRow row = rows.stream()
+                    .filter(r -> r.mfn().equals(item.getManufacturerCode()))
+                    .findFirst().orElseThrow();
+            assertEquals(row.name().replaceFirst("^Symulacja: ", ""), order.getBillingDetails().getSurname());
+        });
+
+        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1");
+        assertTrue(products.stream().anyMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
+
+        String pricelist = readClasspathResource("/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv");
+        assertTrue(pricelist.contains("SIM-"));
+    }
+
+    @Test
+    void filtersOutSimRowsAndProductsWhenAcmeIsNotRegistered() {
+        // given
+        List<CatalogSeedRow> allRows = CatalogSeed.load();
+        List<CatalogSeedRow> rows = DemoStoreSeeder.filterSimulationRows(allRows, false);
+
+        // when
+        SimOrders simOrders = DemoStoreSeeder.buildSimOrders("store-1", rows);
+        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1");
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then
+        assertTrue(rows.stream().noneMatch(row -> row.mfn().startsWith("SIM-")));
+        assertTrue(simOrders.orders().isEmpty());
+        assertTrue(simOrders.itemsByOrderId().isEmpty());
+        assertTrue(simOrders.events().isEmpty());
+        assertTrue(products.stream().noneMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
+        assertEquals(4, demoOrders.orders().size());
+
+        String pricelist = DemoStoreSeeder.filterSimulationPricelistRows(
+                readClasspathResource("/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv"));
+        assertFalse(pricelist.contains("SIM-"));
+        assertTrue(pricelist.startsWith("PimId;EAN;Mfn"));
+    }
+
+    @Test
+    void completedOrdersAndWarehouseStockNeverSeeSimRowsWhenAcmeIsNotRegistered() {
+        // given
+        List<CatalogSeedRow> rows = DemoStoreSeeder.filterSimulationRows(CatalogSeed.load(), false);
+
+        // when
+        CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+
+        // then
+        completed.itemsByOrderId().values().stream()
+                .flatMap(List::stream)
+                .forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
+        stock.items().forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
+    }
+
+    @Test
+    void slugifiesSimulationCustomerEmailButKeepsExistingEmailsByteIdentical() {
+        // given
+        String storeId = "store-1";
+
+        // when
+        String existingEmail = DemoStoreSeeder.customerEmail(storeId, "Jan", "Kowalski");
+        String simEmail = DemoStoreSeeder.customerEmail(storeId, "Symulacja", "timeout, zamówienie u dostawcy istnieje");
+
+        // then
+        assertEquals("jan.kowalski14@test.com", existingEmail);
+        assertEquals("symulacja.timeout.zamowienie.u.dostawcy.istnieje31@test.com", simEmail);
+    }
+
+    private static String readClasspathResource(String resource) {
+        try (java.io.InputStream stream = DemoStoreSeeder.class.getResourceAsStream(resource)) {
+            return new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 }
