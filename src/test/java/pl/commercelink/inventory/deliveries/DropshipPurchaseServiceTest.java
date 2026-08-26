@@ -14,10 +14,13 @@ import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
+import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.util.OperationResult;
@@ -32,6 +35,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -460,5 +465,92 @@ class DropshipPurchaseServiceTest {
         assertEquals("jan.kowalski@example.com", consignee.email());
         assertEquals("ref-1", request.getValue().clientOrderRef());
         assertEquals("CommerceLink ref-1", request.getValue().deliveryInstructions());
+    }
+
+    private static Order pickupPointOrder() {
+        Order order = directToConsumerOrder();
+        Shipment shipment = new Shipment();
+        shipment.setType(ShipmentType.PickupPoint);
+        shipment.setCarrier("InPost");
+        shipment.setCollectionPointCode("WAW04A");
+        order.addShipment(shipment);
+        return order;
+    }
+
+    @Test
+    void toPickupPointIsEmptyForCourierOrders() {
+        // given
+        Order order = pickupPointOrder();
+        order.firstShipment().orElseThrow().setType(ShipmentType.Courier);
+
+        // when / then
+        assertThat(DropshipPurchaseService.toPickupPoint(order)).isEmpty();
+    }
+
+    @Test
+    void toPickupPointMapsCarrierAndCodeFromTheFirstShipment() {
+        // when
+        SupplierPickupPoint point = DropshipPurchaseService.toPickupPoint(pickupPointOrder()).orElseThrow();
+
+        // then
+        assertThat(point.carrier()).isEqualTo("InPost");
+        assertThat(point.code()).isEqualTo("WAW04A");
+        assertThat(point.name()).isNull();
+    }
+
+    @Test
+    void toPickupPointRejectsAPickupShipmentWithoutCode() {
+        // given
+        Order order = pickupPointOrder();
+        order.firstShipment().orElseThrow().setCollectionPointCode(" ");
+
+        // when / then
+        assertThatThrownBy(() -> DropshipPurchaseService.toPickupPoint(order))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void placeDropshipOrderPassesThePickupPointToTheSupplier() {
+        // given
+        Order order = pickupPointOrder();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setPurchaseRef("ref-1");
+        List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-1", "5900000000001", "MFN-1", 1));
+        when(supplierProvider.placeDropshipOrder(any())).thenReturn(new SupplierOrderResult("ACME-DS-ref-1", 10.0, "PLN", List.of()));
+
+        // when
+        service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID);
+
+        // then
+        ArgumentCaptor<SupplierDropshipRequest> request = ArgumentCaptor.forClass(SupplierDropshipRequest.class);
+        verify(supplierProvider).placeDropshipOrder(request.capture());
+        assertThat(request.getValue().pickupPoint()).isEqualTo(new SupplierPickupPoint("InPost", "WAW04A", null, null, null, null));
+        assertThat(request.getValue().consignee()).isNotNull();
+    }
+
+    @Test
+    void placeDropshipOrderFailsWhenThePickupShipmentIsIncomplete() {
+        // given
+        Order order = pickupPointOrder();
+        order.firstShipment().orElseThrow().setCarrier(null);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-1", "5900000000001", "MFN-1", 1));
+
+        // when / then
+        assertThatThrownBy(() -> service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID))
+                .isInstanceOf(SupplierOrderException.class);
+        verify(supplierProvider, never()).placeDropshipOrder(any());
+    }
+
+    @Test
+    void pickupPointAvailabilityFollowsTheProviderCapability() {
+        // given
+        when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
+
+        // when / then
+        assertThat(service.isPickupPointDropshipAvailable(STORE_ID, PROVIDER)).isTrue();
+        assertThat(service.isPickupPointDropshipAvailable(STORE_ID, "Unknown")).isFalse();
     }
 }

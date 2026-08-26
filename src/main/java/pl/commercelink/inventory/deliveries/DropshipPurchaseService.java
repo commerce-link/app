@@ -10,9 +10,11 @@ import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
+import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -45,6 +47,15 @@ public class DropshipPurchaseService {
         try {
             SupplierProvider supplierProvider = supplierProviderResolver.resolve(storeId, provider);
             return supplierProvider != null && supplierProvider.supportsDropshipping();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isPickupPointDropshipAvailable(String storeId, String provider) {
+        try {
+            SupplierProvider supplierProvider = supplierProviderResolver.resolve(storeId, provider);
+            return supplierProvider != null && supplierProvider.supportsPickupPointDropship();
         } catch (Exception e) {
             return false;
         }
@@ -156,14 +167,28 @@ public class DropshipPurchaseService {
                     + " has no complete shipping details for a dropship purchase");
         }
         SupplierConsignee consignee;
+        SupplierPickupPoint pickupPoint;
         try {
             consignee = toConsignee(order.getShippingDetails());
+            pickupPoint = toPickupPoint(order).orElse(null);
         } catch (IllegalArgumentException e) {
             throw new SupplierOrderException(e.getMessage());
         }
         return supplierProviderResolver.resolve(storeId, delivery.getProvider()).placeDropshipOrder(
                 new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
-                        "CommerceLink " + delivery.getPurchaseRef()));
+                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint));
+    }
+
+    /** The customer's pickup point, when the order's first shipment is a pickup-point delivery. */
+    static Optional<SupplierPickupPoint> toPickupPoint(Order order) {
+        return order.firstShipment()
+                .filter(shipment -> shipment.getType() == ShipmentType.PickupPoint)
+                .map(shipment -> new SupplierPickupPoint(shipment.getCarrier(), shipment.getCollectionPointCode(),
+                        null, null, null, null));
+    }
+
+    static boolean requiresPickupPoint(Order order) {
+        return order.firstShipment().map(shipment -> shipment.getType() == ShipmentType.PickupPoint).orElse(false);
     }
 
     static SupplierConsignee toConsignee(ShippingDetails details) {
