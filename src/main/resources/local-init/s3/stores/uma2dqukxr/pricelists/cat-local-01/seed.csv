@@ -104,3 +104,8 @@ local-seed-9013;5901000000003;MFN-SING-01;Logitech;Singular 4K Stream;Logitech S
 local-seed-9014;5902000000001;MFN-ONLY-01;SteelSeries;OnlyHere QcK XXL;SteelSeries OnlyHere QcK XXL;MousePads;219;40;2;239;false
 local-seed-9015;5902000000002;MFN-EXCL-01;Edifier;Exclusive R1280DBs;Edifier Exclusive R1280DBs;Speakers;639;18;2;679;false
 local-seed-9016;5902000000003;MFN-UNIQ-01;Lenovo;UniqueBook 15 Pro;Lenovo UniqueBook 15 Pro;Laptops;6089;6;2;6459;false
+local-seed-sim-01;5900000000901;SIM-OK;Acme;Symulacja: zakup OK;Symulacja: zakup OK;Akcesoria;20;100;1;20;false
+local-seed-sim-02;5900000000902;SIM-UNKNOWN-PLACED;Acme;Symulacja: timeout (zamówienie istnieje);Symulacja: timeout, zamówienie u dostawcy istnieje;Akcesoria;20;100;1;20;false
+local-seed-sim-03;5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502 (zamówienia brak);Symulacja: HTTP 502, zamówienia nie ma;Akcesoria;20;100;1;20;false
+local-seed-sim-04;5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie dostawcy;Symulacja: odrzucenie przez dostawcę;Akcesoria;20;100;1;20;false
+local-seed-sim-05;5900000000905;SIM-BLANK-ID;Acme;Symulacja: brak numeru zamówienia;Symulacja: odpowiedź bez numeru zamówienia;Akcesoria;20;100;1;20;false
