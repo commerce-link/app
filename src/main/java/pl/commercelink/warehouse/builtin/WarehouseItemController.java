@@ -16,6 +16,7 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Arrays;
@@ -53,6 +54,9 @@ class WarehouseItemController {
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
 
+    @Autowired
+    private WarehouseItemUpdateService warehouseItemUpdateService;
+
     @GetMapping("/dashboard/warehouse/items/add")
     String addWarehouseItem(Model model) {
         return showWarehouseItemDetails(model, WarehouseItem.empty(getStoreId()));
@@ -79,6 +83,7 @@ class WarehouseItemController {
         model.addAttribute("productCategories", storeCategories.namesFor(getStoreId()));
         model.addAttribute("productCategoryGroups", storeCategories.groupsFor(getStoreId()));
         model.addAttribute("fulfilmentStatuses", getAvailableStatuses(isEdit));
+        model.addAttribute("itemConditions", ItemCondition.values());
         model.addAttribute("warehouseItem", item);
         model.addAttribute("isEdit", isEdit);
 
@@ -130,9 +135,8 @@ class WarehouseItemController {
 
     @PostMapping("/dashboard/warehouse/items/{itemId}/save")
     String saveWarehouseItem(@PathVariable("itemId") String itemId,
-                                    @ModelAttribute WarehouseItem updatedItem,
-                                    Model model,
-                                    RedirectAttributes redirectAttributes) {
+                             @ModelAttribute WarehouseItem updatedItem,
+                             Model model) {
         WarehouseItem existingItem = warehouseRepository.findById(getStoreId(), itemId);
         boolean isNewItem = existingItem == null;
 
@@ -146,24 +150,24 @@ class WarehouseItemController {
                     CustomSecurityContext.getLoggedInUserName()
             );
             if (!result.isSuccess()) {
-                redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+                model.addAttribute("errorMessage", result.getMessage());
+                return showWarehouseItemDetails(model, updatedItem);
             }
-            return showWarehouseItemDetails(model, updatedItem);
+            return redirectToWarehouseFilteredBy(updatedItem.getStatus());
         }
 
-        existingItem.update(updatedItem);
-        return save(model, existingItem);
+        warehouseItemUpdateService.update(getStoreId(), existingItem, updatedItem);
+        return redirectToWarehouseFilteredBy(existingItem.getStatus());
+    }
+
+    private static String redirectToWarehouseFilteredBy(FulfilmentStatus status) {
+        return "redirect:/dashboard/warehouse?statuses=" + status.name();
     }
 
     @PostMapping("/dashboard/warehouse/items/{itemId}/delete")
     String deleteWarehouseItem(@PathVariable("itemId") String itemId) {
         warehouseAllocationsManager.remove(getStoreId(), itemId);
         return "redirect:/dashboard/warehouse";
-    }
-
-    private String save(Model model, WarehouseItem item) {
-        warehouseRepository.save(item);
-        return showWarehouseItemDetails(model, item);
     }
 
     private String getStoreId() {

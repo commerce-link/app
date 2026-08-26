@@ -296,8 +296,7 @@
     document.getElementById('confirmSaveButton').addEventListener('click', function() {
         if (onConfirmCallback) {
             onConfirmCallback();
-        }
-        if (formToSubmit) {
+        } else if (formToSubmit) {
             formToSubmit.submit();
         }
     });

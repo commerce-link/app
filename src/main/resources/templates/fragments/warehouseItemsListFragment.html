@@ -38,7 +38,12 @@
                         <td th:text="${item.category}"></td>
                         <td th:text="${item.ean}"></td>
                         <td th:text="${item.manufacturerCode}"></td>
-                        <td th:text="${item.name}"></td>
+                        <td>
+                            <span th:text="${item.name}"></span>
+                            <span class="tag ml-1" th:unless="${item.sealed}"
+                                  th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
+                                  th:text="${enumI18n.localize(item.condition)}"></span>
+                        </td>
                         <td th:text="${item.qty}"></td>
                         <td th:text="${item.unitCost.netValue}"></td>
                         <td>

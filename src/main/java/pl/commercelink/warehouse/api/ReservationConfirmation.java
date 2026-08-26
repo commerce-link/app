@@ -9,5 +9,6 @@ public record ReservationConfirmation(
         Price cost,
         int qty,
         boolean inStock,
-        String comment
+        String comment,
+        ItemCondition condition
 ) {}

@@ -14,8 +14,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
-import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.orders.*;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -58,6 +57,9 @@ public class WebController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
+
+    @Autowired
+    private Warehouse warehouse;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -166,8 +168,19 @@ public class WebController {
             matchedInventory = inventoryView.findByEan(ean);
         }
 
-        mapProductPrice(model, matchedInventory);
+        mapProductPrice(model, matchedInventory, notSealedWarehouseItems(matchedInventory));
         return mapInventory(model, inventory);
+    }
+
+    private List<InventoryItemView> notSealedWarehouseItems(MatchedInventory matchedInventory) {
+        if (matchedInventory == null) {
+            return List.of();
+        }
+        return warehouse.stockQueryService(getStoreId())
+                .searchNotSealedAvailableByMfns(getStoreId(), matchedInventory.getMfnCodes())
+                .stream()
+                .map(InventoryItemView::from)
+                .toList();
     }
 
     private String mapInventory(Model model, Inventory _inventory) {
@@ -195,7 +208,7 @@ public class WebController {
         return "inventory";
     }
 
-    private void mapProductPrice(Model model, MatchedInventory matchedInventory) {
+    private void mapProductPrice(Model model, MatchedInventory matchedInventory, List<InventoryItemView> notSealedWarehouseItems) {
         if (matchedInventory != null && matchedInventory.hasAnyOffers()) {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
 
@@ -206,9 +219,11 @@ public class WebController {
             model.addAttribute("lowestGrossPrice", matchedInventory.getLowestPrice().grossValue());
             model.addAttribute("medianGrossPrice", matchedInventory.getMedianPrice().grossValue());
             model.addAttribute("totalAvailableQty", matchedInventory.getTotalAvailableQty());
-            model.addAttribute("inventoryItems", matchedInventory.getInventoryItems().stream()
-                    .map(i -> new InventoryItemView(i.supplier(), ManualSupplierInfos.label(i.supplier()), i.ean(), i.mfn(), Price.fromNet(i.netPrice()).grossValue(), i.qty()))
+            List<InventoryItemView> inventoryItems = new ArrayList<>(matchedInventory.getInventoryItems().stream()
+                    .map(InventoryItemView::from)
                     .toList());
+            inventoryItems.addAll(notSealedWarehouseItems);
+            model.addAttribute("inventoryItems", inventoryItems);
         } else {
             model.addAttribute("error", "Product not found");
         }
