@@ -76,6 +76,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedList;
@@ -161,7 +162,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private void seedStoreData(String storeId) {
-        List<CatalogSeedRow> rows = CatalogSeed.load();
+        List<CatalogSeedRow> rows = filterSimulationRows(CatalogSeed.load(), simulationSuppliersAvailable());
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
 
         savePricelist(storeId);
@@ -277,6 +278,10 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private void saveProducts(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
+        mapper.batchSave(buildProducts(rows, storeId));
+    }
+
+    static List<Product> buildProducts(List<CatalogSeedRow> rows, String storeId) {
         List<Product> products = new ArrayList<>();
         for (CatalogSeedRow row : rows) {
             if (!row.inCatalog()) {
@@ -289,7 +294,7 @@ public class DemoStoreSeeder implements StoreSeeder {
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
             products.add(product);
         }
-        mapper.batchSave(products);
+        return products;
     }
 
     private void saveWarehouseItems(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
@@ -743,10 +748,24 @@ public class DemoStoreSeeder implements StoreSeeder {
             if (template == null) {
                 throw new IllegalStateException("Missing pricelist template resource: " + PRICELIST_TEMPLATE);
             }
-            fileStorage.put(storesBucket, storeId + "/pricelists/" + CATALOG_ID + "/seed.csv", template.readAllBytes());
+            String csv = new String(template.readAllBytes(), StandardCharsets.UTF_8);
+            String content = simulationSuppliersAvailable() ? csv : filterSimulationPricelistRows(csv);
+            fileStorage.put(storesBucket, storeId + "/pricelists/" + CATALOG_ID + "/seed.csv",
+                    content.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write demo pricelist for store " + storeId, e);
         }
+    }
+
+    static String filterSimulationPricelistRows(String csv) {
+        return Arrays.stream(csv.split("\n"))
+                .filter(line -> !isSimulationPricelistRow(line))
+                .collect(Collectors.joining("\n", "", "\n"));
+    }
+
+    private static boolean isSimulationPricelistRow(String line) {
+        String[] columns = line.split(";", -1);
+        return columns.length > 2 && columns[2].startsWith(SIM_MFN_PREFIX);
     }
 
     private void saveOrders(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, String storeId, List<CatalogSeedRow> rows) {
@@ -756,7 +775,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         mapper.save(demoOrders.delivery(), clobber);
         demoOrders.events().forEach(event -> mapper.save(event, clobber));
 
-        SimOrders simOrders = buildSimOrders(storeId, rows, simulationSuppliersAvailable());
+        SimOrders simOrders = buildSimOrders(storeId, rows);
         simOrders.orders().forEach(order -> mapper.save(order, clobber));
         simOrders.itemsByOrderId().values().forEach(mapper::batchSave);
         simOrders.events().forEach(event -> mapper.save(event, clobber));
@@ -764,6 +783,13 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private boolean simulationSuppliersAvailable() {
         return supplierRegistry.exists(ACME);
+    }
+
+    static List<CatalogSeedRow> filterSimulationRows(List<CatalogSeedRow> rows, boolean simulationSuppliersAvailable) {
+        if (simulationSuppliersAvailable) {
+            return rows;
+        }
+        return rows.stream().filter(row -> !row.mfn().startsWith(SIM_MFN_PREFIX)).toList();
     }
 
     private static String ownerEmailOrFallback(DemoStoreMetadata demo) {
@@ -830,28 +856,26 @@ public class DemoStoreSeeder implements StoreSeeder {
         return event;
     }
 
-    static SimOrders buildSimOrders(String storeId, List<CatalogSeedRow> rows, boolean simulationSuppliersAvailable) {
+    static SimOrders buildSimOrders(String storeId, List<CatalogSeedRow> rows) {
         List<Order> orders = new ArrayList<>();
         Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
         List<OrderEvent> events = new ArrayList<>();
 
-        if (simulationSuppliersAvailable) {
-            rows.stream()
-                    .filter(row -> row.mfn().startsWith(SIM_MFN_PREFIX))
-                    .forEach(row -> SIM_SUPPLIERS.stream()
-                            .filter(row::soldBy)
-                            .forEach(supplier -> {
-                                Order order = demoOrder(storeId, "Symulacja", simulationScenarioLabel(row),
-                                        demoId(storeId, "sim-" + row.mfn().toLowerCase(Locale.ROOT) + "-" + supplier.toLowerCase(Locale.ROOT)),
-                                        new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
-                                OrderItem item = allocationItem(order.getOrderId(), row, supplier, 1, 1);
-                                order.setTotalPrice(item.getTotalPrice());
-                                orders.add(order);
-                                itemsByOrderId.put(order.getOrderId(), List.of(item));
-                                events.add(orderEvent(storeId, order,
-                                        EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt()));
-                            }));
-        }
+        rows.stream()
+                .filter(row -> row.mfn().startsWith(SIM_MFN_PREFIX))
+                .forEach(row -> SIM_SUPPLIERS.stream()
+                        .filter(row::soldBy)
+                        .forEach(supplier -> {
+                            Order order = demoOrder(storeId, "Symulacja", simulationScenarioLabel(row),
+                                    demoId(storeId, "sim-" + row.mfn().toLowerCase(Locale.ROOT) + "-" + supplier.toLowerCase(Locale.ROOT)),
+                                    new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+                            OrderItem item = allocationItem(order.getOrderId(), row, supplier, 1, 1);
+                            order.setTotalPrice(item.getTotalPrice());
+                            orders.add(order);
+                            itemsByOrderId.put(order.getOrderId(), List.of(item));
+                            events.add(orderEvent(storeId, order,
+                                    EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt()));
+                        }));
 
         return new SimOrders(orders, itemsByOrderId, events);
     }
