@@ -68,6 +68,7 @@
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
                             th:disabled="${purchaseBlockedReason != null}"
+                            th:attr="data-blocked=${purchaseBlockedReason != null}"
                             th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}">Forward to supplier</button>
                     <button type="submit" class="button" formnovalidate
                             th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase/back(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase/back(orderId=${order.orderId})}"
@@ -79,7 +80,8 @@
                 let validationPassed = false;
 
                 function refreshSubmitState() {
-                    document.getElementById('purchase-confirm-submit').disabled = !validationPassed;
+                    const submitButton = document.getElementById('purchase-confirm-submit');
+                    submitButton.disabled = !validationPassed || submitButton.dataset.blocked === 'true';
                 }
 
                 function loadValidation() {

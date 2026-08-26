@@ -312,6 +312,8 @@ class DropshipTemplateTest {
         assertThat(html).contains("#{${purchaseBlockedReason}}");
         assertThat(html).contains("id=\"purchase-confirm-submit\"");
         assertThat(html).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
+        assertThat(html).contains("th:attr=\"data-blocked=${purchaseBlockedReason != null}\"");
+        assertThat(html).contains("submitButton.dataset.blocked === 'true'");
     }
 
     @Test
