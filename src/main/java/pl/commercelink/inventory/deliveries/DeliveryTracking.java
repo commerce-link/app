@@ -55,6 +55,7 @@ public class DeliveryTracking {
         return state == null ? DeliveryTrackingState.PENDING : state;
     }
 
+    @DynamoDBIgnore
     public boolean isDue(LocalDateTime now) {
         return nextCheckAt == null || !nextCheckAt.isAfter(now);
     }

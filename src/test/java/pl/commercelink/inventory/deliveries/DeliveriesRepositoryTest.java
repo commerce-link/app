@@ -101,7 +101,7 @@ class DeliveriesRepositoryTest {
     }
 
     @Test
-    void trackableDropshipQueryFiltersOnTypeReceivedOrderStatusExternalIdAndTrackingState() {
+    void trackableDropshipQueryFiltersOnTypeReceivedOrderStatusExternalIdAndNestedTrackingState() {
         // given
         Delivery withNumber = new Delivery("store-1", "ACME-DS-1", "Acme");
         withNumber.setType(DeliveryType.DROPSHIP);

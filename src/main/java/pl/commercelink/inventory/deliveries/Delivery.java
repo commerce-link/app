@@ -394,7 +394,6 @@ public class Delivery {
     /**
      * The tracking document to mutate, created and attached on first use.
      */
-    @DynamoDBIgnore
     public DeliveryTracking tracking() {
         if (tracking == null) {
             tracking = new DeliveryTracking();
