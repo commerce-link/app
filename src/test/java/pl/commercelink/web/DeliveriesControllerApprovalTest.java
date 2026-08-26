@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -29,8 +30,11 @@ import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -1818,18 +1822,32 @@ class DeliveriesControllerApprovalTest {
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        Shipment pickupShipment = new Shipment(ShipmentType.PickupPoint);
+        pickupShipment.setCarrier("InPost");
+        pickupShipment.setCollectionPointCode("WAW04A");
+        order.setShipments(List.of(pickupShipment));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
         SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
                 List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), null, true);
-        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
+        ArgumentCaptor<SupplierOrderOptionsContext> context =
+                ArgumentCaptor.forClass(SupplierOrderOptionsContext.class);
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), context.capture()))
                 .thenReturn(List.of(laneOption));
         Model model = new ConcurrentModel();
 
         // when
         String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
 
-        // then
+        // then — the render path must resolve the order and pass its pickup point through, not
+        // just any dropship context.
         assertThat(view).isEqualTo("deliveryApproval");
         assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
+        assertThat(context.getValue().dropship()).isTrue();
+        assertThat(context.getValue().pickupPoint()).isNotNull();
+        assertThat(context.getValue().pickupPoint().carrier()).isEqualTo("InPost");
+        assertThat(context.getValue().pickupPoint().code()).isEqualTo("WAW04A");
     }
 }

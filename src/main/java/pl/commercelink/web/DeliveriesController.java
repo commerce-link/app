@@ -793,6 +793,10 @@ public class DeliveriesController {
             model.addAttribute("isSuperAdmin", isSuperAdmin());
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             addDeliveryAddresses(storeId, provider, form, model);
+            if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
+                OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
+                        SupplierOrderOptionsContext.warehouse(), form.getSupplierOptions(), model);
+            }
             return "deliveryPurchaseConfirmation";
         }
 

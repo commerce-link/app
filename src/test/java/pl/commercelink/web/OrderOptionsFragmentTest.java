@@ -39,6 +39,9 @@ class OrderOptionsFragmentTest {
         assertThat(html).contains("th:name=\"'supplierOptions[' + ${option.key()} + ']'\"");
         assertThat(html).contains("data-order-option");
         assertThat(html).contains("th:attr=\"data-order-option=${option.key()},data-required=${option.required()}\"");
+        // The HTML required attribute must reflect the option too, not just the JS-read data
+        // attribute, so a required select is enforced even if the JS gating fails to run.
+        assertThat(html).contains("th:required=\"${option.required()}\"");
     }
 
     @Test

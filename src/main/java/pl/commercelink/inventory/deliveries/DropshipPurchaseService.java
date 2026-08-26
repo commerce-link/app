@@ -91,23 +91,19 @@ public class DropshipPurchaseService {
         boolean requiresApproval = store.isGlobalSupplier(form.getProvider());
 
         List<SupplierOrderOption> options = null;
-        if (requiresApproval) {
-            try {
-                options = supplierProviderResolver.resolve(storeId, form.getProvider()).orderOptions(optionsContext(order));
-            } catch (Exception e) {
+        try {
+            options = supplierProviderResolver.resolve(storeId, form.getProvider()).orderOptions(optionsContext(order));
+        } catch (Exception e) {
+            if (requiresApproval) {
                 log.error("Supplier order options lookup failed for a global dropship submission: store={} provider={}",
                         storeId, form.getProvider(), e);
-            }
-        } else {
-            try {
-                options = supplierProviderResolver.resolve(storeId, form.getProvider()).orderOptions(optionsContext(order));
-            } catch (Exception e) {
+            } else {
                 log.error("Supplier order options lookup failed: store={} provider={}", storeId, form.getProvider(), e);
                 return OperationResult.failure("deliveries.options.error");
             }
-            if (!SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
-                return OperationResult.failure("deliveries.purchase.error.options");
-            }
+        }
+        if (!requiresApproval && !SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
         }
 
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);

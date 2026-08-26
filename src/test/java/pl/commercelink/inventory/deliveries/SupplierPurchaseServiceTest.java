@@ -233,6 +233,21 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void ownSubmissionFailsWithoutSavingWhenOptionsLookupThrows() {
+        // given
+        when(supplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.options.error", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void submitPurchaseStoresChosenOptionsAndLabelOnDelivery() {
         // given
         when(supplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
@@ -1346,6 +1361,31 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.options.error", result.getMessage());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approveOfADropshipDeliveryFailsGracefullyWhenTheOrderLocatorThrows() throws Exception {
+        // given — a DropshipOrderLocator IllegalStateException (e.g. the source order is gone)
+        // thrown while resolving the options context must yield the same options.error result
+        // as a provider-side failure, not an uncaught 500.
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipPurchaseService.orderOf(STORE_ID, delivery))
+                .thenThrow(new IllegalStateException("no dropship order found for this delivery"));
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, null, Map.of());
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.options.error", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verify(globalSupplierProvider, never()).orderOptions(any());
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 

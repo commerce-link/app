@@ -10,6 +10,7 @@
                     <div class="select is-fullwidth">
                         <select th:name="'supplierOptions[' + ${option.key()} + ']'"
                                 th:attr="data-order-option=${option.key()},data-required=${option.required()}"
+                                th:required="${option.required()}"
                                 onchange="if (typeof refreshSubmitState === 'function') refreshSubmitState(); if (typeof refreshApprovalSubmitState === 'function') refreshApprovalSubmitState();">
                             <th:block th:if="${selected == null or selected[option.key()] == null}">
                                 <option value="" th:text="#{deliveries.options.choose}"></option>

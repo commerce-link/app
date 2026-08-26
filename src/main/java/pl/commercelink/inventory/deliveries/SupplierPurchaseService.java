@@ -332,13 +332,13 @@ public class SupplierPurchaseService {
             delivery.setDeliveryAddressId(deliveryAddressId);
         }
 
-        SupplierOrderOptionsContext optionsContext = delivery.isDropship()
-                ? dropshipPurchaseService.orderOf(storeId, delivery)
-                        .map(DropshipPurchaseService::optionsContext)
-                        .orElse(SupplierOrderOptionsContext.dropship(null))
-                : SupplierOrderOptionsContext.warehouse();
         List<SupplierOrderOption> options;
         try {
+            SupplierOrderOptionsContext optionsContext = delivery.isDropship()
+                    ? dropshipPurchaseService.orderOf(storeId, delivery)
+                            .map(DropshipPurchaseService::optionsContext)
+                            .orElse(SupplierOrderOptionsContext.dropship(null))
+                    : SupplierOrderOptionsContext.warehouse();
             options = supplierProvider.orderOptions(optionsContext);
         } catch (Exception e) {
             log.error("Supplier order options lookup failed: store={} delivery={}", storeId, deliveryId, e);
@@ -566,18 +566,19 @@ public class SupplierPurchaseService {
         }
 
         List<SupplierOrderOption> options = null;
-        if (requiresApproval) {
-            try {
-                options = orderOptions(storeId, form.getProvider(), SupplierOrderOptionsContext.warehouse());
-            } catch (Exception e) {
+        try {
+            options = orderOptions(storeId, form.getProvider(), SupplierOrderOptionsContext.warehouse());
+        } catch (Exception e) {
+            if (requiresApproval) {
                 log.error("Supplier order options lookup failed for a global submission: store={} provider={}",
                         storeId, form.getProvider(), e);
+            } else {
+                log.error("Supplier order options lookup failed: store={} provider={}", storeId, form.getProvider(), e);
+                return OperationResult.failure("deliveries.options.error");
             }
-        } else {
-            options = orderOptions(storeId, form.getProvider(), SupplierOrderOptionsContext.warehouse());
-            if (!SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
-                return OperationResult.failure("deliveries.purchase.error.options");
-            }
+        }
+        if (!requiresApproval && !SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
         }
 
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
