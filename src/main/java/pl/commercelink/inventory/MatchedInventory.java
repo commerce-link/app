@@ -215,6 +215,10 @@ public class MatchedInventory {
         return inventoryItems.stream().mapToLong(InventoryItem::qty).sum();
     }
 
+    public long getTotalAvailableQtyFromSupplier(String supplierName) {
+        return getInventoryItemsFromSupplier(supplierName).stream().mapToLong(InventoryItem::qty).sum();
+    }
+
     public long getTotalAvailableQty(SupplierType supplierType) {
         return inventoryItems.stream()
                 .filter(i -> supplierRegistry.get(i.supplier()).type() == supplierType)

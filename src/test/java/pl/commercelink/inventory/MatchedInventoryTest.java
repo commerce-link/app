@@ -52,6 +52,17 @@ class MatchedInventoryTest {
     }
 
     @Test
+    void sumsAvailableQtyOfSingleSupplier() {
+        // given
+        MatchedInventory matched = inventoryWith(warehouseItem(1000.0, true), supplierItemWithQty("Action", 7));
+
+        // when / then
+        assertThat(matched.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).isEqualTo(2L);
+        assertThat(matched.getTotalAvailableQtyFromSupplier("Action")).isEqualTo(7L);
+        assertThat(matched.getTotalAvailableQtyFromSupplier("Missing")).isEqualTo(0L);
+    }
+
+    @Test
     void countsOnlyLocalSuppliersWithRequiredQty() {
         // given
         when(supplierRegistry.get("Local")).thenReturn(supplierInfo("Local", "PL", 1));

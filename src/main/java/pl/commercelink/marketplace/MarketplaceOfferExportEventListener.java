@@ -8,8 +8,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -104,43 +102,11 @@ public class MarketplaceOfferExportEventListener {
             AvailabilityAndPrice availabilityAndPrice = op.get();
             MatchedInventory matchedInventory = inventory.findByProduct(product);
 
-            long qtyToPublish = resolveQtyToPublish(marketplaceDefinition, matchedInventory);
+            long qtyToPublish = marketplaceDefinition.qtyToPublish(matchedInventory);
 
             result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
         return result;
-    }
-
-    private long resolveQtyToPublish(MarketplaceDefinition marketplaceDefinition, MatchedInventory matchedInventory) {
-        if (marketplaceDefinition.hasWarehouseCriteria()) {
-            int warehouseQty = warehouseQtyOf(matchedInventory);
-            if (warehouseQty >= marketplaceDefinition.getMinWarehouseQty()) {
-                return warehouseQty;
-            }
-        }
-        if (marketplaceDefinition.hasDistributorsCriteria()) {
-            boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
-                    marketplaceDefinition.getMinNumOfDistributors(),
-                    marketplaceDefinition.getMinQtyPerDistributor()
-            );
-            boolean hasRequiredNumOfLocalDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleLocalSuppliers(
-                    marketplaceDefinition.getMinNumOfLocalDistributors(),
-                    marketplaceDefinition.getMinQtyPerDistributor()
-            );
-            boolean hasRequiredDistributorsQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinDistributorsQty());
-            if (hasRequiredNumOfDistributorsWithMinQty && hasRequiredNumOfLocalDistributorsWithMinQty && hasRequiredDistributorsQty) {
-                return matchedInventory.getTotalAvailableQty();
-            }
-        }
-        return 0L;
-    }
-
-    private int warehouseQtyOf(MatchedInventory matchedInventory) {
-        return matchedInventory
-                .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
-                .stream()
-                .mapToInt(InventoryItem::qty)
-                .sum();
     }
 
     private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQty, String categoryName) {

@@ -3,6 +3,8 @@ package pl.commercelink.products;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
+import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 @DynamoDBDocument
 public class MarketplaceDefinition  {
@@ -46,13 +48,30 @@ public class MarketplaceDefinition  {
         return matchesBasicCriteria && (hasDistributorsCriteria() || hasWarehouseCriteria());
     }
 
-    @DynamoDBIgnore
-    public boolean hasDistributorsCriteria() {
+    public long qtyToPublish(MatchedInventory inventory) {
+        if (hasWarehouseCriteria()) {
+            long warehouseQty = inventory.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE);
+            if (warehouseQty >= minWarehouseQty) {
+                return warehouseQty;
+            }
+        }
+        if (hasDistributorsCriteria() && meetsDistributorsCriteria(inventory)) {
+            return inventory.getTotalAvailableQty();
+        }
+        return 0L;
+    }
+
+    private boolean meetsDistributorsCriteria(MatchedInventory inventory) {
+        return inventory.hasOffersFromMultipleSuppliers(minNumOfDistributors, minQtyPerDistributor)
+                && inventory.hasOffersFromMultipleLocalSuppliers(minNumOfLocalDistributors, minQtyPerDistributor)
+                && inventory.hasTotalMinQty(minDistributorsQty);
+    }
+
+    private boolean hasDistributorsCriteria() {
         return minQtyPerDistributor > 0 && minNumOfDistributors > 0;
     }
 
-    @DynamoDBIgnore
-    public boolean hasWarehouseCriteria() {
+    private boolean hasWarehouseCriteria() {
         return minWarehouseQty > 0;
     }
 
