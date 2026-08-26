@@ -3,6 +3,7 @@ package pl.commercelink.orders;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
@@ -19,6 +20,7 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -43,6 +45,8 @@ public class OrdersManager {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private OrderLifecycle orderLifecycle;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int qty, int position) {
         OrderItem orderItem;
@@ -165,7 +169,7 @@ public class OrdersManager {
     }
 
     public Result moveOrderItemsToTheWarehouseForRMA(String storeId, String orderId, List<String> orderItemIds) {
-        return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
+        return executeSkippingDropshipItems(storeId, orderId, orderItemIds, (order, orderItem) -> {
             if (orderItem.isProduct() && orderItem.isDelivered()) {
                 warehouse.reservationService(storeId)
                         .remove(
@@ -183,7 +187,7 @@ public class OrdersManager {
     }
 
     public Result moveOrderItemsToTheWarehouse(String storeId, String orderId, List<String> orderItemIds) {
-        return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
+        return executeSkippingDropshipItems(storeId, orderId, orderItemIds, (order, orderItem) -> {
             if (orderItem.isProduct() && orderItem.isAllocated()) {
                 warehouse.reservationService(storeId)
                         .remove(
@@ -202,6 +206,18 @@ public class OrdersManager {
 
     private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action) {
         return execute(storeId, orderId, orderItemIds, action, o -> { });
+    }
+
+    /** Items sitting in a dropship delivery never reach the warehouse: they are left untouched and counted. */
+    private Result executeSkippingDropshipItems(String storeId, String orderId, Collection<String> orderItemIds,
+                                                BiConsumer<Order, OrderItem> action) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, orderItems);
+        List<String> selected = orderItemIds.stream().filter(id -> !dropshipItemIds.contains(id)).toList();
+        int skipped = orderItemIds.size() - selected.size();
+        Result result = execute(storeId, orderId, selected, action, o -> { });
+        return new Result(result.getOrder(), result.getOrderItems(), skipped);
     }
 
     private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action, Consumer<Order> lifecycleAction) {
@@ -364,10 +380,20 @@ public class OrdersManager {
     public static class Result {
         private final Order order;
         private final List<OrderItem> orderItems;
+        private final int skippedDropshipItems;
 
         public Result(Order order, List<OrderItem> orderItems) {
+            this(order, orderItems, 0);
+        }
+
+        public Result(Order order, List<OrderItem> orderItems, int skippedDropshipItems) {
             this.order = order;
             this.orderItems = orderItems;
+            this.skippedDropshipItems = skippedDropshipItems;
+        }
+
+        public int getSkippedDropshipItems() {
+            return skippedDropshipItems;
         }
 
         public Order getOrder() {

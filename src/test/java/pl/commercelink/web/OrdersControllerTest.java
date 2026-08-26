@@ -25,6 +25,7 @@ import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
@@ -757,5 +758,26 @@ class OrdersControllerTest {
                 "fv-1", "FV/1/2026", "https://example.com/fv/1",
                 pl.commercelink.documents.DocumentType.InvoiceVat));
         return order;
+    }
+
+    @Test
+    void movingDropshipItemsToTheWarehouseIsReportedAsSkipped() {
+        // given
+        OrderItem selected = new OrderItem();
+        selected.setItemId("item-1");
+        selected.setSelected(true);
+        OrderItemsForm form = new OrderItemsForm(List.of(selected));
+        when(ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID, List.of("item-1")))
+                .thenReturn(new OrdersManager.Result(new Order(STORE_ID), List.of(), 1));
+        when(messageSource.getMessage(eq("order.items.action.move.warehouse.dropship.error"), any(), any()))
+                .thenReturn("skipped");
+
+        // when
+        String view = ordersController.moveSelectedItemsToTheWarehouse(ORDER_ID, form, redirectAttributes,
+                Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "skipped");
     }
 }

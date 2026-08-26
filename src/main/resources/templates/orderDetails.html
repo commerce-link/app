@@ -455,8 +455,8 @@
                     <div class="select is-small">
                         <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument}">
                             <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
-                            <option value="moveSelectedItemsToTheWarehouse" th:text="#{order.items.action.move.warehouse}"></option>
-                            <option value="moveSelectedItemsToTheWarehouseForRMA" th:text="#{order.items.action.move.warehouse.rma}"></option>
+                            <option value="moveSelectedItemsToTheWarehouse" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse}"></option>
+                            <option value="moveSelectedItemsToTheWarehouseForRMA" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse.rma}"></option>
                             <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>

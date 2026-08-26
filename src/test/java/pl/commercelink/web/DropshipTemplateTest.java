@@ -217,4 +217,21 @@ class DropshipTemplateTest {
             assertThat(en).as(key + " in en").contains("\n" + key + "=");
         }
     }
+
+    @Test
+    void orderDetailsGreysOutWarehouseMovesWhenItemsSitInADropshipDelivery() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
+
+        // then
+        assertThat(html).contains("value=\"moveSelectedItemsToTheWarehouse\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("value=\"moveSelectedItemsToTheWarehouseForRMA\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("order.items.action.move.warehouse.dropship");
+        assertThat(pl).contains("order.items.action.move.warehouse.dropship=");
+        assertThat(pl).contains("order.items.action.move.warehouse.dropship.error=");
+        assertThat(en).contains("order.items.action.move.warehouse.dropship=");
+        assertThat(en).contains("order.items.action.move.warehouse.dropship.error=");
+    }
 }

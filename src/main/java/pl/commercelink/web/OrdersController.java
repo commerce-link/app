@@ -50,6 +50,8 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -115,6 +117,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -350,6 +354,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
+        model.addAttribute("hasDropshipItems", !dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems).isEmpty());
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
@@ -689,15 +694,26 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouse")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
-        ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
+    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                                  RedirectAttributes redirectAttributes, Locale locale) {
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        flashSkippedDropshipItems(result, redirectAttributes, locale);
         return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouseForRMA")
-    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
-        ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
+    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                                        RedirectAttributes redirectAttributes, Locale locale) {
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        flashSkippedDropshipItems(result, redirectAttributes, locale);
         return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    private void flashSkippedDropshipItems(OrdersManager.Result result, RedirectAttributes redirectAttributes, Locale locale) {
+        if (result.getSkippedDropshipItems() > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.items.action.move.warehouse.dropship.error", null, locale));
+        }
     }
 
     @PostMapping("/dashboard/orders/{orderId}/splitOrder")
