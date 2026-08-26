@@ -11,6 +11,8 @@ public class MarketplaceDefinition  {
     private String name;
     @DynamoDBAttribute(attributeName = "markup")
     private double markup;
+    @DynamoDBAttribute(attributeName = "minDistributorsQty")
+    private int minDistributorsQty;
     @DynamoDBAttribute(attributeName = "minQtyPerDistributor")
     private int minQtyPerDistributor;
     @DynamoDBAttribute(attributeName = "minNumOfDistributors")
@@ -26,9 +28,10 @@ public class MarketplaceDefinition  {
     public MarketplaceDefinition() {
     }
 
-    public MarketplaceDefinition(String name, double markup, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
+    public MarketplaceDefinition(String name, double markup, int minDistributorsQty, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
         this.name = name;
         this.markup = markup;
+        this.minDistributorsQty = minDistributorsQty;
         this.minQtyPerDistributor = minQtyPerDistributor;
         this.minNumOfDistributors = minNumOfDistributors;
         this.minWarehouseQty = minWarehouseQty;
@@ -64,6 +67,14 @@ public class MarketplaceDefinition  {
 
     public void setMarkup(double markup) {
         this.markup = markup;
+    }
+
+    public int getMinDistributorsQty() {
+        return minDistributorsQty;
+    }
+
+    public void setMinDistributorsQty(int minDistributorsQty) {
+        this.minDistributorsQty = minDistributorsQty;
     }
 
     public int getMinQtyPerDistributor() {

@@ -157,6 +157,39 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
+    void publishesQtyZeroWhenDistributorsSummedQtyIsBelowMinimum() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(0, /* distributorsCriteriaMet */ true, /* totalAvailableQty */ 25);
+        configureCategoryWith(definition(/* minDistributorsQty */ 30, 5, 2, 0), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(0L);
+        verify(matched).hasTotalMinQty(30);
+    }
+
+    @Test
+    void publishesTotalQtyWhenDistributorsSummedQtyMeetsMinimum() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(0, true, /* totalAvailableQty */ 25);
+        configureCategoryWith(definition(/* minDistributorsQty */ 20, 5, 2, 0), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers().get(0).quantity()).isEqualTo(25L);
+    }
+
+    @Test
     void prefersWarehouseQtyWhenBothCriteriaAreMet() {
         // given
         Product product = product("pim-A", "EAN-A");
@@ -245,7 +278,11 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private MarketplaceDefinition definition(int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
-        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, minQtyPerDistributor, minNumOfDistributors, minWarehouseQty);
+        return definition(0, minQtyPerDistributor, minNumOfDistributors, minWarehouseQty);
+    }
+
+    private MarketplaceDefinition definition(int minDistributorsQty, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
+        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, minDistributorsQty, minQtyPerDistributor, minNumOfDistributors, minWarehouseQty);
         def.setEnabled(true);
         return def;
     }
@@ -289,6 +326,7 @@ class MarketplaceOfferExportEventListenerTest {
     private MatchedInventory mockMatchedInventory(int warehouseQty, boolean distributorsCriteriaMet, long totalAvailableQty) {
         MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(matched.hasOffersFromMultipleSuppliers(anyInt(), anyInt())).thenReturn(distributorsCriteriaMet);
+        when(matched.hasTotalMinQty(anyInt())).thenAnswer(invocation -> totalAvailableQty >= invocation.<Integer>getArgument(0));
         when(matched.getTotalAvailableQty()).thenReturn(totalAvailableQty);
         return matched;
     }

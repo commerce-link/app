@@ -123,7 +123,8 @@ public class MarketplaceOfferExportEventListener {
                     marketplaceDefinition.getMinNumOfDistributors(),
                     marketplaceDefinition.getMinQtyPerDistributor()
             );
-            if (hasRequiredNumOfDistributorsWithMinQty) {
+            boolean hasRequiredDistributorsQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinDistributorsQty());
+            if (hasRequiredNumOfDistributorsWithMinQty && hasRequiredDistributorsQty) {
                 return matchedInventory.getTotalAvailableQty();
             }
         }
