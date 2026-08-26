@@ -61,6 +61,27 @@ class MarketplaceDefinitionTest {
         // when / then
         assertThat(distributorsDefinition(5, 0).isComplete()).isFalse();
         assertThat(distributorsDefinition(0, 2).isComplete()).isFalse();
+        assertThat(definition(0, 0, 0, 2, 0).isComplete()).isFalse();
+    }
+
+    @Test
+    void isCompleteWhenOnlyLocalDistributorsCountIsSet() {
+        // when / then
+        assertThat(definition(0, 5, 0, /* minNumOfLocalDistributors */ 2, 0).isComplete()).isTrue();
+    }
+
+    @Test
+    void publishesTotalQtyWhenOnlyLocalDistributorsCountIsConfigured() {
+        // given
+        inventoryWith(0, true, 25);
+
+        // when
+        long qty = definition(0, 5, 0, /* minNumOfLocalDistributors */ 2, 0).qtyToPublish(inventory);
+
+        // then
+        assertThat(qty).isEqualTo(25L);
+        verify(inventory).hasOffersFromMultipleSuppliers(0, 5);
+        verify(inventory).hasOffersFromMultipleLocalSuppliers(2, 5);
     }
 
     @Test

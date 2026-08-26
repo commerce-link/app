@@ -68,7 +68,7 @@ public class MarketplaceDefinition  {
     }
 
     private boolean hasDistributorsCriteria() {
-        return minQtyPerDistributor > 0 && minNumOfDistributors > 0;
+        return minQtyPerDistributor > 0 && (minNumOfDistributors > 0 || minNumOfLocalDistributors > 0);
     }
 
     private boolean hasWarehouseCriteria() {
