@@ -337,7 +337,13 @@ public class SupplierPurchaseService {
                         .map(DropshipPurchaseService::optionsContext)
                         .orElse(SupplierOrderOptionsContext.dropship(null))
                 : SupplierOrderOptionsContext.warehouse();
-        List<SupplierOrderOption> options = supplierProvider.orderOptions(optionsContext);
+        List<SupplierOrderOption> options;
+        try {
+            options = supplierProvider.orderOptions(optionsContext);
+        } catch (Exception e) {
+            log.error("Supplier order options lookup failed: store={} delivery={}", storeId, deliveryId, e);
+            return OperationResult.failure("deliveries.options.error");
+        }
         if (!SupplierOptions.missingRequiredOptions(options, supplierOptions).isEmpty()) {
             return OperationResult.failure("deliveries.purchase.error.options");
         }
@@ -591,6 +597,8 @@ public class SupplierPurchaseService {
         if (options != null) {
             SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
         } else {
+            // The dictionary lookup failed for this global submission - keep the posted values
+            // unfiltered (no declared options to validate/label against) rather than losing them.
             delivery.setSupplierOptions(form.getSupplierOptions());
         }
         deliveryCreationService.claimAllocations(storeId, delivery, form);

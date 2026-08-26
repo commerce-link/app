@@ -30,6 +30,9 @@ import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -102,6 +105,8 @@ class SupplierPurchaseServiceTest {
     private DeliveriesQueryService deliveriesQueryService;
     @Mock
     private OrderAllocationsManager orderAllocationsManager;
+    @Mock
+    private DropshipPurchaseService dropshipPurchaseService;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -262,6 +267,29 @@ class SupplierPurchaseServiceTest {
         assertTrue(result.isSuccess());
         assertTrue(result.getPayload().awaitingApproval());
         verify(deliveriesRepository).save(any());
+    }
+
+    @Test
+    void globalSubmissionKeepsPostedOptionsWhenTheLookupThrows() {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.getSupplierOptions().put("lane", "fast");
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        assertTrue(result.getPayload().awaitingApproval());
+        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
+        assertNull(saved.getValue().getSupplierOptionsLabel());
     }
 
     @Test
@@ -1265,6 +1293,60 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.error.options", result.getMessage());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+    }
+
+    @Test
+    void approveOfADropshipDeliveryUsesThePickupContextAndRequiresOptions() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Order order = new Order(STORE_ID);
+        Shipment pickupShipment = new Shipment(ShipmentType.PickupPoint);
+        pickupShipment.setCarrier("InPost");
+        pickupShipment.setCollectionPointCode("WAW04A");
+        order.setShipments(List.of(pickupShipment));
+        when(dropshipPurchaseService.orderOf(STORE_ID, delivery)).thenReturn(Optional.of(order));
+        ArgumentCaptor<SupplierOrderOptionsContext> context = ArgumentCaptor.forClass(SupplierOrderOptionsContext.class);
+
+        // when
+        OperationResult<String> missingOptions = service.approve(STORE_ID, DELIVERY_ID, null, Map.of());
+        OperationResult<String> withOptions = service.approve(STORE_ID, DELIVERY_ID, null, Map.of("lane", "fast"));
+
+        // then
+        assertFalse(missingOptions.isSuccess());
+        assertEquals("deliveries.purchase.error.options", missingOptions.getMessage());
+        assertTrue(withOptions.isSuccess());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        verify(globalSupplierProvider, times(2)).orderOptions(context.capture());
+        assertTrue(context.getValue().dropship());
+        assertEquals("WAW04A", context.getValue().pickupPoint().code());
+    }
+
+    @Test
+    void approveFailsGracefullyWhenTheOptionsLookupThrows() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of());
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.options.error", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 
     @Test
