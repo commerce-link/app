@@ -214,6 +214,7 @@
                     <th th:text="#{catalog.category.min.distributors.qty}"></th>
                     <th th:text="#{catalog.category.min.qty.per.distributor}"></th>
                     <th th:text="#{catalog.category.min.distributors}"></th>
+                    <th th:text="#{catalog.category.min.local.distributors}"></th>
                     <th th:text="#{catalog.category.min.warehouse.qty}"></th>
                     <th th:text="#{catalog.category.enabled}"></th>
                     <th th:text="#{catalog.category.export.selected.products}"></th>
@@ -242,6 +243,9 @@
                     </td>
                     <td>
                         <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minNumOfDistributors}" th:placeholder="#{catalog.category.min.distributors.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minNumOfLocalDistributors}" th:placeholder="#{catalog.category.min.local.distributors.placeholder}">
                     </td>
                     <td>
                         <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minWarehouseQty}" th:placeholder="#{catalog.category.min.warehouse.qty.placeholder}">

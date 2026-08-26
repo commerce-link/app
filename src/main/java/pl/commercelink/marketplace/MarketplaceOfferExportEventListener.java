@@ -123,8 +123,12 @@ public class MarketplaceOfferExportEventListener {
                     marketplaceDefinition.getMinNumOfDistributors(),
                     marketplaceDefinition.getMinQtyPerDistributor()
             );
+            boolean hasRequiredNumOfLocalDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleLocalSuppliers(
+                    marketplaceDefinition.getMinNumOfLocalDistributors(),
+                    marketplaceDefinition.getMinQtyPerDistributor()
+            );
             boolean hasRequiredDistributorsQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinDistributorsQty());
-            if (hasRequiredNumOfDistributorsWithMinQty && hasRequiredDistributorsQty) {
+            if (hasRequiredNumOfDistributorsWithMinQty && hasRequiredNumOfLocalDistributorsWithMinQty && hasRequiredDistributorsQty) {
                 return matchedInventory.getTotalAvailableQty();
             }
         }

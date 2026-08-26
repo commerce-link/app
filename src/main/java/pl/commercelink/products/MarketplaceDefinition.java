@@ -17,6 +17,8 @@ public class MarketplaceDefinition  {
     private int minQtyPerDistributor;
     @DynamoDBAttribute(attributeName = "minNumOfDistributors")
     private int minNumOfDistributors;
+    @DynamoDBAttribute(attributeName = "minNumOfLocalDistributors")
+    private int minNumOfLocalDistributors;
     @DynamoDBAttribute(attributeName = "minWarehouseQty")
     private int minWarehouseQty;
     @DynamoDBAttribute(attributeName = "exportSelectedProducts")
@@ -28,12 +30,13 @@ public class MarketplaceDefinition  {
     public MarketplaceDefinition() {
     }
 
-    public MarketplaceDefinition(String name, double markup, int minDistributorsQty, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
+    public MarketplaceDefinition(String name, double markup, int minDistributorsQty, int minQtyPerDistributor, int minNumOfDistributors, int minNumOfLocalDistributors, int minWarehouseQty) {
         this.name = name;
         this.markup = markup;
         this.minDistributorsQty = minDistributorsQty;
         this.minQtyPerDistributor = minQtyPerDistributor;
         this.minNumOfDistributors = minNumOfDistributors;
+        this.minNumOfLocalDistributors = minNumOfLocalDistributors;
         this.minWarehouseQty = minWarehouseQty;
     }
 
@@ -91,6 +94,14 @@ public class MarketplaceDefinition  {
 
     public void setMinNumOfDistributors(int minNumOfDistributors) {
         this.minNumOfDistributors = minNumOfDistributors;
+    }
+
+    public int getMinNumOfLocalDistributors() {
+        return minNumOfLocalDistributors;
+    }
+
+    public void setMinNumOfLocalDistributors(int minNumOfLocalDistributors) {
+        this.minNumOfLocalDistributors = minNumOfLocalDistributors;
     }
 
     public int getMinWarehouseQty() {

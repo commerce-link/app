@@ -132,7 +132,7 @@ public class ProductCatalogController {
 
         StockDefinition defaultStockDefinition = new StockDefinition(1, 10, 30);
         PriceDefinition defaultPriceDefinition = new PriceDefinition(1.00, 0, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP);
-        MarketplaceDefinition defaultMarketplaceDefinition = new MarketplaceDefinition(null, 1.00, 30, 5, 3, 0);
+        MarketplaceDefinition defaultMarketplaceDefinition = new MarketplaceDefinition(null, 1.00, 30, 5, 3, 0, 0);
         AvailabilityDefinition defaultAvailabilityDefinition = new AvailabilityDefinition(3, 1);
 
         CategoryDefinition categoryDefinition = new CategoryDefinition()

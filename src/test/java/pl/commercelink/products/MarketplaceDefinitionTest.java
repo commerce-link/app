@@ -9,7 +9,7 @@ class MarketplaceDefinitionTest {
     @Test
     void isCompleteWhenOnlyDistributorsCriteriaAreSet() {
         // given
-        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 5, 2, 0);
+        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 5, 2, 0, 0);
 
         // when / then
         assertThat(definition.isComplete()).isTrue();
@@ -20,7 +20,7 @@ class MarketplaceDefinitionTest {
     @Test
     void isCompleteWhenOnlyWarehouseCriteriaAreSet() {
         // given
-        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 0, 0, 3);
+        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 0, 0, 0, 3);
 
         // when / then
         assertThat(definition.isComplete()).isTrue();
@@ -31,7 +31,7 @@ class MarketplaceDefinitionTest {
     @Test
     void isNotCompleteWhenDistributorsCriteriaArePartiallySet() {
         // given
-        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 5, 0, 0);
+        MarketplaceDefinition definition = new MarketplaceDefinition("Morele", 1.1, 0, 5, 0, 0, 0);
 
         // when / then
         assertThat(definition.isComplete()).isFalse();
@@ -41,7 +41,7 @@ class MarketplaceDefinitionTest {
     @Test
     void isNotCompleteWithoutNameOrMarkup() {
         // when / then
-        assertThat(new MarketplaceDefinition(null, 1.1, 0, 5, 2, 3).isComplete()).isFalse();
-        assertThat(new MarketplaceDefinition("Morele", 0, 0, 5, 2, 3).isComplete()).isFalse();
+        assertThat(new MarketplaceDefinition(null, 1.1, 0, 5, 2, 0, 3).isComplete()).isFalse();
+        assertThat(new MarketplaceDefinition("Morele", 0, 0, 5, 2, 0, 3).isComplete()).isFalse();
     }
 }
