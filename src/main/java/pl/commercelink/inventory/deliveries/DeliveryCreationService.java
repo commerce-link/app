@@ -70,6 +70,13 @@ public class DeliveryCreationService {
         deliveriesRepository.save(delivery);
     }
 
+    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setOrderStatus(null);
+        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
+        deliveriesRepository.save(delivery);
+    }
+
     private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {
         return form.getItems().stream()
                 .filter(item -> item.getRequestedQty() > 0)
@@ -120,6 +127,7 @@ public class DeliveryCreationService {
                 form.getTax()
         );
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(storeId, form.getProvider()));
+        delivery.setType(DeliveryType.WAREHOUSE);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }

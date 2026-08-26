@@ -335,6 +335,13 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean canChangeFulfilmentType(List<OrderItem> orderItems) {
+        return orderItems.stream()
+                .filter(OrderItem::isProduct)
+                .allMatch(OrderItem::isNew);
+    }
+
+    @DynamoDBIgnore
     public Order createSplit() {
         Order copy = new Order(this.storeId);
         copy.setBillingDetails(this.billingDetails.copy());

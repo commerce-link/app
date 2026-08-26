@@ -104,6 +104,24 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("reassign stamps the claimed delivery id of moved items with the target delivery")
+    void reassignStampsClaimedDeliveryIdWithTargetDelivery() {
+        // given
+        OrderItem item = orderItemInStatus("item-1", FulfilmentStatus.Ordered);
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(ORDER_ID, "item-1", "customer"));
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(item);
+
+        // when
+        orderAllocationsManager.reassign("delivery-target", List.of(allocation));
+
+        // then
+        verify(orderItemsRepository).save(item);
+        assertThat(item.getDeliveryId()).isEqualTo("delivery-target");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-target");
+    }
+
+    @Test
     @DisplayName("release returns claimed order items to the supplier allocation pool, grouped by order")
     void releaseReturnsClaimedOrderItemsGroupedByOrder() {
         // given

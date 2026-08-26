@@ -47,6 +47,8 @@ public abstract class Item implements Delivered {
     private double tax = DEFAULT_VAT_RATE;
     @DynamoDBAttribute(attributeName = "deliveryId")
     private String deliveryId;
+    @DynamoDBAttribute(attributeName = "claimedDeliveryId")
+    private String claimedDeliveryId;
     @DynamoDBAttribute(attributeName = "serialNo")
     private String serialNo;
     @DynamoDBAttribute(attributeName = "condition")
@@ -91,6 +93,7 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public void removeFulfilment() {
+        boolean wasDelivered = isDelivered();
         this.ean = null;
         this.manufacturerCode = null;
         this.cost = 0;
@@ -98,6 +101,9 @@ public abstract class Item implements Delivered {
         this.serialNo = null;
         this.condition = ItemCondition.Sealed;
         this.status = FulfilmentStatus.New;
+        if (!wasDelivered) {
+            this.claimedDeliveryId = null;
+        }
     }
 
     @DynamoDBIgnore
@@ -163,6 +169,11 @@ public abstract class Item implements Delivered {
     @DynamoDBIgnore
     public boolean isNew() {
         return status == FulfilmentStatus.New;
+    }
+
+    @DynamoDBIgnore
+    public boolean isReleasable() {
+        return isNew() || hasOneOfTheStatuses(FulfilmentStatus.Allocation);
     }
 
     @DynamoDBIgnore
@@ -247,6 +258,7 @@ public abstract class Item implements Delivered {
     public void markAsOrdered(String deliveryId, double cost) {
         this.cost = cost;
         this.deliveryId = deliveryId;
+        this.claimedDeliveryId = deliveryId;
         this.status = FulfilmentStatus.Ordered;
     }
 
@@ -275,6 +287,7 @@ public abstract class Item implements Delivered {
     @DynamoDBIgnore
     public void markAsInAllocation() {
         this.setStatus(FulfilmentStatus.Allocation);
+        this.claimedDeliveryId = null;
     }
 
     @DynamoDBIgnore
@@ -376,6 +389,14 @@ public abstract class Item implements Delivered {
 
     public void setDeliveryId(String deliveryId) {
         this.deliveryId = deliveryId;
+    }
+
+    public String getClaimedDeliveryId() {
+        return claimedDeliveryId;
+    }
+
+    public void setClaimedDeliveryId(String claimedDeliveryId) {
+        this.claimedDeliveryId = claimedDeliveryId;
     }
 
     @DynamoDBIgnore

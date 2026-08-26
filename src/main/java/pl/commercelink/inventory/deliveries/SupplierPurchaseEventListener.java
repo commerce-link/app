@@ -1,7 +1,9 @@
 package pl.commercelink.inventory.deliveries;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
+import io.awspring.cloud.sqs.listener.SqsHeaders;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,7 +18,9 @@ public class SupplierPurchaseEventListener {
             maxMessagesPerPoll = "1",
             pollTimeoutSeconds = "20"
     )
-    public void handleMessage(SupplierPurchaseEventRequest payload) {
-        supplierPurchaseService.processPending(payload.getStoreId(), payload.getDeliveryId());
+    public void handleMessage(SupplierPurchaseEventRequest payload,
+            @Header(SqsHeaders.MessageSystemAttributes.SQS_APPROXIMATE_RECEIVE_COUNT) String receiveCount) {
+        supplierPurchaseService.processPending(payload.getStoreId(), payload.getDeliveryId(),
+                payload.getOrderId(), Integer.parseInt(receiveCount));
     }
 }

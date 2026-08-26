@@ -9,12 +9,15 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
@@ -34,7 +37,10 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
+import pl.commercelink.inventory.deliveries.DropshipCandidate;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -113,6 +119,15 @@ public class DeliveriesController {
 
     @Autowired
     private OrderIdRefreshService orderIdRefreshService;
+
+    @Autowired
+    private DropshipOrderLocator dropshipOrderLocator;
+
+    @Autowired
+    private DropshipDeliveryCompletion dropshipDeliveryCompletion;
+
+    @Autowired
+    private ShipmentCarrierOptions shipmentCarrierOptions;
 
     private static final int DELIVERY_PAGE_SIZE = 25;
 
@@ -239,8 +254,14 @@ public class DeliveriesController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form,
                                                     RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(form.getStoreId(), form.getDeliveryId())) {
+        Delivery delivery = deliveriesRepository.findById(form.getStoreId(), form.getDeliveryId());
+        if (delivery != null && delivery.isAwaitingApproval()) {
             return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        }
+        if (delivery != null && delivery.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
+            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
         }
         OperationResult<Document> result = deliveryReceptionService.receive(
                 form.getStoreId(),
@@ -258,6 +279,57 @@ public class DeliveriesController {
         }
 
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
+    }
+
+    @PostMapping("/dashboard/deliveries/confirmDropshipShipment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String confirmDropshipShipment(@ModelAttribute DeliveryAllocationsForm form,
+                                          RedirectAttributes redirectAttributes, Locale locale) {
+        return confirmDropshipShipment(getStoreId(), form, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/confirmDropshipShipment")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String confirmDropshipShipmentForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                       @ModelAttribute DeliveryAllocationsForm form,
+                                                       RedirectAttributes redirectAttributes, Locale locale) {
+        return confirmDropshipShipment(storeId, form, redirectAttributes, locale);
+    }
+
+    private String confirmDropshipShipment(String storeId, DeliveryAllocationsForm form,
+                                           RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        if (delivery == null || !delivery.isDropship()) {
+            return flashError("deliveries.dropship.shipment.error.notDropship", storeId, form, redirectAttributes, locale);
+        }
+        if (delivery.getOrderStatus() != null || delivery.hasBeenReceived()) {
+            return flashError("deliveries.dropship.confirm.unavailable", storeId, form, redirectAttributes, locale);
+        }
+        List<Allocation> selected = form.getSelectedOrderAllocations();
+        if (selected.isEmpty()) {
+            return flashError("deliveries.select.at.least.one", storeId, form, redirectAttributes, locale);
+        }
+        DropshipShipment shipment = form.toDropshipShipment();
+        String validationError = shipment.validationError();
+        if (validationError != null) {
+            return flashError(validationError, storeId, form, redirectAttributes, locale);
+        }
+        OperationResult<DropshipShipmentResult> result = dropshipDeliveryCompletion.confirmShipped(
+                storeId, delivery, selected, form.getRemainingAllocations(), shipment);
+        if (!result.isSuccess()) {
+            return flashError(result.getMessage(), storeId, form, redirectAttributes, locale);
+        }
+        String successKey = result.getPayload() == DropshipShipmentResult.COMPLETED
+                ? "deliveries.dropship.shipment.success"
+                : "deliveries.dropship.shipment.success.partial";
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(successKey, null, locale));
+        return detailsRedirect(storeId, form.getDeliveryId());
+    }
+
+    private String flashError(String messageKey, String storeId, DeliveryAllocationsForm form,
+                              RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(messageKey, null, locale));
+        return detailsRedirect(storeId, form.getDeliveryId());
     }
 
     @PostMapping("/dashboard/deliveries/deleteSelectedAllocations")
@@ -317,6 +389,11 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.merge.error.statusMismatch", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
         }
+        if (source.isDropship() || target.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.merge.error.dropship", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
         if (source.isOrderPending()) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
@@ -350,6 +427,12 @@ public class DeliveriesController {
 
     private String splitAllocations(String storeId, DeliveryAllocationsForm form,
                                     RedirectAttributes redirectAttributes, Locale locale) {
+        Delivery delivery = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        if (delivery != null && delivery.isDropship()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.merge.error.dropship", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
         if (isOrderingInProgress(storeId, form.getDeliveryId())) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
@@ -412,9 +495,10 @@ public class DeliveriesController {
     }
 
     private String showDeliveriesPreview(String storeId, Model model) {
-        var deliveries = deliveriesPlanningService.run(storeId);
+        var planning = deliveriesPlanningService.plan(storeId);
 
-        model.addAttribute("deliveries", deliveries);
+        model.addAttribute("deliveries", planning.deliveries());
+        model.addAttribute("dropshipCandidates", planning.dropshipCandidates());
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
 
@@ -722,8 +806,10 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
-        addApprovalAddresses(storeId, delivery, model);
-        addSuggestedAddress(storeId, model);
+        if (!delivery.isDropship()) {
+            addApprovalAddresses(storeId, delivery, model);
+            addSuggestedAddress(storeId, model);
+        }
         return "deliveryApproval";
     }
 
@@ -931,10 +1017,32 @@ public class DeliveriesController {
         model.addAttribute("supplierRegistry", supplierRegistry);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
+        if (delivery.isDropship()) {
+            var dropshipOrder = resolveDropshipOrder(storeId, delivery);
+            Store store = storesRepository.findById(storeId);
+            model.addAttribute("dropshipContact", dropshipOrder != null ? dropshipOrder.getShippingDetails() : null);
+            model.addAttribute("dropshipShipment", dropshipOrder != null
+                    ? dropshipOrder.firstShipment().orElse(null)
+                    : null);
+            model.addAttribute("shipmentTypes", List.of(ShipmentType.Courier, ShipmentType.PickupPoint));
+            model.addAttribute("carrierOptions", dropshipOrder != null && store != null
+                    ? shipmentCarrierOptions.forOrder(dropshipOrder, store)
+                    : List.<String>of());
+        }
         if (delivery.isOrderFailed()) {
             model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
         }
         return "deliveryDetails";
+    }
+
+    private Order resolveDropshipOrder(String storeId, Delivery delivery) {
+        try {
+            return dropshipOrderLocator.locate(delivery.getDeliveryId())
+                    .map(orderId -> ordersRepository.findById(storeId, orderId))
+                    .orElse(null);
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     private void addApprovalAddresses(String storeId, Delivery delivery, Model model) {

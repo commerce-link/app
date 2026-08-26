@@ -186,11 +186,12 @@
                                     <label class="label" th:text="#{offers.fulfilment.type}"></label>
                                     <div class="control">
                                         <div class="select">
-                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder}">
+                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder or fulfilmentTypeLocked}">
                                                 <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
                                             </select>
                                         </div>
                                     </div>
+                                    <p class="help" th:if="${fulfilmentTypeLocked and !isCompletedOrder}" th:text="#{order.fulfilment.type.locked}"></p>
                                 </div>
                                 <div class="field">
                                     <label class="label" th:text="#{order.affiliate.id}"></label>
@@ -415,12 +416,12 @@
                                            th:text="#{order.item.assign.warehouse}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.assign.warehouse}"></span>
-                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                        <a th:if="${item.isReleasable() and !item.group and !isSuperAdmin}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="submitClearSupplier(this); return false;"
                                            th:text="#{order.item.clear.assign}"></a>
-                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isReleasable() and !item.group and !isSuperAdmin}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
                                         <a th:if="${item.isNew() and item.group and item.product}" class="dropdown-item"
                                            href="#"
@@ -456,7 +457,7 @@
                             <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
                             <option value="moveSelectedItemsToTheWarehouse" th:text="#{order.items.action.move.warehouse}"></option>
                             <option value="moveSelectedItemsToTheWarehouseForRMA" th:text="#{order.items.action.move.warehouse.rma}"></option>
-                            <option th:if="${canSplitOrder}" value="splitOrder" th:text="#{order.items.action.split}"></option>
+                            <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>

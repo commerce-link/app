@@ -239,7 +239,7 @@ public class OrdersManager {
         if (selectedItems.size() >= originalItems.size()) {
             throw new IllegalStateException("split.order.all.items");
         }
-        if (selectedItems.stream().anyMatch(i -> !i.isNew())) {
+        if (selectedItems.stream().anyMatch(i -> !i.isReleasable())) {
             throw new IllegalStateException("split.order.items.have.fulfilment");
         }
 

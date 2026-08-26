@@ -127,6 +127,7 @@ public class OrderItem extends Item {
         this.setManufacturerCode(other.getManufacturerCode());
         this.setCost(other.getCost());
         this.setDeliveryId(other.getDeliveryId());
+        this.setClaimedDeliveryId(other.getClaimedDeliveryId());
 
         this.setConsolidated(other.isConsolidated());
         this.setComment(other.getComment());

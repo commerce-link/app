@@ -97,6 +97,7 @@ public class DeliveriesManager {
                 source.getTax()
         );
         target.setConnectionMode(source.getConnectionMode());
+        target.setType(DeliveryType.WAREHOUSE);
         if (source.isAwaitingApproval() || source.isOrderFailed()) {
             target.setOrderStatus(source.getOrderStatus());
             target.setPurchaseRef(UUID.randomUUID().toString());

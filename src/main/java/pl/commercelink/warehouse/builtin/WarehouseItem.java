@@ -73,6 +73,7 @@ public class WarehouseItem extends Item {
 
         if (hasOneOfTheStatuses(FulfilmentStatus.New)) {
             setDeliveryId(other.getDeliveryId());
+            setClaimedDeliveryId(other.getClaimedDeliveryId());
             setEan(other.getEan());
             setManufacturerCode(other.getManufacturerCode());
             setCost(other.getCost());
@@ -96,6 +97,7 @@ public class WarehouseItem extends Item {
     public void returnToAllocationPool(String provider) {
         this.setStatus(FulfilmentStatus.Allocation);
         this.setDeliveryId(provider);
+        this.setClaimedDeliveryId(null);
     }
 
     @DynamoDBIgnore
@@ -189,6 +191,7 @@ public class WarehouseItem extends Item {
         splitItem.setUnitSystemCost(getUnitSystemCost());
         splitItem.setTax(getTax());
         splitItem.setDeliveryId(getDeliveryId());
+        splitItem.setClaimedDeliveryId(getClaimedDeliveryId());
         splitItem.setStatus(getStatus());
         splitItem.setCondition(getCondition());
 
