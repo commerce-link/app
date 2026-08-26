@@ -121,6 +121,8 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "trackingLastError")
     private String trackingLastError;
 
+    @DynamoDBAttribute(attributeName = "purchaseAttempts")
+    private int purchaseAttempts;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -540,6 +542,11 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
+    public boolean isOrderDispatched() {
+        return orderStatus == DeliveryOrderStatus.ORDER_DISPATCHED;
+    }
+
+    @DynamoDBIgnore
     public boolean isOrderFailed() {
         return orderStatus == DeliveryOrderStatus.FAILED;
     }
@@ -583,6 +590,14 @@ public class Delivery {
 
     public void setExternalDeliveryIdProvisional(boolean externalDeliveryIdProvisional) {
         this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
+    }
+
+    public int getPurchaseAttempts() {
+        return purchaseAttempts;
+    }
+
+    public void setPurchaseAttempts(int purchaseAttempts) {
+        this.purchaseAttempts = purchaseAttempts;
     }
 
     public List<Shipment> getShipments() {

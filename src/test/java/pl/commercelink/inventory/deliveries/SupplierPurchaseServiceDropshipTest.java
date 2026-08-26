@@ -323,7 +323,7 @@ class SupplierPurchaseServiceDropshipTest {
         // then
         assertTrue(result.isSuccess());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
-        verify(supplierPurchaseEventPublisher).publish(any());
+        verify(supplierPurchaseEventPublisher).publish(any(), any());
     }
 
     @Test

@@ -98,7 +98,7 @@ public class DeliveriesManager {
         );
         target.setConnectionMode(source.getConnectionMode());
         target.setType(DeliveryType.WAREHOUSE);
-        if (source.isAwaitingApproval() || source.isOrderFailed()) {
+        if (source.isAwaitingApproval() || source.isOrderFailed() || source.isOrderDispatched()) {
             target.setOrderStatus(source.getOrderStatus());
             target.setPurchaseRef(UUID.randomUUID().toString());
             target.setDeliveryAddressId(source.getDeliveryAddressId());

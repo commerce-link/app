@@ -236,6 +236,33 @@ class DeliveriesManagerTest {
     }
 
     @Test
+    void splitOfADispatchedDeliveryCreatesADispatchedTargetWithAFreshPurchaseRef() {
+        // given
+        Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        source.setProvider("Elko");
+        source.setConnectionMode(ConnectionMode.GLOBAL);
+        source.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        source.setPurchaseRef("source-ref");
+        source.setDeliveryAddressId("addr-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        Allocation warehouseAllocation = new Allocation();
+        warehouseAllocation.setQty(1);
+        warehouseAllocation.setUnitCost(50.0);
+
+        // when
+        deliveriesManager.splitAllocations(STORE_ID, DELIVERY_ID, "EXT-1", NEW_DELIVERY_DATE,
+                List.of(), List.of(warehouseAllocation));
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, times(2)).save(saved.capture());
+        Delivery target = saved.getAllValues().get(1);
+        assertThat(target.getOrderStatus()).isEqualTo(DeliveryOrderStatus.ORDER_DISPATCHED);
+        assertThat(target.getPurchaseRef()).isNotBlank().isNotEqualTo("source-ref");
+        assertThat(target.getDeliveryAddressId()).isEqualTo("addr-1");
+    }
+
+    @Test
     void splitOfARegularDeliveryLeavesTheTargetWithoutApprovalState() {
         // given
         Delivery source = deliveryWith(ORIGINAL_DELIVERY_DATE);
