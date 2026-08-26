@@ -169,14 +169,14 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveryDetailsShowSupplierTrackingRowWithManualCheck() throws Exception {
+    void deliveryDetailsShowSupplierTrackingTagAmongStatusesWithManualCheck() throws Exception {
         // when
         String html = read("deliveryDetails.html");
 
         // then
-        assertThat(html).contains("deliveries.dropship.tracking.label");
-        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + delivery.trackingView.effectiveState().name()}}");
-        assertThat(html).contains("deliveries.dropship.tracking.lastChecked");
+        assertThat(html).doesNotContain("deliveries.dropship.tracking.label");
+        assertThat(html).doesNotContain("deliveries.dropship.tracking.lastChecked");
+        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + trackingState}}");
         assertThat(html).contains("form=\"tracking-check-form\"");
         assertThat(html).contains("id=\"tracking-check-form\"");
         assertThat(html).contains("/tracking/check");
@@ -206,7 +206,6 @@ class DropshipTemplateTest {
 
         // then
         for (String key : List.of(
-                "deliveries.dropship.tracking.label", "deliveries.dropship.tracking.lastChecked",
                 "deliveries.dropship.tracking.check",
                 "deliveries.dropship.tracking.state.PENDING", "deliveries.dropship.tracking.state.COMPLETED",
                 "deliveries.dropship.tracking.state.UNSUPPORTED", "deliveries.dropship.tracking.state.SHIPPED_WITHOUT_DATA",

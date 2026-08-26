@@ -66,6 +66,18 @@
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
                                 <span class="tag ml-1 is-info" th:if="${delivery.dropship}"
                                       th:text="#{deliveries.dropship.badge}"></span>
+                                <th:block th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived()}"
+                                          th:with="trackingState=${delivery.trackingView.effectiveState().name()}">
+                                    <span class="tag ml-1"
+                                          th:classappend="${trackingState == 'CANCELLED_BY_SUPPLIER'} ? 'is-danger' :
+                                                          (${trackingState == 'SHIPPED_WITHOUT_DATA' or trackingState == 'GIVEN_UP'} ? 'is-warning' : 'is-light')"
+                                          th:text="#{${'deliveries.dropship.tracking.state.' + trackingState}}"></span>
+                                    <button type="submit" form="tracking-check-form" class="button is-white is-small p-1 ml-1"
+                                            th:if="${trackingState != 'UNSUPPORTED' and (isAdmin or isSuperAdmin)}"
+                                            th:title="#{deliveries.dropship.tracking.check}">
+                                        <span class="icon is-small has-text-grey"><i class="fas fa-truck"></i></span>
+                                    </button>
+                                </th:block>
                             </div>
                         </div>
                         <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : null">
@@ -105,20 +117,6 @@
                             <label class="label" th:text="#{order.address.email}"></label>
                             <div class="control">
                                 <span th:text="${dropshipContact.email}"></span>
-                            </div>
-                        </div>
-                        <div class="field" th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived()}">
-                            <label class="label" th:text="#{deliveries.dropship.tracking.label}"></label>
-                            <div class="control">
-                                <span class="tag is-light"
-                                      th:text="#{${'deliveries.dropship.tracking.state.' + delivery.trackingView.effectiveState().name()}}"></span>
-                                <span class="ml-2 has-text-grey is-size-7" th:if="${delivery.trackingView.lastCheckedAt != null}"
-                                      th:text="#{deliveries.dropship.tracking.lastChecked} + ': ' + ${#temporals.format(delivery.trackingView.lastCheckedAt, 'yyyy-MM-dd HH:mm')}"></span>
-                                <button type="submit" form="tracking-check-form" class="button is-white is-small p-1 ml-1"
-                                        th:if="${delivery.trackingView.effectiveState().name() != 'UNSUPPORTED' and (isAdmin or isSuperAdmin)}"
-                                        th:title="#{deliveries.dropship.tracking.check}">
-                                    <span class="icon is-small has-text-grey"><i class="fas fa-truck"></i></span>
-                                </button>
                             </div>
                         </div>
                         <div class="field" th:if="${delivery.dropship and dropshipShipment != null and dropshipShipment.type != null}">
