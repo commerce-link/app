@@ -150,8 +150,8 @@ class DropshipTrackingServiceCompletionTest {
         assertThat(second.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1", "PKG-2");
         assertThat(lastFetched.hasBeenReceived()).isTrue();
-        assertThat(lastFetched.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(lastFetched.getTrackingNextCheckAt()).isNull();
+        assertThat(lastFetched.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(lastFetched.getTrackingView().getNextCheckAt()).isNull();
         verify(orderLifecycleEventPublisher, times(1)).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
     }
 
@@ -171,7 +171,7 @@ class DropshipTrackingServiceCompletionTest {
         assertThat(second.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1");
         assertThat(lastFetched.hasBeenReceived()).isTrue();
-        assertThat(lastFetched.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(lastFetched.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
         verify(orderLifecycleEventPublisher, times(1)).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
     }
 
@@ -198,8 +198,8 @@ class DropshipTrackingServiceCompletionTest {
         // then: the delivery catches up with the order instead of polling until GIVEN_UP
         assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
         assertThat(lastFetched.hasBeenReceived()).isTrue();
-        assertThat(lastFetched.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(lastFetched.getTrackingNextCheckAt()).isNull();
+        assertThat(lastFetched.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(lastFetched.getTrackingView().getNextCheckAt()).isNull();
         assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("PKG-1");
         verify(orderLifecycleEventPublisher, times(1)).publish(same(order), same(OrderLifecycleEventType.ShipmentCreated));
         verify(deliveriesRepository, times(2)).save(any());

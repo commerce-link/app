@@ -61,6 +61,6 @@ public class DropshipTrackingSweep {
         if (delivery.getOrderedAt() == null || delivery.getOrderedAt().plus(properties.initialDelay()).isAfter(now)) {
             return false;
         }
-        return delivery.getTrackingNextCheckAt() == null || !delivery.getTrackingNextCheckAt().isAfter(now);
+        return delivery.getTrackingView().isDue(now);
     }
 }

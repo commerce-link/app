@@ -47,7 +47,7 @@ class DropshipTrackingSweepTest {
         Delivery delivery = new Delivery("store-1", "ACME-DS-" + id, "Acme");
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setOrderedAt(orderedAt);
-        delivery.setTrackingNextCheckAt(nextCheckAt);
+        delivery.tracking().setNextCheckAt(nextCheckAt);
         return delivery;
     }
 

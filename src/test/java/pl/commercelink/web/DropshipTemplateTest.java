@@ -175,7 +175,7 @@ class DropshipTemplateTest {
 
         // then
         assertThat(html).contains("deliveries.dropship.tracking.label");
-        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + delivery.effectiveTrackingState.name()}}");
+        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + delivery.trackingView.effectiveState().name()}}");
         assertThat(html).contains("deliveries.dropship.tracking.lastChecked");
         assertThat(html).contains("form=\"tracking-check-form\"");
         assertThat(html).contains("id=\"tracking-check-form\"");

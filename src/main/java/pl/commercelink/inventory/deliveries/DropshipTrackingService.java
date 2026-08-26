@@ -1,7 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierProviderResolver;
@@ -40,7 +39,6 @@ public class DropshipTrackingService {
     static final String SUPPLIER_CANCELLED_EVENT = "DROPSHIP_SUPPLIER_CANCELLED";
     static final String TRACKING_GIVEN_UP_EVENT = "DROPSHIP_TRACKING_GIVEN_UP";
     private static final String ORDER_CANCELLED_MESSAGE = "deliveries.dropship.shipment.error.orderCancelled";
-    private static final int MAX_ERROR_LENGTH = 500;
 
     enum TrackingOutcome { SKIPPED, UNSUPPORTED, PROCESSING, APPLIED, CANCELLED, NO_DATA, GIVEN_UP, ERROR }
 
@@ -99,7 +97,7 @@ public class DropshipTrackingService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         if (manual) {
-            if (delivery.getTrackingState() == DeliveryTrackingState.UNSUPPORTED) {
+            if (delivery.getTrackingView().getState() == DeliveryTrackingState.UNSUPPORTED) {
                 return TrackingOutcome.SKIPPED;
             }
         } else if (!delivery.isTrackingPending() || isNotDue(delivery, now)) {
@@ -129,10 +127,7 @@ public class DropshipTrackingService {
         } catch (SupplierOrderException e) {
             return recordError(delivery, now, manual, e);
         }
-        delivery.setTrackingLastCheckedAt(now);
-        delivery.setTrackingAttempts(delivery.getTrackingAttempts() + 1);
-        delivery.setTrackingConsecutiveErrors(0);
-        delivery.setTrackingLastError(null);
+        delivery.tracking().recordCheck(now);
         if (tracking.isEmpty()) {
             return scheduleNext(delivery, now, manual);
         }
@@ -202,8 +197,9 @@ public class DropshipTrackingService {
                     collectionPointCode, shippedAt, parcel.trackingUrl());
             String invalidShipment = shipment.validationError();
             if (invalidShipment != null) {
-                delivery.setTrackingLastError("Supplier parcel cannot be applied: " + invalidShipment);
-                finish(delivery, DeliveryTrackingState.SHIPPED_WITHOUT_DATA, TRACKING_NO_DATA_EVENT, now);
+                delivery.tracking().finish(DeliveryTrackingState.SHIPPED_WITHOUT_DATA,
+                        "Supplier parcel cannot be applied: " + invalidShipment);
+                finish(delivery, TRACKING_NO_DATA_EVENT, now);
                 log.error("Supplier parcel failed validation, dropship delivery finished as shipped without data: "
                                 + "store={} delivery={} provider={} externalOrderId={} error={}",
                         storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getExternalDeliveryId(),
@@ -214,11 +210,9 @@ public class DropshipTrackingService {
                     (d, r) -> {
                         d.addEvent(new Event(EventType.action, TRACKING_APPLIED_EVENT, now));
                         if (r == DropshipShipmentResult.COMPLETED) {
-                            d.setTrackingState(DeliveryTrackingState.COMPLETED);
-                            d.setTrackingNextCheckAt(null);
+                            d.tracking().finish(DeliveryTrackingState.COMPLETED);
                         } else {
-                            d.setTrackingState(DeliveryTrackingState.PENDING);
-                            d.setTrackingNextCheckAt(now.plus(properties.intervalFor(ageOf(d, now))));
+                            d.tracking().scheduleNext(now.plus(properties.intervalFor(ageOf(d, now))));
                         }
                     });
             if (!result.isSuccess()) {
@@ -278,20 +272,16 @@ public class DropshipTrackingService {
     }
 
     private TrackingOutcome recordError(Delivery delivery, LocalDateTime now, boolean manual, RuntimeException e) {
-        delivery.setTrackingLastCheckedAt(now);
-        delivery.setTrackingAttempts(delivery.getTrackingAttempts() + 1);
-        if (!manual) {
-            delivery.setTrackingConsecutiveErrors(delivery.getTrackingConsecutiveErrors() + 1);
-        }
-        delivery.setTrackingLastError(StringUtils.abbreviate(e.getMessage(), MAX_ERROR_LENGTH));
-        if (!manual && delivery.getTrackingConsecutiveErrors() >= properties.maxConsecutiveErrors()) {
+        DeliveryTracking tracking = delivery.tracking();
+        tracking.recordError(e.getMessage(), now, !manual);
+        if (!manual && tracking.isExhausted(properties.maxConsecutiveErrors())) {
             finish(delivery, DeliveryTrackingState.GIVEN_UP, TRACKING_GIVEN_UP_EVENT, now);
             log.error("Dropship tracking given up after {} consecutive errors: store={} delivery={} provider={}",
-                    delivery.getTrackingConsecutiveErrors(), delivery.getStoreId(), delivery.getDeliveryId(),
+                    tracking.getConsecutiveErrors(), delivery.getStoreId(), delivery.getDeliveryId(),
                     delivery.getProvider(), e);
             return TrackingOutcome.GIVEN_UP;
         }
-        delivery.setTrackingNextCheckAt(now.plus(properties.intervalFor(ageOf(delivery, now))));
+        tracking.scheduleNext(now.plus(properties.intervalFor(ageOf(delivery, now))));
         deliveriesRepository.save(delivery);
         log.warn("Dropship tracking check failed: store={} delivery={} provider={} error={}",
                 delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(), e.getMessage());
@@ -305,23 +295,23 @@ public class DropshipTrackingService {
                     properties.maxAge(), delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider());
             return TrackingOutcome.GIVEN_UP;
         }
-        if (delivery.getTrackingState() == null) {
-            delivery.setTrackingState(DeliveryTrackingState.PENDING);
-        }
-        delivery.setTrackingNextCheckAt(now.plus(properties.intervalFor(ageOf(delivery, now))));
+        delivery.tracking().scheduleNext(now.plus(properties.intervalFor(ageOf(delivery, now))));
         deliveriesRepository.save(delivery);
         return TrackingOutcome.PROCESSING;
     }
 
     private void finish(Delivery delivery, DeliveryTrackingState state, String eventName, LocalDateTime now) {
-        delivery.setTrackingState(state);
-        delivery.setTrackingNextCheckAt(null);
+        delivery.tracking().finish(state);
+        finish(delivery, eventName, now);
+    }
+
+    private void finish(Delivery delivery, String eventName, LocalDateTime now) {
         delivery.addEvent(new Event(EventType.action, eventName, now));
         deliveriesRepository.save(delivery);
     }
 
     private static boolean isNotDue(Delivery delivery, LocalDateTime now) {
-        return delivery.getTrackingNextCheckAt() != null && delivery.getTrackingNextCheckAt().isAfter(now);
+        return !delivery.getTrackingView().isDue(now);
     }
 
     private static Duration ageOf(Delivery delivery, LocalDateTime now) {

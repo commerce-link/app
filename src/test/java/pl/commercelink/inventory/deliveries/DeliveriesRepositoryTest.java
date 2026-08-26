@@ -123,8 +123,9 @@ class DeliveriesRepositoryTest {
                 .contains("attribute_not_exists(receivedAt) OR receivedAt = :null")
                 .contains("attribute_not_exists(orderStatus) OR orderStatus = :null")
                 .contains("attribute_exists(externalDeliveryId)")
-                .contains("attribute_not_exists(trackingState) OR trackingState = :pending");
+                .contains("attribute_not_exists(tracking) OR attribute_not_exists(tracking.#st) OR tracking.#st = :pending");
         assertThat(expression.getExpressionAttributeNames()).containsEntry("#type", "type");
+        assertThat(expression.getExpressionAttributeNames()).containsEntry("#st", "state");
         assertThat(expression.getExpressionAttributeValues().get(":pending").getS()).isEqualTo("PENDING");
         assertThat(expression.getExpressionAttributeValues().get(":dropship").getS()).isEqualTo("DROPSHIP");
     }

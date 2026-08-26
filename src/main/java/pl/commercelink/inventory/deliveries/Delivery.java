@@ -105,21 +105,8 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
 
-    @DynamoDBAttribute(attributeName = "trackingState")
-    @DynamoDBTypeConvertedEnum
-    private DeliveryTrackingState trackingState;
-    @DynamoDBAttribute(attributeName = "trackingLastCheckedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime trackingLastCheckedAt;
-    @DynamoDBAttribute(attributeName = "trackingNextCheckAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime trackingNextCheckAt;
-    @DynamoDBAttribute(attributeName = "trackingAttempts")
-    private int trackingAttempts;
-    @DynamoDBAttribute(attributeName = "trackingConsecutiveErrors")
-    private int trackingConsecutiveErrors;
-    @DynamoDBAttribute(attributeName = "trackingLastError")
-    private String trackingLastError;
+    @DynamoDBAttribute(attributeName = "tracking")
+    private DeliveryTracking tracking;
 
     @DynamoDBAttribute(attributeName = "purchaseAttempts")
     private int purchaseAttempts;
@@ -392,52 +379,35 @@ public class Delivery {
         this.externalDeliveryId = externalDeliveryId;
     }
 
-    public DeliveryTrackingState getTrackingState() {
-        return trackingState;
+    /**
+     * Stays nullable on purpose: a getter creating the document on the fly would make every saved delivery carry an
+     * empty tracking map and defeat the cron filter that looks for deliveries without one.
+     */
+    public DeliveryTracking getTracking() {
+        return tracking;
     }
 
-    public void setTrackingState(DeliveryTrackingState trackingState) {
-        this.trackingState = trackingState;
+    public void setTracking(DeliveryTracking tracking) {
+        this.tracking = tracking;
     }
 
-    public LocalDateTime getTrackingLastCheckedAt() {
-        return trackingLastCheckedAt;
+    /**
+     * The tracking document to mutate, created and attached on first use.
+     */
+    @DynamoDBIgnore
+    public DeliveryTracking tracking() {
+        if (tracking == null) {
+            tracking = new DeliveryTracking();
+        }
+        return tracking;
     }
 
-    public void setTrackingLastCheckedAt(LocalDateTime trackingLastCheckedAt) {
-        this.trackingLastCheckedAt = trackingLastCheckedAt;
-    }
-
-    public LocalDateTime getTrackingNextCheckAt() {
-        return trackingNextCheckAt;
-    }
-
-    public void setTrackingNextCheckAt(LocalDateTime trackingNextCheckAt) {
-        this.trackingNextCheckAt = trackingNextCheckAt;
-    }
-
-    public int getTrackingAttempts() {
-        return trackingAttempts;
-    }
-
-    public void setTrackingAttempts(int trackingAttempts) {
-        this.trackingAttempts = trackingAttempts;
-    }
-
-    public int getTrackingConsecutiveErrors() {
-        return trackingConsecutiveErrors;
-    }
-
-    public void setTrackingConsecutiveErrors(int trackingConsecutiveErrors) {
-        this.trackingConsecutiveErrors = trackingConsecutiveErrors;
-    }
-
-    public String getTrackingLastError() {
-        return trackingLastError;
-    }
-
-    public void setTrackingLastError(String trackingLastError) {
-        this.trackingLastError = trackingLastError;
+    /**
+     * Read-only view for templates and queries: never null, never attached to the delivery.
+     */
+    @DynamoDBIgnore
+    public DeliveryTracking getTrackingView() {
+        return tracking == null ? new DeliveryTracking() : tracking;
     }
 
     public String getComment() {
@@ -568,12 +538,7 @@ public class Delivery {
 
     @DynamoDBIgnore
     public boolean isTrackingPending() {
-        return trackingState == null || trackingState == DeliveryTrackingState.PENDING;
-    }
-
-    @DynamoDBIgnore
-    public DeliveryTrackingState getEffectiveTrackingState() {
-        return trackingState == null ? DeliveryTrackingState.PENDING : trackingState;
+        return tracking == null || tracking.isPending();
     }
 
     public boolean isPaid() {

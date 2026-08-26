@@ -235,8 +235,8 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                         + " AND (attribute_not_exists(receivedAt) OR receivedAt = :null)"
                         + " AND (attribute_not_exists(orderStatus) OR orderStatus = :null)"
                         + " AND attribute_exists(externalDeliveryId)"
-                        + " AND (attribute_not_exists(trackingState) OR trackingState = :pending)")
-                .withExpressionAttributeNames(Map.of("#type", "type"))
+                        + " AND (attribute_not_exists(tracking) OR attribute_not_exists(tracking.#st) OR tracking.#st = :pending)")
+                .withExpressionAttributeNames(Map.of("#type", "type", "#st", "state"))
                 .withExpressionAttributeValues(expressionAttributeValues);
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)

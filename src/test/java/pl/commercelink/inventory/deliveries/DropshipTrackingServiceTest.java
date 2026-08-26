@@ -120,9 +120,9 @@ class DropshipTrackingServiceTest {
     void skipsTerminalStateAndNotYetDueDeliveries() {
         // given
         Delivery givenUp = trackableDelivery();
-        givenUp.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        givenUp.tracking().setState(DeliveryTrackingState.GIVEN_UP);
         Delivery notDue = trackableDelivery();
-        notDue.setTrackingNextCheckAt(NOW.plusMinutes(5));
+        notDue.tracking().setNextCheckAt(NOW.plusMinutes(5));
         givenDelivery(givenUp);
         givenDelivery(notDue);
 
@@ -145,8 +145,8 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.UNSUPPORTED);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.UNSUPPORTED);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.UNSUPPORTED);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         assertThat(hasEvent(delivery, "DROPSHIP_TRACKING_UNSUPPORTED")).isTrue();
         verify(deliveriesRepository).save(delivery);
         verify(provider, never()).trackOrder(any());
@@ -166,10 +166,10 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
-        assertThat(delivery.getTrackingLastCheckedAt()).isEqualTo(NOW);
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
-        assertThat(delivery.getTrackingAttempts()).isEqualTo(1);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingView().getLastCheckedAt()).isEqualTo(NOW);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.getTrackingView().getAttempts()).isEqualTo(1);
         verify(deliveriesRepository).save(delivery);
     }
 
@@ -186,7 +186,7 @@ class DropshipTrackingServiceTest {
         service.check(STORE_ID, delivery.getDeliveryId(), false);
 
         // then
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusHours(2));
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusHours(2));
     }
 
     @Test
@@ -203,7 +203,7 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.GIVEN_UP);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
         assertThat(hasEvent(delivery, "DROPSHIP_TRACKING_GIVEN_UP")).isTrue();
         verify(deliveriesRepository).save(delivery);
     }
@@ -221,10 +221,10 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.ERROR);
-        assertThat(delivery.getTrackingState()).isNull();
-        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(1);
-        assertThat(delivery.getTrackingLastError()).isEqualTo("timeout");
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.isTrackingPending()).isTrue();
+        assertThat(delivery.getTrackingView().getConsecutiveErrors()).isEqualTo(1);
+        assertThat(delivery.getTrackingView().getLastError()).isEqualTo("timeout");
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
         verify(deliveriesRepository).save(delivery);
     }
 
@@ -232,7 +232,7 @@ class DropshipTrackingServiceTest {
     void consecutiveErrorsReachingLimitGiveUp() {
         // given
         Delivery delivery = trackableDelivery();
-        delivery.setTrackingConsecutiveErrors(4);
+        delivery.tracking().setConsecutiveErrors(4);
         givenDelivery(delivery);
         givenSupportingProvider();
         when(provider.trackOrder(any())).thenThrow(new SupplierOrderException("timeout"));
@@ -242,16 +242,16 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.GIVEN_UP);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
-        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(5);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
+        assertThat(delivery.getTrackingView().getConsecutiveErrors()).isEqualTo(5);
     }
 
     @Test
     void successfulCheckResetsErrorCounter() {
         // given
         Delivery delivery = trackableDelivery();
-        delivery.setTrackingConsecutiveErrors(3);
-        delivery.setTrackingLastError("old");
+        delivery.tracking().setConsecutiveErrors(3);
+        delivery.tracking().setLastError("old");
         givenDelivery(delivery);
         givenSupportingProvider();
         when(provider.trackOrder(any())).thenReturn(Optional.empty());
@@ -260,8 +260,8 @@ class DropshipTrackingServiceTest {
         service.check(STORE_ID, delivery.getDeliveryId(), false);
 
         // then
-        assertThat(delivery.getTrackingConsecutiveErrors()).isZero();
-        assertThat(delivery.getTrackingLastError()).isNull();
+        assertThat(delivery.getTrackingView().getConsecutiveErrors()).isZero();
+        assertThat(delivery.getTrackingView().getLastError()).isNull();
     }
 
     @Test
@@ -276,7 +276,7 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.ERROR);
-        assertThat(delivery.getTrackingLastError()).isEqualTo("no secret");
+        assertThat(delivery.getTrackingView().getLastError()).isEqualTo("no secret");
     }
 
     @Test
@@ -292,7 +292,7 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.CANCELLED);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.CANCELLED_BY_SUPPLIER);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.CANCELLED_BY_SUPPLIER);
         assertThat(hasEvent(delivery, "DROPSHIP_SUPPLIER_CANCELLED")).isTrue();
         verifyNoInteractions(completion);
         verify(deliveriesRepository).save(delivery);
@@ -311,7 +311,7 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.NO_DATA);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
         assertThat(hasEvent(delivery, "DROPSHIP_TRACKING_NO_DATA")).isTrue();
         verifyNoInteractions(completion);
     }
@@ -329,7 +329,7 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any());
     }
 
@@ -367,8 +367,8 @@ class DropshipTrackingServiceTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         assertThat(hasEvent(delivery, "DROPSHIP_TRACKING_APPLIED")).isTrue();
         verify(deliveriesRepository, never()).save(any());
     }

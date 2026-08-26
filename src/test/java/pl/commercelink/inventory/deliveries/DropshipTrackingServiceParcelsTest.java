@@ -149,8 +149,8 @@ class DropshipTrackingServiceParcelsTest {
         assertThat(shipment.getValue().trackingUrl()).isEqualTo("https://t/PKG-1");
         assertThat(shipment.getValue().shippedAt()).isEqualTo(SUPPLIER_SHIPPED_AT);
         assertThat(shipment.getValue().collectionPointCode()).isNull();
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_APPLIED");
         verify(deliveriesRepository, never()).save(any());
     }
@@ -189,8 +189,8 @@ class DropshipTrackingServiceParcelsTest {
         verify(completion).confirmShipped(any(), any(), selected.capture(), remaining.capture(), any(), any());
         assertThat(selected.getValue()).containsExactly(first);
         assertThat(remaining.getValue()).containsExactly(second);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
     }
 
     @Test
@@ -216,7 +216,7 @@ class DropshipTrackingServiceParcelsTest {
         assertThat(remaining.getAllValues().get(0)).containsExactly(second);
         assertThat(selected.getAllValues().get(1)).containsExactly(second);
         assertThat(remaining.getAllValues().get(1)).isEmpty();
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
     }
 
     @Test
@@ -250,7 +250,7 @@ class DropshipTrackingServiceParcelsTest {
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
     }
 
     @Test
@@ -269,8 +269,8 @@ class DropshipTrackingServiceParcelsTest {
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.APPLIED);
         assertThat(delivery.hasBeenReceived()).isTrue();
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         assertThat(delivery.getEvents()).extracting(e -> e.getName())
                 .contains("DELIVERY_RECEIVED", "DROPSHIP_TRACKING_APPLIED");
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
@@ -292,8 +292,8 @@ class DropshipTrackingServiceParcelsTest {
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
         assertThat(delivery.hasBeenReceived()).isFalse();
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
-        assertThat(delivery.getTrackingNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
     }
 
     @Test
@@ -308,7 +308,7 @@ class DropshipTrackingServiceParcelsTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.PENDING);
         assertThat(delivery.getEvents()).extracting(e -> e.getName()).doesNotContain("DROPSHIP_TRACKING_APPLIED");
     }
 
@@ -324,7 +324,7 @@ class DropshipTrackingServiceParcelsTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.GIVEN_UP);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
         assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_GIVEN_UP");
     }
 
@@ -404,10 +404,10 @@ class DropshipTrackingServiceParcelsTest {
 
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.NO_DATA);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
-        assertThat(delivery.getTrackingLastError()).contains("deliveries.dropship.shipment.error.collectionPoint");
+        assertThat(delivery.getTrackingView().getLastError()).contains("deliveries.dropship.shipment.error.collectionPoint");
         assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_NO_DATA");
     }
 
@@ -433,6 +433,6 @@ class DropshipTrackingServiceParcelsTest {
         verify(completion, times(1)).confirmShipped(any(), any(), selected.capture(), anyList(), shipment.capture(), any());
         assertThat(shipment.getValue().trackingNo()).isEqualTo("PKG-1");
         assertThat(selected.getValue()).containsExactlyInAnyOrder(first, second);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
     }
 }

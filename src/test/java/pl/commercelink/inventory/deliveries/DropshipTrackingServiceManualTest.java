@@ -70,7 +70,7 @@ class DropshipTrackingServiceManualTest {
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setPurchaseRef("ref-1");
         delivery.setOrderedAt(NOW.minusDays(20));
-        delivery.setTrackingNextCheckAt(NOW.plusHours(1));
+        delivery.tracking().setNextCheckAt(NOW.plusHours(1));
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
         when(providerResolver.resolve(STORE_ID, "Acme")).thenReturn(provider);
         when(provider.supportsOrderTracking()).thenReturn(true);
@@ -86,14 +86,14 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.STILL_PROCESSING);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.PENDING);
-        assertThat(delivery.getTrackingLastCheckedAt()).isEqualTo(NOW);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.PENDING);
+        assertThat(delivery.getTrackingView().getLastCheckedAt()).isEqualTo(NOW);
     }
 
     @Test
     void manualCheckOnGivenUpDoesNotRearmWhenStillProcessing() {
         // given
-        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        delivery.tracking().setState(DeliveryTrackingState.GIVEN_UP);
         when(provider.trackOrder(any())).thenReturn(Optional.empty());
 
         // when
@@ -101,13 +101,13 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.STILL_PROCESSING);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
     }
 
     @Test
     void manualCheckWithoutOpenAllocationsStaysGivenUp() {
         // given
-        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        delivery.tracking().setState(DeliveryTrackingState.GIVEN_UP);
         delivery.setAllocations(List.of());
         when(provider.trackOrder(any())).thenReturn(Optional.of(new SupplierOrderTracking(SupplierOrderState.SHIPPED,
                 List.of(new SupplierParcel("DPD", "PKG-1", null, null, null)))));
@@ -117,14 +117,14 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.STILL_PROCESSING);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.GIVEN_UP);
         verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
     }
 
     @Test
     void manualCheckOnGivenUpAppliesParcelsAndConfirms() {
         // given
-        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        delivery.tracking().setState(DeliveryTrackingState.GIVEN_UP);
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         BillingDetails billingDetails = new BillingDetails();
@@ -154,8 +154,8 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.CONFIRMED);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.COMPLETED);
-        assertThat(delivery.getTrackingNextCheckAt()).isNull();
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.COMPLETED);
+        assertThat(delivery.getTrackingView().getNextCheckAt()).isNull();
         assertThat(delivery.getEvents()).extracting(e -> e.getName()).contains("DROPSHIP_TRACKING_APPLIED");
         verify(deliveriesRepository, never()).save(any());
     }
@@ -174,7 +174,7 @@ class DropshipTrackingServiceManualTest {
         // then
         assertThat(cancelled).isEqualTo(ManualTrackingOutcome.CANCELLED);
         assertThat(noData).isEqualTo(ManualTrackingOutcome.NO_DATA);
-        assertThat(delivery.getTrackingState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
+        assertThat(delivery.getTrackingView().getState()).isEqualTo(DeliveryTrackingState.SHIPPED_WITHOUT_DATA);
     }
 
     @Test
@@ -182,7 +182,7 @@ class DropshipTrackingServiceManualTest {
         // given
         Delivery unsupported = new Delivery(STORE_ID, "X", "Acme");
         unsupported.setType(DeliveryType.DROPSHIP);
-        unsupported.setTrackingState(DeliveryTrackingState.UNSUPPORTED);
+        unsupported.tracking().setState(DeliveryTrackingState.UNSUPPORTED);
         Delivery pending = new Delivery(STORE_ID, "X", "Acme");
         pending.setType(DeliveryType.DROPSHIP);
         pending.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
@@ -204,7 +204,7 @@ class DropshipTrackingServiceManualTest {
     @Test
     void manualErrorDoesNotCountTowardsGivingUp() {
         // given
-        delivery.setTrackingConsecutiveErrors(4);
+        delivery.tracking().setConsecutiveErrors(4);
         when(provider.trackOrder(any())).thenThrow(new SupplierOrderException("timeout"));
 
         // when
@@ -212,8 +212,8 @@ class DropshipTrackingServiceManualTest {
 
         // then
         assertThat(outcome).isEqualTo(ManualTrackingOutcome.UNAVAILABLE);
-        assertThat(delivery.getTrackingState()).isNull();
-        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(4);
+        assertThat(delivery.isTrackingPending()).isTrue();
+        assertThat(delivery.getTrackingView().getConsecutiveErrors()).isEqualTo(4);
     }
 
     @Test

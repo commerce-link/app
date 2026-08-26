@@ -6,6 +6,8 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeliveryTest {
@@ -93,12 +95,26 @@ class DeliveryTest {
 
         // when / then
         assertTrue(delivery.isTrackingPending());
-        assertEquals(DeliveryTrackingState.PENDING, delivery.getEffectiveTrackingState());
-        delivery.setTrackingState(DeliveryTrackingState.PENDING);
+        assertEquals(DeliveryTrackingState.PENDING, delivery.getTrackingView().effectiveState());
+        delivery.tracking().setState(DeliveryTrackingState.PENDING);
         assertTrue(delivery.isTrackingPending());
-        delivery.setTrackingState(DeliveryTrackingState.GIVEN_UP);
+        delivery.tracking().setState(DeliveryTrackingState.GIVEN_UP);
         assertFalse(delivery.isTrackingPending());
-        assertEquals(DeliveryTrackingState.GIVEN_UP, delivery.getEffectiveTrackingState());
+        assertEquals(DeliveryTrackingState.GIVEN_UP, delivery.getTrackingView().effectiveState());
+    }
+
+    @Test
+    void deliveryWithoutTrackingKeepsTheAttributeUnwritten() {
+        // given
+        Delivery delivery = new Delivery();
+
+        // when / then
+        assertNull(delivery.getTracking());
+        assertTrue(delivery.isTrackingPending());
+        assertNotNull(delivery.getTrackingView());
+        assertNull(delivery.getTracking());
+        assertNotNull(delivery.tracking());
+        assertNotNull(delivery.getTracking());
     }
 
     @Test
@@ -111,5 +127,19 @@ class DeliveryTest {
         // when / then
         assertEquals(Boolean.TRUE, parser.parseExpression("trackable and trackingPending")
                 .getValue(new StandardEvaluationContext(delivery), Boolean.class));
+    }
+
+    @Test
+    void trackingViewResolvesTheTemplateExpressionsInSpel() {
+        // given
+        Delivery delivery = new Delivery("s1", "ACME-DS-1", "Acme");
+        SpelExpressionParser parser = new SpelExpressionParser();
+        StandardEvaluationContext context = new StandardEvaluationContext(delivery);
+
+        // when / then
+        assertEquals("PENDING", parser.parseExpression("trackingView.effectiveState().name()")
+                .getValue(context, String.class));
+        assertNull(parser.parseExpression("trackingView.lastCheckedAt").getValue(context));
+        assertNull(delivery.getTracking());
     }
 }
