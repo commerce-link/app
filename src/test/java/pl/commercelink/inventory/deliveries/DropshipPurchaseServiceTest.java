@@ -547,10 +547,21 @@ class DropshipPurchaseServiceTest {
     @Test
     void pickupPointAvailabilityFollowsTheProviderCapability() {
         // given
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
         when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
 
         // when / then
         assertThat(service.isPickupPointDropshipAvailable(STORE_ID, PROVIDER)).isTrue();
         assertThat(service.isPickupPointDropshipAvailable(STORE_ID, "Unknown")).isFalse();
+    }
+
+    @Test
+    void pickupPointAvailabilityRequiresDropshipSupportEvenWhenPickupPointIsSupported() {
+        // given
+        when(supplierProvider.supportsDropshipping()).thenReturn(false);
+        lenient().when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
+
+        // when / then
+        assertThat(service.isPickupPointDropshipAvailable(STORE_ID, PROVIDER)).isFalse();
     }
 }

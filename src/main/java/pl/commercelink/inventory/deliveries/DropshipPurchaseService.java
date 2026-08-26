@@ -55,7 +55,8 @@ public class DropshipPurchaseService {
     public boolean isPickupPointDropshipAvailable(String storeId, String provider) {
         try {
             SupplierProvider supplierProvider = supplierProviderResolver.resolve(storeId, provider);
-            return supplierProvider != null && supplierProvider.supportsPickupPointDropship();
+            return supplierProvider != null && supplierProvider.supportsDropshipping()
+                    && supplierProvider.supportsPickupPointDropship();
         } catch (Exception e) {
             return false;
         }
