@@ -13,6 +13,9 @@ import pl.commercelink.inventory.supplier.api.SupplierConsignee;
 import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -33,6 +36,7 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,6 +62,8 @@ class DropshipPurchaseServiceTest {
     private static final String PROVIDER = "Acme";
     private static final String DELIVERY_ID = "delivery-1";
     private static final String ORDER_ID = "order-1";
+    private static final List<SupplierOrderOption> LANE_OPTION = List.of(new SupplierOrderOption("lane", "Lane",
+            List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true));
 
     @Mock
     private StoresRepository storesRepository;
@@ -202,6 +208,81 @@ class DropshipPurchaseServiceTest {
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
         verify(supplierPurchaseEventPublisher).publish(event.capture());
         assertEquals(ORDER_ID, event.getValue().getOrderId());
+    }
+
+    @Test
+    void submitDropshipRefusesWhenARequiredOptionIsMissing() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(
+                STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.error.options", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void submitDropshipStoresOptionsAndPlacementPassesThemWithThePickupContext() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
+        Order order = pickupPointOrder();
+        SupplierPickupPoint point = new SupplierPickupPoint("InPost", "WAW04A", null, null, null, null);
+        when(supplierProvider.orderOptions(SupplierOrderOptionsContext.dropship(point))).thenReturn(LANE_OPTION);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("5900000000001", "MFN-1", 1, 100.0);
+        form.getSupplierOptions().put("lane", "fast");
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, order, form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        Delivery delivery = saved.getValue();
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        assertThat(delivery.getSupplierOptionsLabel()).isNotBlank();
+
+        List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-1", "5900000000001", "MFN-1", 1));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(supplierProvider.placeDropshipOrder(any()))
+                .thenReturn(new SupplierOrderResult("ACME-DS-ref-1", 10.0, "PLN", List.of()));
+
+        // when
+        service.placeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID);
+
+        // then
+        ArgumentCaptor<SupplierDropshipRequest> request = ArgumentCaptor.forClass(SupplierDropshipRequest.class);
+        verify(supplierProvider).placeDropshipOrder(request.capture());
+        assertEquals(Map.of("lane", "fast"), request.getValue().options());
+        assertEquals("WAW04A", request.getValue().pickupPoint().code());
+    }
+
+    @Test
+    void submitDropshipFailsWhenTheOptionsLookupThrows() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(
+                STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.options.error", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test

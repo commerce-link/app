@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
@@ -9,6 +10,7 @@ import pl.commercelink.inventory.supplier.api.SupplierConsignee;
 import pl.commercelink.inventory.supplier.api.SupplierDropshipRequest;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
@@ -35,6 +37,7 @@ import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DropshipPurchaseService {
 
     private final StoresRepository storesRepository;
@@ -87,6 +90,26 @@ public class DropshipPurchaseService {
         }
         boolean requiresApproval = store.isGlobalSupplier(form.getProvider());
 
+        List<SupplierOrderOption> options = null;
+        if (requiresApproval) {
+            try {
+                options = supplierProviderResolver.resolve(storeId, form.getProvider()).orderOptions(optionsContext(order));
+            } catch (Exception e) {
+                log.error("Supplier order options lookup failed for a global dropship submission: store={} provider={}",
+                        storeId, form.getProvider(), e);
+            }
+        } else {
+            try {
+                options = supplierProviderResolver.resolve(storeId, form.getProvider()).orderOptions(optionsContext(order));
+            } catch (Exception e) {
+                log.error("Supplier order options lookup failed: store={} provider={}", storeId, form.getProvider(), e);
+                return OperationResult.failure("deliveries.options.error");
+            }
+            if (!SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
+                return OperationResult.failure("deliveries.purchase.error.options");
+            }
+        }
+
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
             return OperationResult.success(
@@ -98,6 +121,13 @@ public class DropshipPurchaseService {
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
+        if (options != null) {
+            SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
+        } else {
+            // The dictionary lookup failed for this global submission - keep the posted values
+            // unfiltered (no declared options to validate/label against) rather than losing them.
+            delivery.setSupplierOptions(form.getSupplierOptions());
+        }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         deliveriesRepository.save(delivery);
 
@@ -215,7 +245,7 @@ public class DropshipPurchaseService {
         }
         return supplierProviderResolver.resolve(storeId, delivery.getProvider()).placeDropshipOrder(
                 new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
-                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint));
+                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint, delivery.getSupplierOptions()));
     }
 
     /** The customer's pickup point, when the order's first shipment is a pickup-point delivery. */

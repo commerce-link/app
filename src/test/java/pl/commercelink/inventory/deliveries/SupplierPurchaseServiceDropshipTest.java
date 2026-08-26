@@ -16,10 +16,13 @@ import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.orders.Order;
 import pl.commercelink.starter.util.OperationResult;
 
 import java.time.LocalDate;
@@ -31,6 +34,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -324,6 +328,41 @@ class SupplierPurchaseServiceDropshipTest {
         assertTrue(result.isSuccess());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
         verify(supplierPurchaseEventPublisher).publish(any(), any());
+    }
+
+    @Test
+    void dropshipApprovalRequiresOptionsButNotAnAddress() {
+        // given
+        connectSupplier(ConnectionMode.GLOBAL);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        lenient().when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        Order order = new Order();
+        order.setOrderId(ORDER_ID);
+        when(dropshipPurchaseService.orderOf(STORE_ID, delivery)).thenReturn(Optional.of(order));
+        List<SupplierOrderOption> laneOption = List.of(new SupplierOrderOption("lane", "Lane",
+                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true));
+        when(supplierProvider.orderOptions(any())).thenReturn(laneOption);
+
+        // when
+        OperationResult<String> missingOptions = service.approve(STORE_ID, DELIVERY_ID, null, Map.of());
+
+        // then
+        assertFalse(missingOptions.isSuccess());
+        assertEquals("deliveries.purchase.error.options", missingOptions.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+
+        // when
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        OperationResult<String> success = service.approve(STORE_ID, DELIVERY_ID, null, Map.of("lane", "fast"));
+
+        // then
+        assertTrue(success.isSuccess());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
     }
 
     @Test
