@@ -318,7 +318,7 @@
             <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingState != null and delivery.trackingState.name() == 'GIVEN_UP'}"
                  th:text="#{deliveries.dropship.tracking.notice.givenUp}"></div>
 
-            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
+            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and !delivery.dropship and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
                 <table class="table">
                     <thead>
                     <tr>

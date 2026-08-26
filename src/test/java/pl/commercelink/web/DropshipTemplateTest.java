@@ -234,4 +234,17 @@ class DropshipTemplateTest {
         assertThat(en).contains("order.items.action.move.warehouse.dropship=");
         assertThat(en).contains("order.items.action.move.warehouse.dropship.error=");
     }
+
+    @Test
+    void deliveryDetailsHideTheOrderedQuantityPencilForDropshipDeliveries() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
+
+        // then
+        assertThat(html).contains("itemQtyEditable=${(isAdmin or isSuperAdmin) and !delivery.dropship and");
+        assertThat(pl).contains("deliveries.editOrderedQty.error.dropship=");
+        assertThat(en).contains("deliveries.editOrderedQty.error.dropship=");
+    }
 }

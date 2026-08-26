@@ -23,6 +23,10 @@ public class DeliveryOrderedQtyUpdateService {
 
     public OperationResult<Void> run(String storeId, String deliveryId, String mfn, int requestedQty) {
         Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (delivery.isDropship()) {
+            // the ordered quantity edit adds the surplus to warehouse stock; dropship goods never get there
+            return OperationResult.failure("deliveries.editOrderedQty.error.dropship");
+        }
         if (delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("error.message.delivery.qty.not.editable");
         }
