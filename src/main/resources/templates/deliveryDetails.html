@@ -24,7 +24,7 @@
                         <div class="field">
                             <label class="label" th:text="#{deliveries.order.no}"></label>
                             <div class="control" th:with="partnerSiteUrl=${supplierRegistry.getPartnerSiteUrl(delivery.provider, delivery.externalDeliveryId)},
-                                                          externalId=${delivery.orderPending} ? #{deliveries.externalId.pending} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId})">
+                                                          externalId=${delivery.orderPending} ? #{deliveries.externalId.pending} : (${delivery.orderDispatched} ? #{deliveries.externalId.dispatched} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId}))">
                                 <a th:if="${not #strings.isEmpty(partnerSiteUrl)}" th:href="${partnerSiteUrl}" target="_blank"
                                    th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"
                                 ></a>
@@ -62,6 +62,7 @@
                                       th:classappend="${delivery.synced} ? 'is-success' : 'is-light'"
                                       th:text="${delivery.synced} ? #{deliveries.status.synced} : #{deliveries.status.not.synced}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                <span class="tag ml-1 is-warning" th:if="${delivery.orderDispatched}" th:text="#{deliveries.orderStatus.dispatched}"></span>
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
@@ -200,6 +201,37 @@
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/retry|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
                     </form>
+
+                    <div class="box" th:if="${delivery.orderDispatched}">
+                        <div class="notification is-warning">
+                            <p th:text="#{deliveries.purchase.dispatched.banner}"></p>
+                            <p th:if="${not #strings.isEmpty(delivery.orderErrorMessage)}" th:text="${delivery.orderErrorMessage}"></p>
+                        </div>
+                        <div class="field is-grouped"
+                             th:if="${!delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                            <div class="control">
+                                <form method="post"
+                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/reconcile|}
+                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/reconcile|}">
+                                    <button type="submit" class="button is-info" th:text="#{deliveries.purchase.reconcile.button}">Check with supplier</button>
+                                </form>
+                            </div>
+                            <div class="control">
+                                <form method="post"
+                                      onsubmit="return confirm(this.dataset.confirm)"
+                                      th:attr="data-confirm=#{deliveries.purchase.force.confirm}"
+                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/force|}
+                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/force|}">
+                                    <button type="submit" class="button is-warning" th:text="#{deliveries.purchase.force.button}">Order anyway</button>
+                                </form>
+                            </div>
+                            <div class="control">
+                                <button type="button" id="complete-dispatched-purchase-button" class="button is-info"
+                                        onclick="toggleCompletePurchaseModal(true)"
+                                        th:text="#{deliveries.purchase.complete.button}">Complete</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="column is-half">
@@ -370,9 +402,9 @@
                             <select id="delivery-action-select">
                                 <option th:unless="${delivery.awaitingApproval or isSuperAdmin or delivery.dropship}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
                                 <option th:if="${delivery.dropship and delivery.orderStatus == null and (isAdmin or isSuperAdmin)}" value="confirmDropshipShipment" th:text="#{deliveries.dropship.confirmShipment}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty()}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty() and !delivery.orderDispatched}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !delivery.orderDispatched}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>
@@ -569,7 +601,7 @@
             </div>
 
             <div id="completePurchaseModal" class="modal"
-                 th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                 th:if="${(delivery.orderFailed or delivery.orderDispatched) and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
                 <div class="modal-background" onclick="toggleCompletePurchaseModal(false)"></div>
                 <div class="modal-card">
                     <header class="modal-card-head">

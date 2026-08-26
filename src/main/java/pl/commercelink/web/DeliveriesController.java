@@ -394,7 +394,7 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.merge.error.dropship", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
         }
-        if (source.isOrderPending()) {
+        if (source.isOrderPending() || source.isOrderDispatched()) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
 
@@ -475,7 +475,7 @@ public class DeliveriesController {
         if (delivery != null && delivery.isAwaitingApproval()) {
             return redirectEditLocked(storeId, deliveryId, redirectAttributes, locale);
         }
-        if (delivery != null && delivery.isOrderPending()) {
+        if (delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched())) {
             return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
         }
         deliveriesRepository.delete(delivery);
@@ -923,6 +923,40 @@ public class DeliveriesController {
         return redirect;
     }
 
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/reconcile")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String reconcilePurchase(@PathVariable("deliveryId") String deliveryId,
+                                    RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        return handleReconcile(getStoreId(), deliveryId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/reconcile")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String reconcilePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                                 @PathVariable("deliveryId") String deliveryId,
+                                                 RedirectAttributes redirectAttributes, Locale locale) {
+        return handleReconcile(storeId, deliveryId, storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleReconcile(String storeId, String deliveryId, String redirect,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.reconcile(storeId, deliveryId);
+        if (result.isSuccess()) {
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("deliveries.purchase.reconcile.found", null, locale));
+        } else {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/complete")
     @PreAuthorize("hasRole('ADMIN')")
     public String completePurchase(@PathVariable("deliveryId") String deliveryId,
@@ -960,6 +994,37 @@ public class DeliveriesController {
             redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage("deliveries.purchase.complete.success", null, locale));
         } else {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, locale));
+        }
+        return redirect;
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/purchase/force")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String forcePurchase(@PathVariable("deliveryId") String deliveryId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<String> blocked = blockGlobalDeliveryForStoreAdmin(deliveryId,
+                "deliveries.purchase.retry.error.global", redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        return handleForce(getStoreId(), deliveryId,
+                "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/purchase/force")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String forcePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
+                                             @PathVariable("deliveryId") String deliveryId,
+                                             RedirectAttributes redirectAttributes, Locale locale) {
+        return handleForce(storeId, deliveryId, storeDeliveryDetailsRedirect(storeId, deliveryId), redirectAttributes, locale);
+    }
+
+    private String handleForce(String storeId, String deliveryId, String redirect,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<String> result = supplierPurchaseService.forceRetry(storeId, deliveryId);
+        if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
         }
@@ -1029,7 +1094,7 @@ public class DeliveriesController {
                     ? shipmentCarrierOptions.forOrder(dropshipOrder, store)
                     : List.<String>of());
         }
-        if (delivery.isOrderFailed()) {
+        if (delivery.isOrderFailed() || delivery.isOrderDispatched()) {
             model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
         }
         return "deliveryDetails";
@@ -1206,7 +1271,7 @@ public class DeliveriesController {
 
     private boolean isOrderingInProgress(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        return delivery != null && delivery.isOrderPending();
+        return delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched());
     }
 
     private String redirectOrderingInProgress(String storeId, String deliveryId,
