@@ -341,4 +341,20 @@ class DropshipTemplateTest {
             assertThat(en).as(key + " in en").contains("\n" + key + "=");
         }
     }
+
+    @Test
+    void dropshipConfirmationRendersOrderOptionsInsideTheFormAndGatesSubmitOnThem() throws Exception {
+        // when
+        String html = read("dropshipConfirmation.html");
+
+        // then
+        assertThat(html).contains("fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})");
+        assertThat(html).contains("id=\"order-options-blocked\"");
+        assertThat(html).contains("deliveries.options.error");
+        String script = html.substring(html.indexOf("<script th:inline=\"none\">"), html.indexOf("</script>"));
+        assertThat(script).contains("function refreshSubmitState()");
+        int refreshStart = script.indexOf("function refreshSubmitState()");
+        int refreshEnd = script.indexOf("}", refreshStart);
+        assertThat(script.substring(refreshStart, refreshEnd)).contains("orderOptionsComplete()");
+    }
 }

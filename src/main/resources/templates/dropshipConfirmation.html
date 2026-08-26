@@ -27,6 +27,14 @@
                 <div class="notification is-danger" th:if="${purchaseBlockedReason != null}"
                      th:text="#{${purchaseBlockedReason}}">Blocked</div>
 
+                <input type="hidden" id="order-options-blocked" th:if="${orderOptionsError}"/>
+                <div class="notification is-danger" th:if="${orderOptionsError}">
+                    <span th:text="#{deliveries.options.error}"></span>
+                    <span th:text="' (' + ${orderOptionsError} + ')'"></span>
+                </div>
+                <div th:replace="~{fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})}"></div>
+                <th:block th:replace="~{fragments/order-options :: orderOptionsScript}"></th:block>
+
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
 
                 <input type="hidden" th:field="*{storeId}"/>
@@ -81,7 +89,9 @@
 
                 function refreshSubmitState() {
                     const submitButton = document.getElementById('purchase-confirm-submit');
-                    submitButton.disabled = !validationPassed || submitButton.dataset.blocked === 'true';
+                    const optionsBlocked = document.getElementById('order-options-blocked') !== null;
+                    submitButton.disabled = !validationPassed || submitButton.dataset.blocked === 'true'
+                        || optionsBlocked || !orderOptionsComplete();
                 }
 
                 function loadValidation() {

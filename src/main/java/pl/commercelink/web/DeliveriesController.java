@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
@@ -33,6 +34,7 @@ import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
+import pl.commercelink.web.dtos.SupplierOptionsParams;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
@@ -688,6 +690,10 @@ public class DeliveriesController {
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         addDeliveryAddresses(storeId, provider, form, model);
+        if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
+            OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
+                    SupplierOrderOptionsContext.warehouse(), form.getSupplierOptions(), model);
+        }
         return "deliveryPurchaseConfirmation";
     }
 
@@ -809,6 +815,7 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
+        SupplierOrderOptionsContext optionsContext;
         if (delivery.isDropship()) {
             Order order = resolveDropshipOrder(storeId, delivery);
             if (order != null && order.getShippingDetails() != null) {
@@ -816,10 +823,16 @@ public class DeliveriesController {
             }
             model.addAttribute("pickupShipment",
                     order != null ? DropshipPurchaseService.pickupShipment(order).orElse(null) : null);
+            optionsContext = order != null
+                    ? DropshipPurchaseService.optionsContext(order)
+                    : SupplierOrderOptionsContext.dropship(null);
         } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(storeId, model);
+            optionsContext = SupplierOrderOptionsContext.warehouse();
         }
+        OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
+                optionsContext, delivery.getSupplierOptions(), model);
         return "deliveryApproval";
     }
 
@@ -836,8 +849,10 @@ public class DeliveriesController {
     public String approvePurchase(@PathVariable("storeId") String storeId,
                                   @PathVariable("deliveryId") String deliveryId,
                                   @RequestParam(value = "deliveryAddressId", required = false) String deliveryAddressId,
+                                  @RequestParam Map<String, String> params,
                                   RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId);
+        OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId,
+                SupplierOptionsParams.fromRequest(params));
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));

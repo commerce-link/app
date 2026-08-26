@@ -54,6 +54,14 @@
                     <div th:replace="~{fragments/address-modal :: addressModal('deliveryAddressId', ${approvalAddressOptions}, ${suggestedAddressId}, ${#lists.size(approvalAddresses) > 6}, true)}"></div>
                 </th:block>
 
+                <input type="hidden" id="order-options-blocked" th:if="${orderOptionsError}"/>
+                <div class="notification is-danger" th:if="${orderOptionsError}">
+                    <span th:text="#{deliveries.options.error}"></span>
+                    <span th:text="' (' + ${orderOptionsError} + ')'"></span>
+                </div>
+                <div th:replace="~{fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})}"></div>
+                <th:block th:replace="~{fragments/order-options :: orderOptionsScript}"></th:block>
+
                 <div class="buttons mt-5">
                     <button type="submit" id="approval-approve-button" class="button is-primary" disabled
                             th:text="#{deliveries.approval.realize}">Order at supplier</button>
@@ -84,7 +92,8 @@
                         return;
                     }
                     const addressBlocked = document.getElementById('approval-address-blocked') !== null;
-                    approve.disabled = addressBlocked || !approvalValidationPassed;
+                    const optionsBlocked = document.getElementById('order-options-blocked') !== null;
+                    approve.disabled = addressBlocked || optionsBlocked || !orderOptionsComplete() || !approvalValidationPassed;
 
                     const confirm = document.getElementById('address-confirm');
                     if (confirm) {

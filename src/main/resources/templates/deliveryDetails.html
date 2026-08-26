@@ -108,6 +108,12 @@
                                 <span th:text="${delivery.deliveryAddress}"></span>
                             </div>
                         </div>
+                        <div class="field" th:if="${not #strings.isEmpty(delivery.supplierOptionsLabel)}">
+                            <label class="label" th:text="#{deliveries.options.label}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.supplierOptionsLabel}"></span>
+                            </div>
+                        </div>
                         <div class="field" th:if="${delivery.dropship and dropshipContact != null and not #strings.isEmpty(dropshipContact.phone)}">
                             <label class="label" th:text="#{order.address.phone}"></label>
                             <div class="control">

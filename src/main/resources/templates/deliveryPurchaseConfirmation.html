@@ -127,6 +127,14 @@
                 <th:block th:replace="~{fragments/address-modal :: addressModalStyle}"></th:block>
                 <th:block th:replace="~{fragments/address-modal :: addressModalScript}"></th:block>
 
+                <input type="hidden" id="order-options-blocked" th:if="${orderOptionsError}"/>
+                <div class="notification is-danger" th:if="${orderOptionsError}">
+                    <span th:text="#{deliveries.options.error}"></span>
+                    <span th:text="' (' + ${orderOptionsError} + ')'"></span>
+                </div>
+                <div th:replace="~{fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})}"></div>
+                <th:block th:replace="~{fragments/order-options :: orderOptionsScript}"></th:block>
+
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
                             th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{deliveries.purchase.confirm.submit}">Place order</button>
@@ -142,7 +150,8 @@
                 function refreshSubmitState() {
                     const submit = document.getElementById('purchase-confirm-submit');
                     const addressBlocked = document.getElementById('delivery-address-blocked') !== null;
-                    submit.disabled = addressBlocked || !validationPassed;
+                    const optionsBlocked = document.getElementById('order-options-blocked') !== null;
+                    submit.disabled = addressBlocked || optionsBlocked || !orderOptionsComplete() || !validationPassed;
                 }
 
                 function selectedAddress() {

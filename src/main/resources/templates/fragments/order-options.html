@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="orderOptions(options, selected)">
+    <th:block th:if="${options != null and !#lists.isEmpty(options)}">
+        <div id="order-options" class="box">
+            <div class="field" th:each="option : ${options}">
+                <label class="label" th:text="${option.label()}"></label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select th:name="'supplierOptions[' + ${option.key()} + ']'"
+                                th:attr="data-order-option=${option.key()},data-required=${option.required()}"
+                                onchange="if (typeof refreshSubmitState === 'function') refreshSubmitState(); if (typeof refreshApprovalSubmitState === 'function') refreshApprovalSubmitState();">
+                            <th:block th:if="${selected == null or selected[option.key()] == null}">
+                                <option value="" th:text="#{deliveries.options.choose}"></option>
+                            </th:block>
+                            <option th:each="choice : ${option.choices()}" th:value="${choice.value()}"
+                                    th:text="${choice.hint() != null} ? ${choice.label() + ' — ' + choice.hint()} : ${choice.label()}"
+                                    th:selected="${selected != null and choice.value() == selected[option.key()]}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </th:block>
+</th:block>
+<th:block th:fragment="orderOptionsScript">
+    <script>
+        function orderOptionsComplete() {
+            return Array.from(document.querySelectorAll('select[data-order-option][data-required="true"]'))
+                .every(function (select) { return select.value !== ''; });
+        }
+    </script>
+</th:block>
+</body>
+</html>
