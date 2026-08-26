@@ -33,6 +33,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -119,6 +120,29 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(publishedOffers.get(0).price()).isEqualTo(100L);
     }
 
+    @Test
+    void evaluatesCriteriaOnInventoryNarrowedToPricelistPriceWithoutMarkup() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MarketplaceDefinition def = warehouseDefinition(5);
+        def.setMarkup(1.1);
+        MatchedInventory full = mock(MatchedInventory.class);
+        MatchedInventory atPrice = mockMatchedInventoryWithWarehouseQty(10);
+        when(full.atPricePoint(100L)).thenReturn(atPrice);
+        configureCategoryWith(def, product, full);
+        priceFor(product, /* price */ 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).price()).isEqualTo(110L);
+        assertThat(published.get(0).quantity()).isEqualTo(10L);
+        verify(full, never()).getTotalAvailableQtyFromSupplier(any());
+    }
+
     // --- helpers ---------------------------------------------------------
 
     private MarketplaceOfferExportRequest request() {
@@ -146,13 +170,21 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName, String definitionName) {
+        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
+        configureCategoryWith(def, product, matched, categoryName, definitionName);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, MatchedInventory matched) {
+        configureCategoryWith(def, product, matched, "Laptops", null);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, MatchedInventory matched, String categoryName, String definitionName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
         category.setCategory(categoryName);
         category.setName(definitionName);
         category.setMarketplaceDefinitions(List.of(def));
 
-        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(catalog.getCategories()).thenReturn(List.of(category));
         when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(product));
         when(inventoryView.findByProduct(product)).thenReturn(matched);
@@ -160,6 +192,7 @@ class MarketplaceOfferExportEventListenerTest {
 
     private MatchedInventory mockMatchedInventoryWithWarehouseQty(long warehouseQty) {
         MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.atPricePoint(anyLong())).thenReturn(matched);
         when(matched.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(warehouseQty);
         return matched;
     }

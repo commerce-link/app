@@ -226,11 +226,12 @@ public class MatchedInventory {
                 .sum();
     }
 
-    public long getTotalAvailableQty(long grossPrice) {
-        return inventoryItems.stream()
+    public MatchedInventory atPricePoint(long grossPrice) {
+        MatchedInventory filtered = new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        inventoryItems.stream()
                 .filter(i -> Price.fromNet(i.netPrice()).grossValue() <= grossPrice)
-                .mapToLong(InventoryItem::qty)
-                .sum();
+                .forEach(filtered.inventoryItems::add);
+        return filtered;
     }
 
     public long getNoOfSuppliersWithProduct(SupplierType supplierType) {

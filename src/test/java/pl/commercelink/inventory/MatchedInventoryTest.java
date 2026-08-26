@@ -51,6 +51,29 @@ class MatchedInventoryTest {
                 new ShippingPolicy(new ShippingTerms(arrivalDays, new ShippingCostPolicy.Free())));
     }
 
+    private InventoryItem supplierItem(String supplier, double netPrice, int qty, int leadTimeDays) {
+        return new InventoryItem("E1", "M1", netPrice, "PLN", qty, leadTimeDays, supplier, true);
+    }
+
+    @Test
+    void narrowsInventoryToItemsWithinGrossPricePoint() {
+        // given
+        MatchedInventory matched = inventoryWith(
+                supplierItem("Cheap", /* net */ 100.0, /* gross 123 */ 5, 1),
+                supplierItem("Pricey", /* net */ 200.0, /* gross 246 */ 20, 1)
+        );
+
+        // when
+        MatchedInventory atPrice = matched.atPricePoint(150);
+
+        // then
+        assertThat(atPrice.getSuppliers()).containsExactly("Cheap");
+        assertThat(atPrice.getTotalAvailableQty()).isEqualTo(5L);
+        assertThat(atPrice.hasOffersFromMultipleSuppliers(2, 1)).isFalse();
+        assertThat(atPrice.getInventoryKey()).isSameAs(matched.getInventoryKey());
+        assertThat(matched.getTotalAvailableQty()).isEqualTo(25L);
+    }
+
     @Test
     void sumsAvailableQtyOfSingleSupplier() {
         // given
