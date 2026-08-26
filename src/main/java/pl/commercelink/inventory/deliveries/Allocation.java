@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import pl.commercelink.orders.Item;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
@@ -20,6 +21,7 @@ public class Allocation {
 
     private boolean inAllocation;
     private boolean selected;
+    private boolean directToConsumer;
 
     public Allocation() {
 
@@ -44,7 +46,11 @@ public class Allocation {
     }
 
     public static Allocation fromOrderItem(Order order, OrderItem i) {
-        return new Allocation(new AllocationKey(order.getOrderId(), i.getItemId(), order.getBillingDetails().getEmail()), AllocationType.Order, i);
+        Allocation allocation = new Allocation(
+                new AllocationKey(order.getOrderId(), i.getItemId(), order.getBillingDetails().getEmail()),
+                AllocationType.Order, i);
+        allocation.directToConsumer = order.getFulfilmentType() == FulfilmentType.DirectToConsumer;
+        return allocation;
     }
 
     public void decreaseQty(int amount) {
@@ -122,6 +128,10 @@ public class Allocation {
 
     public void setInAllocation(boolean inAllocation) {
         this.inAllocation = inAllocation;
+    }
+
+    public boolean isDirectToConsumer() {
+        return directToConsumer;
     }
 
     public boolean isSelected() {

@@ -3,7 +3,10 @@ package pl.commercelink.orders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -219,6 +222,51 @@ class OrderItemTest {
         assertThat(orderItem.getCost()).isEqualTo(80.0);
         assertThat(orderItem.getDeliveryId()).isEqualTo("delivery-1");
         assertThat(orderItem.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+    }
+
+    @Test
+    @DisplayName("copyFulfilmentFrom carries the condition of the reserved warehouse item")
+    void copyFulfilmentFromCarriesConditionOfReservedWarehouseItem() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        ReservationConfirmation confirmation = new ReservationConfirmation(
+                "delivery-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, true, null, ItemCondition.OpenBox
+        );
+
+        // when
+        orderItem.copyFulfilmentFrom(confirmation);
+
+        // then
+        assertThat(orderItem.getCondition()).isEqualTo(ItemCondition.OpenBox);
+        assertThat(orderItem.isSealed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("removeFulfilment resets the condition back to sealed")
+    void removeFulfilmentResetsConditionToSealed() {
+        // given
+        OrderItem orderItem = orderItem("MFN-1");
+        orderItem.setCondition(ItemCondition.Damaged);
+
+        // when
+        orderItem.removeFulfilment();
+
+        // then
+        assertThat(orderItem.getCondition()).isEqualTo(ItemCondition.Sealed);
+    }
+
+    @Test
+    @DisplayName("copy constructor carries the condition of the source item")
+    void copyConstructorCarriesConditionOfSourceItem() {
+        // given
+        OrderItem source = orderItem("MFN-1");
+        source.setCondition(ItemCondition.OpenBox);
+
+        // when
+        OrderItem copy = new OrderItem(ORDER_ID, source, 1);
+
+        // then
+        assertThat(copy.getCondition()).isEqualTo(ItemCondition.OpenBox);
     }
 
     private BasketItem basketItem(String mfn) {

@@ -14,7 +14,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -133,7 +132,7 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private MarketplaceDefinition warehouseDefinition(int minWarehouseQty) {
-        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, 0, 0, 0, minWarehouseQty);
+        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, 0, 0, 0, 0, minWarehouseQty);
         def.setEnabled(true);
         return def;
     }
@@ -153,18 +152,15 @@ class MarketplaceOfferExportEventListenerTest {
         category.setName(definitionName);
         category.setMarketplaceDefinitions(List.of(def));
 
+        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(catalog.getCategories()).thenReturn(List.of(category));
         when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(product));
-
-        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(inventoryView.findByProduct(product)).thenReturn(matched);
     }
 
-    private MatchedInventory mockMatchedInventoryWithWarehouseQty(int warehouseQty) {
+    private MatchedInventory mockMatchedInventoryWithWarehouseQty(long warehouseQty) {
         MatchedInventory matched = mock(MatchedInventory.class);
-        InventoryItem item = mock(InventoryItem.class);
-        when(item.qty()).thenReturn(warehouseQty);
-        when(matched.getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(List.of(item));
+        when(matched.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(warehouseQty);
         return matched;
     }
 

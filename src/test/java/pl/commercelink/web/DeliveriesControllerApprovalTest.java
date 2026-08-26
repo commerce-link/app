@@ -23,8 +23,12 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
+import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -40,6 +44,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +54,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -94,6 +100,12 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private DeliveryTaxResolver deliveryTaxResolver;
+
+    @Mock
+    private OrdersRepository ordersRepository;
+
+    @Mock
+    private DropshipOrderLocator dropshipOrderLocator;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -263,43 +275,86 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void deliveryDetailsSuggestsEstimatedDeliveryDateForFailedPurchase() {
+    void dropshipDeliveryDetailsResolveTheContactThroughTheLocator() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
-        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         Model model = new ConcurrentModel();
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-        when(supplierPurchaseService.suggestEstimatedDeliveryAt(delivery)).thenReturn(ESTIMATED_DELIVERY_AT);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order();
+        order.setOrderId("order-1");
+        ShippingDetails shippingDetails = new ShippingDetails();
+        shippingDetails.setName("Jan");
+        order.setShippingDetails(shippingDetails);
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isEqualTo(shippingDetails);
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
         }
     }
 
     @Test
-    void deliveryDetailsDoesNotSuggestEstimatedDeliveryDateForNonFailedDelivery() {
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorHasNoAnswerYet() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         Model model = new ConcurrentModel();
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.containsAttribute("suggestedEstimatedDeliveryAt")).isFalse();
-            verify(supplierPurchaseService, never()).suggestEstimatedDeliveryAt(any());
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorInvariantIsViolated() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenThrow(
+                new IllegalStateException("Dropship delivery " + DELIVERY_ID + " is claimed by orders [a, b]"));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
         }
     }
 
@@ -1104,6 +1159,65 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void mergeIsRefusedWhenEitherDeliveryIsDropship() {
+        // given
+        Delivery source = new Delivery(STORE_ID, null, PROVIDER);
+        source.setDeliveryId(DELIVERY_ID);
+        source.setType(DeliveryType.DROPSHIP);
+        Delivery target = new Delivery(STORE_ID, null, PROVIDER);
+        target.setDeliveryId("delivery-2");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
+        }
+    }
+
+    @Test
+    void splitIsRefusedForADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
+        }
+    }
+
+    @Test
     void receivingAllocationsIsBlockedWhileAwaitingApproval() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(awaitingApprovalDelivery());
@@ -1531,4 +1645,46 @@ class DeliveriesControllerApprovalTest {
         assertThat(model.getAttribute("suggestedAddressId")).isNull();
         assertThat(model.getAttribute("suggestedAddress")).isNull();
     }
+
+    @Test
+    void deliveryDetailsSuggestsEstimatedDeliveryDateForFailedPurchase() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.suggestEstimatedDeliveryAt(delivery)).thenReturn(ESTIMATED_DELIVERY_AT);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+        }
+    }
+
+    @Test
+    void deliveryDetailsDoesNotSuggestEstimatedDeliveryDateForNonFailedDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.containsAttribute("suggestedEstimatedDeliveryAt")).isFalse();
+            verify(supplierPurchaseService, never()).suggestEstimatedDeliveryAt(any());
+        }
+    }
+
 }

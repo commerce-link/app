@@ -211,9 +211,10 @@
                 <tr>
                     <th th:text="#{general.name}"></th>
                     <th th:text="#{catalog.category.markup}"></th>
-                    <th th:text="#{catalog.category.min.total.quantity}"></th>
+                    <th th:text="#{catalog.category.min.distributors.qty}"></th>
                     <th th:text="#{catalog.category.min.qty.per.distributor}"></th>
                     <th th:text="#{catalog.category.min.distributors}"></th>
+                    <th th:text="#{catalog.category.min.local.distributors}"></th>
                     <th th:text="#{catalog.category.min.warehouse.qty}"></th>
                     <th th:text="#{catalog.category.enabled}"></th>
                     <th th:text="#{catalog.category.export.selected.products}"></th>
@@ -235,13 +236,16 @@
                         <input class="input" type="number" step="0.01" th:field="*{marketplaceDefinitions[__${iterStat.index}__].markup}" th:placeholder="#{catalog.category.multiplier.placeholder}">
                     </td>
                     <td>
-                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minTotalQty}" th:placeholder="#{catalog.category.min.total.quantity.placeholder}">
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minDistributorsQty}" th:placeholder="#{catalog.category.min.distributors.qty.placeholder}">
                     </td>
                     <td>
                         <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minQtyPerDistributor}" th:placeholder="#{catalog.category.min.qty.per.distributor.placeholder}">
                     </td>
                     <td>
                         <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minNumOfDistributors}" th:placeholder="#{catalog.category.min.distributors.placeholder}">
+                    </td>
+                    <td>
+                        <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minNumOfLocalDistributors}" th:placeholder="#{catalog.category.min.local.distributors.placeholder}">
                     </td>
                     <td>
                         <input class="input" type="number" th:field="*{marketplaceDefinitions[__${iterStat.index}__].minWarehouseQty}" th:placeholder="#{catalog.category.min.warehouse.qty.placeholder}">

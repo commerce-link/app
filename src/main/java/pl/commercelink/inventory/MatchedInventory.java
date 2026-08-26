@@ -9,6 +9,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -93,13 +94,21 @@ public class MatchedInventory {
     }
 
     public boolean hasOffersFromMultipleSuppliers(int minSuppliersCount, int minQtyPerSupplier) {
-        long count = inventoryItems.stream()
+        return countSuppliersWithMinQty(minQtyPerSupplier, supplier -> true) >= minSuppliersCount;
+    }
+
+    public boolean hasOffersFromMultipleLocalSuppliers(int minSuppliersCount, int minQtyPerSupplier) {
+        return countSuppliersWithMinQty(minQtyPerSupplier, supplier -> supplierRegistry.get(supplier).isLocalFor("PL")) >= minSuppliersCount;
+    }
+
+    private long countSuppliersWithMinQty(int minQtyPerSupplier, Predicate<String> supplierFilter) {
+        return inventoryItems.stream()
+                .filter(i -> supplierFilter.test(i.supplier()))
                 .collect(Collectors.groupingBy(InventoryItem::supplier, Collectors.summingLong(InventoryItem::qty)))
                 .values()
                 .stream()
                 .filter(totalQty -> totalQty >= minQtyPerSupplier)
                 .count();
-        return count >= minSuppliersCount;
     }
 
     public Price getLowestPrice() {
@@ -204,6 +213,10 @@ public class MatchedInventory {
 
     public long getTotalAvailableQty() {
         return inventoryItems.stream().mapToLong(InventoryItem::qty).sum();
+    }
+
+    public long getTotalAvailableQtyFromSupplier(String supplierName) {
+        return getInventoryItemsFromSupplier(supplierName).stream().mapToLong(InventoryItem::qty).sum();
     }
 
     public long getTotalAvailableQty(SupplierType supplierType) {

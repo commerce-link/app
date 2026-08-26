@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.orders.event.Event;
@@ -21,7 +22,7 @@ public class OrderIdRefreshService {
     private static final String ORDER_ID_UNCONFIRMED_EVENT = "DELIVERY_ORDER_ID_UNCONFIRMED";
 
     private final DeliveriesRepository deliveriesRepository;
-    private final StoreSupplierProviderResolver providerResolver;
+    private final SupplierProviderResolver providerResolver;
 
     public void refresh(OrderIdRefreshEventRequest request, int attempt) {
         if (attempt > MAX_SQS_ATTEMPTS) {

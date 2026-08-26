@@ -24,9 +24,22 @@ class SupplierPurchaseEventListenerTest {
                 "store-1", "delivery-1", "Acme", "ref-1");
 
         // when
-        listener.handleMessage(payload);
+        listener.handleMessage(payload, "3");
 
         // then
-        verify(supplierPurchaseService).processPending("store-1", "delivery-1");
+        verify(supplierPurchaseService).processPending("store-1", "delivery-1", null, 3);
+    }
+
+    @Test
+    void handleMessagePassesThroughThePayloadOrderId() {
+        // given
+        SupplierPurchaseEventRequest payload = new SupplierPurchaseEventRequest(
+                "store-1", "delivery-1", "Acme", "ref-1", "order-1");
+
+        // when
+        listener.handleMessage(payload, "1");
+
+        // then
+        verify(supplierPurchaseService).processPending("store-1", "delivery-1", "order-1", 1);
     }
 }

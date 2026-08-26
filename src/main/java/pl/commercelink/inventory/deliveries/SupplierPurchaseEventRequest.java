@@ -6,25 +6,34 @@ public class SupplierPurchaseEventRequest {
     private String deliveryId;
     private String provider;
     private String purchaseRef;
+    private String orderId;
     // Defaults to 0 so old in-flight SQS messages (serialized before this field existed) still deserialize.
-    private int attempt;
+    private int purchaseAttempt;
 
     public SupplierPurchaseEventRequest() {
     }
 
     public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef) {
-        this.storeId = storeId;
-        this.deliveryId = deliveryId;
-        this.provider = provider;
-        this.purchaseRef = purchaseRef;
+        this(storeId, deliveryId, provider, purchaseRef, null);
     }
 
-    public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef, int attempt) {
+    public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef,
+                                         String orderId) {
         this.storeId = storeId;
         this.deliveryId = deliveryId;
         this.provider = provider;
         this.purchaseRef = purchaseRef;
-        this.attempt = attempt;
+        this.orderId = orderId;
+    }
+
+    public SupplierPurchaseEventRequest(String storeId, String deliveryId, String provider, String purchaseRef,
+                                         String orderId, int purchaseAttempt) {
+        this.storeId = storeId;
+        this.deliveryId = deliveryId;
+        this.provider = provider;
+        this.purchaseRef = purchaseRef;
+        this.orderId = orderId;
+        this.purchaseAttempt = purchaseAttempt;
     }
 
     public String getStoreId() {
@@ -43,11 +52,15 @@ public class SupplierPurchaseEventRequest {
         return purchaseRef;
     }
 
-    public int getAttempt() {
-        return attempt;
+    public String getOrderId() {
+        return orderId;
     }
 
-    public void setAttempt(int attempt) {
-        this.attempt = attempt;
+    public int getPurchaseAttempt() {
+        return purchaseAttempt;
+    }
+
+    public void setPurchaseAttempt(int purchaseAttempt) {
+        this.purchaseAttempt = purchaseAttempt;
     }
 }

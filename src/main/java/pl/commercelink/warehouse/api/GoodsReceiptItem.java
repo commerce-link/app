@@ -14,8 +14,9 @@ public class GoodsReceiptItem {
     private final double unitPrice;
     private final double tax;
     private final String serialNo;
+    private final ItemCondition condition;
 
-    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, String category, int qty, double unitPrice, double tax, String serialNo) {
+    private GoodsReceiptItem(String deliveryId, String ean, String mfn, String name, String category, int qty, double unitPrice, double tax, String serialNo, ItemCondition condition) {
         this.deliveryId = deliveryId;
         this.ean = ean;
         this.mfn = mfn;
@@ -25,9 +26,10 @@ public class GoodsReceiptItem {
         this.unitPrice = unitPrice;
         this.tax = tax;
         this.serialNo = serialNo;
+        this.condition = condition;
     }
 
-    public static GoodsReceiptItem from(RMAItem rmaItem) {
+    public static GoodsReceiptItem from(RMAItem rmaItem, ItemCondition condition) {
         return new GoodsReceiptItem(
                 rmaItem.getDeliveryId(),
                 rmaItem.getEan(),
@@ -37,7 +39,8 @@ public class GoodsReceiptItem {
                 rmaItem.getQty(),
                 rmaItem.getCost(),
                 rmaItem.getTax(),
-                rmaItem.getSerialNo()
+                rmaItem.getSerialNo(),
+                condition
         );
     }
 
@@ -75,5 +78,9 @@ public class GoodsReceiptItem {
 
     public String getSerialNo() {
         return serialNo;
+    }
+
+    public ItemCondition getCondition() {
+        return condition;
     }
 }

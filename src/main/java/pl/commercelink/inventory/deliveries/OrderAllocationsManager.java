@@ -115,6 +115,7 @@ public class OrderAllocationsManager {
         for (Allocation allocation : allocations) {
             OrderItem orderItem = orderItemsRepository.findById(allocation.getKey().getOrderId(), allocation.getKey().getItemId());
             orderItem.setDeliveryId(targetDeliveryId);
+            orderItem.setClaimedDeliveryId(targetDeliveryId);
             orderItemsRepository.save(orderItem);
         }
     }

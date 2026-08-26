@@ -402,6 +402,14 @@
                             <option value="deleteItems" th:text="#{general.delete}"></option>
                         </select>
                     </div>
+                    <div class="select is-small ml-2" id="condition-select-wrapper" style="display: none;"
+                         th:data-required-message="#{rma.item.condition.required}">
+                        <select id="condition-select" name="condition" th:disabled="${isClosed}">
+                            <option value="" th:text="#{rma.item.condition.select}"></option>
+                            <option th:each="condition : ${itemConditions}" th:value="${condition}"
+                                    th:text="${enumI18n.localize(condition)}"></option>
+                        </select>
+                    </div>
                     <button class="button is-primary is-small" type="button" onclick="handleRMAAction(this)" th:text="#{general.submit}" th:disabled="${isClosed}"></button>
                 </div>
                 <div class="control">
@@ -695,9 +703,29 @@
             });
         });
 
+        const actionsRequiringCondition = ['replaceItems?broken=false', 'replaceItems?broken=true', 'acceptReturn'];
+
+        function actionRequiresCondition() {
+            return actionsRequiringCondition.includes(document.getElementById('action-select').value);
+        }
+
+        function toggleConditionSelect() {
+            document.getElementById('condition-select-wrapper').style.display = actionRequiresCondition() ? '' : 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('action-select').addEventListener('change', toggleConditionSelect);
+            toggleConditionSelect();
+        });
+
         function handleRMAAction(button) {
             const actionSelect = document.getElementById('action-select');
             const selectedAction = actionSelect.value;
+
+            if (actionRequiresCondition() && !document.getElementById('condition-select').value) {
+                alert(document.getElementById('condition-select-wrapper').dataset.requiredMessage);
+                return;
+            }
 
             if (selectedAction === 'split') {
                 submitSplitAction();

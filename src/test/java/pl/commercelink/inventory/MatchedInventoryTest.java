@@ -38,9 +38,52 @@ class MatchedInventoryTest {
         return new InventoryItem("E1", "M1", netPrice, "PLN", 20, leadTimeDays, supplier, true);
     }
 
+    private InventoryItem supplierItemWithQty(String supplier, int qty) {
+        return new InventoryItem("E1", "M1", 1000.0, "PLN", qty, 1, supplier, true);
+    }
+
     private SupplierInfo supplierInfo(String name, int arrivalDays) {
-        return new SupplierInfo(name, SupplierType.Distributor, 1, "PL",
+        return supplierInfo(name, "PL", arrivalDays);
+    }
+
+    private SupplierInfo supplierInfo(String name, String origin, int arrivalDays) {
+        return new SupplierInfo(name, SupplierType.Distributor, 1, origin,
                 new ShippingPolicy(new ShippingTerms(arrivalDays, new ShippingCostPolicy.Free())));
+    }
+
+    @Test
+    void sumsAvailableQtyOfSingleSupplier() {
+        // given
+        MatchedInventory matched = inventoryWith(warehouseItem(1000.0, true), supplierItemWithQty("Action", 7));
+
+        // when / then
+        assertThat(matched.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).isEqualTo(2L);
+        assertThat(matched.getTotalAvailableQtyFromSupplier("Action")).isEqualTo(7L);
+        assertThat(matched.getTotalAvailableQtyFromSupplier("Missing")).isEqualTo(0L);
+    }
+
+    @Test
+    void countsOnlyLocalSuppliersWithRequiredQty() {
+        // given
+        when(supplierRegistry.get("Local")).thenReturn(supplierInfo("Local", "PL", 1));
+        when(supplierRegistry.get("Foreign")).thenReturn(supplierInfo("Foreign", "DE", 3));
+        MatchedInventory matched = inventoryWith(supplierItemWithQty("Local", 10), supplierItemWithQty("Foreign", 10));
+
+        // when / then
+        assertThat(matched.hasOffersFromMultipleSuppliers(2, 5)).isTrue();
+        assertThat(matched.hasOffersFromMultipleLocalSuppliers(1, 5)).isTrue();
+        assertThat(matched.hasOffersFromMultipleLocalSuppliers(2, 5)).isFalse();
+    }
+
+    @Test
+    void ignoresLocalSuppliersBelowRequiredQty() {
+        // given
+        when(supplierRegistry.get("Local")).thenReturn(supplierInfo("Local", "PL", 1));
+        MatchedInventory matched = inventoryWith(supplierItemWithQty("Local", 3));
+
+        // when / then
+        assertThat(matched.hasOffersFromMultipleLocalSuppliers(1, 5)).isFalse();
+        assertThat(matched.hasOffersFromMultipleLocalSuppliers(0, 5)).isTrue();
     }
 
     @Test

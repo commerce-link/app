@@ -45,18 +45,17 @@ class SupplierPurchaseEventPublisherTest {
         verify(options).queue("supplier-purchase-queue.fifo");
         verify(options).payload(request);
         verify(options).messageGroupId("store-1:Acme");
-        // old 4-arg constructor defaults attempt to 0, so dedup id keeps the "ref:attempt" shape
-        verify(options).messageDeduplicationId("ref-1:0");
+        verify(options).messageDeduplicationId("ref-1");
     }
 
     @Test
-    void publishIncludesAttemptInDeduplicationId() {
+    void publishWithExplicitDeduplicationIdUsesIt() {
         // given
         SupplierPurchaseEventRequest request =
-                new SupplierPurchaseEventRequest("store-1", "delivery-1", "Acme", "ref-1", 3);
+                new SupplierPurchaseEventRequest("store-1", "delivery-1", "Acme", "ref-1", null, 3);
 
         // when
-        publisher.publish(request);
+        publisher.publish(request, "ref-1:3");
 
         // then
         ArgumentCaptor<Consumer<SqsSendOptions<SupplierPurchaseEventRequest>>> captor =

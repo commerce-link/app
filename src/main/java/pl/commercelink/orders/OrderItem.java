@@ -65,6 +65,7 @@ public class OrderItem extends Item {
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
         this.position = source.getPosition();
+        this.setCondition(source.getCondition());
 
         this.addFulfilment(
             source.getEan(),
@@ -126,6 +127,7 @@ public class OrderItem extends Item {
         this.setManufacturerCode(other.getManufacturerCode());
         this.setCost(other.getCost());
         this.setDeliveryId(other.getDeliveryId());
+        this.setClaimedDeliveryId(other.getClaimedDeliveryId());
 
         this.setConsolidated(other.isConsolidated());
         this.setComment(other.getComment());
@@ -144,6 +146,7 @@ public class OrderItem extends Item {
     public void copyFulfilmentFrom(ReservationConfirmation confirmation) {
         this.setQty(confirmation.qty());
         this.appendComment(confirmation.comment());
+        this.setCondition(confirmation.condition());
         this.addFulfilment(
                 confirmation.ean(),
                 confirmation.mfn(),

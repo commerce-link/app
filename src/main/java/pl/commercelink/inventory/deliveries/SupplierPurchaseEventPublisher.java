@@ -13,11 +13,15 @@ public class SupplierPurchaseEventPublisher {
     private SqsTemplate sqsTemplate;
 
     public void publish(SupplierPurchaseEventRequest request) {
+        publish(request, request.getPurchaseRef());
+    }
+
+    public void publish(SupplierPurchaseEventRequest request, String deduplicationId) {
         sqsTemplate.send(to -> to
                 .queue(QUEUE_NAME)
                 .payload(request)
                 .messageGroupId(request.getStoreId() + ":" + request.getProvider())
-                .messageDeduplicationId(request.getPurchaseRef() + ":" + request.getAttempt())
+                .messageDeduplicationId(deduplicationId)
         );
     }
 }

@@ -36,37 +36,42 @@ public class DeliveryReceptionService {
             List<Allocation> remainingAllocations
     ) {
         Store store = storesRepository.findById(storeId);
-
         WarehouseConfiguration warehouseConfiguration = store.getWarehouseConfiguration();
-        if (warehouseConfiguration == null || !warehouseConfiguration.isComplete()) {
-            return OperationResult.failure("Warehouse configuration is missing for store: " + storeId);
-        }
+        boolean documentsGenerationEnabled = warehouseConfiguration != null && warehouseConfiguration.isDocumentsGenerationEnabled();
 
-        InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
-        BillingParty issuer = invoicingProvider.fetchCostCenterById(warehouseConfiguration.getCostCenterId());
-        if (issuer == null || !issuer.hasCompanyDetails()) {
-            return OperationResult.failure("Failed to fetch cost center with id: " + warehouseConfiguration.getCostCenterId());
-        }
-
-        BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(provider);
-        if (counterparty == null || !counterparty.hasCompanyDetails()) {
-            return OperationResult.failure("Failed to fetch counterparty with shortcut: " + provider);
-        }
-
-        String createdBy = CustomSecurityContext.getLoggedInUserName();
-
-        GoodsInRequest request = GoodsInRequest.builder()
-                .issuer(issuer)
-                .counterparty(counterparty)
-                .warehouseId(warehouseConfiguration.getWarehouseId())
+        GoodsInRequest.Builder builder = GoodsInRequest.builder()
                 .deliveryId(deliveryId)
                 .orderAllocations(orderAllocations)
                 .warehouseAllocations(warehouseAllocations)
-                .createdBy(createdBy)
-                .build();
+                .createdBy(CustomSecurityContext.getLoggedInUserName());
+
+        if (documentsGenerationEnabled) {
+            if (!warehouseConfiguration.isComplete()) {
+                return OperationResult.failure("Warehouse configuration is missing for store: " + storeId);
+            }
+
+            InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+            if (invoicingProvider == null) {
+                return OperationResult.failure("Invoicing provider is not configured for store: " + storeId);
+            }
+
+            BillingParty issuer = invoicingProvider.fetchCostCenterById(warehouseConfiguration.getCostCenterId());
+            if (issuer == null || !issuer.hasCompanyDetails()) {
+                return OperationResult.failure("Failed to fetch cost center with id: " + warehouseConfiguration.getCostCenterId());
+            }
+
+            BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(provider);
+            if (counterparty == null || !counterparty.hasCompanyDetails()) {
+                return OperationResult.failure("Failed to fetch counterparty with shortcut: " + provider);
+            }
+
+            builder.issuer(issuer)
+                    .counterparty(counterparty)
+                    .warehouseId(warehouseConfiguration.getWarehouseId());
+        }
 
         OperationResult<Document> result = warehouse.goodsInHandler(storeId).receive(
-                request, warehouseConfiguration.isDocumentsGenerationEnabled());
+                builder.build(), documentsGenerationEnabled);
         if (!result.isSuccess()) {
             return result;
         }
