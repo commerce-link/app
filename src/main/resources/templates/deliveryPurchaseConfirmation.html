@@ -11,7 +11,6 @@
             <h1 class="title" th:text="#{deliveries.purchase.confirm.title}">Supplier order confirmation</h1>
             <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
 
-            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
             <div id="validation-area" class="mb-6">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

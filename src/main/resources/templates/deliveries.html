@@ -7,8 +7,6 @@
 <div layout:fragment="content">
     <section class="section">
         <div class="container">
-            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
-            <div class="notification is-danger is-light" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
             <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
                 <h1 class="mb-0" th:text="#{deliveries.title}"></h1>
