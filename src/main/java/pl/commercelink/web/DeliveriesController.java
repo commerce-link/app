@@ -1094,7 +1094,7 @@ public class DeliveriesController {
                     ? shipmentCarrierOptions.forOrder(dropshipOrder, store)
                     : List.<String>of());
         }
-        if (delivery.isOrderFailed()) {
+        if (delivery.isOrderFailed() || delivery.isOrderDispatched()) {
             model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
         }
         return "deliveryDetails";

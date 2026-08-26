@@ -1668,6 +1668,27 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void deliveryDetailsSuggestsEstimatedDeliveryDateForDispatchedPurchase() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.suggestEstimatedDeliveryAt(delivery)).thenReturn(ESTIMATED_DELIVERY_AT);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+        }
+    }
+
+    @Test
     void deliveryDetailsDoesNotSuggestEstimatedDeliveryDateForNonFailedDelivery() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);

@@ -388,7 +388,11 @@ public class SupplierPurchaseService {
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.setOrderErrorMessage(null);
             delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
-            deliveryCreationService.completePending(storeId, delivery, form);
+            if (delivery.isDropship()) {
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
+            } else {
+                deliveryCreationService.completePending(storeId, delivery, form);
+            }
             if (orderResult.provisional()) {
                 try {
                     orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(

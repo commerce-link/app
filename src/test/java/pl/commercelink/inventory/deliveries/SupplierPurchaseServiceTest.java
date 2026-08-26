@@ -1535,6 +1535,33 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void reconcileCompletesDropshipDeliveryViaDropshipPath() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.findPlacedOrder(any())).thenReturn(Optional.of(new SupplierOrderResult(
+                "555", 180.0, "PLN",
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        OperationResult<String> result = service.reconcile(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
     void reconcileSucceedsWhenRefreshPublishFailsAfterCompletion() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -1659,8 +1686,10 @@ class SupplierPurchaseServiceTest {
         assertNull(delivery.getOrderErrorMessage());
         assertEquals(2, delivery.getPurchaseAttempts());
         ArgumentCaptor<SupplierPurchaseEventRequest> event = ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
-        verify(supplierPurchaseEventPublisher).publish(event.capture(), anyString());
+        ArgumentCaptor<String> dedupId = ArgumentCaptor.forClass(String.class);
+        verify(supplierPurchaseEventPublisher).publish(event.capture(), dedupId.capture());
         assertEquals(2, event.getValue().getPurchaseAttempt());
+        assertEquals("ref-1:2", dedupId.getValue());
     }
 
     @Test
