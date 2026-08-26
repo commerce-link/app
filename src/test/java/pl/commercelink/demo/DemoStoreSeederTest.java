@@ -815,4 +815,46 @@ class DemoStoreSeederTest {
                 assertEquals(items.stream().map(OrderItem::getItemId).toList(),
                         secondRun.itemsByOrderId().get(orderId).stream().map(OrderItem::getItemId).toList()));
     }
+
+    @Test
+    void seedsOneOrderPerSimProductPerSupplierWhenAcmeIsRegistered() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        SimOrders simOrders = DemoStoreSeeder.buildSimOrders("store-1", rows, true);
+
+        // then
+        assertEquals(10, simOrders.orders().size());
+        simOrders.orders().forEach(order -> {
+            List<OrderItem> items = simOrders.itemsByOrderId().get(order.getOrderId());
+            assertEquals(1, items.size());
+            OrderItem item = items.getFirst();
+            assertTrue(item.getManufacturerCode().startsWith("SIM-"));
+            assertEquals(FulfilmentStatus.Allocation, item.getStatus());
+            assertTrue(item.getDeliveryId().equals("Acme") || item.getDeliveryId().equals("AcmeB"));
+            assertEquals("Symulacja", order.getBillingDetails().getName());
+            CatalogSeedRow row = rows.stream()
+                    .filter(r -> r.mfn().equals(item.getManufacturerCode()))
+                    .findFirst().orElseThrow();
+            assertEquals(row.name().replaceFirst("^Symulacja: ", ""), order.getBillingDetails().getSurname());
+        });
+    }
+
+    @Test
+    void skipsSimOrdersWhenAcmeIsNotRegistered() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        SimOrders simOrders = DemoStoreSeeder.buildSimOrders("store-1", rows, false);
+
+        // then
+        assertTrue(simOrders.orders().isEmpty());
+        assertTrue(simOrders.itemsByOrderId().isEmpty());
+        assertTrue(simOrders.events().isEmpty());
+
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+        assertEquals(4, demoOrders.orders().size());
+    }
 }

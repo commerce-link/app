@@ -11,6 +11,7 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
@@ -119,6 +120,9 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static final String ACME = "Acme";
     private static final String ACME_B = "AcmeB";
+    private static final List<String> SIM_SUPPLIERS = List.of(ACME, ACME_B);
+    private static final String SIM_MFN_PREFIX = "SIM-";
+    private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
@@ -129,6 +133,7 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private final AmazonDynamoDB dynamoDB;
     private final FileStorage fileStorage;
+    private final SupplierRegistry supplierRegistry;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -750,6 +755,15 @@ public class DemoStoreSeeder implements StoreSeeder {
         demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
         mapper.save(demoOrders.delivery(), clobber);
         demoOrders.events().forEach(event -> mapper.save(event, clobber));
+
+        SimOrders simOrders = buildSimOrders(storeId, rows, simulationSuppliersAvailable());
+        simOrders.orders().forEach(order -> mapper.save(order, clobber));
+        simOrders.itemsByOrderId().values().forEach(mapper::batchSave);
+        simOrders.events().forEach(event -> mapper.save(event, clobber));
+    }
+
+    private boolean simulationSuppliersAvailable() {
+        return supplierRegistry.exists(ACME);
     }
 
     private static String ownerEmailOrFallback(DemoStoreMetadata demo) {
@@ -814,6 +828,36 @@ public class DemoStoreSeeder implements StoreSeeder {
         OrderEvent event = new OrderEvent(order.getOrderId(), type, name, createdAt);
         event.setEventId(demoId(storeId, order.getOrderId() + "-event-" + name));
         return event;
+    }
+
+    static SimOrders buildSimOrders(String storeId, List<CatalogSeedRow> rows, boolean simulationSuppliersAvailable) {
+        List<Order> orders = new ArrayList<>();
+        Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
+        List<OrderEvent> events = new ArrayList<>();
+
+        if (simulationSuppliersAvailable) {
+            rows.stream()
+                    .filter(row -> row.mfn().startsWith(SIM_MFN_PREFIX))
+                    .forEach(row -> SIM_SUPPLIERS.stream()
+                            .filter(row::soldBy)
+                            .forEach(supplier -> {
+                                Order order = demoOrder(storeId, "Symulacja", simulationScenarioLabel(row),
+                                        demoId(storeId, "sim-" + row.mfn().toLowerCase(Locale.ROOT) + "-" + supplier.toLowerCase(Locale.ROOT)),
+                                        new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+                                OrderItem item = allocationItem(order.getOrderId(), row, supplier, 1, 1);
+                                order.setTotalPrice(item.getTotalPrice());
+                                orders.add(order);
+                                itemsByOrderId.put(order.getOrderId(), List.of(item));
+                                events.add(orderEvent(storeId, order,
+                                        EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt()));
+                            }));
+        }
+
+        return new SimOrders(orders, itemsByOrderId, events);
+    }
+
+    private static String simulationScenarioLabel(CatalogSeedRow row) {
+        return row.name().startsWith(SIM_LABEL_PREFIX) ? row.name().substring(SIM_LABEL_PREFIX.length()) : row.name();
     }
 
     private static CatalogSeedRow acmeBExclusiveRow(List<CatalogSeedRow> catalogRows) {
