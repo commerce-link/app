@@ -11,6 +11,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.taxonomy.Categories;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 import pl.commercelink.warehouse.api.ReservationItem;
@@ -92,7 +93,8 @@ class WarehouseFulfilmentServiceTest {
                 Price.fromNet(unitCost),
                 reservationItem.getRemainingQty(),
                 true,
-                null
+                null,
+                ItemCondition.Sealed
         ));
         return reservation;
     }

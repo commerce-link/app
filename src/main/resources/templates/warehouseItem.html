@@ -136,6 +136,18 @@
                     </div>
 
                     <div class="field">
+                        <label class="label" th:text="#{warehouse.item.condition}">Condition</label>
+                        <div class="control">
+                            <div class="select">
+                                <select th:field="*{condition}">
+                                    <option th:each="condition : ${itemConditions}" th:value="${condition}"
+                                            th:text="${enumI18n.localize(condition)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
                         <label class="label" th:text="#{warehouse.item.comment}">Comment</label>
                         <div class="control">
                             <textarea class="textarea" th:field="*{comment}" th:placeholder="#{warehouse.item.comment}"

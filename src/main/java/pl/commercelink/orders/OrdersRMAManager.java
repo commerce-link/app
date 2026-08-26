@@ -8,6 +8,7 @@ import pl.commercelink.orders.rma.RmaGoodsInService;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.warehouse.api.ItemCondition;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,7 @@ public class OrdersRMAManager {
     @Autowired
     private OptimisticLockingExecutor optimisticLockingExecutor;
 
-    public OperationResult<Document> acceptReturn(String storeId, RMA rma, List<RMAItem> rmaItems) {
+    public OperationResult<Document> acceptReturn(String storeId, RMA rma, List<RMAItem> rmaItems, ItemCondition condition) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         List<OrderItem> newOrderItems = new ArrayList<>();
@@ -51,7 +52,7 @@ public class OrdersRMAManager {
         }
 
         double finalTotalToDecrement = totalToDecrement;
-        OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), false);
+        OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), false, condition);
         commitCurrentOrderChangesIfSuccess(op, order, fresh -> {
             fresh.decreaseTotalPrice(finalTotalToDecrement);
             fresh.reopen();
@@ -59,7 +60,7 @@ public class OrdersRMAManager {
         return op;
     }
 
-    public OperationResult<Document> createReplacementOrder(String storeId, RMA rma, List<RMAItem> rmaItems, boolean itemsRequireRepair) {
+    public OperationResult<Document> createReplacementOrder(String storeId, RMA rma, List<RMAItem> rmaItems, boolean itemsRequireRepair, ItemCondition condition) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         List<OrderItem> newOrderItems = new ArrayList<>();
@@ -82,7 +83,7 @@ public class OrdersRMAManager {
             replacementItems.add(createReplacementItem(replacementOrder.getOrderId(), itemToProcess, rmaItem));
         }
 
-        OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), itemsRequireRepair);
+        OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), itemsRequireRepair, condition);
         commitCurrentOrderChangesIfSuccess(op, order, fresh -> { }, orderItems, newOrderItems);
         commitNewOrderChangesIfSuccess(op, replacementOrder, replacementItems);
         return op;

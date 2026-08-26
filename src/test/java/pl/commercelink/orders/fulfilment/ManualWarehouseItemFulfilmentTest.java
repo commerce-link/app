@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.List;
@@ -50,7 +51,7 @@ class ManualWarehouseItemFulfilmentTest {
         // given
         OrderItem orderItem = new OrderItem(ORDER_ID, Categories.UNCATEGORIZED, "Widget", 1, 199.0, "MFN-1", false);
         WarehouseItemView warehouseItem = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
         );
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(orderItem));
