@@ -152,7 +152,9 @@ class DynamicCategoryPricelistTest {
         when(matchedInventory.hasTotalMinQty(anyInt())).thenReturn(true);
         when(matchedInventory.getNoOfSuppliersWithProduct(any())).thenReturn(3L);
         when(matchedInventory.getTotalAvailableQty(any(SupplierType.class))).thenReturn(50L);
-        when(matchedInventory.getTotalAvailableQty(anyLong())).thenReturn(5L);
+        MatchedInventory inventoryAtPricePoint = mock(MatchedInventory.class);
+        when(inventoryAtPricePoint.getTotalAvailableQty()).thenReturn(5L);
+        when(matchedInventory.atPricePoint(anyLong())).thenReturn(inventoryAtPricePoint);
         when(matchedInventory.getEstimatedDeliveryDays(anyLong())).thenReturn(3);
     }
 

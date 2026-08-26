@@ -98,7 +98,7 @@ public class AvailabilityAndPriceList {
         int estimatedDeliveryDays = p.getEstimatedDeliveryDays() > 0
                 ? p.getEstimatedDeliveryDays()
                 : matchedInventory.getEstimatedDeliveryDays(grossPrice);
-        long totalAvailableQty = matchedInventory.getTotalAvailableQty(grossPrice);
+        long totalAvailableQty = matchedInventory.atPricePoint(grossPrice).getTotalAvailableQty();
 
         SellingPriceHistory history = histories.get(p.getPimId());
         long lowest30DaysPrice = history != null ? history.getLowestPriceOtherThan(grossPrice) : grossPrice;

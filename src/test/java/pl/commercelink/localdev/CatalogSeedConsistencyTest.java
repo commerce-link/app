@@ -25,10 +25,12 @@ class CatalogSeedConsistencyTest {
     private static final String ACME_B_STORE_FEED = "/local-init/s3/stores/uma2dqukxr/supplier-feeds/acmeb-feed.csv";
     private static final String PRICELIST = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String FEED_HEADER = "ean;mfn;brand;name;category;price;currency;qty";
+    private static final String SCENARIO_MFN_PREFIX = "SIM-";
 
     private static final Set<String> ACME_MAPPED_CATEGORIES = Set.of(
             "CPU", "GPU", "Memory", "Motherboard", "PSU", "Storage", "Cooler", "Case", "Fan",
-            "Displays", "Keyboards", "Mice", "MousePads", "Headphones", "Microphones", "Webcams", "Speakers", "Laptops");
+            "Displays", "Keyboards", "Mice", "MousePads", "Headphones", "Microphones", "Webcams", "Speakers", "Laptops",
+            "Akcesoria");
 
     private final List<CatalogSeedRow> rows = CatalogSeed.load();
 
@@ -184,6 +186,9 @@ class CatalogSeedConsistencyTest {
 
         // when / then
         for (String mfn : acme.keySet()) {
+            if (mfn.startsWith(SCENARIO_MFN_PREFIX)) {
+                continue;
+            }
             if (acmeB.containsKey(mfn)) {
                 assertThat(Double.parseDouble(acmeB.get(mfn)[5]))
                         .as("AcmeB price for %s", mfn)
@@ -198,7 +203,11 @@ class CatalogSeedConsistencyTest {
         Map<String, List<CatalogSeedRow>> feedOnlyByCategory = rows.stream()
                 .filter(row -> !row.inCatalog())
                 .collect(Collectors.groupingBy(CatalogSeedRow::category));
-        List<String> categories = rows.stream().map(CatalogSeedRow::category).distinct().toList();
+        List<String> categories = rows.stream()
+                .filter(row -> !row.mfn().startsWith(SCENARIO_MFN_PREFIX))
+                .map(CatalogSeedRow::category)
+                .distinct()
+                .toList();
 
         // when / then
         for (String category : categories) {

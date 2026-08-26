@@ -168,3 +168,8 @@ local-seed-9007;5903000000009;BX8071514600KF;Intel;Core i5-14600KF;Intel Core i5
 local-seed-9008;5903000000010;BX8071514900K;Intel;Core i9-14900K;Intel Core i9-14900K;CPU;2599;8;1;2699;AcmeB;false;false;989
 local-seed-9009;5903000000011;NH-D15;Noctua;NH-D15;Noctua NH-D15 CPU Cooler;Cooler;449;40;1;459;Acme,AcmeB;false;false;921
 local-seed-9010;5903000000012;ML360R-RGB;Cooler Master;MasterLiquid 360R;Cooler Master MasterLiquid ML360R RGB;Cooler;559;16;2;599;Acme;false;false;921
+local-seed-sim-01;5900000000901;SIM-OK;Acme;Symulacja: zakup OK;Symulacja: zakup OK;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-02;5900000000902;SIM-UNKNOWN-PLACED;Acme;Symulacja: timeout (zamówienie istnieje);Symulacja: timeout, zamówienie u dostawcy istnieje;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-03;5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502 (zamówienia brak);Symulacja: HTTP 502, zamówienia nie ma;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-04;5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie dostawcy;Symulacja: odrzucenie przez dostawcę;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-05;5900000000905;SIM-BLANK-ID;Acme;Symulacja: brak numeru zamówienia;Symulacja: odpowiedź bez numeru zamówienia;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571

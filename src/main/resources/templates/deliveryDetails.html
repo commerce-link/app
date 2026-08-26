@@ -234,13 +234,9 @@
                                 </form>
                             </div>
                             <div class="control">
-                                <form method="post"
-                                      onsubmit="return confirm(this.dataset.confirm)"
-                                      th:attr="data-confirm=#{deliveries.purchase.force.confirm}"
-                                      th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/force|}
-                                                                 : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/force|}">
-                                    <button type="submit" class="button is-warning" th:text="#{deliveries.purchase.force.button}">Order anyway</button>
-                                </form>
+                                <button type="button" id="force-dispatched-purchase-button" class="button is-warning"
+                                        onclick="toggleForcePurchaseModal(true)"
+                                        th:text="#{deliveries.purchase.force.button}">Order anyway</button>
                             </div>
                             <div class="control">
                                 <button type="button" id="complete-dispatched-purchase-button" class="button is-info"
@@ -658,6 +654,27 @@
                 </div>
             </div>
 
+            <div id="forcePurchaseModal" class="modal"
+                 th:if="${delivery.orderDispatched and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                <div class="modal-background" onclick="toggleForcePurchaseModal(false)"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title" th:text="#{deliveries.purchase.force.modal.title}"></p>
+                        <button type="button" class="delete" aria-label="close" onclick="toggleForcePurchaseModal(false)"></button>
+                    </header>
+                    <form th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/purchase/force|}
+                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/force|}" method="post">
+                        <section class="modal-card-body">
+                            <p th:text="#{deliveries.purchase.force.confirm}"></p>
+                        </section>
+                        <footer class="modal-card-foot">
+                            <button type="submit" class="button is-warning" th:text="#{deliveries.purchase.force.button}">Order anyway</button>
+                            <button type="button" class="button" onclick="toggleForcePurchaseModal(false)" th:text="#{general.cancel}">Cancel</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
+
             <div id="confirmActionModal" class="modal">
                 <div class="modal-background" onclick="toggleConfirmActionModal(false)"></div>
                 <div class="modal-card">
@@ -716,6 +733,12 @@
 
         function toggleCompletePurchaseModal(show) {
             const modal = document.getElementById('completePurchaseModal');
+            if (!modal) return;
+            modal.classList.toggle('is-active', show);
+        }
+
+        function toggleForcePurchaseModal(show) {
+            const modal = document.getElementById('forcePurchaseModal');
             if (!modal) return;
             modal.classList.toggle('is-active', show);
         }

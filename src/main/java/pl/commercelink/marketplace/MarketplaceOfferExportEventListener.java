@@ -100,7 +100,7 @@ public class MarketplaceOfferExportEventListener {
             }
 
             AvailabilityAndPrice availabilityAndPrice = op.get();
-            MatchedInventory matchedInventory = inventory.findByProduct(product);
+            MatchedInventory matchedInventory = inventory.findByProduct(product).atPricePoint(availabilityAndPrice.getPrice());
 
             long qtyToPublish = marketplaceDefinition.qtyToPublish(matchedInventory);
 

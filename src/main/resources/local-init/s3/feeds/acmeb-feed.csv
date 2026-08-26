@@ -106,3 +106,8 @@ ean;mfn;brand;name;category;price;currency;qty
 5903000000008;100-100000910WOF;AMD;AMD Ryzen 7 7800X3D;CPU;1418.72;PLN;18
 5903000000010;BX8071514900K;Intel;Intel Core i9-14900K;CPU;2049.62;PLN;8
 5903000000011;NH-D15;Noctua;Noctua NH-D15 CPU Cooler;Cooler;354.09;PLN;40
+5900000000901;SIM-OK;Acme;Symulacja: zakup OK;Akcesoria;10.00;PLN;100
+5900000000902;SIM-UNKNOWN-PLACED;Acme;Symulacja: timeout, zamówienie u dostawcy istnieje;Akcesoria;10.00;PLN;100
+5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502, zamówienia nie ma;Akcesoria;10.00;PLN;100
+5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie przez dostawcę;Akcesoria;10.00;PLN;100
+5900000000905;SIM-BLANK-ID;Acme;Symulacja: odpowiedź bez numeru zamówienia;Akcesoria;10.00;PLN;100
