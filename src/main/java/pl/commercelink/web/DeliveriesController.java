@@ -814,6 +814,8 @@ public class DeliveriesController {
             if (order != null && order.getShippingDetails() != null) {
                 model.addAttribute("consignee", order.getShippingDetails());
             }
+            model.addAttribute("pickupShipment",
+                    order != null ? DropshipPurchaseService.pickupShipment(order).orElse(null) : null);
         } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(storeId, model);

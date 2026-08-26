@@ -35,7 +35,7 @@
             </div>
 
             <div th:if="${delivery.dropship and consignee != null}">
-                <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
+                <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>
             </div>
 
             <div class="notification is-info is-light" th:if="${!delivery.dropship and suggestedAddress != null}">

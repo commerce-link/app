@@ -14,6 +14,7 @@ import pl.commercelink.inventory.supplier.api.SupplierPickupPoint;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -74,6 +75,16 @@ public class DropshipPurchaseService {
         if (!isDropshipAvailable(storeId, form.getProvider())) {
             return OperationResult.failure("orders.dropship.error.unsupported");
         }
+        if (requiresPickupPoint(order)) {
+            if (!isPickupPointDropshipAvailable(storeId, form.getProvider())) {
+                return OperationResult.failure("orders.dropship.error.pickupPointUnsupported");
+            }
+            try {
+                toPickupPoint(order);
+            } catch (IllegalArgumentException e) {
+                return OperationResult.failure("orders.dropship.error.pickupPointIncomplete");
+            }
+        }
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return OperationResult.failure("deliveries.purchase.error.failed");
@@ -99,6 +110,27 @@ public class DropshipPurchaseService {
                     storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef, order.getOrderId()));
         }
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
+    }
+
+    /** Message key explaining why "order at supplier" is blocked for this order, or null. */
+    public String purchaseBlockedReason(String storeId, Order order, String provider) {
+        if (!requiresPickupPoint(order)) {
+            return null;
+        }
+        if (!isPickupPointDropshipAvailable(storeId, provider)) {
+            return "orders.dropship.error.pickupPointUnsupported";
+        }
+        try {
+            toPickupPoint(order);
+            return null;
+        } catch (IllegalArgumentException e) {
+            return "orders.dropship.error.pickupPointIncomplete";
+        }
+    }
+
+    /** The order's first shipment, when it is a pickup-point delivery. */
+    public static Optional<Shipment> pickupShipment(Order order) {
+        return order.firstShipment().filter(shipment -> shipment.getType() == ShipmentType.PickupPoint);
     }
 
     public OperationResult<String> createManualDropship(String storeId, Order order, DeliveryCreationForm form) {

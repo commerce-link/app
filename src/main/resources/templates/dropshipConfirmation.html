@@ -12,7 +12,7 @@
             <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
 
 
-            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
+            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>
 
             <div id="validation-area" class="mb-6">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

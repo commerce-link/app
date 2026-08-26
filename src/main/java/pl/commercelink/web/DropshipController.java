@@ -229,6 +229,9 @@ public class DropshipController extends BaseController {
         model.addAttribute("consignee", order.getShippingDetails());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("requiresApproval", supplierPurchaseService.requiresApproval(storeId, form.getProvider()));
+        model.addAttribute("pickupShipment", DropshipPurchaseService.pickupShipment(order).orElse(null));
+        model.addAttribute("purchaseBlockedReason",
+                dropshipPurchaseService.purchaseBlockedReason(storeId, order, form.getProvider()));
     }
 
     private String renderValidationFragment(String storeId, DeliveryCreationForm form, Model model, Locale locale) {

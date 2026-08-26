@@ -21,7 +21,7 @@
             </div>
 
 
-            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
+            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>
 
             <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/create(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/create(orderId=${order.orderId})}"
                   th:object="${form}" method="post" id="deliveryCreateForm">
@@ -83,10 +83,15 @@
                             <button type="submit" class="button is-primary" th:text="#{general.save}">Save</button>
                             <button type="submit" class="button is-link ml-2" id="purchase-order-button"
                                     formnovalidate
+                                    th:disabled="${purchaseBlockedReason != null}"
+                                    th:attr="data-blocked=${purchaseBlockedReason != null}"
+                                    th:title="${purchaseBlockedReason != null} ? #{${purchaseBlockedReason}} : ''"
                                     th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase(orderId=${order.orderId})}"
                                     th:text="#{deliveries.purchase.button}">Order at supplier</button>
                         </div>
                     </div>
+                    <p class="help is-danger" th:if="${purchaseBlockedReason != null}"
+                       th:text="#{${purchaseBlockedReason}}">Blocked</p>
                 </div>
 
                 <!-- Products List - Full Width -->
@@ -192,7 +197,7 @@
             document.getElementById('deliveryNetValue').textContent = total.toFixed(2);
             const purchaseButton = document.getElementById('purchase-order-button');
             if (purchaseButton) {
-                purchaseButton.disabled = totalQty === 0;
+                purchaseButton.disabled = totalQty === 0 || purchaseButton.dataset.blocked === 'true';
             }
         }
 

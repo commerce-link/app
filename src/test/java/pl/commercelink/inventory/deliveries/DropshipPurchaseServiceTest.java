@@ -564,4 +564,50 @@ class DropshipPurchaseServiceTest {
         // when / then
         assertThat(service.isPickupPointDropshipAvailable(STORE_ID, PROVIDER)).isFalse();
     }
+
+    @Test
+    void submitDropshipRejectsPickupPointOrdersWhenTheProviderCannotDeliverToPoints() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.supportsPickupPointDropship()).thenReturn(false);
+        DeliveryCreationForm form = formWithItem("5900000000001", "MFN-1", 1, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, pickupPointOrder(), form, "ref-1");
+
+        // then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("orders.dropship.error.pickupPointUnsupported");
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void submitDropshipRejectsPickupPointOrdersWithoutAPointCode() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.supportsPickupPointDropship()).thenReturn(true);
+        Order order = pickupPointOrder();
+        order.firstShipment().orElseThrow().setCollectionPointCode(null);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, order, formWithItem("5900000000001", "MFN-1", 1, 100.0), "ref-1");
+
+        // then
+        assertThat(result.getMessage()).isEqualTo("orders.dropship.error.pickupPointIncomplete");
+    }
+
+    @Test
+    void createManualDropshipAcceptsPickupPointOrdersRegardlessOfTheProvider() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        lenient().when(supplierProvider.supportsPickupPointDropship()).thenReturn(false);
+
+        // when
+        OperationResult<String> result = service.createManualDropship(STORE_ID, pickupPointOrder(), formWithItem("5900000000001", "MFN-1", 1, 100.0));
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+    }
 }

@@ -22,6 +22,8 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -128,6 +130,34 @@ class DropshipControllerTest {
         assertThat(item.getRequestedQty()).isEqualTo(2);
         assertThat(item.getAllocations()).allMatch(allocation -> allocation.isSelected());
         assertThat(model.getAttribute("consignee")).isSameAs(order.getShippingDetails());
+    }
+
+    @Test
+    void createScreenExposesThePickupShipmentAndTheBlockedReason() {
+        // given
+        Order order = order();
+        Shipment shipment = new Shipment();
+        shipment.setType(ShipmentType.PickupPoint);
+        shipment.setCarrier("InPost");
+        shipment.setCollectionPointCode("WAW04A");
+        order.addShipment(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        when(dropshipPurchaseService.purchaseBlockedReason(STORE_ID, order, PROVIDER))
+                .thenReturn("orders.dropship.error.pickupPointUnsupported");
+        Model model = new ConcurrentModel();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.dropshipCreate(ORDER_ID, model);
+        }
+
+        // then
+        assertThat(model.getAttribute("pickupShipment")).isSameAs(shipment);
+        assertThat(model.getAttribute("purchaseBlockedReason")).isEqualTo("orders.dropship.error.pickupPointUnsupported");
     }
 
     @Test

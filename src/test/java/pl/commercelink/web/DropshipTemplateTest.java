@@ -21,7 +21,7 @@ class DropshipTemplateTest {
         String html = read("dropshipConfirmation.html");
 
         // then
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
         assertThat(html).doesNotContain("${consignee.streetAndNumber}");
         assertThat(html).doesNotContain("address-modal");
         assertThat(html).doesNotContain("deliveryAddressId");
@@ -257,7 +257,7 @@ class DropshipTemplateTest {
         String fragment = read("fragments/consignee-address.html");
 
         // then
-        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee)\"");
+        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
         assertThat(fragment).contains("orders.dropship.confirm.consignee");
         for (String field : List.of("${consignee.displayName}", "${consignee.streetAndNumber}", "${consignee.postalCode}",
                 "${consignee.city}", "${consignee.country}", "${consignee.phone}", "${consignee.email}")) {
@@ -272,7 +272,7 @@ class DropshipTemplateTest {
 
         // then
         assertThat(html).contains("<span class=\"tag is-info ml-2\" th:text=\"#{deliveries.dropship.badge}\">");
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
     }
 
     @Test
@@ -282,6 +282,23 @@ class DropshipTemplateTest {
 
         // then
         assertThat(html).contains("th:if=\"${delivery.dropship and consignee != null}\"");
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
+    }
+
+    @Test
+    void createScreenBlocksTheSupplierOrderButtonWithAReasonAndShowsThePickupPoint() throws Exception {
+        // given
+        String create = read("dropshipCreate.html");
+        String fragment = read("fragments/consignee-address.html");
+
+        // then
+        assertThat(create).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
+        assertThat(create).contains("#{${purchaseBlockedReason}}");
+        assertThat(create).contains("consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
+        assertThat(fragment).contains("#{orders.dropship.confirm.pickupPoint}");
+        assertThat(fragment).contains("${pickupShipment.collectionPointCode}");
+        assertThat(read("dropshipConfirmation.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(read("deliveryApproval.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
     }
 }
