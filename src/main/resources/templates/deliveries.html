@@ -90,6 +90,7 @@
                             <th th:text="#{general.store.id}" th:if="${isSuperAdmin}"></th>
                             <th th:text="#{deliveries.provider}"></th>
                             <th th:text="#{deliveries.order.no}"></th>
+                            <th th:text="#{deliveries.list.status}"></th>
                             <th th:text="#{deliveries.external.order.no}"></th>
                             <th th:text="#{deliveries.estimated.delivery}"></th>
                             <th th:text="#{deliveries.list.cost.net}"></th>
@@ -104,13 +105,17 @@
                             <td>
                                 <a th:href="@{${detailPath + '/deliveries/details'}(deliveryId=${delivery.deliveryId})}"
                                    th:text="${delivery.shortenedDeliveryId}"></a>
-                                <span class="tag is-warning ml-1" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
-                                <span class="tag is-warning ml-1" th:if="${delivery.orderDispatched}" th:text="#{deliveries.orderStatus.dispatched}"></span>
-                                <span class="tag is-danger ml-1" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
-                                <span class="tag is-warning ml-1" th:if="${delivery.awaitingApproval}"
-                                      th:text="#{deliveries.status.awaitingApproval}"></span>
-                                <span class="tag is-info ml-1" th:if="${delivery.dropship}"
-                                      th:text="#{deliveries.dropship.badge}"></span>
+                            </td>
+                            <td>
+                                <div class="tags mb-0">
+                                    <span class="tag is-warning mb-0" th:if="${delivery.orderPending}" th:text="#{deliveries.status.orderPending}"></span>
+                                    <span class="tag is-warning mb-0" th:if="${delivery.orderDispatched}" th:text="#{deliveries.orderStatus.dispatched}"></span>
+                                    <span class="tag is-danger mb-0" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
+                                    <span class="tag is-warning mb-0" th:if="${delivery.awaitingApproval}"
+                                          th:text="#{deliveries.status.awaitingApproval}"></span>
+                                    <span class="tag is-info mb-0" th:if="${delivery.dropship}"
+                                          th:text="#{deliveries.dropship.badge}"></span>
+                                </div>
                             </td>
                             <td th:text="${delivery.orderPending} ? #{deliveries.externalId.pending} : (${delivery.orderDispatched} ? #{deliveries.externalId.dispatched} : (${#strings.isEmpty(delivery.externalDeliveryId)} ? '&mdash;' : ${delivery.externalDeliveryId}))"></td>
                             <td th:text="${delivery.estimatedDeliveryAt}"></td>

@@ -26,6 +26,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
 
@@ -52,6 +53,7 @@ class StoreDeletionServiceTest {
     @Mock private FileStorage fileStorage;
     @Mock private StoreInventoryCache storeInventoryCache;
     @Mock private CognitoUserService cognitoUserService;
+    @Mock private SupplierProviderFactory supplierProviderFactory;
 
     private StoreDeletionService service;
 
@@ -59,7 +61,8 @@ class StoreDeletionServiceTest {
     void setUp() {
         service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
-                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService);
+                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
+                supplierProviderFactory);
         service.storesBucket = "stores";
     }
 
@@ -241,5 +244,41 @@ class StoreDeletionServiceTest {
 
         // then
         verify(cognitoUserService).deleteUser("user@example.com");
+    }
+
+    @Test
+    void deletesSecretsOfOwnSupplierConnectionsOnly() {
+        // given
+        Store store = demoStore();
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setSupplierConnections(List.of(
+                new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL),
+                new StoreSupplierConnection("AcmeB", ConnectionMode.OWN)));
+        store.setFulfilmentConfiguration(fulfilment);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verify(supplierProviderFactory).deleteConfiguration(store, "AcmeB");
+        verify(supplierProviderFactory, never()).deleteConfiguration(store, "Acme");
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void storeWithoutFulfilmentConfigurationDeletesNoSupplierSecrets() {
+        // given
+        Store store = demoStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verifyNoInteractions(supplierProviderFactory);
+        verify(storesRepository).delete(store);
     }
 }

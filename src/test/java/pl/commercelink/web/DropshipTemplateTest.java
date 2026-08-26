@@ -119,6 +119,19 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void deliveriesListKeepsStatusTagsInTheirOwnColumn() throws Exception {
+        // when
+        String html = read("deliveries.html");
+
+        // then
+        assertThat(html).contains("<th th:text=\"#{deliveries.list.status}\"></th>");
+        int deliveryIdCell = html.indexOf("${delivery.shortenedDeliveryId}");
+        int cellEnd = html.indexOf("</td>", deliveryIdCell);
+        assertThat(html.substring(deliveryIdCell, cellEnd)).doesNotContain("class=\"tag");
+        assertThat(html.indexOf("deliveries.dropship.badge")).isGreaterThan(cellEnd);
+    }
+
+    @Test
     void deliveryDetailsShowTheDropshipContactBelowTheAddress() throws Exception {
         // when
         String html = read("deliveryDetails.html");

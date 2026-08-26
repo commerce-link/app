@@ -334,9 +334,40 @@ class DemoStoreSeederTest {
             assertEquals(o.getBillingDetails().getCity(), o.getShippingDetails().getCity());
             assertTrue(o.getShippingDetails().isProperlyFilled());
             assertTrue(o.getTotalPrice() > 0);
-            assertEquals(FulfilmentType.WarehouseFulfilment, o.getFulfilmentType());
             assertEquals(LocalDate.now().plusDays(3), o.getEstimatedShippingAt());
         });
+        List<String> dropshipOrderIds = List.of(
+                DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY),
+                DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY));
+        demoOrders.orders().forEach(o -> assertEquals(
+                dropshipOrderIds.contains(o.getOrderId()) ? FulfilmentType.DirectToConsumer : FulfilmentType.WarehouseFulfilment,
+                o.getFulfilmentType(), o.getOrderId()));
+    }
+
+    @Test
+    void buildsDropshipOrdersForGlobalAcmeAndOwnAcmeB() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then
+        Order acmeOrder = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY));
+        Order acmeBOrder = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY));
+        for (Order order : List.of(acmeOrder, acmeBOrder)) {
+            assertEquals(FulfilmentType.DirectToConsumer, order.getFulfilmentType());
+            assertEquals(OrderStatus.New, order.getStatus());
+            assertTrue(order.hasShippingDetails(), "dropship needs a consignee address");
+            assertNull(order.getExternalOrderId());
+            List<OrderItem> items = demoOrders.itemsByOrderId().get(order.getOrderId());
+            assertEquals(1, items.size());
+            assertTrue(items.getFirst().isInAllocation());
+        }
+        assertEquals("Acme", demoOrders.itemsByOrderId().get(acmeOrder.getOrderId()).getFirst().getDeliveryId());
+        assertEquals("AcmeB", demoOrders.itemsByOrderId().get(acmeBOrder.getOrderId()).getFirst().getDeliveryId());
+        assertEquals("Lis", acmeOrder.getBillingDetails().getSurname());
+        assertEquals("Krol", acmeBOrder.getBillingDetails().getSurname());
     }
 
     @Test
@@ -808,7 +839,7 @@ class DemoStoreSeederTest {
 
         // then
         List<String> orderIds = firstRun.orders().stream().map(Order::getOrderId).toList();
-        assertEquals(List.of(DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.POS_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_2_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.WEBSTORE_ORDER_KEY)), orderIds);
+        assertEquals(List.of(DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.POS_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_2_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.WEBSTORE_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY)), orderIds);
         assertEquals(orderIds, secondRun.orders().stream().map(Order::getOrderId).toList());
         assertEquals(DemoStoreSeeder.demoId("store-1", "demo-delivery-open"), firstRun.delivery().getDeliveryId());
         assertEquals(firstRun.delivery().getDeliveryId(), secondRun.delivery().getDeliveryId());
@@ -866,7 +897,7 @@ class DemoStoreSeederTest {
         assertTrue(simOrders.itemsByOrderId().isEmpty());
         assertTrue(simOrders.events().isEmpty());
         assertTrue(products.stream().noneMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
-        assertEquals(4, demoOrders.orders().size());
+        assertEquals(6, demoOrders.orders().size());
 
         String pricelist = DemoStoreSeeder.filterSimulationPricelistRows(
                 readClasspathResource("/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv"));
