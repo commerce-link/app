@@ -254,4 +254,38 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
     }
+
+    @Test
+    void claimAllocationsNeverTouchesTheWarehouseForADropshipDelivery() {
+        // given: a tampered form asks for more than the selected order allocations cover
+        Delivery delivery = new Delivery(STORE_ID, "ACME-DS-1", "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("customer@example.com");
+        order.setBillingDetails(billingDetails);
+        OrderItem orderItem = new OrderItem(order.getOrderId(), "Category", "Product", 1, 100.0, null, false);
+        orderItem.setItemId("item-1");
+        orderItem.setDeliveryId("Acme");
+        orderItem.setStatus(FulfilmentStatus.Allocation);
+        Allocation selected = Allocation.fromOrderItem(order, orderItem);
+        selected.setSelected(true);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(3);
+        item.setUnitCost(90.0);
+        item.setAllocations(List.of(selected));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.getItems().add(item);
+
+        // when
+        service.claimAllocations(STORE_ID, delivery, form);
+
+        // then: only the selected order allocation is claimed and priced, nothing goes to the warehouse
+        assertEquals(1, item.getRequestedQty());
+        assertEquals(90.0, delivery.getTotalCost());
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), eq(form.getItems()));
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
 }
