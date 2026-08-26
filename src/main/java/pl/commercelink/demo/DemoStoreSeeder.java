@@ -73,6 +73,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -116,7 +117,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         String localPart = (name + "." + surname).toLowerCase(Locale.ROOT);
         long digits = Math.floorMod(
                 UUID.nameUUIDFromBytes((storeId + "/" + localPart).getBytes(StandardCharsets.UTF_8)).getMostSignificantBits(), 90) + 10;
-        return localPart + digits + "@test.com";
+        return slugify(localPart) + digits + "@test.com";
+    }
+
+    private static String slugify(String value) {
+        String ascii = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("[^\\x00-\\x7F]", "");
+        return ascii.replaceAll("[^a-z0-9]+", ".").replaceAll("^\\.+|\\.+$", "");
     }
 
     private static final String ACME = "Acme";
@@ -146,10 +153,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyDemoCompanyDetails(store);
         applyDemoInvoicingConfiguration(store);
         applyDemoFulfilmentDefaults(store);
-        seedStoreData(store.getStoreId());
+        List<CatalogSeedRow> rows = loadFilteredRows();
+        seedStoreData(store.getStoreId(), rows);
         saveSupplierRmaCenters(store.getStoreId());
-        saveCompletedOrders(store);
-        saveWarehouseStock(store);
+        saveCompletedOrders(store, rows);
+        saveWarehouseStock(store, rows);
     }
 
     public Store seedStore(String storeId, String storeName, DemoStoreMetadata demo) {
@@ -157,12 +165,15 @@ public class DemoStoreSeeder implements StoreSeeder {
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
         mapper.save(store);
-        seedStoreData(storeId);
+        seedStoreData(storeId, loadFilteredRows());
         return store;
     }
 
-    private void seedStoreData(String storeId) {
-        List<CatalogSeedRow> rows = filterSimulationRows(CatalogSeed.load(), simulationSuppliersAvailable());
+    private List<CatalogSeedRow> loadFilteredRows() {
+        return filterSimulationRows(CatalogSeed.load(), simulationSuppliersAvailable());
+    }
+
+    private void seedStoreData(String storeId, List<CatalogSeedRow> rows) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
 
         savePricelist(storeId);
@@ -365,13 +376,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         return center;
     }
 
-    private void saveCompletedOrders(Store store) {
+    private void saveCompletedOrders(Store store, List<CatalogSeedRow> rows) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
         CompletedDemoOrders completed = buildCompletedDemoOrders(
-                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), CatalogSeed.load());
+                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), rows);
         completed.orders().forEach(order -> mapper.save(order, clobber));
         completed.itemsByOrderId().values().forEach(mapper::batchSave);
         completed.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
@@ -543,13 +554,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         return new CompletedOrderBundle(order, items, delivery, List.of(goodsReceipt, goodsIssue), documentItems, events);
     }
 
-    private void saveWarehouseStock(Store store) {
+    private void saveWarehouseStock(Store store, List<CatalogSeedRow> rows) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
         WarehouseStock stock = buildWarehouseStock(
-                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), CatalogSeed.load());
+                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), rows);
         mapper.batchSave(stock.items());
         stock.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
         stock.documents().forEach(document -> mapper.save(document, clobber));

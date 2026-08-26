@@ -874,6 +874,36 @@ class DemoStoreSeederTest {
         assertTrue(pricelist.startsWith("PimId;EAN;Mfn"));
     }
 
+    @Test
+    void completedOrdersAndWarehouseStockNeverSeeSimRowsWhenAcmeIsNotRegistered() {
+        // given
+        List<CatalogSeedRow> rows = DemoStoreSeeder.filterSimulationRows(CatalogSeed.load(), false);
+
+        // when
+        CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+
+        // then
+        completed.itemsByOrderId().values().stream()
+                .flatMap(List::stream)
+                .forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
+        stock.items().forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
+    }
+
+    @Test
+    void slugifiesSimulationCustomerEmailButKeepsExistingEmailsByteIdentical() {
+        // given
+        String storeId = "store-1";
+
+        // when
+        String existingEmail = DemoStoreSeeder.customerEmail(storeId, "Jan", "Kowalski");
+        String simEmail = DemoStoreSeeder.customerEmail(storeId, "Symulacja", "timeout, zamówienie u dostawcy istnieje");
+
+        // then
+        assertEquals("jan.kowalski14@test.com", existingEmail);
+        assertEquals("symulacja.timeout.zamowienie.u.dostawcy.istnieje31@test.com", simEmail);
+    }
+
     private static String readClasspathResource(String resource) {
         try (java.io.InputStream stream = DemoStoreSeeder.class.getResourceAsStream(resource)) {
             return new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
