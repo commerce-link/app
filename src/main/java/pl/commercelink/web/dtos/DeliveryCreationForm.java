@@ -139,6 +139,10 @@ public class DeliveryCreationForm {
         this.suggestedItems = suggestedItems;
     }
 
+    public boolean hasRequestedItems() {
+        return items.stream().anyMatch(item -> item.getRequestedQty() > 0);
+    }
+
     public boolean hasDeliveryDetails() {
         return isNotBlank(externalDeliveryId) && isNotBlank(provider) && estimatedDeliveryAt != null;
     }

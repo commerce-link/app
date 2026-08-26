@@ -107,6 +107,11 @@ public class DropshipPurchaseService {
         return OperationResult.success(delivery.getDeliveryId());
     }
 
+    /** "Zapisz" with every allocation unchecked and "remove unselected" ticked: free the items, create nothing. */
+    public void releaseUnselected(String storeId, DeliveryCreationForm form) {
+        deliveryCreationService.releaseUnselectedAllocations(storeId, form);
+    }
+
     private String dropshipValidationError(Order order, DeliveryCreationForm form) {
         if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
             return "orders.dropship.error.fulfilmentType";
@@ -114,8 +119,8 @@ public class DropshipPurchaseService {
         if (!order.hasShippingDetails()) {
             return "orders.dropship.error.address";
         }
-        if (form.getItems().stream().noneMatch(item -> item.getRequestedQty() > 0)) {
-            return "deliveries.purchase.error.availability";
+        if (!form.hasRequestedItems()) {
+            return "orders.dropship.error.nothingSelected";
         }
         return null;
     }

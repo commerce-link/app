@@ -10,6 +10,10 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
+import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
 import java.time.LocalDate;
@@ -100,6 +104,37 @@ class DeliveryCreationServiceTest {
 
         // then
         verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
+    }
+
+    @Test
+    void releaseUnselectedAllocationsFreesTheUncheckedOrderItemsWithoutCreatingAnything() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("customer@example.com");
+        order.setBillingDetails(billingDetails);
+        OrderItem orderItem = new OrderItem(order.getOrderId(), "Category", "Product", 1, 100.0, null, false);
+        orderItem.setItemId("item-1");
+        orderItem.setDeliveryId(PROVIDER);
+        orderItem.setStatus(FulfilmentStatus.Allocation);
+        Allocation unchecked = Allocation.fromOrderItem(order, orderItem);
+        unchecked.setSelected(false);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(0);
+        item.setAllocations(List.of(unchecked));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        form.setRemoveUnselected(true);
+        form.getItems().add(item);
+
+        // when
+        service.releaseUnselectedAllocations(STORE_ID, form);
+
+        // then
+        verify(orderAllocationsManager).remove(STORE_ID, "order-1", List.of("item-1"));
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test

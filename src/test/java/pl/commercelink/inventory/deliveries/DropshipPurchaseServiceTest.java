@@ -291,6 +291,36 @@ class DropshipPurchaseServiceTest {
     }
 
     @Test
+    void createManualDropshipRejectsAFormWithNothingSelected() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
+
+        // when
+        OperationResult<String> result = service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("orders.dropship.error.nothingSelected", result.getMessage());
+        verify(deliveriesRepository, never()).save(any());
+        verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
+    }
+
+    @Test
+    void releaseUnselectedHandsTheFormToTheCreationServiceWithoutCreatingADelivery() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
+        form.setRemoveUnselected(true);
+
+        // when
+        service.releaseUnselected(STORE_ID, form);
+
+        // then
+        verify(deliveryCreationService).releaseUnselectedAllocations(STORE_ID, form);
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void createManualDropshipRejectsWarehouseFulfilmentOrder() {
         // given
         connectSupplier(ConnectionMode.OWN);

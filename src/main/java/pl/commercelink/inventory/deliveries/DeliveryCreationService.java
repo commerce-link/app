@@ -52,6 +52,11 @@ public class DeliveryCreationService {
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 
+    /** Frees the allocations the operator unchecked on the creation form without creating a delivery. */
+    public void releaseUnselectedAllocations(String storeId, DeliveryCreationForm form) {
+        removeUnselectedAllocations(storeId, form.getItems());
+    }
+
     public void releaseAllocations(String storeId, Delivery delivery) {
         orderAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());
         warehouseAllocationsManager.release(storeId, delivery.getDeliveryId(), delivery.getProvider());

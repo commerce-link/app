@@ -187,6 +187,12 @@ public class DropshipController extends BaseController {
             return orderDetailsRedirect(storeId, orderId);
         }
         form.setStoreId(storeId);
+        if (!form.hasRequestedItems() && form.isRemoveUnselected()) {
+            dropshipPurchaseService.releaseUnselected(storeId, form);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("orders.dropship.unselectedReleased", null, locale));
+            return orderDetailsRedirect(storeId, orderId);
+        }
         OperationResult<String> result = dropshipPurchaseService.createManualDropship(storeId, order.get(), form);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
