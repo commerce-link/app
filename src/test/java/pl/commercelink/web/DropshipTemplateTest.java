@@ -136,13 +136,19 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveryDetailsHideMergeAndSplitForDropshipDeliveries() throws Exception {
+    void deliveryDetailsGreyOutWarehouseActionsForDropshipDeliveries() throws Exception {
         // when
         String html = read("deliveryDetails.html");
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
 
-        // then
-        assertThat(html).contains("!delivery.dropship and !mergeTargetDeliveries.isEmpty()");
-        assertThat(html).contains("!delivery.orderPending and !delivery.dropship and !delivery.orderDispatched}\" value=\"splitSelectedAllocations\"");
+        // then: reception, merge and split stay visible but disabled, with a tooltip explaining why
+        assertThat(html).contains("th:unless=\"${delivery.awaitingApproval or isSuperAdmin}\" th:disabled=\"${delivery.dropship}\" th:title=\"${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''\" value=\"markSelectedAsReceived\"");
+        assertThat(html).contains("!mergeTargetDeliveries.isEmpty() and !delivery.orderDispatched}\" th:disabled=\"${delivery.dropship}\" th:title=\"${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''\" value=\"mergeSelectedAllocations\"");
+        assertThat(html).contains("!delivery.orderPending and !delivery.orderDispatched}\" th:disabled=\"${delivery.dropship}\" th:title=\"${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''\" value=\"splitSelectedAllocations\"");
+        assertThat(html).doesNotContain("!delivery.dropship and !mergeTargetDeliveries.isEmpty()");
+        assertThat(pl).contains("deliveries.action.dropship.disabled=");
+        assertThat(en).contains("deliveries.action.dropship.disabled=");
     }
 
     @Test
