@@ -13,6 +13,7 @@ import pl.commercelink.inventory.supplier.api.SupplierParcel;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -164,6 +165,9 @@ public class DropshipTrackingService {
     private TrackingOutcome applyParcels(String storeId, Delivery delivery, SupplierOrderTracking snapshot,
                                          LocalDateTime now, boolean manual) {
         Order order = orderOf(storeId, delivery);
+        // A customer who chose a parcel locker gets a PickupPoint shipment carrying the point they picked;
+        // the supplier only reports the carrier and the waybill.
+        Shipment pickup = order == null ? null : DropshipPurchaseService.pickupShipment(order).orElse(null);
         List<Allocation> open = delivery.getAllocations().stream()
                 .filter(allocation -> allocation.getType() == AllocationType.Order && allocation.isInAllocation())
                 .toList();
@@ -188,8 +192,11 @@ public class DropshipTrackingService {
             Set<Allocation> taken = Collections.newSetFromMap(new IdentityHashMap<>());
             taken.addAll(selected);
             List<Allocation> remaining = open.stream().filter(allocation -> !taken.contains(allocation)).toList();
-            DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, parcel.carrier(), parcel.trackingNo(),
-                    null, parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl());
+            DropshipShipment shipment = pickup != null
+                    ? new DropshipShipment(ShipmentType.PickupPoint, parcel.carrier(), parcel.trackingNo(),
+                            pickup.getCollectionPointCode(), parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl())
+                    : new DropshipShipment(ShipmentType.Courier, parcel.carrier(), parcel.trackingNo(),
+                            null, parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl());
             OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment,
                     (d, r) -> {
                         d.addEvent(new Event(EventType.action, TRACKING_APPLIED_EVENT, now));

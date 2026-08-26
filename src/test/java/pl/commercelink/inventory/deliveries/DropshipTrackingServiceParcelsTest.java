@@ -367,6 +367,30 @@ class DropshipTrackingServiceParcelsTest {
     }
 
     @Test
+    void parcelForAPickupPointOrderBecomesAPickupPointShipmentWithTheOrdersPointCode() {
+        // given
+        Shipment chosen = new Shipment();
+        chosen.setType(ShipmentType.PickupPoint);
+        chosen.setCarrier("InPost");
+        chosen.setCollectionPointCode("WAW04A");
+        order.addShipment(chosen);
+        supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));
+        when(completion.confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), any(), any()))
+                .thenAnswer(confirmedAs(DropshipShipmentResult.COMPLETED));
+
+        // when
+        service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        ArgumentCaptor<DropshipShipment> shipment = ArgumentCaptor.forClass(DropshipShipment.class);
+        verify(completion).confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), shipment.capture(), any());
+        assertThat(shipment.getValue().type()).isEqualTo(ShipmentType.PickupPoint);
+        assertThat(shipment.getValue().collectionPointCode()).isEqualTo("WAW04A");
+        assertThat(shipment.getValue().carrier()).isEqualTo("DPD");
+        assertThat(shipment.getValue().trackingNo()).isEqualTo("PKG-1");
+    }
+
+    @Test
     void absorbRuleAppliesToLastParcelNotAlreadyOnTheOrder() {
         // given
         Shipment already = new Shipment();
