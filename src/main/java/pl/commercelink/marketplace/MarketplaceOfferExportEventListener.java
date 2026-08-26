@@ -104,29 +104,38 @@ public class MarketplaceOfferExportEventListener {
             AvailabilityAndPrice availabilityAndPrice = op.get();
             MatchedInventory matchedInventory = inventory.findByProduct(product);
 
-            long qtyToPublish;
-            if (marketplaceDefinition.getMinWarehouseQty() > 0) {
-                int totalQty = matchedInventory
-                        .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
-                        .stream()
-                        .map(InventoryItem::qty)
-                        .mapToInt(Integer::intValue)
-                        .sum();
-                qtyToPublish = totalQty >= marketplaceDefinition.getMinWarehouseQty() ? totalQty : 0L;
-            } else {
-                boolean hasRequiredTotalQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinTotalQty());
-                boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
-                        marketplaceDefinition.getMinNumOfDistributors(),
-                        marketplaceDefinition.getMinQtyPerDistributor()
-                );
-                qtyToPublish = (hasRequiredTotalQty && hasRequiredNumOfDistributorsWithMinQty)
-                        ? matchedInventory.getTotalAvailableQty()
-                        : 0L;
-            }
+            long qtyToPublish = resolveQtyToPublish(marketplaceDefinition, matchedInventory);
 
             result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
         return result;
+    }
+
+    private long resolveQtyToPublish(MarketplaceDefinition marketplaceDefinition, MatchedInventory matchedInventory) {
+        if (marketplaceDefinition.hasWarehouseCriteria()) {
+            int warehouseQty = warehouseQtyOf(matchedInventory);
+            if (warehouseQty >= marketplaceDefinition.getMinWarehouseQty()) {
+                return warehouseQty;
+            }
+        }
+        if (marketplaceDefinition.hasDistributorsCriteria()) {
+            boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
+                    marketplaceDefinition.getMinNumOfDistributors(),
+                    marketplaceDefinition.getMinQtyPerDistributor()
+            );
+            if (hasRequiredNumOfDistributorsWithMinQty) {
+                return matchedInventory.getTotalAvailableQty();
+            }
+        }
+        return 0L;
+    }
+
+    private int warehouseQtyOf(MatchedInventory matchedInventory) {
+        return matchedInventory
+                .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
+                .stream()
+                .mapToInt(InventoryItem::qty)
+                .sum();
     }
 
     private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQty, String categoryName) {

@@ -34,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -120,6 +121,109 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(publishedOffers.get(0).price()).isEqualTo(100L);
     }
 
+    @Test
+    void publishesTotalQtyWhenDistributorsCriteriaAreMet() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(/* warehouseQty */ 0, /* distributorsCriteriaMet */ true, /* totalAvailableQty */ 25);
+        configureCategoryWith(distributorsDefinition(/* minQtyPerDistributor */ 5, /* minNumOfDistributors */ 2), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(25L);
+        verify(matched).hasOffersFromMultipleSuppliers(2, 5);
+    }
+
+    @Test
+    void publishesQtyZeroWhenDistributorsCriteriaAreNotMet() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(0, /* distributorsCriteriaMet */ false, 25);
+        configureCategoryWith(distributorsDefinition(5, 2), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(0L);
+    }
+
+    @Test
+    void prefersWarehouseQtyWhenBothCriteriaAreMet() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(/* warehouseQty */ 10, /* distributorsCriteriaMet */ true, /* totalAvailableQty */ 25);
+        configureCategoryWith(definition(5, 2, /* minWarehouseQty */ 5), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(10L);
+        verify(matched, never()).getTotalAvailableQty();
+    }
+
+    @Test
+    void fallsBackToDistributorsCriteriaWhenWarehouseCriteriaAreNotMet() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(/* warehouseQty */ 2, /* distributorsCriteriaMet */ true, /* totalAvailableQty */ 25);
+        configureCategoryWith(definition(5, 2, /* minWarehouseQty */ 5), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(25L);
+    }
+
+    @Test
+    void publishesQtyZeroWhenNeitherCriteriaAreMet() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(2, false, 25);
+        configureCategoryWith(definition(5, 2, 5), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).quantity()).isEqualTo(0L);
+    }
+
+    @Test
+    void ignoresDistributorsCriteriaWhenOnlyWarehouseCriteriaAreConfigured() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MatchedInventory matched = mockMatchedInventory(2, true, 25);
+        configureCategoryWith(warehouseDefinition(5), product, matched);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers().get(0).quantity()).isEqualTo(0L);
+        verify(matched, never()).hasOffersFromMultipleSuppliers(anyInt(), anyInt());
+    }
+
     // --- helpers ---------------------------------------------------------
 
     private MarketplaceOfferExportRequest request() {
@@ -133,7 +237,15 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private MarketplaceDefinition warehouseDefinition(int minWarehouseQty) {
-        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, 0, 0, 0, minWarehouseQty);
+        return definition(0, 0, minWarehouseQty);
+    }
+
+    private MarketplaceDefinition distributorsDefinition(int minQtyPerDistributor, int minNumOfDistributors) {
+        return definition(minQtyPerDistributor, minNumOfDistributors, 0);
+    }
+
+    private MarketplaceDefinition definition(int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
+        MarketplaceDefinition def = new MarketplaceDefinition(MARKETPLACE, 1.0, minQtyPerDistributor, minNumOfDistributors, minWarehouseQty);
         def.setEnabled(true);
         return def;
     }
@@ -147,6 +259,14 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition def, Product product, int warehouseQty, String categoryName, String definitionName) {
+        configureCategoryWith(def, product, mockMatchedInventoryWithWarehouseQty(warehouseQty), categoryName, definitionName);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, MatchedInventory matched) {
+        configureCategoryWith(def, product, matched, "Laptops", null);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition def, Product product, MatchedInventory matched, String categoryName, String definitionName) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(CATEGORY_ID);
         category.setCategory(categoryName);
@@ -155,8 +275,6 @@ class MarketplaceOfferExportEventListenerTest {
 
         when(catalog.getCategories()).thenReturn(List.of(category));
         when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(product));
-
-        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
         when(inventoryView.findByProduct(product)).thenReturn(matched);
     }
 
@@ -165,6 +283,13 @@ class MarketplaceOfferExportEventListenerTest {
         InventoryItem item = mock(InventoryItem.class);
         when(item.qty()).thenReturn(warehouseQty);
         when(matched.getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(List.of(item));
+        return matched;
+    }
+
+    private MatchedInventory mockMatchedInventory(int warehouseQty, boolean distributorsCriteriaMet, long totalAvailableQty) {
+        MatchedInventory matched = mockMatchedInventoryWithWarehouseQty(warehouseQty);
+        when(matched.hasOffersFromMultipleSuppliers(anyInt(), anyInt())).thenReturn(distributorsCriteriaMet);
+        when(matched.getTotalAvailableQty()).thenReturn(totalAvailableQty);
         return matched;
     }
 

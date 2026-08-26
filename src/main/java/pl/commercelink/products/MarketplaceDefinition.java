@@ -11,8 +11,6 @@ public class MarketplaceDefinition  {
     private String name;
     @DynamoDBAttribute(attributeName = "markup")
     private double markup;
-    @DynamoDBAttribute(attributeName = "minTotalQty")
-    private int minTotalQty;
     @DynamoDBAttribute(attributeName = "minQtyPerDistributor")
     private int minQtyPerDistributor;
     @DynamoDBAttribute(attributeName = "minNumOfDistributors")
@@ -28,10 +26,9 @@ public class MarketplaceDefinition  {
     public MarketplaceDefinition() {
     }
 
-    public MarketplaceDefinition(String name, double markup, int minTotalQty, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
+    public MarketplaceDefinition(String name, double markup, int minQtyPerDistributor, int minNumOfDistributors, int minWarehouseQty) {
         this.name = name;
         this.markup = markup;
-        this.minTotalQty = minTotalQty;
         this.minQtyPerDistributor = minQtyPerDistributor;
         this.minNumOfDistributors = minNumOfDistributors;
         this.minWarehouseQty = minWarehouseQty;
@@ -40,13 +37,17 @@ public class MarketplaceDefinition  {
     @DynamoDBIgnore
     public boolean isComplete() {
         boolean matchesBasicCriteria = name != null && markup > 0;
-        boolean matchesDistributorsCriteria = minTotalQty > 0 && minQtyPerDistributor > 0 && minNumOfDistributors > 0;
-        boolean matchesWarehouseCriteria = minWarehouseQty > 0;
+        return matchesBasicCriteria && (hasDistributorsCriteria() || hasWarehouseCriteria());
+    }
 
-        if (matchesBasicCriteria) {
-            return matchesDistributorsCriteria || matchesWarehouseCriteria;
-        }
-        return false;
+    @DynamoDBIgnore
+    public boolean hasDistributorsCriteria() {
+        return minQtyPerDistributor > 0 && minNumOfDistributors > 0;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasWarehouseCriteria() {
+        return minWarehouseQty > 0;
     }
 
     public String getName() {
@@ -63,14 +64,6 @@ public class MarketplaceDefinition  {
 
     public void setMarkup(double markup) {
         this.markup = markup;
-    }
-
-    public int getMinTotalQty() {
-        return minTotalQty;
-    }
-
-    public void setMinTotalQty(int minTotalQty) {
-        this.minTotalQty = minTotalQty;
     }
 
     public int getMinQtyPerDistributor() {
