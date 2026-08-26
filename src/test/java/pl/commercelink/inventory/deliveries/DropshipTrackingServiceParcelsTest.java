@@ -391,6 +391,25 @@ class DropshipTrackingServiceParcelsTest {
     }
 
     @Test
+    void pickupPointOrderWithBlankCollectionPointCodeFailsValidationAndRecordsAnError() {
+        // given
+        Shipment chosen = new Shipment();
+        chosen.setType(ShipmentType.PickupPoint);
+        chosen.setCarrier("InPost");
+        order.addShipment(chosen);
+        supplierReports(SupplierOrderState.SHIPPED, parcel("PKG-1"));
+
+        // when
+        TrackingOutcome outcome = service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        assertThat(outcome).isEqualTo(TrackingOutcome.ERROR);
+        verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
+        assertThat(delivery.getTrackingLastError()).contains("deliveries.dropship.shipment.error.collectionPoint");
+        assertThat(delivery.getTrackingConsecutiveErrors()).isEqualTo(1);
+    }
+
+    @Test
     void absorbRuleAppliesToLastParcelNotAlreadyOnTheOrder() {
         // given
         Shipment already = new Shipment();

@@ -192,11 +192,16 @@ public class DropshipTrackingService {
             Set<Allocation> taken = Collections.newSetFromMap(new IdentityHashMap<>());
             taken.addAll(selected);
             List<Allocation> remaining = open.stream().filter(allocation -> !taken.contains(allocation)).toList();
-            DropshipShipment shipment = pickup != null
-                    ? new DropshipShipment(ShipmentType.PickupPoint, parcel.carrier(), parcel.trackingNo(),
-                            pickup.getCollectionPointCode(), parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl())
-                    : new DropshipShipment(ShipmentType.Courier, parcel.carrier(), parcel.trackingNo(),
-                            null, parcel.shippedAt() != null ? parcel.shippedAt() : now, parcel.trackingUrl());
+            ShipmentType type = pickup != null ? ShipmentType.PickupPoint : ShipmentType.Courier;
+            String collectionPointCode = pickup != null ? pickup.getCollectionPointCode() : null;
+            LocalDateTime shippedAt = parcel.shippedAt() != null ? parcel.shippedAt() : now;
+            DropshipShipment shipment = new DropshipShipment(type, parcel.carrier(), parcel.trackingNo(),
+                    collectionPointCode, shippedAt, parcel.trackingUrl());
+            String invalidShipment = shipment.validationError();
+            if (invalidShipment != null) {
+                return recordError(delivery, now, manual,
+                        new IllegalStateException("Supplier parcel cannot be applied: " + invalidShipment));
+            }
             OperationResult<DropshipShipmentResult> result = completion.confirmShipped(storeId, delivery, selected, remaining, shipment,
                     (d, r) -> {
                         d.addEvent(new Event(EventType.action, TRACKING_APPLIED_EVENT, now));
