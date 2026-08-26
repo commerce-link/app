@@ -30,8 +30,12 @@
 
             <div class="notification is-info is-light" th:if="${delivery.dropship}">
                 <strong th:text="#{deliveries.dropship.badge}">Dropshipping</strong> &mdash;
-                <span th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</span>:
-                <span th:text="${delivery.deliveryAddress}"></span>
+                <span th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</span>
+                <span th:if="${consignee == null}" th:text="': ' + ${delivery.deliveryAddress}"></span>
+            </div>
+
+            <div th:if="${delivery.dropship and consignee != null}">
+                <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
             </div>
 
             <div class="notification is-info is-light" th:if="${!delivery.dropship and suggestedAddress != null}">

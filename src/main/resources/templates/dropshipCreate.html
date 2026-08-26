@@ -14,12 +14,15 @@
                         <h1>
                             <span th:text="#{deliveries.create.title}">Create Delivery</span>
                             <span th:text="' - ' + ${form.provider}"></span>
+                            <span class="tag is-info ml-2" th:text="#{deliveries.dropship.badge}">Dropshipping</span>
                         </h1>
                     </div>
                 </div>
             </div>
 
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
 
             <form th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/create(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/create(orderId=${order.orderId})}"
                   th:object="${form}" method="post" id="deliveryCreateForm">

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Customer address a dropship delivery ships to; used by the create, confirmation and approval screens. -->
+<div class="box" th:fragment="consigneeAddress(consignee)">
+    <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
+    <p>
+        <strong th:text="${consignee.displayName}">Jan Kowalski</strong><br/>
+        <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
+        <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
+        <span th:text="${consignee.phone}">+48601234567</span><br/>
+        <span th:text="${consignee.email}">jan@example.com</span>
+    </p>
+</div>
+</body>
+</html>

@@ -21,9 +21,8 @@ class DropshipTemplateTest {
         String html = read("dropshipConfirmation.html");
 
         // then
-        assertThat(html).contains("orders.dropship.confirm.consignee");
-        assertThat(html).contains("${consignee.streetAndNumber}");
-        assertThat(html).contains("${consignee.phone}");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
+        assertThat(html).doesNotContain("${consignee.streetAndNumber}");
         assertThat(html).doesNotContain("address-modal");
         assertThat(html).doesNotContain("deliveryAddressId");
     }
@@ -75,8 +74,6 @@ class DropshipTemplateTest {
 
         // then
         assertThat(dropship).contains("deliveries.create.title");
-        assertThat(dropship).doesNotContain("orders.dropship.confirm.consignee");
-        assertThat(dropship).doesNotContain("${consignee");
         assertThat(dropship).doesNotContain("deliveries.preview.dropship.order");
         assertThat(dropship).contains("dropship/create");
         assertThat(dropship).contains("dropship/purchase");
@@ -252,5 +249,39 @@ class DropshipTemplateTest {
         assertThat(html).contains("itemQtyEditable=${(isAdmin or isSuperAdmin) and !delivery.dropship and");
         assertThat(pl).contains("deliveries.editOrderedQty.error.dropship=");
         assertThat(en).contains("deliveries.editOrderedQty.error.dropship=");
+    }
+
+    @Test
+    void consigneeAddressIsOneSharedFragment() throws Exception {
+        // when
+        String fragment = read("fragments/consignee-address.html");
+
+        // then
+        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee)\"");
+        assertThat(fragment).contains("orders.dropship.confirm.consignee");
+        for (String field : List.of("${consignee.displayName}", "${consignee.streetAndNumber}", "${consignee.postalCode}",
+                "${consignee.city}", "${consignee.country}", "${consignee.phone}", "${consignee.email}")) {
+            assertThat(fragment).contains(field);
+        }
+    }
+
+    @Test
+    void createScreenCarriesTheDropshipBadgeAndTheConsignee() throws Exception {
+        // when
+        String html = read("dropshipCreate.html");
+
+        // then
+        assertThat(html).contains("<span class=\"tag is-info ml-2\" th:text=\"#{deliveries.dropship.badge}\">");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
+    }
+
+    @Test
+    void approvalScreenShowsTheConsigneeOfADropshipDelivery() throws Exception {
+        // when
+        String html = read("deliveryApproval.html");
+
+        // then
+        assertThat(html).contains("th:if=\"${delivery.dropship and consignee != null}\"");
+        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee})");
     }
 }

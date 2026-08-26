@@ -13,16 +13,7 @@
 
             <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
-            <div class="box">
-                <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
-                <p>
-                    <strong th:text="${consignee.displayName}">Jan Kowalski</strong><br/>
-                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
-                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
-                    <span th:text="${consignee.phone}">+48601234567</span><br/>
-                    <span th:text="${consignee.email}">jan@example.com</span>
-                </p>
-            </div>
+            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee})}"></div>
 
             <div id="validation-area" class="mb-6">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>

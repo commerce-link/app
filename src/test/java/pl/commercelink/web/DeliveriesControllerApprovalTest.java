@@ -1708,4 +1708,32 @@ class DeliveriesControllerApprovalTest {
         }
     }
 
+    @Test
+    void approvalScreenExposesTheConsigneeOfADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        ShippingDetails consignee = new ShippingDetails();
+        consignee.setName("Jan");
+        consignee.setSurname("Kowalski");
+        order.setShippingDetails(consignee);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(model.getAttribute("consignee")).isSameAs(consignee);
+        verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+    }
 }

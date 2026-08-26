@@ -809,7 +809,12 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
-        if (!delivery.isDropship()) {
+        if (delivery.isDropship()) {
+            Order order = resolveDropshipOrder(storeId, delivery);
+            if (order != null && order.getShippingDetails() != null) {
+                model.addAttribute("consignee", order.getShippingDetails());
+            }
+        } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(storeId, model);
         }
