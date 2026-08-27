@@ -140,7 +140,7 @@ class DropshipTemplateTest {
         assertThat(typeHeader).isGreaterThan(html.indexOf("<th th:text=\"#{deliveries.provider}\"></th>"));
         assertThat(typeHeader).isLessThan(html.indexOf("<th th:text=\"#{deliveries.order.no}\"></th>"));
         // the type cell names both kinds, the status cell no longer carries the dropship badge
-        int typeCell = html.indexOf("deliveries.dropship.badge");
+        int typeCell = html.lastIndexOf("<td>", html.indexOf("deliveries.dropship.badge"));
         int typeCellEnd = html.indexOf("</td>", typeCell);
         String typeCellHtml = html.substring(typeCell, typeCellEnd);
         assertThat(typeCellHtml).contains("deliveries.type.warehouse");
