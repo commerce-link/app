@@ -137,6 +137,8 @@
                                           class="tag"
                                           th:classappend="${rmaEntry.status.tagClass()}"
                                           th:text="${enumI18n.localize(rmaEntry.status)}"></span>
+                                    <span th:if="${rmaEntry.marketplaceReturn}" class="tag is-info is-light ml-1"
+                                          th:text="${rmaEntry.marketplace + (rmaEntry.externalReturnStatus != null ? ' · ' + enumI18n.localize(rmaEntry.externalReturnStatus) : '')}"></span>
                                 </td>
                                 <td th:text="${#temporals.format(rmaEntry.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
                             </tr>

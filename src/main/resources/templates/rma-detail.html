@@ -129,6 +129,15 @@
                 <p class="heading" th:text="#{rma.created.at}"></p>
                 <p class="title is-5" th:text="${rma.createdAt}"></p>
             </div>
+            <div class="column" th:if="${rma.marketplaceReturn}">
+                <p class="heading" th:text="#{rma.marketplace.return}"></p>
+                <p class="title is-5">
+                    <span th:text="${rma.marketplace}"></span>
+                    <span class="tag is-info is-light" th:if="${rma.externalReturnStatus != null}"
+                          th:text="${enumI18n.localize(rma.externalReturnStatus)}"></span>
+                </p>
+                <p class="is-size-7 has-text-grey" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
+            </div>
         </div>
     </div>
 
@@ -184,6 +193,7 @@
                                   th:field="*{rejectionReason}"
                                   th:disabled="${isClosed}"
                                   th:placeholder="#{rma.reject.reason.placeholder}"></textarea>
+                        <p class="help" th:if="${rma.marketplaceReturn}" th:text="#{rma.rejection.reason.marketplace.hint}"></p>
                     </div>
 
                     <!-- RMA Link -->
@@ -409,6 +419,12 @@
                             <option th:each="condition : ${itemConditions}" th:value="${condition}"
                                     th:text="${enumI18n.localize(condition)}"></option>
                         </select>
+                    </div>
+                    <div class="control ml-2" id="refund-delivery-wrapper" style="display: none;" th:if="${rma.marketplaceReturn}">
+                        <label class="checkbox is-size-7">
+                            <input type="checkbox" name="refundDelivery" value="true" th:checked="${refundDeliveryDefault}" th:disabled="${isClosed}">
+                            <span th:text="#{rma.refund.delivery}"></span>
+                        </label>
                     </div>
                     <button class="button is-primary is-small" type="button" onclick="handleRMAAction(this)" th:text="#{general.submit}" th:disabled="${isClosed}"></button>
                 </div>
@@ -711,6 +727,10 @@
 
         function toggleConditionSelect() {
             document.getElementById('condition-select-wrapper').style.display = actionRequiresCondition() ? '' : 'none';
+            const refundDelivery = document.getElementById('refund-delivery-wrapper');
+            if (refundDelivery) {
+                refundDelivery.style.display = document.getElementById('action-select').value === 'acceptReturn' ? '' : 'none';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {

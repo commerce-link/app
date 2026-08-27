@@ -20,6 +20,7 @@ import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.marketplace.MarketplaceReturnDecisions;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -36,6 +37,9 @@ public class RMAController {
 
     @Autowired
     private RMARepository rmaRepository;
+
+    @Autowired
+    private MarketplaceReturnDecisions marketplaceReturnDecisions;
 
     @Autowired
     private RMAItemsRepository rmaItemsRepository;
@@ -180,6 +184,8 @@ public class RMAController {
         model.addAttribute("isClosed", rma.getStatus() == RMAStatus.Rejected || rma.getStatus() == RMAStatus.Completed);
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
+        model.addAttribute("refundDeliveryDefault",
+                rma.isMarketplaceReturn() && marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems));
 
         return "rma-detail";
     }
@@ -247,6 +253,12 @@ public class RMAController {
                             @RequestParam MultiValueMap<String, MultipartFile> rmaMedia,
                             RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
+        if (marketplaceReturnDecisions.requiresRejectionReason(existingRma, rma.getStatus(), rma.getRejectionReason())) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("rma.rejection.reason.required", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
+        boolean turnsRejected = rma.getStatus() == RMAStatus.Rejected && existingRma.getStatus() != RMAStatus.Rejected;
         existingRma.setStatus(rma.getStatus());
         existingRma.setEmail(rma.getEmail());
         existingRma.setRejectionReason(rma.getRejectionReason());
@@ -272,6 +284,10 @@ public class RMAController {
         existingRma.setMedia(media);
 
         rmaLifecycle.update(existingRma);
+
+        if (turnsRejected) {
+            marketplaceReturnDecisions.returnRejected(existingRma);
+        }
 
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.update.success", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
@@ -368,6 +384,7 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/acceptReturn")
     public String acceptReturn(@PathVariable String rmaId, @RequestParam(required = false) ItemCondition condition,
+                               @RequestParam(required = false, defaultValue = "false") boolean refundDelivery,
                                @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
         if (condition == null) {
             return redirectWithMissingCondition(rmaId, redirectAttributes, locale);
@@ -391,6 +408,10 @@ public class RMAController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+        }
+
+        if (result.isSuccess()) {
+            marketplaceReturnDecisions.returnAccepted(op.getRma(), op.getRmaItems(), refundDelivery);
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
