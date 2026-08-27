@@ -90,7 +90,13 @@ public class MarketplaceOrderImporter {
         Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
-                .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
+                .map(i -> {
+                    OrderItem orderItem = OrderItem.fromBasketItem(order.getOrderId(), i);
+                    if (!i.isService()) {
+                        orderItem.setExternalItemId(i.getMfn());
+                    }
+                    return orderItem;
+                })
                 .collect(Collectors.toList());
 
         ordersManager.saveWithFulfilment(order, orderItems);

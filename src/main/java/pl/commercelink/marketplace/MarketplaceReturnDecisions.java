@@ -1,5 +1,7 @@
 package pl.commercelink.marketplace;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -22,6 +24,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 /**
  * Bridges operator decisions on a marketplace-originated RMA to the marketplace: publishes the
@@ -29,6 +35,10 @@ import java.util.UUID;
  */
 @Component
 public class MarketplaceReturnDecisions {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnDecisions.class);
+
+    private static final int MAX_REJECTION_REASON_LENGTH = 250;
 
     @Autowired
     private OrdersRepository ordersRepository;
@@ -48,14 +58,32 @@ public class MarketplaceReturnDecisions {
             return;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
+        if (order == null) {
+            LOGGER.warn("Cannot publish return acceptance for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            return;
+        }
+
+        Map<String, OrderItem> orderItemsById = orderItemsRepository.findByOrderId(rma.getOrderId()).stream()
+                .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
+
         List<MarketplaceReturnAction.Item> items = acceptedItems.stream()
-                .map(i -> new MarketplaceReturnAction.Item(i.getMfn(), i.getQty()))
+                .map(i -> new MarketplaceReturnAction.Item(refundKeyFor(i, orderItemsById), i.getQty()))
                 .toList();
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
         rma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
         rmaRepository.save(rma);
+    }
+
+    private static String refundKeyFor(RMAItem rmaItem, Map<String, OrderItem> orderItemsById) {
+        OrderItem orderItem = orderItemsById.get(rmaItem.getItemId());
+        if (orderItem == null) {
+            LOGGER.warn("Accepted RMA item {} has no matching order item; falling back to its stored mfn {}",
+                    rmaItem.getRmaItemId(), rmaItem.getMfn());
+            return rmaItem.getMfn();
+        }
+        return keyOf(orderItem);
     }
 
     public void returnRejected(RMA rma) {
@@ -67,6 +95,10 @@ public class MarketplaceReturnDecisions {
             return;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
+        if (order == null) {
+            LOGGER.warn("Cannot publish return rejection for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            return;
+        }
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 List.of(), false, null, rma.getRejectionReason());
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
@@ -74,28 +106,45 @@ public class MarketplaceReturnDecisions {
         rmaRepository.save(rma);
     }
 
-    /** A marketplace rejection is shown to the buyer and must carry a reason; manual RMAs keep the old free-form rules. */
+    /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */
     public boolean requiresRejectionReason(RMA existing, RMAStatus newStatus, String reason) {
         boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
-        return existing.isMarketplaceReturn() && turnsRejected && (reason == null || reason.isBlank());
+        return existing.isMarketplaceReturn() && turnsRejected
+                && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
     }
 
-    /** True when the RMA items cover the full quantity of every order item not yet returned/replaced. */
+    /** True when the RMA items cover the full quantity of every non-service order item not yet returned/replaced. */
     public boolean coversWholeOrder(RMA rma, List<RMAItem> rmaItems) {
+        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(rma.getOrderId());
+        Map<String, OrderItem> orderItemsById = orderItems.stream()
+                .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
+
         Map<String, Integer> returned = new HashMap<>();
         for (RMAItem item : rmaItems) {
-            returned.merge(item.getMfn(), item.getQty(), Integer::sum);
+            OrderItem orderItem = orderItemsById.get(item.getItemId());
+            String key = orderItem != null ? keyOf(orderItem) : item.getMfn();
+            returned.merge(key, item.getQty(), Integer::sum);
         }
-        for (OrderItem orderItem : orderItemsRepository.findByOrderId(rma.getOrderId())) {
+
+        for (OrderItem orderItem : orderItems) {
+            if (orderItem.isService()) {
+                continue;
+            }
             if (orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)) {
                 continue;
             }
-            int covered = returned.getOrDefault(orderItem.getManufacturerCode(), 0);
+            String key = keyOf(orderItem);
+            int covered = returned.getOrDefault(key, 0);
             if (covered < orderItem.getQty()) {
                 return false;
             }
-            returned.put(orderItem.getManufacturerCode(), covered - orderItem.getQty());
+            returned.put(key, covered - orderItem.getQty());
         }
         return true;
+    }
+
+    private static String keyOf(OrderItem orderItem) {
+        String externalItemId = orderItem.getExternalItemId();
+        return isNotBlank(externalItemId) ? externalItemId : orderItem.getManufacturerCode();
     }
 }

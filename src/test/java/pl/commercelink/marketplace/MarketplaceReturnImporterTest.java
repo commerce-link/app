@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -124,6 +125,41 @@ class MarketplaceReturnImporterTest {
         assertEquals(RMAResolutionType.Return, rmaItem.getDesiredResolution());
         assertEquals("NOT_AS_DESCRIBED: wrong colour", rmaItem.getReason());
         assertEquals("SKU-1", rmaItem.getMfn());
+
+        InOrder inOrder = inOrder(rmaItemsRepository, rmaRepository);
+        inOrder.verify(rmaItemsRepository).batchSave(anyList());
+        inOrder.verify(rmaRepository).save(any());
+    }
+
+    @Test
+    void matchesByThePersistedExternalItemIdWhenManufacturerCodeWasOverwrittenBySupplierAssignment() {
+        // given
+        when(orderItem.getExternalItemId()).thenReturn("SKU-1");
+        when(orderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
+
+        // then
+        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
+        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
+    }
+
+    @Test
+    void fallsBackToManufacturerCodeWhenExternalItemIdIsBlank() {
+        // given
+        when(orderItem.getExternalItemId()).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
+
+        // then
+        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
+        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
     }
 
     @Test
@@ -151,6 +187,25 @@ class MarketplaceReturnImporterTest {
         // then
         verify(rmaRepository, never()).save(any());
         verify(rmaItemsRepository, never()).batchSave(anyList());
+        assertEquals(1, store.getNotifications().size());
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
+        assertEquals("r-1", store.getNotifications().get(0).getObject());
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void notifiesStoreOnceWhenTheSameUnmatchedReturnIsPolledAgain() {
+        // given
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        MarketplaceReturn unmatched = marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("OTHER", 1));
+
+        // when
+        importer.importReturn(store, MARKETPLACE, unmatched);
+        importer.importReturn(store, MARKETPLACE, unmatched);
+
+        // then
+        assertEquals(1, store.getNotifications().size());
+        verify(storesRepository, times(1)).save(store);
     }
 
     @Test

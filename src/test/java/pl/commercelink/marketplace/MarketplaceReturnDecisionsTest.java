@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.MarketplaceReturnAction;
 import pl.commercelink.orders.Order;
@@ -58,15 +59,17 @@ class MarketplaceReturnDecisionsTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
     }
 
-    private static RMAItem rmaItem(String mfn, int qty) {
+    private static RMAItem rmaItem(String itemId, String mfn, int qty) {
         RMAItem item = new RMAItem();
+        item.setItemId(itemId);
         item.setMfn(mfn);
         item.setQty(qty);
         return item;
     }
 
-    private static OrderItem orderItem(String mfn, int qty, FulfilmentStatus status) {
+    private static OrderItem orderItem(String itemId, String mfn, int qty, FulfilmentStatus status) {
         OrderItem item = mock(OrderItem.class);
+        when(item.getItemId()).thenReturn(itemId);
         when(item.getManufacturerCode()).thenReturn(mfn);
         when(item.getQty()).thenReturn(qty);
         when(item.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
@@ -74,10 +77,26 @@ class MarketplaceReturnDecisionsTest {
         return item;
     }
 
+    private static OrderItem shippingOrderItem(String itemId) {
+        OrderItem item = mock(OrderItem.class);
+        when(item.getItemId()).thenReturn(itemId);
+        when(item.getManufacturerCode()).thenReturn(BasketItem.SHIPPING_MFN_CODE);
+        when(item.getQty()).thenReturn(1);
+        when(item.isService()).thenReturn(true);
+        return item;
+    }
+
     @Test
     void returnAcceptedPublishesRefundActionAndRecordsEvent() {
+        // given
+        List<OrderItem> orderItems = List.of(
+                orderItem("item-1", "SKU-1", 2, FulfilmentStatus.Delivered),
+                orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("SKU-1", 2), rmaItem("SKU-2", 1)), true);
+        decisions.returnAccepted(marketplaceRma,
+                List.of(rmaItem("item-1", "SKU-1", 2), rmaItem("item-2", "SKU-2", 1)), true);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -95,10 +114,48 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
-    void eachAcceptanceRoundGetsItsOwnCommandId() {
+    void refundItemsUseThePersistedOrderItemKeyInsteadOfTheRmaItemsStoredMfn() {
+        // given
+        OrderItem mutatedOrderItem = mock(OrderItem.class);
+        when(mutatedOrderItem.getItemId()).thenReturn("item-1");
+        when(mutatedOrderItem.getExternalItemId()).thenReturn("SKU-1");
+        when(mutatedOrderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(mutatedOrderItem));
+
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("SKU-1", 1)), false);
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("SKU-2", 1)), false);
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-CODE-1", 1)), false);
+
+        // then
+        ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
+        verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
+        assertEquals("SKU-1", captor.getValue().getItems().get(0).getManufacturerCode());
+    }
+
+    @Test
+    void refundItemsFallBackToTheRmaItemsStoredMfnWhenTheOrderItemIsGone() {
+        // given
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
+        verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
+        assertEquals("SKU-1", captor.getValue().getItems().get(0).getManufacturerCode());
+    }
+
+    @Test
+    void eachAcceptanceRoundGetsItsOwnCommandId() {
+        // given
+        List<OrderItem> orderItems = List.of(
+                orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered),
+                orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -113,8 +170,35 @@ class MarketplaceReturnDecisionsTest {
         manual.setOrderId(ORDER_ID);
 
         // when
-        decisions.returnAccepted(manual, List.of(rmaItem("SKU-1", 1)), false);
+        decisions.returnAccepted(manual, List.of(rmaItem("item-1", "SKU-1", 1)), false);
         decisions.returnRejected(manual);
+
+        // then
+        verifyNoInteractions(publisher);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void returnAcceptedDoesNothingWhenOrderIsMissing() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        verifyNoInteractions(publisher);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void returnRejectedDoesNothingWhenOrderIsMissing() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+        marketplaceRma.setRejectionReason("Damaged by buyer");
+
+        // when
+        decisions.returnRejected(marketplaceRma);
 
         // then
         verifyNoInteractions(publisher);
@@ -166,17 +250,31 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
+    void rejectionReasonIsRequiredWhenLongerThan250Characters() {
+        // given
+        String tooLong = "x".repeat(251);
+        String maxAllowed = "x".repeat(250);
+
+        // when / then
+        assertTrue(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, tooLong));
+        assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, maxAllowed));
+    }
+
+    @Test
     void coversWholeOrderWhenRmaQuantitiesMatchOpenOrderItems() {
         // given
         List<OrderItem> orderItems = List.of(
-                orderItem("SKU-1", 2, FulfilmentStatus.Delivered),
-                orderItem("SKU-2", 1, FulfilmentStatus.Delivered),
-                orderItem("SKU-3", 1, FulfilmentStatus.Returned));
+                orderItem("item-1", "SKU-1", 2, FulfilmentStatus.Delivered),
+                orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered),
+                orderItem("item-3", "SKU-3", 1, FulfilmentStatus.Returned),
+                shippingOrderItem("item-shipping"));
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when / then
-        assertTrue(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("SKU-1", 2), rmaItem("SKU-2", 1))));
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("SKU-1", 1), rmaItem("SKU-2", 1))));
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("SKU-1", 2))));
+        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+                List.of(rmaItem("item-1", "SKU-1", 2), rmaItem("item-2", "SKU-2", 1))));
+        assertFalse(decisions.coversWholeOrder(marketplaceRma,
+                List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
+        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 2))));
     }
 }

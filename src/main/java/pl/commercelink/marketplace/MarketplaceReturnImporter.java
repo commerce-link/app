@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 /**
  * Turns marketplace customer returns into RMAs. Idempotent by (storeId, externalReturnId): a known return only
  * has its marketplace status refreshed; an unknown open return creates an RMA in WaitingForItems (the buyer
@@ -112,10 +114,12 @@ public class MarketplaceReturnImporter {
         if (order == null) {
             LOGGER.warn("Skipping {} return {}: order {} not found in store {}", marketplace, ret.externalReturnId(),
                     ret.externalOrderId(), store.getStoreId());
+            notifyUnmatched(store, marketplace, ret);
             return;
         }
         if (order.getStatus() == OrderStatus.Cancelled) {
             LOGGER.warn("Skipping {} return {}: order {} is cancelled", marketplace, ret.externalReturnId(), order.getOrderId());
+            notifyUnmatched(store, marketplace, ret);
             return;
         }
 
@@ -124,6 +128,7 @@ public class MarketplaceReturnImporter {
         if (rmaItems.isEmpty()) {
             LOGGER.warn("Skipping {} return {}: none of its items match order {}", marketplace, ret.externalReturnId(),
                     order.getOrderId());
+            notifyUnmatched(store, marketplace, ret);
             return;
         }
 
@@ -142,10 +147,27 @@ public class MarketplaceReturnImporter {
         rma.setExternalReturnReference(ret.referenceNumber());
         rma.setExternalReturnStatus(ret.status());
 
-        rmaRepository.save(rma);
         rmaItemsRepository.batchSave(rmaItems);
+        rmaRepository.save(rma);
         LOGGER.info("Created RMA {} from {} return {} for order {}", rma.getRmaId(), marketplace, ret.externalReturnId(),
                 order.getOrderId());
+    }
+
+    private void notifyUnmatched(Store store, String marketplace, MarketplaceReturn ret) {
+        StoreNotification notification = new StoreNotification(
+                StoreNotificationSeverity.WARNING,
+                StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED,
+                ret.externalReturnId(),
+                marketplace + " return " + referenceOf(ret)
+                        + " could not be matched to an order in the application — handle it in the marketplace panel");
+        if (!store.getNotifications().contains(notification)) {
+            store.getNotifications().add(notification);
+            storesRepository.save(store);
+        }
+    }
+
+    private static String referenceOf(MarketplaceReturn ret) {
+        return ret.referenceNumber() != null ? ret.referenceNumber() : ret.externalReturnId();
     }
 
     private List<RMAItem> matchItems(String rmaId, Order order, MarketplaceReturn ret, String marketplace) {
@@ -155,12 +177,12 @@ public class MarketplaceReturnImporter {
         for (MarketplaceReturn.Item item : ret.items()) {
             OrderItem match = orderItems.stream()
                     .filter(oi -> !used.contains(oi.getItemId()))
-                    .filter(oi -> item.manufacturerCode() != null && item.manufacturerCode().equals(oi.getManufacturerCode()))
+                    .filter(oi -> item.manufacturerCode() != null && item.manufacturerCode().equals(keyOf(oi)))
                     .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                     .findFirst()
                     .orElse(null);
             if (match == null) {
-                LOGGER.warn("{} return {}: no order item with manufacturer code {} in order {}", marketplace,
+                LOGGER.warn("{} return {}: no order item with key {} in order {}", marketplace,
                         ret.externalReturnId(), item.manufacturerCode(), order.getOrderId());
                 continue;
             }
@@ -178,6 +200,11 @@ public class MarketplaceReturnImporter {
             result.add(new RMAItem(rmaId, match, draft));
         }
         return result;
+    }
+
+    private static String keyOf(OrderItem orderItem) {
+        String externalItemId = orderItem.getExternalItemId();
+        return isNotBlank(externalItemId) ? externalItemId : orderItem.getManufacturerCode();
     }
 
     private static List<Shipment> toShipments(MarketplaceReturn ret) {

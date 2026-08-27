@@ -750,6 +750,7 @@
             if (selectedAction === 'split') {
                 submitSplitAction();
             } else {
+                button.disabled = true;
                 confirmSave(button, submitRMAItemsForm);
             }
         }
