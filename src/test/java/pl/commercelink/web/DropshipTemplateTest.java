@@ -142,7 +142,11 @@ class DropshipTemplateTest {
         // the type cell names both kinds, the status cell no longer carries the dropship badge
         int typeCell = html.indexOf("deliveries.dropship.badge");
         int typeCellEnd = html.indexOf("</td>", typeCell);
-        assertThat(html.substring(typeCell, typeCellEnd)).contains("deliveries.type.warehouse");
+        String typeCellHtml = html.substring(typeCell, typeCellEnd);
+        assertThat(typeCellHtml).contains("deliveries.type.warehouse");
+        // both kinds are tags, in different colours
+        assertThat(typeCellHtml).contains("<span class=\"tag is-info is-light mb-0\" th:if=\"${delivery.dropship}\"");
+        assertThat(typeCellHtml).contains("<span class=\"tag is-primary is-light mb-0\" th:unless=\"${delivery.dropship}\"");
         int statusCell = html.indexOf("deliveries.status.orderPending");
         int statusCellEnd = html.indexOf("</td>", statusCell);
         assertThat(html.substring(statusCell, statusCellEnd)).doesNotContain("deliveries.dropship.badge");
