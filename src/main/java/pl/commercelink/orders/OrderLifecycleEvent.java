@@ -7,6 +7,7 @@ public class OrderLifecycleEvent {
     private OrderLifecycleEventType type;
     private String externalOrderId;
     private String marketplace;
+    private MarketplaceReturnAction returnAction;
 
     private OrderLifecycleEvent() {
 
@@ -18,11 +19,17 @@ public class OrderLifecycleEvent {
 
     public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type,
                                String externalOrderId, String marketplace) {
+        this(storeId, orderId, type, externalOrderId, marketplace, null);
+    }
+
+    public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type,
+                               String externalOrderId, String marketplace, MarketplaceReturnAction returnAction) {
         this.storeId = storeId;
         this.orderId = orderId;
         this.type = type;
         this.externalOrderId = externalOrderId;
         this.marketplace = marketplace;
+        this.returnAction = returnAction;
     }
 
     public String getStoreId() {
@@ -43,5 +50,9 @@ public class OrderLifecycleEvent {
 
     public String getMarketplace() {
         return marketplace;
+    }
+
+    public MarketplaceReturnAction getReturnAction() {
+        return returnAction;
     }
 }
