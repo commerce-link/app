@@ -7,6 +7,7 @@ import pl.commercelink.localdev.CatalogSeedRow;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
@@ -336,9 +337,8 @@ class DemoStoreSeederTest {
             assertTrue(o.getTotalPrice() > 0);
             assertEquals(LocalDate.now().plusDays(3), o.getEstimatedShippingAt());
         });
-        List<String> dropshipOrderIds = List.of(
-                DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY),
-                DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY));
+        List<String> dropshipOrderIds = DemoStoreSeeder.DROPSHIP_ORDER_KEYS.stream()
+                .map(key -> DemoStoreSeeder.demoId("store-1", key)).toList();
         demoOrders.orders().forEach(o -> assertEquals(
                 dropshipOrderIds.contains(o.getOrderId()) ? FulfilmentType.DirectToConsumer : FulfilmentType.WarehouseFulfilment,
                 o.getFulfilmentType(), o.getOrderId()));
@@ -368,6 +368,77 @@ class DemoStoreSeederTest {
         assertEquals("AcmeB", demoOrders.itemsByOrderId().get(acmeBOrder.getOrderId()).getFirst().getDeliveryId());
         assertEquals("Lis", acmeOrder.getBillingDetails().getSurname());
         assertEquals("Krol", acmeBOrder.getBillingDetails().getSurname());
+    }
+
+    @Test
+    void buildsPickupPointDropshipOrdersCoveringSupportedUnsupportedAndIncompletePoints() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then - InPost point with a code at Acme (supported), DPD point at AcmeB (supplier without points), InPost without a code
+        Order acmePickup = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_PICKUP_ACME_ORDER_KEY));
+        Order acmeBPickup = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_PICKUP_ACME_B_ORDER_KEY));
+        Order noCode = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_PICKUP_NO_CODE_ORDER_KEY));
+        for (Order order : List.of(acmePickup, acmeBPickup, noCode)) {
+            assertEquals(FulfilmentType.DirectToConsumer, order.getFulfilmentType());
+            assertEquals(1, order.getShipments().size());
+            assertEquals(ShipmentType.PickupPoint, order.getShipments().getFirst().getType());
+            demoOrders.itemsByOrderId().get(order.getOrderId()).forEach(item -> assertTrue(item.isInAllocation()));
+        }
+        assertEquals("InPost", acmePickup.getShipments().getFirst().getCarrier());
+        assertEquals("WAW04A", acmePickup.getShipments().getFirst().getCollectionPointCode());
+        assertEquals(2, demoOrders.itemsByOrderId().get(acmePickup.getOrderId()).size());
+        assertEquals("Acme", demoOrders.itemsByOrderId().get(acmePickup.getOrderId()).getFirst().getDeliveryId());
+        assertEquals("DPD", acmeBPickup.getShipments().getFirst().getCarrier());
+        assertEquals("PL12345", acmeBPickup.getShipments().getFirst().getCollectionPointCode());
+        assertEquals("AcmeB", demoOrders.itemsByOrderId().get(acmeBPickup.getOrderId()).getFirst().getDeliveryId());
+        assertEquals("InPost", noCode.getShipments().getFirst().getCarrier());
+        assertNull(noCode.getShipments().getFirst().getCollectionPointCode());
+        assertEquals("Acme", demoOrders.itemsByOrderId().get(noCode.getOrderId()).getFirst().getDeliveryId());
+    }
+
+    @Test
+    void buildsSpareCourierDropshipOrdersIncludingAMultiItemOne() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then
+        Order multi = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_MULTI_ORDER_KEY));
+        Order acmeSpare = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_SPARE_ORDER_KEY));
+        Order acmeBSpare = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_SPARE_ORDER_KEY));
+        for (Order order : List.of(multi, acmeSpare, acmeBSpare)) {
+            assertEquals(FulfilmentType.DirectToConsumer, order.getFulfilmentType());
+            assertTrue(order.getShipments().isEmpty(), "courier orders carry no pickup shipment");
+            demoOrders.itemsByOrderId().get(order.getOrderId()).forEach(item -> assertTrue(item.isInAllocation()));
+        }
+        List<OrderItem> multiItems = demoOrders.itemsByOrderId().get(multi.getOrderId());
+        assertEquals(3, multiItems.size());
+        multiItems.forEach(item -> assertEquals("Acme", item.getDeliveryId()));
+        assertEquals("Acme", demoOrders.itemsByOrderId().get(acmeSpare.getOrderId()).getFirst().getDeliveryId());
+        assertEquals("AcmeB", demoOrders.itemsByOrderId().get(acmeBSpare.getOrderId()).getFirst().getDeliveryId());
+    }
+
+    @Test
+    void buildsWarehouseOrderWithTwoDifferentAcmeItemsForSplitScenarios() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then
+        Order order = orderById(demoOrders, DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY));
+        assertEquals(FulfilmentType.WarehouseFulfilment, order.getFulfilmentType());
+        List<OrderItem> items = demoOrders.itemsByOrderId().get(order.getOrderId());
+        assertEquals(2, items.size());
+        items.forEach(item -> { assertEquals("Acme", item.getDeliveryId()); assertTrue(item.isInAllocation()); });
+        assertNotEquals(items.get(0).getSku(), items.get(1).getSku(), "two different products, so one can be split off");
     }
 
     @Test
@@ -839,7 +910,14 @@ class DemoStoreSeederTest {
 
         // then
         List<String> orderIds = firstRun.orders().stream().map(Order::getOrderId).toList();
-        assertEquals(List.of(DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.POS_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.MARKETPLACE_ORDER_2_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.WEBSTORE_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY), DemoStoreSeeder.demoId("store-1", DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY)), orderIds);
+        List<String> expectedKeys = List.of(DemoStoreSeeder.POS_ORDER_KEY, DemoStoreSeeder.MARKETPLACE_ORDER_KEY,
+                DemoStoreSeeder.MARKETPLACE_ORDER_2_KEY, DemoStoreSeeder.WEBSTORE_ORDER_KEY,
+                DemoStoreSeeder.DROPSHIP_ACME_ORDER_KEY, DemoStoreSeeder.DROPSHIP_ACME_B_ORDER_KEY,
+                DemoStoreSeeder.DROPSHIP_PICKUP_ACME_ORDER_KEY, DemoStoreSeeder.DROPSHIP_PICKUP_ACME_B_ORDER_KEY,
+                DemoStoreSeeder.DROPSHIP_PICKUP_NO_CODE_ORDER_KEY, DemoStoreSeeder.DROPSHIP_ACME_MULTI_ORDER_KEY,
+                DemoStoreSeeder.DROPSHIP_ACME_SPARE_ORDER_KEY, DemoStoreSeeder.DROPSHIP_ACME_B_SPARE_ORDER_KEY,
+                DemoStoreSeeder.WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY);
+        assertEquals(expectedKeys.stream().map(key -> DemoStoreSeeder.demoId("store-1", key)).toList(), orderIds);
         assertEquals(orderIds, secondRun.orders().stream().map(Order::getOrderId).toList());
         assertEquals(DemoStoreSeeder.demoId("store-1", "demo-delivery-open"), firstRun.delivery().getDeliveryId());
         assertEquals(firstRun.delivery().getDeliveryId(), secondRun.delivery().getDeliveryId());
@@ -897,7 +975,7 @@ class DemoStoreSeederTest {
         assertTrue(simOrders.itemsByOrderId().isEmpty());
         assertTrue(simOrders.events().isEmpty());
         assertTrue(products.stream().noneMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
-        assertEquals(6, demoOrders.orders().size());
+        assertEquals(13, demoOrders.orders().size());
 
         String pricelist = DemoStoreSeeder.filterSimulationPricelistRows(
                 readClasspathResource("/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv"));
