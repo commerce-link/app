@@ -35,7 +35,7 @@ public class DropshipTrackingSweep {
         this.clock = clock;
     }
 
-    @Scheduled(cron = "${dropship.tracking.sweep-cron:0 7-52/15 * * * ?}")
+    @Scheduled(cron = "${dropship.tracking.sweep-cron:0 7 * * * ?}")
     public void sweep() {
         LocalDateTime now = LocalDateTime.now(clock);
         int published = 0;
