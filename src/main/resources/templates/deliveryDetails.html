@@ -72,11 +72,6 @@
                                               th:classappend="${trackingState == 'CANCELLED_BY_SUPPLIER'} ? 'is-danger' :
                                                               (${trackingState == 'SHIPPED_WITHOUT_DATA' or trackingState == 'GIVEN_UP'} ? 'is-warning' : 'is-light')"
                                               th:text="#{${'deliveries.dropship.tracking.state.' + trackingState}}"></span>
-                                        <button type="submit" form="tracking-check-form" class="button is-white is-small p-1 ml-1"
-                                                th:if="${trackingState != 'UNSUPPORTED' and (isAdmin or isSuperAdmin)}"
-                                                th:title="#{deliveries.dropship.tracking.check}">
-                                            <span class="icon is-small has-text-grey"><i class="fas fa-truck"></i></span>
-                                        </button>
                                     </th:block>
                                 </th:block>
                             </div>
@@ -212,11 +207,6 @@
                           th:if="${delivery.externalDeliveryIdProvisional and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/refresh-order-id|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/refresh-order-id|}">
-                    </form>
-                    <form id="tracking-check-form" method="post"
-                          th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
-                          th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/tracking/check|}
-                                                     : @{|/dashboard/deliveries/${delivery.deliveryId}/tracking/check|}">
                     </form>
                     <form id="retry-purchase-form" method="post"
                           th:if="${delivery.orderFailed and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}"
