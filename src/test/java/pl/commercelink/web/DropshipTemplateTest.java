@@ -119,6 +119,23 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void deliveryDetailsShowTheDeliveryTypeNextToTheOrderNumberNotAmongStatuses() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then - both kinds get a tag right after the delivery number, same colours as the list
+        int numberField = html.indexOf("<label class=\"label\" th:text=\"#{deliveries.order.no}\"></label>");
+        int numberFieldEnd = html.indexOf("<label class=\"label\" th:text=\"#{general.provider.name}\"></label>", numberField);
+        String numberFieldHtml = html.substring(numberField, numberFieldEnd);
+        assertThat(numberFieldHtml).contains("<span class=\"tag is-info is-light ml-2\" th:if=\"${delivery.dropship}\" th:text=\"#{deliveries.dropship.badge}\">");
+        assertThat(numberFieldHtml).contains("<span class=\"tag is-primary is-light ml-2\" th:unless=\"${delivery.dropship}\" th:text=\"#{deliveries.type.warehouse}\">");
+        // and the statuses block no longer carries the dropship badge
+        int statuses = html.indexOf("deliveries.status.paid");
+        int statusesEnd = html.indexOf("deliveries.dropship.tracking.state.", statuses);
+        assertThat(html.substring(statuses, statusesEnd)).doesNotContain("deliveries.dropship.badge");
+    }
+
+    @Test
     void deliveriesListKeepsStatusTagsInTheirOwnColumn() throws Exception {
         // when
         String html = read("deliveries.html");
