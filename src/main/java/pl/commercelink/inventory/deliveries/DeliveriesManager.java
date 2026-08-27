@@ -14,6 +14,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -103,6 +104,8 @@ public class DeliveriesManager {
             target.setPurchaseRef(UUID.randomUUID().toString());
             target.setDeliveryAddressId(source.getDeliveryAddressId());
             target.setOrderErrorMessage(source.getOrderErrorMessage());
+            target.setSupplierOptions(new HashMap<>(source.getSupplierOptions()));
+            target.setSupplierOptionsLabel(source.getSupplierOptionsLabel());
         }
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);
