@@ -6,6 +6,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
+import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -43,6 +44,15 @@ public class RMA {
     private LocalDateTime createdAt;
     @DynamoDBAttribute(attributeName = "media")
     private List<String> media = new LinkedList<>();
+    @DynamoDBAttribute(attributeName = "marketplace")
+    private String marketplace;
+    @DynamoDBAttribute(attributeName = "externalReturnId")
+    private String externalReturnId;
+    @DynamoDBAttribute(attributeName = "externalReturnReference")
+    private String externalReturnReference;
+    @DynamoDBAttribute(attributeName = "externalReturnStatus")
+    @DynamoDBTypeConvertedEnum
+    private MarketplaceReturnStatus externalReturnStatus;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -228,6 +238,43 @@ public class RMA {
     @DynamoDBIgnore
     public void decreaseShippingInsurance(double amount) {
         this.shippingInsurance -= amount;
+    }
+
+    public String getMarketplace() {
+        return marketplace;
+    }
+
+    public void setMarketplace(String marketplace) {
+        this.marketplace = marketplace;
+    }
+
+    public String getExternalReturnId() {
+        return externalReturnId;
+    }
+
+    public void setExternalReturnId(String externalReturnId) {
+        this.externalReturnId = externalReturnId;
+    }
+
+    public String getExternalReturnReference() {
+        return externalReturnReference;
+    }
+
+    public void setExternalReturnReference(String externalReturnReference) {
+        this.externalReturnReference = externalReturnReference;
+    }
+
+    public MarketplaceReturnStatus getExternalReturnStatus() {
+        return externalReturnStatus;
+    }
+
+    public void setExternalReturnStatus(MarketplaceReturnStatus externalReturnStatus) {
+        this.externalReturnStatus = externalReturnStatus;
+    }
+
+    @DynamoDBIgnore
+    public boolean isMarketplaceReturn() {
+        return externalReturnId != null && !externalReturnId.isBlank();
     }
 
     public Long getVersion() {
