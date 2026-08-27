@@ -24,6 +24,19 @@ public final class SupplierOptions {
                 .toList();
     }
 
+    /** Posted answers with blank values removed - the only filter that needs no declared options. */
+    public static Map<String, String> withoutBlankValues(Map<String, String> chosen) {
+        Map<String, String> kept = new LinkedHashMap<>();
+        if (chosen != null) {
+            chosen.forEach((key, value) -> {
+                if (!StringUtils.isBlank(value)) {
+                    kept.put(key, value);
+                }
+            });
+        }
+        return kept;
+    }
+
     /** Records the operator's answers and their human label; options the supplier does not declare are dropped. */
     public static void applySupplierOptions(Delivery delivery, List<SupplierOrderOption> options, Map<String, String> chosen) {
         Map<String, String> kept = new LinkedHashMap<>();

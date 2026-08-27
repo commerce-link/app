@@ -317,6 +317,7 @@ class SupplierPurchaseServiceDropshipTest {
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipPurchaseService.orderOf(STORE_ID, delivery)).thenReturn(Optional.of(new Order()));
         lenient().when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
         when(supplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));

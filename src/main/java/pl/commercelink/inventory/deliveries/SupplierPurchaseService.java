@@ -20,6 +20,7 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
@@ -334,10 +335,18 @@ public class SupplierPurchaseService {
 
         List<SupplierOrderOption> options;
         try {
-            SupplierOrderOptionsContext optionsContext = delivery.isDropship()
+            Optional<Order> dropshipOrder = delivery.isDropship()
                     ? dropshipPurchaseService.orderOf(storeId, delivery)
-                            .map(DropshipPurchaseService::optionsContext)
-                            .orElse(SupplierOrderOptionsContext.dropship(null))
+                    : Optional.empty();
+            if (delivery.isDropship() && dropshipOrder.isEmpty()) {
+                // Without the order we cannot tell a pickup-point delivery from a courier one, and
+                // courier options offered for a pickup-point order would let the operator approve
+                // on a false premise - fail closed instead of guessing the context.
+                log.error("Dropship order not found for delivery: store={} delivery={}", storeId, deliveryId);
+                return OperationResult.failure("deliveries.options.error");
+            }
+            SupplierOrderOptionsContext optionsContext = delivery.isDropship()
+                    ? DropshipPurchaseService.optionsContext(dropshipOrder.get())
                     : SupplierOrderOptionsContext.warehouse();
             options = supplierProvider.orderOptions(optionsContext);
         } catch (Exception e) {
@@ -599,8 +608,8 @@ public class SupplierPurchaseService {
             SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
         } else {
             // The dictionary lookup failed for this global submission - keep the posted values
-            // unfiltered (no declared options to validate/label against) rather than losing them.
-            delivery.setSupplierOptions(form.getSupplierOptions());
+            // (minus blank answers; no declared options to validate/label against) rather than losing them.
+            delivery.setSupplierOptions(SupplierOptions.withoutBlankValues(form.getSupplierOptions()));
         }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));

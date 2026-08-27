@@ -121,8 +121,8 @@ public class DropshipPurchaseService {
             SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
         } else {
             // The dictionary lookup failed for this global submission - keep the posted values
-            // unfiltered (no declared options to validate/label against) rather than losing them.
-            delivery.setSupplierOptions(form.getSupplierOptions());
+            // (minus blank answers; no declared options to validate/label against) rather than losing them.
+            delivery.setSupplierOptions(SupplierOptions.withoutBlankValues(form.getSupplierOptions()));
         }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         deliveriesRepository.save(delivery);

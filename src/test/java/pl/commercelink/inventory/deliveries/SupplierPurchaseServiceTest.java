@@ -308,6 +308,30 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void globalSubmissionDropsBlankPostedOptionsWhenTheLookupThrows() {
+        // given - the unfiltered fallback must still apply the one rule that needs no dictionary:
+        // a blank answer is no answer.
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.getSupplierOptions().put("lane", "fast");
+        form.getSupplierOptions().put("paymentMethod", "");
+        form.getSupplierOptions().put("deliveryMethod", "   ");
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
+    }
+
+    @Test
     void purchaseRefusedWhenRequiredDeliveryAddressMissing() {
         // given
         when(supplierProvider.requiresDeliveryAddress()).thenReturn(true);
@@ -1377,6 +1401,30 @@ class SupplierPurchaseServiceTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(dropshipPurchaseService.orderOf(STORE_ID, delivery))
                 .thenThrow(new IllegalStateException("no dropship order found for this delivery"));
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, null, Map.of());
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.options.error", result.getMessage());
+        assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, delivery.getOrderStatus());
+        verify(globalSupplierProvider, never()).orderOptions(any());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void approveOfADropshipDeliveryFailsClosedWhenTheOrderCannotBeLocated() throws Exception {
+        // given - no order item claims the delivery any more, so the locator yields nothing (no exception);
+        // asking the supplier for courier options in place of the pickup-point context would let the
+        // operator approve on a false premise, so approval must fail with the options error instead.
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        Delivery delivery = awaitingApprovalDelivery();
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipPurchaseService.orderOf(STORE_ID, delivery)).thenReturn(Optional.empty());
 
         // when
         OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, null, Map.of());

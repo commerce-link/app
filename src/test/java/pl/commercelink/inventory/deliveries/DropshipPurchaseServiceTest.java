@@ -188,6 +188,30 @@ class DropshipPurchaseServiceTest {
     }
 
     @Test
+    void globalDropshipSubmissionDropsBlankPostedOptionsWhenTheLookupThrows() {
+        // given
+        connectSupplier(ConnectionMode.GLOBAL);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.getSupplierOptions().put("shippingService", "express");
+        form.getSupplierOptions().put("paymentMethod", "");
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(
+                STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(Map.of("shippingService", "express"), saved.getValue().getSupplierOptions());
+        assertNull(saved.getValue().getSupplierOptionsLabel());
+    }
+
+    @Test
     void submitDropshipPublishesImmediatelyForOwnSupplier() {
         // given
         connectSupplier(ConnectionMode.OWN);
