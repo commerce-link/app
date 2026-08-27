@@ -67,10 +67,10 @@ public class Delivery {
     private String deliveryAddress;
     @DynamoDBAttribute(attributeName = "deliveryAddressId")
     private String deliveryAddressId;
-    @DynamoDBAttribute(attributeName = "supplierOptions")
-    private Map<String, String> supplierOptions = new HashMap<>();
-    @DynamoDBAttribute(attributeName = "supplierOptionsLabel")
-    private String supplierOptionsLabel;
+    @DynamoDBAttribute(attributeName = "supplierOrderChoices")
+    private Map<String, String> supplierOrderChoices = new HashMap<>();
+    @DynamoDBAttribute(attributeName = "supplierOrderChoicesLabel")
+    private String supplierOrderChoicesLabel;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
@@ -495,20 +495,20 @@ public class Delivery {
         this.deliveryAddressId = deliveryAddressId;
     }
 
-    public Map<String, String> getSupplierOptions() {
-        return supplierOptions;
+    public Map<String, String> getSupplierOrderChoices() {
+        return supplierOrderChoices;
     }
 
-    public void setSupplierOptions(Map<String, String> supplierOptions) {
-        this.supplierOptions = supplierOptions == null ? new HashMap<>() : supplierOptions;
+    public void setSupplierOrderChoices(Map<String, String> supplierOrderChoices) {
+        this.supplierOrderChoices = supplierOrderChoices == null ? new HashMap<>() : supplierOrderChoices;
     }
 
-    public String getSupplierOptionsLabel() {
-        return supplierOptionsLabel;
+    public String getSupplierOrderChoicesLabel() {
+        return supplierOrderChoicesLabel;
     }
 
-    public void setSupplierOptionsLabel(String supplierOptionsLabel) {
-        this.supplierOptionsLabel = supplierOptionsLabel;
+    public void setSupplierOrderChoicesLabel(String supplierOrderChoicesLabel) {
+        this.supplierOrderChoicesLabel = supplierOrderChoicesLabel;
     }
 
     public ConnectionMode getConnectionMode() {

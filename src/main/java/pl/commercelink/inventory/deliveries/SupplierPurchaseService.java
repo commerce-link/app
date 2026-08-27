@@ -217,7 +217,7 @@ public class SupplierPurchaseService {
                     ? dropshipPurchaseService.placeDropshipOrder(storeId, delivery, lines, dropshipOrderId)
                     : getProvider(storeId, form.getProvider())
                             .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                                    form.getDeliveryAddressId(), form.getSupplierOptions()));
+                                    form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
                 throw new SupplierOrderOutcomeUnknownException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
@@ -306,7 +306,7 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId,
-                                           Map<String, String> supplierOptions) {
+                                           Map<String, String> supplierOrderChoices) {
         Delivery delivery = findAwaitingApproval(storeId, deliveryId);
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
@@ -353,10 +353,10 @@ public class SupplierPurchaseService {
             log.error("Supplier order options lookup failed: store={} delivery={}", storeId, deliveryId, e);
             return OperationResult.failure("deliveries.options.error");
         }
-        if (!SupplierOptions.missingRequiredOptions(options, supplierOptions).isEmpty()) {
+        if (!SupplierOrderChoices.missingRequiredOptions(options, supplierOrderChoices).isEmpty()) {
             return OperationResult.failure("deliveries.purchase.error.options");
         }
-        SupplierOptions.applySupplierOptions(delivery, options, supplierOptions);
+        SupplierOrderChoices.applySupplierOrderChoices(delivery, options, supplierOrderChoices);
 
         PurchaseValidation validation;
         try {
@@ -415,7 +415,7 @@ public class SupplierPurchaseService {
                     .toList();
             Optional<SupplierOrderResult> placed = getProvider(storeId, delivery.getProvider())
                     .findPlacedOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                            form.getDeliveryAddressId(), form.getSupplierOptions()));
+                            form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
             if (placed.isEmpty()) {
                 log.info("Reconcile found no supplier order: store={} delivery={} provider={} ref={}",
                         storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef());
@@ -544,7 +544,7 @@ public class SupplierPurchaseService {
         form.setStoreId(storeId);
         form.setProvider(delivery.getProvider());
         form.setDeliveryAddressId(delivery.getDeliveryAddressId());
-        form.getSupplierOptions().putAll(delivery.getSupplierOptions());
+        form.getSupplierOrderChoices().putAll(delivery.getSupplierOrderChoices());
         form.getItems().addAll(withAllocations.getItems());
         return form;
     }
@@ -586,7 +586,7 @@ public class SupplierPurchaseService {
                 return OperationResult.failure("deliveries.options.error");
             }
         }
-        if (!requiresApproval && !SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
+        if (!requiresApproval && !SupplierOrderChoices.missingRequiredOptions(options, form.getSupplierOrderChoices()).isEmpty()) {
             return OperationResult.failure("deliveries.purchase.error.options");
         }
 
@@ -605,11 +605,11 @@ public class SupplierPurchaseService {
         delivery.setPurchaseRef(purchaseRef);
         delivery.setDeliveryAddressId(form.getDeliveryAddressId());
         if (options != null) {
-            SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
+            SupplierOrderChoices.applySupplierOrderChoices(delivery, options, form.getSupplierOrderChoices());
         } else {
             // The dictionary lookup failed for this global submission - keep the posted values
             // (minus blank answers; no declared options to validate/label against) rather than losing them.
-            delivery.setSupplierOptions(SupplierOptions.withoutBlankValues(form.getSupplierOptions()));
+            delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
         }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));

@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public final class SupplierOptionsLabel {
+public final class SupplierOrderChoicesLabel {
 
-    private SupplierOptionsLabel() {
+    private SupplierOrderChoicesLabel() {
     }
 
     public static String of(List<SupplierOrderOption> options, Map<String, String> chosen) {

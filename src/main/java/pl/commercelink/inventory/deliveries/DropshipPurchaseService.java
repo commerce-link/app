@@ -102,7 +102,7 @@ public class DropshipPurchaseService {
                 return OperationResult.failure("deliveries.options.error");
             }
         }
-        if (!requiresApproval && !SupplierOptions.missingRequiredOptions(options, form.getSupplierOptions()).isEmpty()) {
+        if (!requiresApproval && !SupplierOrderChoices.missingRequiredOptions(options, form.getSupplierOrderChoices()).isEmpty()) {
             return OperationResult.failure("deliveries.purchase.error.options");
         }
 
@@ -118,11 +118,11 @@ public class DropshipPurchaseService {
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         if (options != null) {
-            SupplierOptions.applySupplierOptions(delivery, options, form.getSupplierOptions());
+            SupplierOrderChoices.applySupplierOrderChoices(delivery, options, form.getSupplierOrderChoices());
         } else {
             // The dictionary lookup failed for this global submission - keep the posted values
             // (minus blank answers; no declared options to validate/label against) rather than losing them.
-            delivery.setSupplierOptions(SupplierOptions.withoutBlankValues(form.getSupplierOptions()));
+            delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
         }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         deliveriesRepository.save(delivery);
@@ -241,7 +241,7 @@ public class DropshipPurchaseService {
         }
         return supplierProviderResolver.resolve(storeId, delivery.getProvider()).placeDropshipOrder(
                 new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
-                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint, delivery.getSupplierOptions()));
+                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint, delivery.getSupplierOrderChoices()));
     }
 
     /** The customer's pickup point, when the order's first shipment is a pickup-point delivery. */

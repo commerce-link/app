@@ -5,12 +5,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Extracts the {@code supplierOptions[<key>]} request parameters posted alongside a purchase/approval form. */
-public final class SupplierOptionsParams {
+/** Extracts the {@code supplierOrderChoices[<key>]} request parameters posted alongside a purchase/approval form. */
+public final class SupplierOrderChoicesParams {
 
-    private static final Pattern KEY = Pattern.compile("^supplierOptions\\[(.+)]$");
+    private static final Pattern KEY = Pattern.compile("^supplierOrderChoices\\[(.+)]$");
 
-    private SupplierOptionsParams() {
+    private SupplierOrderChoicesParams() {
     }
 
     public static Map<String, String> fromRequest(Map<String, String> params) {

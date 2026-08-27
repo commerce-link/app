@@ -362,7 +362,7 @@ class SupplierPurchaseServiceDropshipTest {
 
         // then
         assertTrue(success.isSuccess());
-        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, delivery.getOrderStatus());
     }
 

@@ -10,7 +10,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class SupplierOptionsLabelTest {
+class SupplierOrderChoicesLabelTest {
 
     @Test
     void joinsOptionLabelsWithChoiceLabelsInDeclaredOrder() {
@@ -21,13 +21,13 @@ class SupplierOptionsLabelTest {
 
         // when / then
         assertEquals("Sposób zapłaty: 1.Przelew · Sposób dostawy: DPD Kurier",
-                SupplierOptionsLabel.of(options, Map.of("deliveryMethod", "DPD Kurier", "paymentMethod", "1.Przelew")));
+                SupplierOrderChoicesLabel.of(options, Map.of("deliveryMethod", "DPD Kurier", "paymentMethod", "1.Przelew")));
     }
 
     @Test
     void fallsBackToRawValuesAndReturnsNullWhenNothingChosen() {
         // when / then
-        assertEquals("deliveryMethod: X", SupplierOptionsLabel.of(List.of(), Map.of("deliveryMethod", "X")));
-        assertNull(SupplierOptionsLabel.of(List.of(), Map.of()));
+        assertEquals("deliveryMethod: X", SupplierOrderChoicesLabel.of(List.of(), Map.of("deliveryMethod", "X")));
+        assertNull(SupplierOrderChoicesLabel.of(List.of(), Map.of()));
     }
 }

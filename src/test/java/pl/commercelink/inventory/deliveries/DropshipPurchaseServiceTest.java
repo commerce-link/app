@@ -196,8 +196,8 @@ class DropshipPurchaseServiceTest {
         when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.GLOBAL);
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
-        form.getSupplierOptions().put("shippingService", "express");
-        form.getSupplierOptions().put("paymentMethod", "");
+        form.getSupplierOrderChoices().put("shippingService", "express");
+        form.getSupplierOrderChoices().put("paymentMethod", "");
 
         // when
         OperationResult<PurchaseSubmission> result = service.submitDropship(
@@ -207,8 +207,8 @@ class DropshipPurchaseServiceTest {
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
-        assertEquals(Map.of("shippingService", "express"), saved.getValue().getSupplierOptions());
-        assertNull(saved.getValue().getSupplierOptionsLabel());
+        assertEquals(Map.of("shippingService", "express"), saved.getValue().getSupplierOrderChoices());
+        assertNull(saved.getValue().getSupplierOrderChoicesLabel());
     }
 
     @Test
@@ -263,7 +263,7 @@ class DropshipPurchaseServiceTest {
         when(supplierProvider.orderOptions(SupplierOrderOptionsContext.dropship(point))).thenReturn(LANE_OPTION);
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("5900000000001", "MFN-1", 1, 100.0);
-        form.getSupplierOptions().put("lane", "fast");
+        form.getSupplierOrderChoices().put("lane", "fast");
 
         // when
         OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, order, form, "ref-1");
@@ -273,8 +273,8 @@ class DropshipPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
         Delivery delivery = saved.getValue();
-        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
-        assertThat(delivery.getSupplierOptionsLabel()).isNotBlank();
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
+        assertThat(delivery.getSupplierOrderChoicesLabel()).isNotBlank();
 
         List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-1", "5900000000001", "MFN-1", 1));
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);

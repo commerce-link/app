@@ -235,7 +235,7 @@ public class DropshipController extends BaseController {
                 dropshipPurchaseService.purchaseBlockedReason(storeId, order, form.getProvider()));
         if (!requiresApproval) {
             OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, form.getProvider(),
-                    DropshipPurchaseService.optionsContext(order), form.getSupplierOptions(), model);
+                    DropshipPurchaseService.optionsContext(order), form.getSupplierOrderChoices(), model);
         }
     }
 

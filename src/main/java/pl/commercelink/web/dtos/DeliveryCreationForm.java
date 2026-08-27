@@ -31,7 +31,7 @@ public class DeliveryCreationForm {
     private int paymentTerms;
     private boolean removeUnselected;
     private String deliveryAddressId;
-    private Map<String, String> supplierOptions = new LinkedHashMap<>();
+    private Map<String, String> supplierOrderChoices = new LinkedHashMap<>();
 
     private List<DeliveryItem> items = new ArrayList<>();
     private List<SuggestedDeliveryItem> suggestedItems = new ArrayList<>();
@@ -62,12 +62,12 @@ public class DeliveryCreationForm {
         this.deliveryAddressId = deliveryAddressId;
     }
 
-    public Map<String, String> getSupplierOptions() {
-        return supplierOptions;
+    public Map<String, String> getSupplierOrderChoices() {
+        return supplierOrderChoices;
     }
 
-    public void setSupplierOptions(Map<String, String> supplierOptions) {
-        this.supplierOptions = supplierOptions == null ? new LinkedHashMap<>() : supplierOptions;
+    public void setSupplierOrderChoices(Map<String, String> supplierOrderChoices) {
+        this.supplierOrderChoices = supplierOrderChoices == null ? new LinkedHashMap<>() : supplierOrderChoices;
     }
 
     public String getExternalDeliveryId() {

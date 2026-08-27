@@ -104,8 +104,8 @@ public class DeliveriesManager {
             target.setPurchaseRef(UUID.randomUUID().toString());
             target.setDeliveryAddressId(source.getDeliveryAddressId());
             target.setOrderErrorMessage(source.getOrderErrorMessage());
-            target.setSupplierOptions(new HashMap<>(source.getSupplierOptions()));
-            target.setSupplierOptionsLabel(source.getSupplierOptionsLabel());
+            target.setSupplierOrderChoices(new HashMap<>(source.getSupplierOrderChoices()));
+            target.setSupplierOrderChoicesLabel(source.getSupplierOrderChoicesLabel());
         }
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);

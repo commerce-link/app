@@ -218,8 +218,8 @@ class DeliveriesManagerTest {
         source.setPurchaseRef("source-ref");
         source.setDeliveryAddressId("addr-1");
         source.setOrderErrorMessage("Out of stock");
-        source.setSupplierOptions(new HashMap<>(Map.of("paymentMethod", "1.Przelew")));
-        source.setSupplierOptionsLabel("Sposób zapłaty: 1.Przelew");
+        source.setSupplierOrderChoices(new HashMap<>(Map.of("paymentMethod", "1.Przelew")));
+        source.setSupplierOrderChoicesLabel("Sposób zapłaty: 1.Przelew");
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
         Allocation warehouseAllocation = new Allocation();
         warehouseAllocation.setQty(1);
@@ -237,8 +237,8 @@ class DeliveriesManagerTest {
         assertThat(target.getPurchaseRef()).isNotBlank().isNotEqualTo("source-ref");
         assertThat(target.getDeliveryAddressId()).isEqualTo("addr-1");
         assertThat(target.getOrderErrorMessage()).isEqualTo("Out of stock");
-        assertThat(target.getSupplierOptions()).containsExactlyEntriesOf(Map.of("paymentMethod", "1.Przelew"));
-        assertThat(target.getSupplierOptionsLabel()).isEqualTo("Sposób zapłaty: 1.Przelew");
+        assertThat(target.getSupplierOrderChoices()).containsExactlyEntriesOf(Map.of("paymentMethod", "1.Przelew"));
+        assertThat(target.getSupplierOrderChoicesLabel()).isEqualTo("Sposób zapłaty: 1.Przelew");
     }
 
     @Test

@@ -252,7 +252,7 @@ class SupplierPurchaseServiceTest {
         // given
         when(supplierProvider.orderOptions(any())).thenReturn(LANE_OPTION);
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
-        form.getSupplierOptions().put("lane", "fast");
+        form.getSupplierOrderChoices().put("lane", "fast");
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
 
@@ -261,8 +261,8 @@ class SupplierPurchaseServiceTest {
 
         // then
         verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
-        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
-        assertEquals("Lane: Fast", saved.getValue().getSupplierOptionsLabel());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOrderChoices());
+        assertEquals("Lane: Fast", saved.getValue().getSupplierOrderChoicesLabel());
     }
 
     @Test
@@ -293,7 +293,7 @@ class SupplierPurchaseServiceTest {
         when(globalSupplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
         when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
-        form.getSupplierOptions().put("lane", "fast");
+        form.getSupplierOrderChoices().put("lane", "fast");
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
 
         // when
@@ -303,8 +303,8 @@ class SupplierPurchaseServiceTest {
         assertTrue(result.isSuccess());
         assertTrue(result.getPayload().awaitingApproval());
         verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
-        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
-        assertNull(saved.getValue().getSupplierOptionsLabel());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOrderChoices());
+        assertNull(saved.getValue().getSupplierOrderChoicesLabel());
     }
 
     @Test
@@ -317,9 +317,9 @@ class SupplierPurchaseServiceTest {
         when(globalSupplierProvider.orderOptions(any())).thenThrow(new SupplierOrderException("dictionary down"));
         when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
-        form.getSupplierOptions().put("lane", "fast");
-        form.getSupplierOptions().put("paymentMethod", "");
-        form.getSupplierOptions().put("deliveryMethod", "   ");
+        form.getSupplierOrderChoices().put("lane", "fast");
+        form.getSupplierOrderChoices().put("paymentMethod", "");
+        form.getSupplierOrderChoices().put("deliveryMethod", "   ");
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
 
         // when
@@ -328,7 +328,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
-        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOptions());
+        assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOrderChoices());
     }
 
     @Test
@@ -619,7 +619,7 @@ class SupplierPurchaseServiceTest {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         Delivery delivery = pendingDelivery(form, "ref-1");
-        delivery.setSupplierOptions(Map.of("lane", "fast"));
+        delivery.setSupplierOrderChoices(Map.of("lane", "fast"));
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
@@ -1310,8 +1310,8 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
-        assertEquals("Lane: Fast", delivery.getSupplierOptionsLabel());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
+        assertEquals("Lane: Fast", delivery.getSupplierOrderChoicesLabel());
     }
 
     @Test
@@ -1362,7 +1362,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(missingOptions.isSuccess());
         assertEquals("deliveries.purchase.error.options", missingOptions.getMessage());
         assertTrue(withOptions.isSuccess());
-        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOptions());
+        assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
         verify(globalSupplierProvider, times(2)).orderOptions(context.capture());
         assertTrue(context.getValue().dropship());
         assertEquals("WAW04A", context.getValue().pickupPoint().code());
@@ -1854,7 +1854,7 @@ class SupplierPurchaseServiceTest {
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         Delivery delivery = pendingDelivery(form, "ref-1");
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
-        delivery.setSupplierOptions(Map.of("lane", "fast"));
+        delivery.setSupplierOrderChoices(Map.of("lane", "fast"));
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierProvider.checkAvailability(anyList())).thenReturn(
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));

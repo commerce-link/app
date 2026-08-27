@@ -30,13 +30,13 @@ class OrderOptionsFragmentTest {
     }
 
     @Test
-    void rendersASelectPerOptionCarryingTheSupplierOptionsFieldName() throws Exception {
+    void rendersASelectPerOptionCarryingTheSupplierOrderChoicesFieldName() throws Exception {
         // when
         String html = fragment();
 
         // then
         assertThat(html).contains("<select");
-        assertThat(html).contains("th:name=\"'supplierOptions[' + ${option.key()} + ']'\"");
+        assertThat(html).contains("th:name=\"'supplierOrderChoices[' + ${option.key()} + ']'\"");
         assertThat(html).contains("data-order-option");
         assertThat(html).contains("th:attr=\"data-order-option=${option.key()},data-required=${option.required()}\"");
         // The HTML required attribute must reflect the option too, not just the JS-read data

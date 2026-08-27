@@ -6,18 +6,18 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SupplierOptionsParamsTest {
+class SupplierOrderChoicesParamsTest {
 
     @Test
     void extractsSupplierOptionKeysAndIgnoresUnrelatedParams() {
         // given
         Map<String, String> params = Map.of(
-                "supplierOptions[deliveryMethod]", "DPD Kurier",
+                "supplierOrderChoices[deliveryMethod]", "DPD Kurier",
                 "purchaseRef", "x",
-                "supplierOptions[]", "y");
+                "supplierOrderChoices[]", "y");
 
         // when
-        Map<String, String> options = SupplierOptionsParams.fromRequest(params);
+        Map<String, String> options = SupplierOrderChoicesParams.fromRequest(params);
 
         // then
         assertThat(options).containsExactly(Map.entry("deliveryMethod", "DPD Kurier"));
@@ -27,11 +27,11 @@ class SupplierOptionsParamsTest {
     void dropsBlankValues() {
         // given
         Map<String, String> params = Map.of(
-                "supplierOptions[lane]", "",
-                "supplierOptions[warehouse]", "   ");
+                "supplierOrderChoices[lane]", "",
+                "supplierOrderChoices[warehouse]", "   ");
 
         // when
-        Map<String, String> options = SupplierOptionsParams.fromRequest(params);
+        Map<String, String> options = SupplierOrderChoicesParams.fromRequest(params);
 
         // then
         assertThat(options).isEmpty();
@@ -40,10 +40,10 @@ class SupplierOptionsParamsTest {
     @Test
     void trimsSurroundingWhitespaceFromValues() {
         // given
-        Map<String, String> params = Map.of("supplierOptions[lane]", "  fast  ");
+        Map<String, String> params = Map.of("supplierOrderChoices[lane]", "  fast  ");
 
         // when
-        Map<String, String> options = SupplierOptionsParams.fromRequest(params);
+        Map<String, String> options = SupplierOrderChoicesParams.fromRequest(params);
 
         // then
         assertThat(options).containsExactly(Map.entry("lane", "fast"));
@@ -55,7 +55,7 @@ class SupplierOptionsParamsTest {
         Map<String, String> params = Map.of("purchaseRef", "x", "deliveryAddressId", "17200617");
 
         // when
-        Map<String, String> options = SupplierOptionsParams.fromRequest(params);
+        Map<String, String> options = SupplierOrderChoicesParams.fromRequest(params);
 
         // then
         assertThat(options).isEmpty();

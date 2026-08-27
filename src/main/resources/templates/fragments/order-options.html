@@ -8,7 +8,7 @@
                 <label class="label" th:text="${option.label()}"></label>
                 <div class="control">
                     <div class="select is-fullwidth">
-                        <select th:name="'supplierOptions[' + ${option.key()} + ']'"
+                        <select th:name="'supplierOrderChoices[' + ${option.key()} + ']'"
                                 th:attr="data-order-option=${option.key()},data-required=${option.required()}"
                                 th:required="${option.required()}"
                                 onchange="if (typeof refreshSubmitState === 'function') refreshSubmitState(); if (typeof refreshApprovalSubmitState === 'function') refreshApprovalSubmitState();">

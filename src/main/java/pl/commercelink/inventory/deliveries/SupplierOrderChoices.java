@@ -11,9 +11,9 @@ import java.util.Map;
  * Free-standing so {@link DropshipPurchaseService} can use it without depending on
  * {@link SupplierPurchaseService}.
  */
-public final class SupplierOptions {
+public final class SupplierOrderChoices {
 
-    private SupplierOptions() {
+    private SupplierOrderChoices() {
     }
 
     public static List<String> missingRequiredOptions(List<SupplierOrderOption> options, Map<String, String> chosen) {
@@ -38,7 +38,7 @@ public final class SupplierOptions {
     }
 
     /** Records the operator's answers and their human label; options the supplier does not declare are dropped. */
-    public static void applySupplierOptions(Delivery delivery, List<SupplierOrderOption> options, Map<String, String> chosen) {
+    public static void applySupplierOrderChoices(Delivery delivery, List<SupplierOrderOption> options, Map<String, String> chosen) {
         Map<String, String> kept = new LinkedHashMap<>();
         options.forEach(option -> {
             String value = chosen == null ? null : chosen.get(option.key());
@@ -46,7 +46,7 @@ public final class SupplierOptions {
                 kept.put(option.key(), value);
             }
         });
-        delivery.setSupplierOptions(kept);
-        delivery.setSupplierOptionsLabel(SupplierOptionsLabel.of(options, kept));
+        delivery.setSupplierOrderChoices(kept);
+        delivery.setSupplierOrderChoicesLabel(SupplierOrderChoicesLabel.of(options, kept));
     }
 }

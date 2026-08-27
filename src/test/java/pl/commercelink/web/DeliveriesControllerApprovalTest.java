@@ -531,14 +531,14 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void approveEndpointPassesSupplierOptionsToTheService() {
+    void approveEndpointPassesSupplierOrderChoicesToTheService() {
         // given
         when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of("lane", "fast")))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
 
         // when
         String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617",
-                Map.of("supplierOptions[lane]", "fast", "deliveryAddressId", "17200617"),
+                Map.of("supplierOrderChoices[lane]", "fast", "deliveryAddressId", "17200617"),
                 redirectAttributes, Locale.ENGLISH);
 
         // then

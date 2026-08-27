@@ -34,7 +34,7 @@ import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
-import pl.commercelink.web.dtos.SupplierOptionsParams;
+import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
@@ -692,7 +692,7 @@ public class DeliveriesController {
         addDeliveryAddresses(storeId, provider, form, model);
         if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
             OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
-                    SupplierOrderOptionsContext.warehouse(), form.getSupplierOptions(), model);
+                    SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
         }
         return "deliveryPurchaseConfirmation";
     }
@@ -795,7 +795,7 @@ public class DeliveriesController {
             addDeliveryAddresses(storeId, provider, form, model);
             if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
                 OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
-                        SupplierOrderOptionsContext.warehouse(), form.getSupplierOptions(), model);
+                        SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
             }
             return "deliveryPurchaseConfirmation";
         }
@@ -836,7 +836,7 @@ public class DeliveriesController {
             optionsContext = SupplierOrderOptionsContext.warehouse();
         }
         OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
-                optionsContext, delivery.getSupplierOptions(), model);
+                optionsContext, delivery.getSupplierOrderChoices(), model);
         return "deliveryApproval";
     }
 
@@ -856,7 +856,7 @@ public class DeliveriesController {
                                   @RequestParam Map<String, String> params,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId,
-                SupplierOptionsParams.fromRequest(params));
+                SupplierOrderChoicesParams.fromRequest(params));
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
