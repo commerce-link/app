@@ -13,11 +13,14 @@ import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOutcomeUnknownException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
@@ -85,6 +88,11 @@ public class SupplierPurchaseService {
             return List.of();
         }
         return supplierProvider.deliveryAddresses();
+    }
+
+    public List<SupplierOrderOption> orderOptions(String storeId, String provider, SupplierOrderOptionsContext context) {
+        SupplierProvider supplierProvider = getProvider(storeId, provider);
+        return supplierProvider == null ? List.of() : supplierProvider.orderOptions(context);
     }
 
     public void mergeSuggestedItems(DeliveryCreationForm form) {
@@ -209,7 +217,7 @@ public class SupplierPurchaseService {
                     ? dropshipPurchaseService.placeDropshipOrder(storeId, delivery, lines, dropshipOrderId)
                     : getProvider(storeId, form.getProvider())
                             .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                                    form.getDeliveryAddressId()));
+                                    form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
                 throw new SupplierOrderOutcomeUnknownException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
@@ -294,6 +302,11 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId) {
+        return approve(storeId, deliveryId, deliveryAddressId, Map.of());
+    }
+
+    public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId,
+                                           Map<String, String> supplierOrderChoices) {
         Delivery delivery = findAwaitingApproval(storeId, deliveryId);
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
@@ -319,6 +332,31 @@ public class SupplierPurchaseService {
             form.setDeliveryAddressId(deliveryAddressId);
             delivery.setDeliveryAddressId(deliveryAddressId);
         }
+
+        List<SupplierOrderOption> options;
+        try {
+            Optional<Order> dropshipOrder = delivery.isDropship()
+                    ? dropshipPurchaseService.orderOf(storeId, delivery)
+                    : Optional.empty();
+            if (delivery.isDropship() && dropshipOrder.isEmpty()) {
+                // Without the order we cannot tell a pickup-point delivery from a courier one, and
+                // courier options offered for a pickup-point order would let the operator approve
+                // on a false premise - fail closed instead of guessing the context.
+                log.error("Dropship order not found for delivery: store={} delivery={}", storeId, deliveryId);
+                return OperationResult.failure("deliveries.options.error");
+            }
+            SupplierOrderOptionsContext optionsContext = delivery.isDropship()
+                    ? DropshipPurchaseService.optionsContext(dropshipOrder.get())
+                    : SupplierOrderOptionsContext.warehouse();
+            options = supplierProvider.orderOptions(optionsContext);
+        } catch (Exception e) {
+            log.error("Supplier order options lookup failed: store={} delivery={}", storeId, deliveryId, e);
+            return OperationResult.failure("deliveries.options.error");
+        }
+        if (!SupplierOrderChoices.missingRequiredOptions(options, supplierOrderChoices).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
+        }
+        SupplierOrderChoices.applySupplierOrderChoices(delivery, options, supplierOrderChoices);
 
         PurchaseValidation validation;
         try {
@@ -377,7 +415,7 @@ public class SupplierPurchaseService {
                     .toList();
             Optional<SupplierOrderResult> placed = getProvider(storeId, delivery.getProvider())
                     .findPlacedOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                            form.getDeliveryAddressId()));
+                            form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
             if (placed.isEmpty()) {
                 log.info("Reconcile found no supplier order: store={} delivery={} provider={} ref={}",
                         storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef());
@@ -506,6 +544,7 @@ public class SupplierPurchaseService {
         form.setStoreId(storeId);
         form.setProvider(delivery.getProvider());
         form.setDeliveryAddressId(delivery.getDeliveryAddressId());
+        form.getSupplierOrderChoices().putAll(delivery.getSupplierOrderChoices());
         form.getItems().addAll(withAllocations.getItems());
         return form;
     }
@@ -535,6 +574,22 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
+        List<SupplierOrderOption> options = null;
+        try {
+            options = orderOptions(storeId, form.getProvider(), SupplierOrderOptionsContext.warehouse());
+        } catch (Exception e) {
+            if (requiresApproval) {
+                log.error("Supplier order options lookup failed for a global submission: store={} provider={}",
+                        storeId, form.getProvider(), e);
+            } else {
+                log.error("Supplier order options lookup failed: store={} provider={}", storeId, form.getProvider(), e);
+                return OperationResult.failure("deliveries.options.error");
+            }
+        }
+        if (!requiresApproval && !SupplierOrderChoices.missingRequiredOptions(options, form.getSupplierOrderChoices()).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
+        }
+
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
             return OperationResult.success(
@@ -549,6 +604,13 @@ public class SupplierPurchaseService {
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         delivery.setDeliveryAddressId(form.getDeliveryAddressId());
+        if (options != null) {
+            SupplierOrderChoices.applySupplierOrderChoices(delivery, options, form.getSupplierOrderChoices());
+        } else {
+            // The dictionary lookup failed for this global submission - keep the posted values
+            // (minus blank answers; no declared options to validate/label against) rather than losing them.
+            delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
+        }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 

@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 @Component
@@ -39,6 +40,14 @@ public class DropshipDeliveryCompletion {
                                                                   List<Allocation> selectedOrderAllocations,
                                                                   List<Allocation> remainingAllocations,
                                                                   DropshipShipment shipment) {
+        return confirmShipped(storeId, delivery, selectedOrderAllocations, remainingAllocations, shipment, (d, r) -> { });
+    }
+
+    public OperationResult<DropshipShipmentResult> confirmShipped(String storeId, Delivery delivery,
+                                                                  List<Allocation> selectedOrderAllocations,
+                                                                  List<Allocation> remainingAllocations,
+                                                                  DropshipShipment shipment,
+                                                                  BiConsumer<Delivery, DropshipShipmentResult> beforeSave) {
         Map<String, Set<String>> itemIdsByOrderId = selectedOrderAllocations.stream()
                 .filter(allocation -> allocation.getType() == AllocationType.Order)
                 .collect(Collectors.groupingBy(allocation -> allocation.getKey().getOrderId(), LinkedHashMap::new,
@@ -72,8 +81,10 @@ public class DropshipDeliveryCompletion {
             delivery.markAsReceived();
         }
         delivery.addEvent(new Event(EventType.action, DROPSHIP_SHIPMENT_CONFIRMED_EVENT, LocalDateTime.now()));
+        DropshipShipmentResult result = completed ? DropshipShipmentResult.COMPLETED : DropshipShipmentResult.PARTIAL;
+        beforeSave.accept(delivery, result);
         deliveriesRepository.save(delivery);
-        return OperationResult.success(completed ? DropshipShipmentResult.COMPLETED : DropshipShipmentResult.PARTIAL);
+        return OperationResult.success(result);
     }
 
     private int confirmOrderItems(String deliveryId, Order order, Set<String> itemIds, DropshipShipment shipment) {

@@ -7,7 +7,12 @@ import pl.commercelink.orders.ShipmentType;
 import java.time.LocalDateTime;
 
 public record DropshipShipment(ShipmentType type, String carrier, String trackingNo,
-                               String collectionPointCode, LocalDateTime shippedAt) {
+                               String collectionPointCode, LocalDateTime shippedAt, String trackingUrl) {
+
+    public DropshipShipment(ShipmentType type, String carrier, String trackingNo,
+                            String collectionPointCode, LocalDateTime shippedAt) {
+        this(type, carrier, trackingNo, collectionPointCode, shippedAt, null);
+    }
 
     public String validationError() {
         if (type != ShipmentType.Courier && type != ShipmentType.PickupPoint) {
@@ -34,5 +39,8 @@ public record DropshipShipment(ShipmentType type, String carrier, String trackin
         shipment.setTrackingNo(StringUtils.trimToNull(trackingNo));
         shipment.setCollectionPointCode(type == ShipmentType.PickupPoint ? StringUtils.trimToNull(collectionPointCode) : null);
         shipment.setShippedAt(shippedAt);
+        if (StringUtils.isNotBlank(trackingUrl)) {
+            shipment.setTrackingUrl(trackingUrl.trim());
+        }
     }
 }

@@ -11,18 +11,8 @@
             <h1 class="title" th:text="#{orders.dropship.confirm.title}">Dropship order confirmation</h1>
             <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
 
-            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
-            <div class="box">
-                <h3 class="title is-6" th:text="#{orders.dropship.confirm.consignee}">Ships directly to the customer</h3>
-                <p>
-                    <strong th:text="${consignee.displayName}">Jan Kowalski</strong><br/>
-                    <span th:text="${consignee.streetAndNumber}">ul. Polna 1</span><br/>
-                    <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}">00-001 Warszawa, PL</span><br/>
-                    <span th:text="${consignee.phone}">+48601234567</span><br/>
-                    <span th:text="${consignee.email}">jan@example.com</span>
-                </p>
-            </div>
+            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>
 
             <div id="validation-area" class="mb-6">
                 <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
@@ -34,6 +24,17 @@
                   th:attr="data-validate-url=${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/validate(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/validate(orderId=${order.orderId})}"
                   th:object="${form}" method="post"
                   onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
+                <div class="notification is-danger" th:if="${purchaseBlockedReason != null}"
+                     th:text="#{${purchaseBlockedReason}}">Blocked</div>
+
+                <input type="hidden" id="order-options-blocked" th:if="${orderOptionsError}"/>
+                <div class="notification is-danger" th:if="${orderOptionsError}">
+                    <span th:text="#{deliveries.options.error}"></span>
+                    <span th:text="' (' + ${orderOptionsError} + ')'"></span>
+                </div>
+                <div th:replace="~{fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})}"></div>
+                <th:block th:replace="~{fragments/order-options :: orderOptionsScript}"></th:block>
+
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
 
                 <input type="hidden" th:field="*{storeId}"/>
@@ -74,6 +75,8 @@
 
                 <div class="buttons">
                     <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
+                            th:disabled="${purchaseBlockedReason != null}"
+                            th:attr="data-blocked=${purchaseBlockedReason != null}"
                             th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}">Forward to supplier</button>
                     <button type="submit" class="button" formnovalidate
                             th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase/back(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase/back(orderId=${order.orderId})}"
@@ -85,7 +88,10 @@
                 let validationPassed = false;
 
                 function refreshSubmitState() {
-                    document.getElementById('purchase-confirm-submit').disabled = !validationPassed;
+                    const submitButton = document.getElementById('purchase-confirm-submit');
+                    const optionsBlocked = document.getElementById('order-options-blocked') !== null;
+                    submitButton.disabled = !validationPassed || submitButton.dataset.blocked === 'true'
+                        || optionsBlocked || !orderOptionsComplete();
                 }
 
                 function loadValidation() {

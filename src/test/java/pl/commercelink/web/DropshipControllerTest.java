@@ -22,6 +22,8 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -131,6 +133,34 @@ class DropshipControllerTest {
     }
 
     @Test
+    void createScreenExposesThePickupShipmentAndTheBlockedReason() {
+        // given
+        Order order = order();
+        Shipment shipment = new Shipment();
+        shipment.setType(ShipmentType.PickupPoint);
+        shipment.setCarrier("InPost");
+        shipment.setCollectionPointCode("WAW04A");
+        order.addShipment(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+        when(dropshipPurchaseService.purchaseBlockedReason(STORE_ID, order, PROVIDER))
+                .thenReturn("orders.dropship.error.pickupPointUnsupported");
+        Model model = new ConcurrentModel();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.dropshipCreate(ORDER_ID, model);
+        }
+
+        // then
+        assertThat(model.getAttribute("pickupShipment")).isSameAs(shipment);
+        assertThat(model.getAttribute("purchaseBlockedReason")).isEqualTo("orders.dropship.error.pickupPointUnsupported");
+    }
+
+    @Test
     void backFromConfirmationRestoresTheUserEnteredHeaderAndSelections() {
         // given
         Order order = order();
@@ -205,6 +235,64 @@ class DropshipControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-7");
+    }
+
+    @Test
+    void manualCreateWithNothingSelectedAndRemoveUnselectedReleasesTheAllocationsAndReturnsToTheOrder() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        form.setRemoveUnselected(true);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(0);
+        form.getItems().add(item);
+        when(messageSource.getMessage(eq("orders.dropship.unselectedReleased"), any(), any())).thenReturn("released");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(dropshipPurchaseService).releaseUnselected(STORE_ID, form);
+        verify(dropshipPurchaseService, never()).createManualDropship(any(), any(), any());
+        verify(redirectAttributes).addFlashAttribute("successMessage", "released");
+    }
+
+    @Test
+    void manualCreateWithNothingSelectedAndNoRemovalGoesBackToTheFormWithTheError() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        DeliveryItem item = new DeliveryItem();
+        item.setRequestedQty(0);
+        form.getItems().add(item);
+        when(dropshipPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
+                .thenReturn(OperationResult.failure("orders.dropship.error.nothingSelected"));
+        when(messageSource.getMessage(eq("orders.dropship.error.nothingSelected"), any(), any())).thenReturn("nothing");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID + "/dropship");
+        verify(dropshipPurchaseService, never()).releaseUnselected(any(), any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "nothing");
     }
 
     @Test

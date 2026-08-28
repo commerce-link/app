@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
@@ -33,6 +34,7 @@ import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
+import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
@@ -128,6 +130,9 @@ public class DeliveriesController {
 
     @Autowired
     private ShipmentCarrierOptions shipmentCarrierOptions;
+
+    @Autowired
+    private DropshipTrackingService dropshipTrackingService;
 
     private static final int DELIVERY_PAGE_SIZE = 25;
 
@@ -685,6 +690,10 @@ public class DeliveriesController {
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         addDeliveryAddresses(storeId, provider, form, model);
+        if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
+            OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
+                    SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
+        }
         return "deliveryPurchaseConfirmation";
     }
 
@@ -784,6 +793,10 @@ public class DeliveriesController {
             model.addAttribute("isSuperAdmin", isSuperAdmin());
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             addDeliveryAddresses(storeId, provider, form, model);
+            if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
+                OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
+                        SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
+            }
             return "deliveryPurchaseConfirmation";
         }
 
@@ -806,10 +819,24 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
-        if (!delivery.isDropship()) {
+        SupplierOrderOptionsContext optionsContext;
+        if (delivery.isDropship()) {
+            Order order = resolveDropshipOrder(storeId, delivery);
+            if (order != null && order.getShippingDetails() != null) {
+                model.addAttribute("consignee", order.getShippingDetails());
+            }
+            model.addAttribute("pickupShipment",
+                    order != null ? DropshipPurchaseService.pickupShipment(order).orElse(null) : null);
+            optionsContext = order != null
+                    ? DropshipPurchaseService.optionsContext(order)
+                    : SupplierOrderOptionsContext.dropship(null);
+        } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(storeId, model);
+            optionsContext = SupplierOrderOptionsContext.warehouse();
         }
+        OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
+                optionsContext, delivery.getSupplierOrderChoices(), model);
         return "deliveryApproval";
     }
 
@@ -826,8 +853,10 @@ public class DeliveriesController {
     public String approvePurchase(@PathVariable("storeId") String storeId,
                                   @PathVariable("deliveryId") String deliveryId,
                                   @RequestParam(value = "deliveryAddressId", required = false) String deliveryAddressId,
+                                  @RequestParam Map<String, String> params,
                                   RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId);
+        OperationResult<String> result = supplierPurchaseService.approve(storeId, deliveryId, deliveryAddressId,
+                SupplierOrderChoicesParams.fromRequest(params));
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
@@ -878,6 +907,36 @@ public class DeliveriesController {
             case UNAVAILABLE -> redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.orderId.refresh.unavailable", null, locale));
         }
+        return detailsRedirect(storeId, deliveryId);
+    }
+
+    @PostMapping("/dashboard/deliveries/{deliveryId}/tracking/check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String checkTracking(@PathVariable("deliveryId") String deliveryId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        return checkTracking(getStoreId(), deliveryId, redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/tracking/check")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String checkTrackingForSuperAdmin(@PathVariable("storeId") String storeId,
+                                             @PathVariable("deliveryId") String deliveryId,
+                                             RedirectAttributes redirectAttributes, Locale locale) {
+        return checkTracking(storeId, deliveryId, redirectAttributes, locale);
+    }
+
+    private String checkTracking(String storeId, String deliveryId,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        ManualTrackingOutcome outcome = dropshipTrackingService.checkManually(storeId, deliveryId);
+        String key = switch (outcome) {
+            case CONFIRMED -> "deliveries.dropship.tracking.result.confirmed";
+            case STILL_PROCESSING -> "deliveries.dropship.tracking.result.stillProcessing";
+            case CANCELLED -> "deliveries.dropship.tracking.result.cancelled";
+            case NO_DATA -> "deliveries.dropship.tracking.result.noData";
+            case UNAVAILABLE -> "deliveries.dropship.tracking.result.unavailable";
+        };
+        redirectAttributes.addFlashAttribute(outcome == ManualTrackingOutcome.CONFIRMED ? "successMessage" : "errorMessage",
+                messageSource.getMessage(key, null, locale));
         return detailsRedirect(storeId, deliveryId);
     }
 

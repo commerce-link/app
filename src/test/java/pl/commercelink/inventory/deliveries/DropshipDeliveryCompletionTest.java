@@ -20,11 +20,14 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.starter.util.OperationResult;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -234,6 +237,32 @@ class DropshipDeliveryCompletionTest {
         assertThat(fromOtherDelivery.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
         assertThat(order.getShipments()).isEmpty();
         verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, deliveriesRepository);
+    }
+
+    @Test
+    void beforeSaveCallbackRunsWithResultBeforeTheDeliveryIsSaved() {
+        // given
+        Delivery delivery = dropshipDelivery();
+        Order order = order();
+        OrderItem selected = item("1", delivery.getDeliveryId(), FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(selected));
+        List<DropshipShipmentResult> capturedResults = new ArrayList<>();
+        AtomicBoolean saveAlreadyCalledWhenCallbackRan = new AtomicBoolean();
+
+        // when
+        OperationResult<DropshipShipmentResult> result = completion.confirmShipped(STORE_ID, delivery,
+                List.of(Allocation.fromOrderItem(order, selected)), List.of(), COURIER,
+                (d, r) -> {
+                    capturedResults.add(r);
+                    saveAlreadyCalledWhenCallbackRan.set(!mockingDetails(deliveriesRepository).getInvocations().isEmpty());
+                });
+
+        // then
+        assertThat(result.getPayload()).isEqualTo(DropshipShipmentResult.COMPLETED);
+        assertThat(capturedResults).containsExactly(DropshipShipmentResult.COMPLETED);
+        assertThat(saveAlreadyCalledWhenCallbackRan).isFalse();
+        verify(deliveriesRepository).save(delivery);
     }
 
     @Test

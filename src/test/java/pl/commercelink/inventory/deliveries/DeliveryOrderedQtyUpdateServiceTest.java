@@ -20,6 +20,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import static org.mockito.ArgumentMatchers.any;
+
+import static org.mockito.Mockito.never;
+
 @ExtendWith(MockitoExtension.class)
 class DeliveryOrderedQtyUpdateServiceTest {
 
@@ -223,5 +227,22 @@ class DeliveryOrderedQtyUpdateServiceTest {
         allocation.setQty(qty);
         allocation.setUnitCost(unitCost);
         return allocation;
+    }
+
+    @Test
+    void runRejectsDropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery("store-1", "ACME-DS-1", "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", delivery.getDeliveryId())).thenReturn(delivery);
+
+        // when
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run("store-1", delivery.getDeliveryId(), "MFN-1", 5);
+
+        // then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("deliveries.editOrderedQty.error.dropship");
+        verifyNoInteractions(warehouseAllocationsManager);
+        verify(deliveriesRepository, never()).save(any());
     }
 }

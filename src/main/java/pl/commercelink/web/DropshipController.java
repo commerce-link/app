@@ -187,6 +187,12 @@ public class DropshipController extends BaseController {
             return orderDetailsRedirect(storeId, orderId);
         }
         form.setStoreId(storeId);
+        if (!form.hasRequestedItems() && form.isRemoveUnselected()) {
+            dropshipPurchaseService.releaseUnselected(storeId, form);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("orders.dropship.unselectedReleased", null, locale));
+            return orderDetailsRedirect(storeId, orderId);
+        }
         OperationResult<String> result = dropshipPurchaseService.createManualDropship(storeId, order.get(), form);
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -222,7 +228,15 @@ public class DropshipController extends BaseController {
         model.addAttribute("order", order);
         model.addAttribute("consignee", order.getShippingDetails());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("requiresApproval", supplierPurchaseService.requiresApproval(storeId, form.getProvider()));
+        boolean requiresApproval = supplierPurchaseService.requiresApproval(storeId, form.getProvider());
+        model.addAttribute("requiresApproval", requiresApproval);
+        model.addAttribute("pickupShipment", DropshipPurchaseService.pickupShipment(order).orElse(null));
+        model.addAttribute("purchaseBlockedReason",
+                dropshipPurchaseService.purchaseBlockedReason(storeId, order, form.getProvider()));
+        if (!requiresApproval) {
+            OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, form.getProvider(),
+                    DropshipPurchaseService.optionsContext(order), form.getSupplierOrderChoices(), model);
+        }
     }
 
     private String renderValidationFragment(String storeId, DeliveryCreationForm form, Model model, Locale locale) {

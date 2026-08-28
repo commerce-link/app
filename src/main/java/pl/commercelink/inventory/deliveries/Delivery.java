@@ -20,8 +20,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -65,6 +67,10 @@ public class Delivery {
     private String deliveryAddress;
     @DynamoDBAttribute(attributeName = "deliveryAddressId")
     private String deliveryAddressId;
+    @DynamoDBAttribute(attributeName = "supplierOrderChoices")
+    private Map<String, String> supplierOrderChoices = new HashMap<>();
+    @DynamoDBAttribute(attributeName = "supplierOrderChoicesLabel")
+    private String supplierOrderChoicesLabel;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
@@ -104,6 +110,10 @@ public class Delivery {
     private boolean paid;
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
+
+    @DynamoDBAttribute(attributeName = "tracking")
+    private DeliveryTracking tracking;
+
     @DynamoDBAttribute(attributeName = "purchaseAttempts")
     private int purchaseAttempts;
     @DynamoDBVersionAttribute
@@ -375,6 +385,36 @@ public class Delivery {
         this.externalDeliveryId = externalDeliveryId;
     }
 
+    /**
+     * Stays nullable on purpose: a getter creating the document on the fly would make every saved delivery carry an
+     * empty tracking map and defeat the cron filter that looks for deliveries without one.
+     */
+    public DeliveryTracking getTracking() {
+        return tracking;
+    }
+
+    public void setTracking(DeliveryTracking tracking) {
+        this.tracking = tracking;
+    }
+
+    /**
+     * The tracking document to mutate, created and attached on first use.
+     */
+    public DeliveryTracking tracking() {
+        if (tracking == null) {
+            tracking = new DeliveryTracking();
+        }
+        return tracking;
+    }
+
+    /**
+     * Read-only view for templates and queries: never null, never attached to the delivery.
+     */
+    @DynamoDBIgnore
+    public DeliveryTracking getTrackingView() {
+        return tracking == null ? new DeliveryTracking() : tracking;
+    }
+
     public String getComment() {
         return comment;
     }
@@ -455,6 +495,22 @@ public class Delivery {
         this.deliveryAddressId = deliveryAddressId;
     }
 
+    public Map<String, String> getSupplierOrderChoices() {
+        return supplierOrderChoices;
+    }
+
+    public void setSupplierOrderChoices(Map<String, String> supplierOrderChoices) {
+        this.supplierOrderChoices = supplierOrderChoices == null ? new HashMap<>() : supplierOrderChoices;
+    }
+
+    public String getSupplierOrderChoicesLabel() {
+        return supplierOrderChoicesLabel;
+    }
+
+    public void setSupplierOrderChoicesLabel(String supplierOrderChoicesLabel) {
+        this.supplierOrderChoicesLabel = supplierOrderChoicesLabel;
+    }
+
     public ConnectionMode getConnectionMode() {
         return connectionMode;
     }
@@ -494,6 +550,16 @@ public class Delivery {
     @DynamoDBIgnore
     public boolean isDropship() {
         return getType() == DeliveryType.DROPSHIP;
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackable() {
+        return isDropship() && orderStatus == null && !hasBeenReceived() && StringUtils.isNotBlank(externalDeliveryId);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackingPending() {
+        return tracking == null || tracking.isPending();
     }
 
     public boolean isPaid() {

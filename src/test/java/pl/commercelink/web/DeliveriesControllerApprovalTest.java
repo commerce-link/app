@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -27,8 +28,13 @@ import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -44,6 +50,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -113,29 +120,29 @@ class DeliveriesControllerApprovalTest {
     @Test
     void approvingRedirectsBackToTheStoreScopedDeliveryDetails() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of()))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617",
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617", Map.of(),
                 redirectAttributes, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"));
+        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"), eq(Map.of()));
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
 
     @Test
     void approvalFailureAddsFlashErrorMessageAndRedirectsToTheRealisationScreen() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, null))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, null, Map.of()))
                 .thenReturn(OperationResult.failure("deliveries.approval.error.state"));
         when(messageSource.getMessage(eq("deliveries.approval.error.state"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("Delivery is no longer awaiting approval");
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, null,
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, null, Map.of(),
                 redirectAttributes, Locale.ENGLISH);
 
         // then
@@ -225,6 +232,57 @@ class DeliveriesControllerApprovalTest {
             assertThat(model.getAttribute("deliveryAddresses")).isEqualTo(List.of(address));
             assertThat(model.getAttribute("deliveryAddressOptions"))
                     .isEqualTo(List.of(new PickerOption("addr-1", address.label())));
+        }
+    }
+
+    @Test
+    void purchaseConfirmationExposesOrderOptionsWithDefaultsPreselected() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        Model model = new ConcurrentModel();
+        SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
+                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true);
+        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
+                .thenReturn(List.of(laneOption));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
+
+            // then
+            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
+            assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
+            assertThat(model.getAttribute("selectedOptions")).isEqualTo(Map.of("lane", "fast"));
+            assertThat(model.containsAttribute("orderOptionsError")).isFalse();
+        }
+    }
+
+    @Test
+    void purchaseConfirmationBlocksWhenOptionsCannotBeFetched() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        Model model = new ConcurrentModel();
+        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
+                .thenThrow(new RuntimeException("supplier unavailable"));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
+
+            // then
+            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
+            assertThat(model.getAttribute("orderOptionsError")).isEqualTo("supplier unavailable");
+            assertThat((List<?>) model.getAttribute("orderOptions")).isEmpty();
         }
     }
 
@@ -460,15 +518,32 @@ class DeliveriesControllerApprovalTest {
     @Test
     void failedApprovalReturnsToTheRealisationScreen() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "1"))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "1", Map.of()))
                 .thenReturn(OperationResult.failure("deliveries.purchase.error.availability"));
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "1", redirectAttributes, Locale.ENGLISH);
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "1", Map.of(),
+                redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo(
                 "redirect:/dashboard/store/" + STORE_ID + "/deliveries/" + DELIVERY_ID + "/approval");
+    }
+
+    @Test
+    void approveEndpointPassesSupplierOrderChoicesToTheService() {
+        // given
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of("lane", "fast")))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617",
+                Map.of("supplierOrderChoices[lane]", "fast", "deliveryAddressId", "17200617"),
+                redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"), eq(Map.of("lane", "fast")));
     }
 
     @Test
@@ -1708,4 +1783,71 @@ class DeliveriesControllerApprovalTest {
         }
     }
 
+    @Test
+    void approvalScreenExposesTheConsigneeOfADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        ShippingDetails consignee = new ShippingDetails();
+        consignee.setName("Jan");
+        consignee.setSurname("Kowalski");
+        order.setShippingDetails(consignee);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(model.getAttribute("consignee")).isSameAs(consignee);
+        verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+    }
+
+    @Test
+    void approvalScreenExposesOrderOptionsForDropshipDeliveries() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        Shipment pickupShipment = new Shipment(ShipmentType.PickupPoint);
+        pickupShipment.setCarrier("InPost");
+        pickupShipment.setCollectionPointCode("WAW04A");
+        order.setShipments(List.of(pickupShipment));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
+                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), null, true);
+        ArgumentCaptor<SupplierOrderOptionsContext> context =
+                ArgumentCaptor.forClass(SupplierOrderOptionsContext.class);
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), context.capture()))
+                .thenReturn(List.of(laneOption));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then — the render path must resolve the order and pass its pickup point through, not
+        // just any dropship context.
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
+        assertThat(context.getValue().dropship()).isTrue();
+        assertThat(context.getValue().pickupPoint()).isNotNull();
+        assertThat(context.getValue().pickupPoint().carrier()).isEqualTo("InPost");
+        assertThat(context.getValue().pickupPoint().code()).isEqualTo("WAW04A");
+    }
 }

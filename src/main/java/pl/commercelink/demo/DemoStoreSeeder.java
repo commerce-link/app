@@ -11,6 +11,7 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
@@ -97,6 +98,18 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String MARKETPLACE_ORDER_KEY = "demo-order-marketplace-1";
     static final String MARKETPLACE_ORDER_2_KEY = "demo-order-marketplace-2";
     static final String WEBSTORE_ORDER_KEY = "demo-order-webstore";
+    static final String DROPSHIP_ACME_ORDER_KEY = "demo-order-dropship-acme";
+    static final String DROPSHIP_ACME_B_ORDER_KEY = "demo-order-dropship-acmeb";
+    static final String DROPSHIP_PICKUP_ACME_ORDER_KEY = "demo-order-dropship-pickup-acme";
+    static final String DROPSHIP_PICKUP_ACME_B_ORDER_KEY = "demo-order-dropship-pickup-acmeb";
+    static final String DROPSHIP_PICKUP_NO_CODE_ORDER_KEY = "demo-order-dropship-pickup-nocode";
+    static final String DROPSHIP_ACME_MULTI_ORDER_KEY = "demo-order-dropship-acme-multi";
+    static final String DROPSHIP_ACME_SPARE_ORDER_KEY = "demo-order-dropship-acme-spare";
+    static final String DROPSHIP_ACME_B_SPARE_ORDER_KEY = "demo-order-dropship-acmeb-spare";
+    static final String WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY = "demo-order-warehouse-acme-two-items";
+    static final List<String> DROPSHIP_ORDER_KEYS = List.of(DROPSHIP_ACME_ORDER_KEY, DROPSHIP_ACME_B_ORDER_KEY,
+            DROPSHIP_PICKUP_ACME_ORDER_KEY, DROPSHIP_PICKUP_ACME_B_ORDER_KEY, DROPSHIP_PICKUP_NO_CODE_ORDER_KEY,
+            DROPSHIP_ACME_MULTI_ORDER_KEY, DROPSHIP_ACME_SPARE_ORDER_KEY, DROPSHIP_ACME_B_SPARE_ORDER_KEY);
     static final String MARKETPLACE_EXTERNAL_KEY = "demo-external-allegro-1";
     static final String MARKETPLACE_EXTERNAL_2_KEY = "demo-external-allegro-2";
     static final String DEMO_WAREHOUSE_ID = "MAG-01";
@@ -130,6 +143,10 @@ public class DemoStoreSeeder implements StoreSeeder {
     private static final String ACME_B = "AcmeB";
     private static final List<String> SIM_SUPPLIERS = List.of(ACME, ACME_B);
     private static final String SIM_MFN_PREFIX = "SIM-";
+    /** AcmeB simulates dropshipping only when asked to; the demo store asks, so the OWN path is visible. */
+    static final String ACME_B_DROPSHIP_KNOB = "orderingDropshipEnabled";
+    /** AcmeB is the demo supplier WITHOUT pickup-point deliveries (Acme has them), so both paths can be exercised. */
+    static final String ACME_B_PICKUP_POINTS_KNOB = "orderingPickupPointsEnabled";
     private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
@@ -142,6 +159,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     private final AmazonDynamoDB dynamoDB;
     private final FileStorage fileStorage;
     private final SupplierRegistry supplierRegistry;
+    private final SupplierProviderFactory supplierProviderFactory;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -155,6 +173,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyDemoFulfilmentDefaults(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
         seedStoreData(store.getStoreId(), rows);
+        enableAcmeBDropship(store);
         saveSupplierRmaCenters(store.getStoreId());
         saveCompletedOrders(store, rows);
         saveWarehouseStock(store, rows);
@@ -166,7 +185,26 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyStoreConfiguration(store, storeId, storeName, demo);
         mapper.save(store);
         seedStoreData(storeId, loadFilteredRows());
+        enableAcmeBDropship(store);
         return store;
+    }
+
+    /**
+     * Turns on AcmeB's dropship simulation in the store's OWN configuration so the seeded AcmeB
+     * dropship order can be fulfilled. Only the missing knob is added: a value already chosen in
+     * the fulfilment settings stays untouched, so re-seeding never flips it back.
+     */
+    private void enableAcmeBDropship(Store store) {
+        if (!supplierRegistry.exists(ACME_B)) {
+            return;
+        }
+        Map<String, String> current = supplierProviderFactory.loadConfiguration(store, ACME_B);
+        Map<String, String> merged = new HashMap<>(current);
+        merged.putIfAbsent(ACME_B_DROPSHIP_KNOB, "1");
+        merged.putIfAbsent(ACME_B_PICKUP_POINTS_KNOB, "0");
+        if (!merged.equals(current)) {
+            supplierProviderFactory.saveConfiguration(store, ACME_B, merged);
+        }
     }
 
     private List<CatalogSeedRow> loadFilteredRows() {
@@ -842,10 +880,57 @@ public class DemoStoreSeeder implements StoreSeeder {
         itemsByOrderId.put(fourth.getOrderId(), List.of(
                 allocationItem(fourth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
 
+        Order fifth = demoOrder(storeId, "Tomasz", "Lis", demoId(storeId, DROPSHIP_ACME_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        fifth.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        itemsByOrderId.put(fifth.getOrderId(), List.of(
+                allocationItem(fifth.getOrderId(), acmeRow(catalogRows), ACME, 1, 1)));
+
+        Order sixth = demoOrder(storeId, "Zofia", "Krol", demoId(storeId, DROPSHIP_ACME_B_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        sixth.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        itemsByOrderId.put(sixth.getOrderId(), List.of(
+                allocationItem(sixth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+
+        List<CatalogSeedRow> acmeRows = acmeRows(catalogRows, 3);
+        Order pickupAtAcme = dropshipOrder(storeId, "Krzysztof", "Dudek", demoId(storeId, DROPSHIP_PICKUP_ACME_ORDER_KEY),
+                pickupShipment("InPost", "WAW04A"));
+        itemsByOrderId.put(pickupAtAcme.getOrderId(), List.of(
+                allocationItem(pickupAtAcme.getOrderId(), acmeRows.get(0), ACME, 1, 1),
+                allocationItem(pickupAtAcme.getOrderId(), acmeRows.get(1), ACME, 1, 2)));
+        Order pickupAtAcmeB = dropshipOrder(storeId, "Barbara", "Zajac", demoId(storeId, DROPSHIP_PICKUP_ACME_B_ORDER_KEY),
+                pickupShipment("DPD", "PL12345"));
+        itemsByOrderId.put(pickupAtAcmeB.getOrderId(), List.of(
+                allocationItem(pickupAtAcmeB.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+        Order pickupWithoutCode = dropshipOrder(storeId, "Pawel", "Sadowski", demoId(storeId, DROPSHIP_PICKUP_NO_CODE_ORDER_KEY),
+                pickupShipment("InPost", null));
+        itemsByOrderId.put(pickupWithoutCode.getOrderId(), List.of(
+                allocationItem(pickupWithoutCode.getOrderId(), acmeRows.get(0), ACME, 1, 1)));
+        Order courierMulti = dropshipOrder(storeId, "Natalia", "Borkowska", demoId(storeId, DROPSHIP_ACME_MULTI_ORDER_KEY), null);
+        itemsByOrderId.put(courierMulti.getOrderId(), List.of(
+                allocationItem(courierMulti.getOrderId(), acmeRows.get(0), ACME, 1, 1),
+                allocationItem(courierMulti.getOrderId(), acmeRows.get(1), ACME, 1, 2),
+                allocationItem(courierMulti.getOrderId(), acmeRows.get(2), ACME, 1, 3)));
+        Order courierAcmeSpare = dropshipOrder(storeId, "Joanna", "Michalska", demoId(storeId, DROPSHIP_ACME_SPARE_ORDER_KEY), null);
+        itemsByOrderId.put(courierAcmeSpare.getOrderId(), List.of(
+                allocationItem(courierAcmeSpare.getOrderId(), acmeRows.get(1), ACME, 1, 1)));
+        Order courierAcmeBSpare = dropshipOrder(storeId, "Lukasz", "Czarnecki", demoId(storeId, DROPSHIP_ACME_B_SPARE_ORDER_KEY), null);
+        itemsByOrderId.put(courierAcmeBSpare.getOrderId(), List.of(
+                allocationItem(courierAcmeBSpare.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+        Order warehouseTwoItems = demoOrder(storeId, "Marek", "Pawlak", demoId(storeId, WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        itemsByOrderId.put(warehouseTwoItems.getOrderId(), List.of(
+                allocationItem(warehouseTwoItems.getOrderId(), acmeRows.get(0), ACME, 1, 1),
+                allocationItem(warehouseTwoItems.getOrderId(), acmeRows.get(1), ACME, 1, 2)));
+
         orders.add(first);
         orders.add(second);
         orders.add(third);
         orders.add(fourth);
+        orders.add(fifth);
+        orders.add(sixth);
+        orders.addAll(List.of(pickupAtAcme, pickupAtAcmeB, pickupWithoutCode, courierMulti, courierAcmeSpare,
+                courierAcmeBSpare, warehouseTwoItems));
         orders.forEach(order -> order.setTotalPrice(itemsByOrderId.get(order.getOrderId()).stream()
                 .mapToDouble(OrderItem::getTotalPrice).sum()));
         first.setPayments(new ArrayList<>(List.of(
@@ -893,6 +978,37 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static String simulationScenarioLabel(CatalogSeedRow row) {
         return row.name().startsWith(SIM_LABEL_PREFIX) ? row.name().substring(SIM_LABEL_PREFIX.length()) : row.name();
+    }
+
+    private static CatalogSeedRow acmeRow(List<CatalogSeedRow> catalogRows) {
+        return catalogRows.stream()
+                .filter(row -> row.soldBy(ACME))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No catalog row sold by " + ACME));
+    }
+
+    private static List<CatalogSeedRow> acmeRows(List<CatalogSeedRow> catalogRows, int count) {
+        List<CatalogSeedRow> rows = catalogRows.stream().filter(row -> row.soldBy(ACME)).limit(count).toList();
+        if (rows.size() < count) {
+            throw new IllegalStateException("Need " + count + " catalog rows sold by " + ACME + ", found " + rows.size());
+        }
+        return rows;
+    }
+
+    private static Order dropshipOrder(String storeId, String name, String surname, String orderId, Shipment pickup) {
+        Order order = demoOrder(storeId, name, surname, orderId, new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        if (pickup != null) {
+            order.setShipments(new ArrayList<>(List.of(pickup)));
+        }
+        return order;
+    }
+
+    private static Shipment pickupShipment(String carrier, String collectionPointCode) {
+        Shipment shipment = new Shipment(ShipmentType.PickupPoint);
+        shipment.setCarrier(carrier);
+        shipment.setCollectionPointCode(collectionPointCode);
+        return shipment;
     }
 
     private static CatalogSeedRow acmeBExclusiveRow(List<CatalogSeedRow> catalogRows) {

@@ -21,6 +21,7 @@ import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationService;
 import pl.commercelink.warehouse.api.StockQueryService;
@@ -29,10 +30,12 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -71,6 +74,8 @@ class OrdersManagerTest {
     private StockQueryService stockQueryService;
     @Mock
     private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
+    @Mock
+    private DropshipItemLookup dropshipItemLookup;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -458,6 +463,52 @@ class OrdersManagerTest {
                 .isInstanceOf(IllegalStateException.class);
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
         verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+    }
+
+    @Test
+    void moveToWarehouseLeavesItemsOfADropshipDeliveryAlone() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem dropshipped = allocatedProduct("item-1");
+        dropshipped.setStatus(FulfilmentStatus.Ordered);
+        dropshipped.setDeliveryId("dropship-delivery");
+        OrderItem fromWarehouse = allocatedProduct("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipped, fromWarehouse));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
+        // when
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID,
+                List.of("item-1", "item-2"));
+
+        // then
+        verify(reservationService, times(1)).remove(any(Reservation.class));
+        verify(orderItemsRepository, never()).save(dropshipped);
+        assertThat(dropshipped.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(dropshipped.getDeliveryId()).isEqualTo("dropship-delivery");
+        assertThat(fromWarehouse.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(result.getSkippedDropshipItems()).isEqualTo(1);
+    }
+
+    @Test
+    void moveToWarehouseForRmaLeavesItemsOfADropshipDeliveryAlone() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem dropshipped = allocatedProduct("item-1");
+        dropshipped.setDeliveryId("dropship-delivery");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipped));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
+        // when
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(STORE_ID, ORDER_ID, List.of("item-1"));
+
+        // then
+        verify(reservationService, never()).remove(any(Reservation.class));
+        assertThat(dropshipped.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(result.getSkippedDropshipItems()).isEqualTo(1);
     }
 
     @Test

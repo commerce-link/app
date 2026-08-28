@@ -11,8 +11,6 @@
 
             <h2 th:text="#{deliveries.action.edit.delivery.link}"></h2>
 
-            <div class="notification is-success is-light" th:if="${successMessage}" th:text="${successMessage}"></div>
-            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
             <div class="columns">
                 <div class="column is-half">
@@ -29,6 +27,8 @@
                                    th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"
                                 ></a>
                                 <span th:if="${#strings.isEmpty(partnerSiteUrl)}" th:text="${delivery.shortenedDeliveryId} + ' (' + ${externalId} + ')'"></span>
+                                <span class="tag is-info is-light ml-2" th:if="${delivery.dropship}" th:text="#{deliveries.dropship.badge}"></span>
+                                <span class="tag is-primary is-light ml-2" th:unless="${delivery.dropship}" th:text="#{deliveries.type.warehouse}"></span>
                                 <span class="tag is-warning is-light ml-2" th:if="${delivery.externalDeliveryIdProvisional}"
                                       th:text="#{deliveries.externalId.provisional}"></span>
                                 <button type="submit" form="refresh-order-id-form" class="button is-white is-small p-1 ml-1"
@@ -66,8 +66,14 @@
                                 <span class="tag ml-1 is-danger" th:if="${delivery.orderFailed}" th:text="#{deliveries.status.orderFailed}"></span>
                                 <span class="tag ml-1 is-warning" th:if="${delivery.awaitingApproval}"
                                       th:text="#{deliveries.status.awaitingApproval}"></span>
-                                <span class="tag ml-1 is-info" th:if="${delivery.dropship}"
-                                      th:text="#{deliveries.dropship.badge}"></span>
+                                <th:block th:if="${delivery.dropship and delivery.orderStatus == null and !delivery.hasBeenReceived()}">
+                                    <th:block th:with="trackingState=${delivery.trackingView.effectiveState().name()}">
+                                        <span class="tag ml-1"
+                                              th:classappend="${trackingState == 'CANCELLED_BY_SUPPLIER'} ? 'is-danger' :
+                                                              (${trackingState == 'SHIPPED_WITHOUT_DATA' or trackingState == 'GIVEN_UP'} ? 'is-warning' : 'is-light')"
+                                              th:text="#{${'deliveries.dropship.tracking.state.' + trackingState}}"></span>
+                                    </th:block>
+                                </th:block>
                             </div>
                         </div>
                         <th:block th:with="orderIssueReason=${delivery.orderFailed} ? ${delivery.orderErrorMessage} : null">
@@ -95,6 +101,12 @@
                             <label class="label" th:text="#{deliveries.deliveryAddress}"></label>
                             <div class="control">
                                 <span th:text="${delivery.deliveryAddress}"></span>
+                            </div>
+                        </div>
+                        <div class="field" th:if="${not #strings.isEmpty(delivery.supplierOrderChoicesLabel)}">
+                            <label class="label" th:text="#{deliveries.options.label}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.supplierOrderChoicesLabel}"></span>
                             </div>
                         </div>
                         <div class="field" th:if="${delivery.dropship and dropshipContact != null and not #strings.isEmpty(dropshipContact.phone)}">
@@ -288,7 +300,14 @@
 
             <h2 th:text="#{deliveries.items}"></h2>
 
-            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingView.effectiveState().name() == 'CANCELLED_BY_SUPPLIER'}"
+                 th:text="#{deliveries.dropship.tracking.notice.cancelled}"></div>
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingView.effectiveState().name() == 'SHIPPED_WITHOUT_DATA'}"
+                 th:text="#{deliveries.dropship.tracking.notice.noData}"></div>
+            <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingView.effectiveState().name() == 'GIVEN_UP'}"
+                 th:text="#{deliveries.dropship.tracking.notice.givenUp}"></div>
+
+            <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and !delivery.dropship and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
                 <table class="table">
                     <thead>
                     <tr>
@@ -396,11 +415,11 @@
                     <div class="control">
                         <div class="select is-small" >
                             <select id="delivery-action-select">
-                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin or delivery.dropship}" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
+                                <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
                                 <option th:if="${delivery.dropship and delivery.orderStatus == null and (isAdmin or isSuperAdmin)}" value="confirmDropshipShipment" th:text="#{deliveries.dropship.confirmShipment}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !mergeTargetDeliveries.isEmpty() and !delivery.orderDispatched}" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.dropship and !delivery.orderDispatched}" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !mergeTargetDeliveries.isEmpty() and !delivery.orderDispatched}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
                         </div>
                         <button class="button is-primary is-small" type="button" onclick="handleDeliveryAction()" th:text="#{general.save}"></button>

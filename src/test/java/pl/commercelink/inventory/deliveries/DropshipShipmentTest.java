@@ -124,4 +124,39 @@ class DropshipShipmentTest {
         assertThat(shipment.getCarrier()).isNull();
         assertThat(shipment.getTrackingNo()).isNull();
     }
+
+    @Test
+    void fiveArgumentConstructorLeavesTrackingUrlEmpty() {
+        // when
+        DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT);
+
+        // then
+        assertThat(shipment.trackingUrl()).isNull();
+    }
+
+    @Test
+    void applyToSetsTrackingUrlWhenPresent() {
+        // given
+        Shipment target = new Shipment();
+        target.setTrackingUrl("https://old");
+
+        // when
+        new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT, " https://t/PKG-1 ").applyTo(target);
+
+        // then
+        assertThat(target.getTrackingUrl()).isEqualTo("https://t/PKG-1");
+    }
+
+    @Test
+    void applyToKeepsExistingTrackingUrlWhenBlank() {
+        // given
+        Shipment target = new Shipment();
+        target.setTrackingUrl("https://old");
+
+        // when
+        new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT, " ").applyTo(target);
+
+        // then
+        assertThat(target.getTrackingUrl()).isEqualTo("https://old");
+    }
 }

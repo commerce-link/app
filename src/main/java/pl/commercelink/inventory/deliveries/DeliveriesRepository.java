@@ -220,6 +220,32 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .collect(Collectors.toList());
     }
 
+    public List<Delivery> findTrackableDropshipDeliveries(String storeId) {
+        Delivery deliveryKey = new Delivery();
+        deliveryKey.setStoreId(storeId);
+
+        Map<String, AttributeValue> expressionAttributeValues = new HashMap<>();
+        expressionAttributeValues.put(":null", new AttributeValue().withNULL(true));
+        expressionAttributeValues.put(":dropship", new AttributeValue().withS(DeliveryType.DROPSHIP.name()));
+        expressionAttributeValues.put(":pending", new AttributeValue().withS(DeliveryTrackingState.PENDING.name()));
+
+        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
+                .withHashKeyValues(deliveryKey)
+                .withFilterExpression("#type = :dropship"
+                        + " AND (attribute_not_exists(receivedAt) OR receivedAt = :null)"
+                        + " AND (attribute_not_exists(orderStatus) OR orderStatus = :null)"
+                        + " AND attribute_exists(externalDeliveryId)"
+                        + " AND (attribute_not_exists(tracking) OR attribute_not_exists(tracking.#st) OR tracking.#st = :pending)")
+                .withExpressionAttributeNames(Map.of("#type", "type", "#st", "state"))
+                .withExpressionAttributeValues(expressionAttributeValues);
+
+        return dynamoDBMapper.query(Delivery.class, queryExpression)
+                .stream()
+                .filter(delivery -> isNotBlank(delivery.getExternalDeliveryId()))
+                .sorted(Comparator.comparing(Delivery::getOrderedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+    }
+
     private static class QueryAndFilterExpressions {
         private final String keyConditionExpression;
         private final String filterExpression;
