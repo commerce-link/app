@@ -24,6 +24,9 @@ public class ShippingConfiguration {
     @DynamoDBAttribute(attributeName = "authorizedCarriers")
     private List<AuthorizedCarrier> authorizedCarriers = new LinkedList<>();
 
+    @DynamoDBAttribute(attributeName = "deliveryFormCarriers")
+    private List<DeliveryFormCarrier> deliveryFormCarriers = new LinkedList<>();
+
     public ShippingConfiguration() {
     }
 
@@ -57,6 +60,22 @@ public class ShippingConfiguration {
 
     public void setAuthorizedCarriers(List<AuthorizedCarrier> authorizedCarriers) {
         this.authorizedCarriers = authorizedCarriers;
+    }
+
+    public List<DeliveryFormCarrier> getDeliveryFormCarriers() {
+        return deliveryFormCarriers;
+    }
+
+    public void setDeliveryFormCarriers(List<DeliveryFormCarrier> deliveryFormCarriers) {
+        this.deliveryFormCarriers = deliveryFormCarriers;
+    }
+
+    public Optional<String> carrierForDeliveryForm(String source, String deliveryForm) {
+        return deliveryFormCarriers.stream()
+                .filter(mapping -> mapping.describes(source, deliveryForm))
+                .map(DeliveryFormCarrier::getCarrier)
+                .filter(carrier -> carrier != null && !carrier.isBlank())
+                .findFirst();
     }
 
     @DynamoDBIgnore

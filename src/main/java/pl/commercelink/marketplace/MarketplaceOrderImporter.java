@@ -79,7 +79,8 @@ public class MarketplaceOrderImporter {
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shippingCarrier()));
+                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shippingCarrier()))
+                .withDeliveryForm(marketplaceOrder.shippingCarrier());
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.pickupPoint());
         if (collectionPointCode != null) {
@@ -96,9 +97,19 @@ public class MarketplaceOrderImporter {
     }
 
     String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {
-        return carrierDictionary
-                .translate(marketplaceName, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), shippingCarrier)
-                .orElse(shippingCarrier);
+        if (shippingCarrier == null || shippingCarrier.isBlank()) {
+            return null;
+        }
+        return declaredCarrier(store, marketplaceName, shippingCarrier)
+                .or(() -> carrierDictionary.translate(marketplaceName,
+                        store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), shippingCarrier))
+                .orElseGet(() -> carrierDictionary.knows(marketplaceName) ? shippingCarrier : null);
+    }
+
+    private Optional<String> declaredCarrier(Store store, String marketplaceName, String shippingCarrier) {
+        return store.getShippingConfiguration() == null
+                ? Optional.empty()
+                : store.getShippingConfiguration().carrierForDeliveryForm(marketplaceName, shippingCarrier);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {

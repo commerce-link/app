@@ -45,6 +45,10 @@ public class CarrierDictionary {
         return matchExactly(codes, normalized).or(() -> matchByContent(codes, normalized.toUpperCase()));
     }
 
+    public boolean knows(String source) {
+        return carriers.keySet().stream().anyMatch(key -> key.equalsIgnoreCase(source));
+    }
+
     public boolean describes(String source, String target, String value, String expected) {
         return expected != null && translate(source, target, value)
                 .filter(expected::equalsIgnoreCase)

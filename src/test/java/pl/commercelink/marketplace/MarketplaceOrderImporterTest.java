@@ -11,6 +11,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.stores.Integration;
 import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.DeliveryFormCarrier;
+import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.util.List;
@@ -34,6 +36,12 @@ class MarketplaceOrderImporterTest {
         CarrierDictionary dictionary = new CarrierDictionary();
         dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\"}")));
         return dictionary;
+    }
+
+    private static ShippingConfiguration configurationDeclaring(String source, String deliveryForm, String carrier) {
+        ShippingConfiguration configuration = new ShippingConfiguration();
+        configuration.setDeliveryFormCarriers(List.of(new DeliveryFormCarrier(source, deliveryForm, carrier)));
+        return configuration;
     }
 
     private static Store storeShippingWith(String shippingProvider) {
@@ -104,6 +112,55 @@ class MarketplaceOrderImporterTest {
         assertEquals("99", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "99"));
         assertEquals("2", importer.toCarrierName(storeShippingWith("apaczka"), "Morele", "2"));
         assertNull(importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", null));
+    }
+
+    @Test
+    void leavesTheCarrierUnsetForAMarketplaceTheDictionaryDoesNotKnow() {
+        // when / then
+        assertNull(importer.toCarrierName(storeShippingWith("furgonetka"), "Ceneo",
+                "Poczta Polska, P\u0142atno\u015b\u0107 z g\u00f3ry, List polecony ekonomiczny"));
+    }
+
+    @Test
+    void usesTheCarrierTheMerchantDeclaredForTheDeliveryForm() {
+        // given
+        Store store = storeShippingWith("furgonetka");
+        store.setShippingConfiguration(configurationDeclaring(
+                "Ceneo", "Poczta Polska, P\u0142atno\u015b\u0107 z g\u00f3ry, List polecony ekonomiczny", "Poczta Polska"));
+
+        // when / then
+        assertEquals("Poczta Polska", importer.toCarrierName(store, "Ceneo",
+                "Poczta Polska, P\u0142atno\u015b\u0107 z g\u00f3ry, List polecony ekonomiczny"));
+    }
+
+    @Test
+    void matchesTheDeclaredDeliveryFormExactlyRatherThanBySubstring() {
+        // given
+        Store store = storeShippingWith("furgonetka");
+        store.setShippingConfiguration(configurationDeclaring("Ceneo", "Kurier DPD", "DPD"));
+
+        // when / then
+        assertNull(importer.toCarrierName(store, "Ceneo", "Kurier DPD ekspres"));
+    }
+
+    @Test
+    void ignoresADeclarationMadeForAnotherMarketplace() {
+        // given
+        Store store = storeShippingWith("furgonetka");
+        store.setShippingConfiguration(configurationDeclaring("Empik", "Kurier DPD", "DPD"));
+
+        // when / then
+        assertNull(importer.toCarrierName(store, "Ceneo", "Kurier DPD"));
+    }
+
+    @Test
+    void theDeclarationWinsOverTheGlobalDictionary() {
+        // given
+        Store store = storeShippingWith("furgonetka");
+        store.setShippingConfiguration(configurationDeclaring("Morele", "2", "Orlen"));
+
+        // when / then
+        assertEquals("Orlen", importer.toCarrierName(store, "Morele", "2"));
     }
 
     @Test

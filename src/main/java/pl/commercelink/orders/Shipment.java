@@ -24,6 +24,8 @@ public class Shipment {
     private String carrier;
     @DynamoDBAttribute(attributeName = "collectionPointCode")
     private String collectionPointCode;
+    @DynamoDBAttribute(attributeName = "deliveryForm")
+    private String deliveryForm;
     @DynamoDBAttribute(attributeName = "shippedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime shippedAt;
@@ -81,6 +83,14 @@ public class Shipment {
         if (collectionPointCode != null && type == ShipmentType.Courier) {
             type = ShipmentType.PickupPoint;
         }
+    }
+
+    public String getDeliveryForm() {
+        return deliveryForm;
+    }
+
+    public void setDeliveryForm(String deliveryForm) {
+        this.deliveryForm = deliveryForm;
     }
 
     public String getCarrier() {
