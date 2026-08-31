@@ -7,6 +7,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.RollingPriceAggregate;
 import pl.commercelink.warehouse.StockLevel;
 
+import java.util.List;
 import java.util.Map;
 
 public class ProductPricingStrategy {
@@ -48,7 +49,21 @@ public class ProductPricingStrategy {
 
         long ourGrossPrice = calculateGrossPrice(product, matchedInventory, priceDefinition, stockDefinition);
 
-        return Math.max(ourGrossPrice, product.getSuggestedRetailPrice());
+        long ourPrice = Math.max(ourGrossPrice, product.getSuggestedRetailPrice());
+
+        return applyMaxRetailPrice(ourPrice, product, matchedInventory);
+    }
+
+    private long applyMaxRetailPrice(long price, Product product, MatchedInventory matchedInventory) {
+        if (product.getMaxRetailPrice() > 0 && maxRetailPriceApplies(product, matchedInventory)) {
+            return Math.min(price, product.getMaxRetailPrice());
+        }
+        return price;
+    }
+
+    private boolean maxRetailPriceApplies(Product product, MatchedInventory matchedInventory) {
+        List<String> suppliers = product.getMaxRetailPriceSupplierNames();
+        return suppliers.isEmpty() || suppliers.stream().anyMatch(matchedInventory::hasOffersFrom);
     }
 
     private long calculateGrossPrice(Product product, MatchedInventory matchedInventory, PriceDefinition priceDefinition, StockDefinition stockDefinition) {

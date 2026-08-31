@@ -165,6 +165,8 @@ public class StoreCopyService {
                 target.setQuickFilters(copyList(source.getQuickFilters()));
                 target.setProductPage(source.getProductPage());
                 target.setSuggestedRetailPrice(source.getSuggestedRetailPrice());
+                target.setMaxRetailPrice(source.getMaxRetailPrice());
+                target.setMaxRetailPriceSuppliers(source.getMaxRetailPriceSuppliers());
                 target.setAvailabilityType(source.getAvailabilityType());
                 target.setStockExpectedQty(source.getStockExpectedQty());
                 target.setRestockPricePromo(source.getRestockPricePromo());

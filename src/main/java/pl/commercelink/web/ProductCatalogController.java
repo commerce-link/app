@@ -388,27 +388,32 @@ public class ProductCatalogController {
 
                     if (hasExportSelectedProducts) {
                         products = productRepository.findAllProductsPaginated(
-                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, true, null, page, PRODUCTS_PAGE_SIZE);
+                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, true, null, null, page, PRODUCTS_PAGE_SIZE);
                     } else {
                         products = productRepository.findAllProductsPaginated(
-                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, null, null, page, PRODUCTS_PAGE_SIZE);
+                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, null, null, null, page, PRODUCTS_PAGE_SIZE);
                     }
                 }
                 model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
                 model.addAttribute("currentPage", page);
                 model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
             } else if ("ExpectedStock".equalsIgnoreCase(status)) {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, 1, null, null, page, PRODUCTS_PAGE_SIZE);
+                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, 1, null, null, null, page, PRODUCTS_PAGE_SIZE);
                 model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
                 model.addAttribute("currentPage", page);
                 model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
             } else if ("SuggestedRetailPrice".equalsIgnoreCase(status)) {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, null, null, 1, page, PRODUCTS_PAGE_SIZE);
+                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, null, null, 1, null, page, PRODUCTS_PAGE_SIZE);
+                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
+                model.addAttribute("currentPage", page);
+                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
+            } else if ("MaxRetailPrice".equalsIgnoreCase(status)) {
+                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, null, null, null, 1, page, PRODUCTS_PAGE_SIZE);
                 model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
                 model.addAttribute("currentPage", page);
                 model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
             } else {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), enabled, brand, label, pimId, ean, mfn, !"Queued".equalsIgnoreCase(status), null, null, null, page, PRODUCTS_PAGE_SIZE);
+                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), enabled, brand, label, pimId, ean, mfn, !"Queued".equalsIgnoreCase(status), null, null, null, null, page, PRODUCTS_PAGE_SIZE);
                 model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
                 model.addAttribute("currentPage", page);
                 model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
@@ -647,6 +652,8 @@ public class ProductCatalogController {
 
         existingProduct.setAvailabilityType(product.getAvailabilityType());
         existingProduct.setSuggestedRetailPrice(product.getSuggestedRetailPrice());
+        existingProduct.setMaxRetailPrice(product.getMaxRetailPrice());
+        existingProduct.setMaxRetailPriceSuppliers(product.getMaxRetailPriceSuppliers());
         existingProduct.setStockExpectedQty(product.getStockExpectedQty());
         existingProduct.setRestockPricePromo(product.getRestockPricePromo());
         existingProduct.setRestockPriceStandard(product.getRestockPriceStandard());

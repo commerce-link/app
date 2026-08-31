@@ -122,6 +122,98 @@ class ProductPricingStrategyTest {
         assertThat(price).isEqualTo(1939);
     }
 
+    @Test
+    void shouldCapPriceAtMaxRetailPrice() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setMaxRetailPrice(900);
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(900);
+    }
+
+    @Test
+    void shouldNotCapPriceWhenBelowMaxRetailPrice() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setMaxRetailPrice(5000);
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(1009);
+    }
+
+    @Test
+    void shouldCapPriceWhenListedSupplierHasOffers() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setMaxRetailPrice(900);
+        product.setMaxRetailPriceSuppliers("Acme, Globex");
+        when(matchedInventory.hasOffersFrom("Acme")).thenReturn(false);
+        when(matchedInventory.hasOffersFrom("Globex")).thenReturn(true);
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(900);
+    }
+
+    @Test
+    void shouldNotCapPriceWhenNoListedSupplierHasOffers() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setMaxRetailPrice(900);
+        product.setMaxRetailPriceSuppliers("Acme, Globex");
+        when(matchedInventory.hasOffersFrom("Acme")).thenReturn(false);
+        when(matchedInventory.hasOffersFrom("Globex")).thenReturn(false);
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(1009);
+    }
+
+    @Test
+    void shouldCapPriceUnconditionallyWhenSupplierListIsBlank() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setMaxRetailPrice(900);
+        product.setMaxRetailPriceSuppliers(" , ");
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(900);
+    }
+
+    @Test
+    void shouldCapPriceBelowSuggestedRetailPrice() {
+        // given
+        mockPrices(1000.0, 2000.0);
+        mockStockLevel(StockLevel.High);
+        product.setSuggestedRetailPrice(1500);
+        product.setMaxRetailPrice(1200);
+
+        // when
+        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
+
+        // then
+        assertThat(price).isEqualTo(1200);
+    }
+
     private void mockStockLevel(StockLevel stockLevel) {
         when(stockDefinition.getStockLevel(matchedInventory)).thenReturn(stockLevel);
     }
