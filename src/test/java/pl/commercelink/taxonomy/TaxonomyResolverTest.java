@@ -31,6 +31,19 @@ class TaxonomyResolverTest {
         assertThat(resolved.mfn()).isEqualTo("MFN-1");
         assertThat(resolved.name()).isEqualTo("Resolved Name");
         assertThat(resolved.category()).isEqualTo("CPU");
+        assertThat(resolved.categoryId()).isEqualTo("PIM-100");
+    }
+
+    @Test
+    void missYieldsNoCategoryId() {
+        // given
+        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+
+        // when
+        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
+
+        // then
+        assertThat(resolved.categoryId()).isNull();
     }
 
     @Test
@@ -73,6 +86,6 @@ class TaxonomyResolverTest {
     }
 
     private static Taxonomy taxonomy(String name, String category) {
-        return new Taxonomy("1234567890123", "MFN-1", "Brand", name, category, 1, null, null);
+        return new Taxonomy("1234567890123", "MFN-1", "Brand", name, category, 1, null, null, null, "PIM-100");
     }
 }
