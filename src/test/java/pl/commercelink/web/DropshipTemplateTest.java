@@ -422,4 +422,14 @@ class DropshipTemplateTest {
         int refreshEnd = script.indexOf("}", refreshStart);
         assertThat(script.substring(refreshStart, refreshEnd)).contains("orderOptionsComplete()");
     }
+
+    @Test
+    void orderDetailsHidesTheGoodsIssueActionForOrdersWithoutWarehouseItems() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains("${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}");
+        assertThat(html).doesNotContain("${hasWarehouseDocumentsEnabled and !hasWarehouseDocument}");
+    }
 }
