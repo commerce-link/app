@@ -27,9 +27,6 @@ import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.stores.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
-import pl.commercelink.web.dtos.DeliveryFormMappingForm;
-import pl.commercelink.marketplace.ObservedDeliveryForms;
-import pl.commercelink.stores.DeliveryFormCarrier;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 import pl.commercelink.web.dtos.ParcelForm;
 import pl.commercelink.web.dtos.PrinterForm;
@@ -46,9 +43,6 @@ public class StoreController {
 
     @Autowired
     private ShippingProviderFactory shippingProviderFactory;
-
-    @Autowired
-    private ObservedDeliveryForms observedDeliveryForms;
 
     @Autowired
     private InvoicingProviderFactory invoicingProviderFactory;
@@ -647,62 +641,6 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/invoicing", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/invoicing";
-    }
-
-    @PostMapping("/dashboard/store/shipping/delivery-forms/fetch")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String fetchObservedDeliveryForms(@RequestParam String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-
-        List<DeliveryFormMappingForm.DeliveryFormMapping> mappings = observedDeliveryForms.of(store).stream()
-                .map(form -> {
-                    DeliveryFormMappingForm.DeliveryFormMapping mapping = new DeliveryFormMappingForm.DeliveryFormMapping();
-                    mapping.setSource(form.source());
-                    mapping.setDeliveryForm(form.name());
-                    mapping.setCarrier(declaredCarrierFor(store, form.source(), form.name()));
-                    return mapping;
-                })
-                .collect(Collectors.toList());
-
-        model.addAttribute("observedDeliveryForms", mappings);
-        model.addAttribute("deliveryFormCarrierNames", observedDeliveryForms.carrierNamesFor(store));
-        return renderStoreShipping(storeId, model);
-    }
-
-    private String declaredCarrierFor(Store store, String source, String deliveryForm) {
-        return store.getShippingConfiguration() == null
-                ? null
-                : store.getShippingConfiguration().carrierForDeliveryForm(source, deliveryForm).orElse(null);
-    }
-
-    @PostMapping("/dashboard/store/shipping/delivery-forms/save")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String saveDeliveryFormMappings(@ModelAttribute DeliveryFormMappingForm form,
-                                           Locale locale,
-                                           RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(form.getStoreId());
-
-        if (store.getShippingConfiguration() == null) {
-            store.setShippingConfiguration(new ShippingConfiguration());
-        }
-
-        List<DeliveryFormCarrier> declared = form.getMappings() == null
-                ? List.of()
-                : form.getMappings().stream()
-                        .filter(mapping -> mapping.getCarrier() != null && !mapping.getCarrier().isBlank())
-                        .map(mapping -> new DeliveryFormCarrier(
-                                mapping.getSource(), mapping.getDeliveryForm(), mapping.getCarrier()))
-                        .collect(Collectors.toList());
-
-        store.getShippingConfiguration().setDeliveryFormCarriers(declared);
-        storesRepository.save(store);
-
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("store.shipping.deliveryForms.save.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", form.getStoreId())
-                : "redirect:/dashboard/store/shipping";
     }
 
     @PostMapping("/dashboard/store/shipping/carriers/fetch")

@@ -71,14 +71,6 @@ class CarrierDictionaryTest {
     }
 
     @Test
-    void knowsTheMarketplacesItHasMappingsFor() {
-        // when / then
-        assertTrue(dictionary.knows("Morele"));
-        assertTrue(dictionary.knows("morele"));
-        assertFalse(dictionary.knows("Ceneo"));
-    }
-
-    @Test
     void collectsEveryCarrierNameKnownToTheShippingProvider() {
         // when / then
         assertEquals(Set.of("InPost", "Orlen", "Zabka"), dictionary.namesUsedBy("furgonetka"));

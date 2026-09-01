@@ -755,11 +755,6 @@ public class Order {
             return this;
         }
 
-        public Builder withDeliveryForm(String deliveryForm) {
-            shipment.setDeliveryForm(deliveryForm);
-            return this;
-        }
-
         public Builder withCollectionPointCode(String collectionPointCode) {
             shipment.setCollectionPointCode(collectionPointCode);
             return this;
