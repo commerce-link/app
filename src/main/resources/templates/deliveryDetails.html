@@ -417,7 +417,7 @@
                             <select id="delivery-action-select">
                                 <option th:unless="${delivery.awaitingApproval or isSuperAdmin}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="markSelectedAsReceived" th:text="#{deliveries.receive}"></option>
                                 <option th:if="${delivery.dropship and delivery.orderStatus == null and (isAdmin or isSuperAdmin)}" value="confirmDropshipShipment" th:text="#{deliveries.dropship.confirmShipment}"></option>
-                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
+                                <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and (!delivery.orderDispatched or delivery.orderOutcomeUnknown)}" value="deleteSelectedAllocations" th:text="#{deliveries.deleteAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !mergeTargetDeliveries.isEmpty() and !delivery.orderDispatched}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="mergeSelectedAllocations" th:text="#{deliveries.mergeAllocation}"></option>
                                 <option th:if="${(isAdmin or isSuperAdmin) and !delivery.orderPending and !delivery.orderDispatched}" th:disabled="${delivery.dropship}" th:title="${delivery.dropship} ? #{deliveries.action.dropship.disabled} : ''" value="splitSelectedAllocations" th:text="#{deliveries.splitAllocation}"></option>
                             </select>
@@ -778,7 +778,7 @@
 
         const actionMessages = {
             'markSelectedAsReceived': /*[[#{deliveries.confirm.receive}]]*/ 'Are you sure you want to receive selected items?',
-            'deleteSelectedAllocations': /*[[${delivery.dropship} ? #{deliveries.dropship.confirm.deleteAllocation} : #{deliveries.confirm.deleteAllocation}]]*/ 'Are you sure you want to delete selected allocations?'
+            'deleteSelectedAllocations': /*[[${delivery.orderOutcomeUnknown} ? #{deliveries.unknownOutcome.confirm.deleteAllocation} : (${delivery.dropship} ? #{deliveries.dropship.confirm.deleteAllocation} : #{deliveries.confirm.deleteAllocation})]]*/ 'Are you sure you want to delete selected allocations?'
         };
 
         let pendingAction = null;

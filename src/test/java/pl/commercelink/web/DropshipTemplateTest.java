@@ -205,6 +205,17 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void deliveryDetailsOffersAllocationRemovalWhenTheSupplierOrderOutcomeIsUnknown() throws Exception {
+        // when
+        String template = Files.readString(Path.of("src/main/resources/templates/deliveryDetails.html"));
+
+        // then
+        assertThat(template).contains(
+                "!delivery.orderPending and (!delivery.orderDispatched or delivery.orderOutcomeUnknown)}\" value=\"deleteSelectedAllocations\"");
+        assertThat(template).contains("deliveries.unknownOutcome.confirm.deleteAllocation");
+    }
+
+    @Test
     void deliveryDetailsOffersDropshipShipmentConfirmationInsteadOfWarehouseReceipt() throws Exception {
         // when
         String html = read("deliveryDetails.html");
