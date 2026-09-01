@@ -9,8 +9,12 @@ import java.util.List;
  */
 public record DropshipAssessment(List<String> providers, DropshipRejection rejection) {
 
+    public DropshipAssessment {
+        providers = List.copyOf(providers);
+    }
+
     public static DropshipAssessment of(List<String> providers) {
-        return new DropshipAssessment(List.copyOf(providers), null);
+        return new DropshipAssessment(providers, null);
     }
 
     public static DropshipAssessment rejected(DropshipRejection rejection) {

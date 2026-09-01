@@ -2,6 +2,7 @@ package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,5 +40,18 @@ class DropshipAssessmentTest {
         DropshipAssessment assessment = DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED);
 
         assertThat(assessment.supports("Acme")).isFalse();
+    }
+
+    @Test
+    void constructingDirectlyDefendsAgainstMutationOfTheSourceList() {
+        // given
+        List<String> mutable = new ArrayList<>(List.of("Acme"));
+
+        // when
+        DropshipAssessment assessment = new DropshipAssessment(mutable, null);
+        mutable.add("Elko");
+
+        // then
+        assertThat(assessment.providers()).containsExactly("Acme");
     }
 }
