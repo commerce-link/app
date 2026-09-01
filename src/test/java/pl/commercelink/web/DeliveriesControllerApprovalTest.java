@@ -1580,7 +1580,7 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void deleteSelectedAllocationsForSuperAdminIsBlockedWhileOrderDispatched() {
+    void deleteSelectedAllocationsForSuperAdminIsBlockedWhileTheOrderIsStillBeingPlaced() {
         // given
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
         when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
@@ -1598,6 +1598,46 @@ class DeliveriesControllerApprovalTest {
             assertThat(view).isEqualTo(
                     "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(deliveriesManager, never()).deleteAllocations(any(), any(), any());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminIsAllowedWhenTheOrderOutcomeIsUnknown() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID))
+                .thenReturn(dispatchedDeliveryWithUnknownOutcome(DELIVERY_ID));
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).deleteAllocations(STORE_ID, DELIVERY_ID, List.of());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForStoreAdminIsAllowedWhenTheOrderOutcomeIsUnknown() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID))
+                .thenReturn(dispatchedDeliveryWithUnknownOutcome(DELIVERY_ID));
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).deleteAllocations(STORE_ID, DELIVERY_ID, List.of());
         }
     }
 
@@ -1688,6 +1728,14 @@ class DeliveriesControllerApprovalTest {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(deliveryId);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        return delivery;
+    }
+
+    private Delivery dispatchedDeliveryWithUnknownOutcome(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setOrderErrorMessage("Supplier did not confirm the order");
         return delivery;
     }
 
