@@ -161,7 +161,7 @@ Products are matched across suppliers by EAN and manufacturer code via `Inventor
 
 ### Event-Driven Processing
 
-Async work is driven through 17 `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
+Async work is driven through 18 `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
 
 **Scheduled tasks** (`@Scheduled`):
 - Every 5 min: `FeedReloaderScheduler` — reload global inventory feeds
@@ -184,7 +184,7 @@ Async work is driven through 17 `@SqsListener` methods. Queue names follow `{dom
 |---------|-------|
 | DynamoDB | Primary database |
 | S3 | Feed storage, pricelists, images, stores |
-| SQS | Async job queues (17 listeners) |
+| SQS | Async job queues (18 listeners) |
 | EventBridge Scheduler | Per-store daily feed imports, recurring generation jobs |
 | SES v2 | Email delivery |
 | Secrets Manager | External API credentials |
