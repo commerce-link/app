@@ -158,25 +158,49 @@ class MarketplaceOrderImporterTest {
         when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-        MarketplaceCustomer.Address address = new MarketplaceCustomer.Address(
-                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
-        MarketplaceCustomer customer = new MarketplaceCustomer(
-                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
-                "500600700", null, address, address);
-        MarketplaceProduct product = new MarketplaceProduct("Widget", "SKU-1", new BigDecimal("100.00"), 2, BigDecimal.ZERO);
-        MarketplaceOrder marketplaceOrder = new MarketplaceOrder("mp-order-1", customer, List.of(product),
-                new BigDecimal("9.99"), "InPost", "BankTransfer", "txn-1", null);
+        MarketplaceOrder marketplaceOrder = orderWithProduct("SKU-1");
 
         // when
         importer.importOrder(store, "Allegro", marketplaceOrder);
 
         // then
-        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(ordersManager).saveWithFulfilment(any(), itemsCaptor.capture());
-        List<OrderItem> orderItems = itemsCaptor.getValue();
+        List<OrderItem> orderItems = capturedOrderItems();
         OrderItem productItem = orderItems.stream().filter(i -> !i.isService()).findFirst().orElseThrow();
         OrderItem shippingItem = orderItems.stream().filter(OrderItem::isService).findFirst().orElseThrow();
         assertEquals("SKU-1", productItem.getExternalItemId());
         assertNull(shippingItem.getExternalItemId());
+    }
+
+    @Test
+    void storesTheMarketplaceKeyVerbatimEvenWhenItIsLowercase() {
+        // given: pimId-shaped seller SKU — UniqueIdentifierGenerator emits 10 lowercase alphanumerics
+        when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
+        Store store = new Store();
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        MarketplaceOrder order = orderWithProduct("k7m2xq9pz4");
+
+        // when
+        importer.importOrder(store, "Allegro", order);
+
+        // then: the key must survive byte-for-byte, because Allegro sends it back raw on returns
+        OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
+        assertEquals("k7m2xq9pz4", productItem.getExternalItemId());
+    }
+
+    private static MarketplaceOrder orderWithProduct(String manufacturerCode) {
+        MarketplaceCustomer.Address address = new MarketplaceCustomer.Address(
+                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
+                "500600700", null, address, address);
+        MarketplaceProduct product = new MarketplaceProduct("Widget", manufacturerCode, new BigDecimal("100.00"), 2, BigDecimal.ZERO);
+        return new MarketplaceOrder("mp-order-1", customer, List.of(product),
+                new BigDecimal("9.99"), "InPost", "BankTransfer", "txn-1", null);
+    }
+
+    private List<OrderItem> capturedOrderItems() {
+        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(ordersManager).saveWithFulfilment(any(), itemsCaptor.capture());
+        return itemsCaptor.getValue();
     }
 }

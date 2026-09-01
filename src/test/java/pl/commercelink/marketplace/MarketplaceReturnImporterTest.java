@@ -91,6 +91,20 @@ class MarketplaceReturnImporterTest {
         return new MarketplaceReturn.Item(mfn, qty, new BigDecimal("100.00"), "NOT_AS_DESCRIBED: wrong colour");
     }
 
+    private static MarketplaceReturn returnWithItem(String marketplaceKey, int qty) {
+        return marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item(marketplaceKey, qty));
+    }
+
+    private static OrderItem orderItem(String itemId, String externalItemId, String manufacturerCode, int qty) {
+        OrderItem item = mock(OrderItem.class);
+        when(item.getItemId()).thenReturn(itemId);
+        when(item.getExternalItemId()).thenReturn(externalItemId);
+        when(item.getManufacturerCode()).thenReturn(manufacturerCode);
+        when(item.getQty()).thenReturn(qty);
+        when(item.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)).thenReturn(false);
+        return item;
+    }
+
     @Test
     void createsWaitingForItemsRmaWithMatchedItemsAndParcel() {
         // given
@@ -145,6 +159,34 @@ class MarketplaceReturnImporterTest {
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
         verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
         assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
+    }
+
+    @Test
+    void matchesLegacyOrderItemsWhoseManufacturerCodeWasNormalisedAtImport() {
+        // given: an order imported before externalItemId existed — mfn went through unifyMfn
+        OrderItem legacy = orderItem("item-1", null, "K7M2XQ9PZ4", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
+        MarketplaceReturn ret = returnWithItem("k7m2xq9pz4", 1);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then
+        verify(rmaRepository).save(any(RMA.class));
+    }
+
+    @Test
+    void matchesCurrentOrderItemsOnTheRawMarketplaceKey() {
+        // given: externalItemId holds the raw key; manufacturerCode may have been overwritten by assignSupplier
+        OrderItem current = orderItem("item-1", "k7m2xq9pz4", "SUPPLIER-CODE-9", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(current));
+        MarketplaceReturn ret = returnWithItem("k7m2xq9pz4", 1);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then
+        verify(rmaRepository).save(any(RMA.class));
     }
 
     @Test

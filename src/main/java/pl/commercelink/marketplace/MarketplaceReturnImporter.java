@@ -27,6 +27,7 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -177,7 +178,7 @@ public class MarketplaceReturnImporter {
         for (MarketplaceReturn.Item item : ret.items()) {
             OrderItem match = orderItems.stream()
                     .filter(oi -> !used.contains(oi.getItemId()))
-                    .filter(oi -> item.manufacturerCode() != null && item.manufacturerCode().equals(keyOf(oi)))
+                    .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
                     .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                     .findFirst()
                     .orElse(null);
@@ -202,9 +203,23 @@ public class MarketplaceReturnImporter {
         return result;
     }
 
-    private static String keyOf(OrderItem orderItem) {
+    /**
+     * The marketplace key is stored raw in externalItemId, so current orders compare verbatim.
+     * Orders imported before that field was populated only carry manufacturerCode, which
+     * Basket.setBasketItems normalised through unifyMfn (uppercase, spaces stripped) — hence the
+     * fallback normalises both sides.
+     */
+    static boolean matchesMarketplaceKey(OrderItem orderItem, String marketplaceKey) {
+        if (marketplaceKey == null) {
+            return false;
+        }
         String externalItemId = orderItem.getExternalItemId();
-        return isNotBlank(externalItemId) ? externalItemId : orderItem.getManufacturerCode();
+        if (isNotBlank(externalItemId)) {
+            return marketplaceKey.equals(externalItemId);
+        }
+        String normalisedOrderItem = UnifiedProductIdentifiers.unifyMfn(orderItem.getManufacturerCode());
+        return normalisedOrderItem != null
+                && normalisedOrderItem.equals(UnifiedProductIdentifiers.unifyMfn(marketplaceKey));
     }
 
     private static List<Shipment> toShipments(MarketplaceReturn ret) {
