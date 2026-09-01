@@ -417,4 +417,19 @@ class MarketplaceReturnDecisionsTest {
                 List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
         assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 2))));
     }
+
+    @Test
+    void doesNotCoverWholeOrderWhenOnlySomeItemsAreSelected() {
+        // given: an order with two open items, but only one is being accepted
+        List<OrderItem> orderItems = List.of(
+                orderItem("item-1", "sku-a", 1, FulfilmentStatus.Delivered),
+                orderItem("item-2", "sku-b", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
+        // when
+        boolean covers = decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "sku-a", 1)));
+
+        // then
+        assertFalse(covers);
+    }
 }

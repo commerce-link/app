@@ -427,7 +427,11 @@ public class RMAController {
         }
 
         if (result.isSuccess()) {
-            marketplaceReturnDecisions.returnAccepted(op.getRma(), op.getRmaItems(), refundDelivery);
+            // The checkbox default was computed for the whole RMA at render time; the operator may have
+            // selected a subset, so the delivery refund must be re-derived from what was actually accepted.
+            boolean deliveryCovered = refundDelivery
+                    && marketplaceReturnDecisions.coversWholeOrder(op.getRma(), op.getRmaItems());
+            marketplaceReturnDecisions.returnAccepted(op.getRma(), op.getRmaItems(), deliveryCovered);
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
