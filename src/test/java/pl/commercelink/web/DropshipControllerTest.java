@@ -12,6 +12,8 @@ import org.springframework.ui.Model;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
+import pl.commercelink.inventory.deliveries.DropshipAssessment;
+import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
 import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
@@ -110,7 +112,7 @@ class DropshipControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(
                 List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
         Model model = new ConcurrentModel();
 
@@ -143,7 +145,7 @@ class DropshipControllerTest {
         order.addShipment(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
         when(dropshipPurchaseService.purchaseBlockedReason(STORE_ID, order, PROVIDER))
                 .thenReturn("orders.dropship.error.pickupPointUnsupported");
@@ -167,7 +169,7 @@ class DropshipControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(
                 List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
         DeliveryCreationForm posted = new DeliveryCreationForm();
         posted.setExternalDeliveryId("EXT-9");
@@ -196,7 +198,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         Model model = new ConcurrentModel();
@@ -220,7 +222,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         when(dropshipPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
@@ -243,7 +245,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         form.setRemoveUnselected(true);
@@ -272,7 +274,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         DeliveryItem item = new DeliveryItem();
@@ -301,7 +303,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
 
         // when
         String view;
@@ -320,7 +322,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
@@ -344,7 +346,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
 
@@ -366,7 +368,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of("Elko"));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of("Elko")));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
 
@@ -388,7 +390,7 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.eligibleProvider(same(order), any())).thenReturn(Optional.of(PROVIDER));
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
         when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))

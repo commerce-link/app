@@ -14,6 +14,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
+import pl.commercelink.inventory.deliveries.DropshipAssessment;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
 import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
@@ -144,12 +145,12 @@ public class DropshipController extends BaseController {
             return orderDetailsRedirect(storeId, orderId);
         }
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
-        Optional<String> provider = dropshipEligibility.eligibleProvider(order, orderItems);
-        if (provider.isEmpty()) {
+        DropshipAssessment assessment = dropshipEligibility.assess(order, orderItems);
+        if (!assessment.hasProviders()) {
             return orderDetailsRedirect(storeId, orderId);
         }
 
-        DeliveryCreationForm form = buildForm(storeId, order, orderItems, provider.get());
+        DeliveryCreationForm form = buildForm(storeId, order, orderItems, assessment.providers().getFirst());
         if (posted != null) {
             form.applyUserSelections(posted);
         }
@@ -204,7 +205,8 @@ public class DropshipController extends BaseController {
 
     private Optional<String> eligibleProviderFor(Order order) {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
-        return dropshipEligibility.eligibleProvider(order, orderItems);
+        DropshipAssessment assessment = dropshipEligibility.assess(order, orderItems);
+        return assessment.hasProviders() ? Optional.of(assessment.providers().getFirst()) : Optional.empty();
     }
 
     private DeliveryCreationForm buildForm(String storeId, Order order, List<OrderItem> orderItems, String provider) {

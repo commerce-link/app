@@ -71,7 +71,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
 
         // when
         List<Delivery> deliveries = service.run(STORE_ID);
@@ -94,10 +94,10 @@ class DeliveriesPlanningServiceTest {
                 allocation("order-3", "4", "Acme", true)));
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order2);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order2, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order2, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
         when(ordersRepository.findById(STORE_ID, "order-3")).thenReturn(order3);
         when(orderItemsRepository.findByOrderId("order-3")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order3, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order3, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
@@ -122,7 +122,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
@@ -145,7 +145,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
@@ -175,7 +175,7 @@ class DeliveriesPlanningServiceTest {
         Order order = new Order();
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
 
         // when
         DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);

@@ -13,10 +13,9 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -27,6 +26,7 @@ class DropshipEligibilityTest {
 
     private static final String STORE_ID = "store-1";
     private static final String PROVIDER = "Acme";
+    private static final String SECOND_PROVIDER = "Elko";
 
     @Mock
     private DropshipPurchaseService dropshipPurchaseService;
@@ -56,6 +56,7 @@ class DropshipEligibilityTest {
         details.setEmail("jan@example.com");
         order.setShippingDetails(details);
         lenient().when(dropshipPurchaseService.isDropshipAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        lenient().when(dropshipPurchaseService.isDropshipAvailable(STORE_ID, SECOND_PROVIDER)).thenReturn(true);
     }
 
     private static OrderItem item(String deliveryId, FulfilmentStatus status) {
@@ -70,21 +71,22 @@ class DropshipEligibilityTest {
     @Test
     void reportsTheSingleSupplierOfAFullyAllocatedOrder() {
         // when
-        Optional<String> provider = eligibility.eligibleProvider(order,
+        DropshipAssessment assessment = eligibility.assess(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation), item(PROVIDER, FulfilmentStatus.Allocation)));
 
         // then
-        assertEquals(Optional.of(PROVIDER), provider);
+        assertEquals(List.of(PROVIDER), assessment.providers());
+        assertNull(assessment.rejection());
     }
 
     @Test
     void allowsDeliveredServiceItemsNextToTheAllocation() {
         // when
-        Optional<String> provider = eligibility.eligibleProvider(order,
+        DropshipAssessment assessment = eligibility.assess(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation), item(null, FulfilmentStatus.Delivered)));
 
         // then
-        assertEquals(Optional.of(PROVIDER), provider);
+        assertEquals(List.of(PROVIDER), assessment.providers());
         verifyNoInteractions(deliveriesRepository);
     }
 
@@ -93,9 +95,12 @@ class DropshipEligibilityTest {
         // given
         order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
 
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(PROVIDER, FulfilmentStatus.Allocation))).isEmpty());
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(DropshipRejection.WAREHOUSE_FULFILMENT, assessment.rejection());
         verifyNoInteractions(dropshipPurchaseService);
     }
 
@@ -104,38 +109,81 @@ class DropshipEligibilityTest {
         // given
         order.setShippingDetails(null);
 
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(PROVIDER, FulfilmentStatus.Allocation))).isEmpty());
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(DropshipRejection.NO_SHIPPING_DETAILS, assessment.rejection());
     }
 
     @Test
-    void rejectsAllocationsSplitAcrossSuppliers() {
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("Elko", FulfilmentStatus.Allocation)))
-                .isEmpty());
+    void reportsEverySupplierWhenTheAllocationSpansSeveralOfThem() {
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation),
+                        item(SECOND_PROVIDER, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(List.of(PROVIDER, SECOND_PROVIDER), assessment.providers());
+        assertNull(assessment.rejection());
+    }
+
+    @Test
+    void aMixedOrderReportsOnlyTheDropshipCapableSupplier() {
+        // when: one item at Acme, one sitting on the warehouse sentinel
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation),
+                        item(OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(List.of(PROVIDER), assessment.providers());
+        assertNull(assessment.rejection());
+    }
+
+    @Test
+    void aSupplierWithoutDropshipIsLeftOutInsteadOfSinkingTheWholeOrder() {
+        // given
+        when(dropshipPurchaseService.isDropshipAvailable(STORE_ID, SECOND_PROVIDER)).thenReturn(false);
+
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation),
+                        item(SECOND_PROVIDER, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(List.of(PROVIDER), assessment.providers());
+        assertNull(assessment.rejection());
     }
 
     @Test
     void rejectsWarehouseAllocations() {
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Allocation))).isEmpty());
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Allocation)));
+
+        // then
+        assertEquals(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER, assessment.rejection());
     }
 
     @Test
     void rejectsOrdersWithUnsettledItemsOutsideTheAllocation() {
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item(null, FulfilmentStatus.New))).isEmpty());
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(PROVIDER, FulfilmentStatus.Allocation), item(null, FulfilmentStatus.New)));
+
+        // then
+        assertEquals(DropshipRejection.UNSETTLED_ITEMS, assessment.rejection());
     }
 
     @Test
     void rejectsOrdersWithNothingAllocated() {
-        // when / then
-        assertTrue(eligibility.eligibleProvider(order,
-                List.of(item(null, FulfilmentStatus.Delivered))).isEmpty());
+        // when
+        DropshipAssessment assessment = eligibility.assess(order,
+                List.of(item(null, FulfilmentStatus.Delivered)));
+
+        // then
+        assertEquals(DropshipRejection.NOTHING_ALLOCATED, assessment.rejection());
     }
 
     @Test
@@ -146,11 +194,12 @@ class DropshipEligibilityTest {
         when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(dropshipDelivery);
 
         // when
-        Optional<String> provider = eligibility.eligibleProvider(order,
+        DropshipAssessment assessment = eligibility.assess(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
 
         // then
-        assertEquals(Optional.of(PROVIDER), provider);
+        assertEquals(List.of(PROVIDER), assessment.providers());
+        assertNull(assessment.rejection());
     }
 
     @Test
@@ -160,11 +209,11 @@ class DropshipEligibilityTest {
         when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(warehouseDelivery);
 
         // when
-        Optional<String> provider = eligibility.eligibleProvider(order,
+        DropshipAssessment assessment = eligibility.assess(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
 
         // then
-        assertTrue(provider.isEmpty());
+        assertEquals(DropshipRejection.UNSETTLED_ITEMS, assessment.rejection());
     }
 
     @Test
@@ -173,10 +222,10 @@ class DropshipEligibilityTest {
         when(deliveriesRepository.findById(eq(STORE_ID), eq("dropship-1"))).thenReturn(null);
 
         // when
-        Optional<String> provider = eligibility.eligibleProvider(order,
+        DropshipAssessment assessment = eligibility.assess(order,
                 List.of(item(PROVIDER, FulfilmentStatus.Allocation), item("dropship-1", FulfilmentStatus.Ordered)));
 
         // then
-        assertTrue(provider.isEmpty());
+        assertEquals(DropshipRejection.UNSETTLED_ITEMS, assessment.rejection());
     }
 }

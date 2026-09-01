@@ -86,7 +86,8 @@ public class DeliveriesPlanningService {
         if (order == null) {
             return Optional.empty();
         }
-        return dropshipEligibility.eligibleProvider(order, orderItemsRepository.findByOrderId(orderId));
+        DropshipAssessment assessment = dropshipEligibility.assess(order, orderItemsRepository.findByOrderId(orderId));
+        return assessment.hasProviders() ? Optional.of(assessment.providers().getFirst()) : Optional.empty();
     }
 
     private List<Delivery> groupIntoDeliveries(String storeId, List<Allocation> allocations) {
