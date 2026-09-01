@@ -85,6 +85,7 @@ public class MarketplaceReturnDecisions {
                 .toList();
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
+        action.setExternalReturnReference(rma.getExternalReturnReference());
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
         rememberAction(rma, OrderLifecycleEventType.ReturnAccepted, action);
         rma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));

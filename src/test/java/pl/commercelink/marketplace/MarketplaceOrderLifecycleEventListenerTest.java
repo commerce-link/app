@@ -456,6 +456,23 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
+    void returnAcceptedEventCarriesTheExternalReturnReferenceIntoTheRefund() {
+        // given
+        when(provider.returns()).thenReturn(Optional.of(returns));
+        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1",
+                List.of(new MarketplaceReturnAction.Item("SKU-1", 2)), true, "cmd-1", null);
+        action.setExternalReturnReference("XGQX/2026");
+
+        // when
+        handleReturn(OrderLifecycleEventType.ReturnAccepted, action);
+
+        // then
+        ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
+        verify(returns).refundReturn(eq(EXTERNAL_ORDER_ID), eq("r-1"), captor.capture());
+        assertEquals("XGQX/2026", captor.getValue().referenceNumber());
+    }
+
+    @Test
     void returnRejectedEventRejectsThroughProviderReturns() {
         // given
         when(provider.returns()).thenReturn(Optional.of(returns));

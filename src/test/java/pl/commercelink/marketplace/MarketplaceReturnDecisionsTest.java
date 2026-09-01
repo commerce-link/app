@@ -127,6 +127,19 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
+    void returnAcceptedCarriesTheRmasExternalReturnReferenceOntoTheAction() {
+        // given: the buyer's own reference is more meaningful to them than our internal return id
+        marketplaceRma.setExternalReturnReference("XGQX/2026");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(), false);
+
+        // then
+        assertEquals("XGQX/2026", capturePublishedAction().getExternalReturnReference());
+    }
+
+    @Test
     void mergesAcceptedItemsThatResolveToTheSameMarketplaceKey() {
         // given: an RMA item split in two - both halves point at the same OrderItem
         OrderItem orderItem = orderItem("item-1", "sku-a", 2, FulfilmentStatus.Delivered);

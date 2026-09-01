@@ -13,6 +13,8 @@ public class MarketplaceReturnAction {
     /** Idempotency key for the marketplace refund; generated once, stable across SQS redeliveries. */
     private String commandId;
     private String rejectionReason;
+    /** The return's buyer-facing reference number (e.g. "XGQX/2026"); null when unavailable. */
+    private String externalReturnReference;
 
     public MarketplaceReturnAction() {
     }
@@ -39,6 +41,8 @@ public class MarketplaceReturnAction {
     public void setCommandId(String commandId) { this.commandId = commandId; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public String getExternalReturnReference() { return externalReturnReference; }
+    public void setExternalReturnReference(String externalReturnReference) { this.externalReturnReference = externalReturnReference; }
 
     public static class Item {
         private String manufacturerCode;

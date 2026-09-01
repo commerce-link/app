@@ -149,7 +149,8 @@ public class MarketplaceOrderLifecycleEventListener {
                         .map(i -> new ReturnRefund.Item(i.getManufacturerCode(), i.getQuantity()))
                         .toList(),
                 action.isRefundDelivery(),
-                action.getCommandId());
+                action.getCommandId(),
+                action.getExternalReturnReference());
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order, Store store, String marketplace) {
