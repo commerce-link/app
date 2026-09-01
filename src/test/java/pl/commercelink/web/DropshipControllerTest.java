@@ -293,7 +293,7 @@ class DropshipControllerTest {
         }
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID + "/dropship");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID + "/dropship?provider=" + PROVIDER);
         verify(dropshipPurchaseService, never()).releaseUnselected(any(), any());
         verify(redirectAttributes).addFlashAttribute("errorMessage", "nothing");
     }
@@ -470,6 +470,32 @@ class DropshipControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
+    }
+
+    @Test
+    void confirmRejectsAFormThatNamesNoProviderAtAll() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
+        when(messageSource.getMessage(eq("orders.dropship.rejected.providerMismatch"), eq(null), any()))
+                .thenReturn("mismatch");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "mismatch");
     }
 
     @Test

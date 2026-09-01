@@ -27,6 +27,8 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -174,9 +176,7 @@ public class DropshipController extends BaseController {
             }
             provider = assessment.providers().getFirst();
         } else if (!assessment.supports(provider)) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("orders.dropship.rejected.providerMismatch", null, locale));
-            return orderDetailsRedirect(storeId, orderId);
+            return providerMismatchRedirect(storeId, orderId, redirectAttributes, locale);
         }
 
         DeliveryCreationForm form = buildForm(storeId, order, orderItems, provider);
@@ -217,7 +217,7 @@ public class DropshipController extends BaseController {
             return Optional.empty();
         }
         DropshipAssessment assessment = dropshipEligibility.assess(order, orderItemsRepository.findByOrderId(orderId));
-        if (!assessment.supports(form.getProvider())) {
+        if (form.getProvider() == null || !assessment.supports(form.getProvider())) {
             return Optional.empty();
         }
         return Optional.of(order);
@@ -252,7 +252,7 @@ public class DropshipController extends BaseController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage(result.getMessage(), null, locale));
-            return dropshipCreateRedirect(storeId, orderId);
+            return dropshipCreateRedirect(storeId, orderId, form.getProvider());
         }
         return deliveryDetailsRedirect(storeId, result.getPayload());
     }
@@ -342,9 +342,11 @@ public class DropshipController extends BaseController {
                 : "redirect:/dashboard/deliveries/preview";
     }
 
-    private String dropshipCreateRedirect(String storeId, String orderId) {
+    private String dropshipCreateRedirect(String storeId, String orderId, String provider) {
+        String query = provider == null ? ""
+                : "?provider=" + URLEncoder.encode(provider, StandardCharsets.UTF_8);
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/orders/%s/dropship", storeId, orderId)
-                : "redirect:/dashboard/orders/" + orderId + "/dropship";
+                ? String.format("redirect:/dashboard/store/%s/orders/%s/dropship%s", storeId, orderId, query)
+                : "redirect:/dashboard/orders/" + orderId + "/dropship" + query;
     }
 }
