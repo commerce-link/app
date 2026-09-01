@@ -20,6 +20,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
@@ -77,6 +78,8 @@ class GoodsOutServiceTest {
     private GoodsOutHandler goodsOutHandler;
     @Mock
     private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private OrderLifecycle orderLifecycle;
 
     @InjectMocks
     private GoodsOutService goodsOutService;
@@ -251,6 +254,51 @@ class GoodsOutServiceTest {
         ArgumentCaptor<GoodsOutRequest> request = ArgumentCaptor.forClass(GoodsOutRequest.class);
         verify(goodsOutHandler).issue(request.capture(), anyBoolean());
         assertThat(request.getValue().getItems()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut re-evaluates the order lifecycle after attaching a new goods issue note")
+    void issueGoodsOutReEvaluatesTheOrderLifecycleAfterAttachingANewDocument() {
+        // given
+        Order order = orderWithoutDocuments();
+        Document warehouseDocument = new Document("doc-4", "WZ/4/2026", "https://example.com/wz/4", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        verify(orderLifecycle).update(any(Order.class));
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut does not re-evaluate the lifecycle when the goods issue note already exists")
+    void issueGoodsOutDoesNotReEvaluateTheLifecycleWhenTheDocumentAlreadyExists() {
+        // given
+        Document existing = new Document("doc-5", "WZ/5/2026", "https://example.com/wz/5", DocumentType.GoodsIssue);
+        Order order = orderWithDocument(existing);
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        verifyNoInteractions(orderLifecycle);
     }
 
     private OrderItem productItem(String itemId) {

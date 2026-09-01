@@ -11,6 +11,7 @@ import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -24,6 +25,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +38,7 @@ class GoodsOutService {
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final DropshipItemLookup dropshipItemLookup;
+    private final OrderLifecycle orderLifecycle;
 
     GoodsOutService(
             OrdersRepository ordersRepository,
@@ -44,7 +47,8 @@ class GoodsOutService {
             StoresRepository storesRepository,
             InvoicingProviderFactory invoicingProviderFactory,
             OptimisticLockingExecutor optimisticLockingExecutor,
-            DropshipItemLookup dropshipItemLookup
+            DropshipItemLookup dropshipItemLookup,
+            OrderLifecycle orderLifecycle
     ) {
         this.ordersRepository = ordersRepository;
         this.orderItemsRepository = orderItemsRepository;
@@ -53,6 +57,7 @@ class GoodsOutService {
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.optimisticLockingExecutor = optimisticLockingExecutor;
         this.dropshipItemLookup = dropshipItemLookup;
+        this.orderLifecycle = orderLifecycle;
     }
 
     OperationResult<Document> issueGoodsOut(Order order, String createdBy) {
@@ -132,15 +137,26 @@ class GoodsOutService {
 
         if (result.hasPayload()) {
             Document document = result.getPayload();
+            AtomicBoolean attached = new AtomicBoolean(false);
             optimisticLockingExecutor.modifyAndSave(
                     () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
                     fresh -> {
                         if (fresh.getDocumentByType(DocumentType.GoodsIssue).isEmpty()) {
                             fresh.getDocuments().add(document);
+                            attached.set(true);
                         }
                     },
                     ordersRepository::save
             );
+            // The goods issue note arrives asynchronously long after the lifecycle last ran, so the order has to be
+            // re-evaluated or it stays open until the production-only cron picks it up. Only on a fresh attachment:
+            // re-evaluating an order that already had the document would re-publish the goods-out event in a loop.
+            if (attached.get()) {
+                Order fresh = ordersRepository.findById(order.getStoreId(), order.getOrderId());
+                if (fresh != null) {
+                    orderLifecycle.update(fresh);
+                }
+            }
             return OperationResult.success(document);
         }
 
