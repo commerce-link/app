@@ -217,7 +217,7 @@ public class DropshipController extends BaseController {
             return Optional.empty();
         }
         DropshipAssessment assessment = dropshipEligibility.assess(order, orderItemsRepository.findByOrderId(orderId));
-        if (form.getProvider() == null || !assessment.supports(form.getProvider())) {
+        if (!assessment.supports(form.getProvider())) {
             return Optional.empty();
         }
         return Optional.of(order);

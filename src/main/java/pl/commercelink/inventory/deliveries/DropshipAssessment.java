@@ -26,6 +26,6 @@ public record DropshipAssessment(List<String> providers, DropshipRejection rejec
     }
 
     public boolean supports(String provider) {
-        return providers.contains(provider);
+        return provider != null && providers.contains(provider);
     }
 }

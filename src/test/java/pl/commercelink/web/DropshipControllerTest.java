@@ -218,6 +218,33 @@ class DropshipControllerTest {
     }
 
     @Test
+    void purchasePostRejectsAFormNamingASupplierTheOrderNoLongerHas() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of("Elko")));
+        when(messageSource.getMessage(eq("orders.dropship.rejected.providerMismatch"), eq(null), any()))
+                .thenReturn("mismatch");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider(PROVIDER);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.dropshipPurchase(ORDER_ID, form, model, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(model.getAttribute("purchaseRef")).isNull();
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "mismatch");
+    }
+
+    @Test
     void manualCreateRedirectsToTheCreatedDelivery() {
         // given
         Order order = order();

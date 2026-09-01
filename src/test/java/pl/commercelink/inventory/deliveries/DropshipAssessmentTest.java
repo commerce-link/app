@@ -36,6 +36,16 @@ class DropshipAssessmentTest {
     }
 
     @Test
+    void supportsAnswersFalseForANullProviderInsteadOfThrowing() {
+        // given: List.of(...).contains(null) throws, so the record has to answer for itself
+        DropshipAssessment assessment = DropshipAssessment.of(List.of("Acme"));
+
+        // when / then
+        assertThat(assessment.supports(null)).isFalse();
+        assertThat(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED).supports(null)).isFalse();
+    }
+
+    @Test
     void aRejectedAssessmentSupportsNobody() {
         DropshipAssessment assessment = DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED);
 
