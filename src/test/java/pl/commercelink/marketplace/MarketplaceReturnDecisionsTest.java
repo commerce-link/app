@@ -114,6 +114,25 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
+    void mergesAcceptedItemsThatResolveToTheSameMarketplaceKey() {
+        // given: an RMA item split in two - both halves point at the same OrderItem
+        OrderItem orderItem = orderItem("item-1", "sku-a", 2, FulfilmentStatus.Delivered);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(orderItem));
+        List<RMAItem> accepted = List.of(rmaItem("item-1", "sku-a", 1), rmaItem("item-1", "sku-a", 1));
+
+        // when
+        decisions.returnAccepted(marketplaceRma, accepted, false);
+
+        // then: one entry with the summed quantity, never two entries with the same key
+        ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
+        verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
+        MarketplaceReturnAction action = captor.getValue();
+        assertEquals(1, action.getItems().size());
+        assertEquals("sku-a", action.getItems().get(0).getManufacturerCode());
+        assertEquals(2, action.getItems().get(0).getQuantity());
+    }
+
+    @Test
     void refundItemsUseThePersistedOrderItemKeyInsteadOfTheRmaItemsStoredMfn() {
         // given
         OrderItem mutatedOrderItem = mock(OrderItem.class);

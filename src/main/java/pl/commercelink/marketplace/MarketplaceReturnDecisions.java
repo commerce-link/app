@@ -21,6 +21,7 @@ import pl.commercelink.orders.rma.RMAStatus;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,8 +67,13 @@ public class MarketplaceReturnDecisions {
         Map<String, OrderItem> orderItemsById = orderItemsRepository.findByOrderId(rma.getOrderId()).stream()
                 .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
 
+        // Two RMA items can point at one OrderItem (item split), and two order items can share a key
+        // (multi-batch fulfilment). Allegro must receive one entry per line item, so merge by key.
         List<MarketplaceReturnAction.Item> items = acceptedItems.stream()
-                .map(i -> new MarketplaceReturnAction.Item(refundKeyFor(i, orderItemsById), i.getQty()))
+                .collect(Collectors.groupingBy(i -> refundKeyFor(i, orderItemsById),
+                        LinkedHashMap::new, Collectors.summingInt(RMAItem::getQty)))
+                .entrySet().stream()
+                .map(e -> new MarketplaceReturnAction.Item(e.getKey(), e.getValue()))
                 .toList();
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
