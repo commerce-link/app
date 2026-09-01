@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,6 +45,7 @@ class MarketplaceReturnDecisionsTest {
     @Mock private OrderItemsRepository orderItemsRepository;
     @Mock private RMARepository rmaRepository;
     @Mock private OrderLifecycleEventPublisher publisher;
+    @Mock private OrderItemFamily orderItemFamily;
     @Mock private Order order;
 
     @InjectMocks
@@ -444,5 +446,147 @@ class MarketplaceReturnDecisionsTest {
 
         // then
         assertFalse(covers);
+    }
+
+    @Test
+    void coversWholeOrderReturnsFalseWhenOrderIsMissing() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when / then
+        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
+    }
+
+    // --- Finding 1: split-family awareness ---
+
+    @Test
+    void returnAcceptedResolvesAnItemThatMovedToASplitOffOrder() {
+        // given: item-1 no longer lives on the parent order - it moved to a split-off child
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        OrderItem movedItem = orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered);
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(movedItem));
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then: the split family was consulted and gave the real key, not the RMA item's stored (and
+        // possibly stale) mfn
+        assertEquals("SKU-1", capturePublishedAction().getItems().get(0).getManufacturerCode());
+    }
+
+    @Test
+    void returnAcceptedDoesNotConsultTheSplitFamilyWhenTheParentsOwnItemsAlreadyResolveEverything() {
+        // given: no split ever happened, every accepted item resolves against the parent's own items
+        List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then: the expensive family lookup is skipped on the common path
+        verifyNoInteractions(orderItemFamily);
+    }
+
+    @Test
+    void coversWholeOrderAcrossASplitFamily() {
+        // given: the order was split - one item stayed on the parent, one moved to a child order
+        OrderItem remaining = orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered);
+        OrderItem moved = orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(remaining));
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+
+        // when / then: only the parent's item is being returned - the moved item is still outstanding, so
+        // this must NOT count as a whole-order return (a split family can never trivially satisfy this)
+        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
+
+        // when / then: once both the parent's and the moved item are returned, the whole family is covered
+        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+                List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
+    }
+
+    // --- Finding 2: refund/rejection mutual exclusion is symmetric ---
+
+    @Test
+    void returnRejectedIsRefusedOnceARefundWasAlreadyRequested() {
+        // given
+        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.setRejectionReason("Damaged by buyer");
+
+        // when
+        decisions.returnRejected(marketplaceRma);
+
+        // then
+        verifyNoInteractions(publisher);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    // --- Finding 3: persist before publish ---
+
+    @Test
+    void returnAcceptedPersistsBeforePublishing() {
+        // given
+        List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        InOrder inOrder = inOrder(rmaRepository, publisher);
+        inOrder.verify(rmaRepository).save(marketplaceRma);
+        inOrder.verify(publisher).publishReturnAction(any(), any(), any(), any());
+    }
+
+    @Test
+    void returnAcceptedNeverPublishesWhenTheSaveFails() {
+        // given
+        List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+        doThrow(new RuntimeException("version conflict")).when(rmaRepository).save(marketplaceRma);
+
+        // when / then
+        assertThrows(RuntimeException.class, () ->
+                decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void returnRejectedPersistsBeforePublishing() {
+        // given
+        marketplaceRma.setRejectionReason("Damaged");
+
+        // when
+        decisions.returnRejected(marketplaceRma);
+
+        // then
+        InOrder inOrder = inOrder(rmaRepository, publisher);
+        inOrder.verify(rmaRepository).save(marketplaceRma);
+        inOrder.verify(publisher).publishReturnAction(any(), any(), any(), any());
+    }
+
+    @Test
+    void returnRejectedNeverPublishesWhenTheSaveFails() {
+        // given
+        marketplaceRma.setRejectionReason("Damaged");
+        doThrow(new RuntimeException("version conflict")).when(rmaRepository).save(marketplaceRma);
+
+        // when / then
+        assertThrows(RuntimeException.class, () -> decisions.returnRejected(marketplaceRma));
+        verifyNoInteractions(publisher);
+    }
+
+    // --- M4: refundKeyFor must not silently produce a null grouping key ---
+
+    @Test
+    void returnAcceptedFailsLoudlyWhenAnItemHasNoOrderItemAndNoStoredMfn() {
+        // given: no order item anywhere in the family, and the RMA item's own stored mfn is also blank
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        RMAItem itemWithoutMfn = rmaItem("item-1", null, 1);
+
+        // when / then
+        assertThrows(IllegalStateException.class, () ->
+                decisions.returnAccepted(marketplaceRma, List.of(itemWithoutMfn), false));
+        verifyNoInteractions(publisher);
+        verify(rmaRepository, never()).save(any());
     }
 }
