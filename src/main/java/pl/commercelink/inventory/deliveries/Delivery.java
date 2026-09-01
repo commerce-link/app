@@ -557,6 +557,13 @@ public class Delivery {
         return getType() == DeliveryType.DROPSHIP;
     }
 
+    // A warehouse delivery can still carry goods bought for a direct-to-consumer order: the supplier simply
+    // cannot ship them to the customer. They arrive at the warehouse and have to be forwarded by hand.
+    @DynamoDBIgnore
+    public boolean hasDirectToConsumerAllocations() {
+        return getAllocations() != null && getAllocations().stream().anyMatch(Allocation::isDirectToConsumer);
+    }
+
     @DynamoDBIgnore
     public boolean isTrackable() {
         return isDropship() && orderStatus == null && !hasBeenReceived() && StringUtils.isNotBlank(externalDeliveryId);
