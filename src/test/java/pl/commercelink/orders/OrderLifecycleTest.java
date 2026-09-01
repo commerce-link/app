@@ -275,4 +275,25 @@ class OrderLifecycleTest {
         assertEquals(OrderStatus.Delivered, order.getStatus());
         verify(goodsOutEventPublisher).publish(eq(order), any());
     }
+
+    @Test
+    void doesNotConsultDropshipLookupWhenOrderIsNotYetDelivered() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Assembly);
+        doReturn(false).when(order).isDelivered();
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(false);
+        when(item.isDelivered()).thenReturn(false);
+
+        Store store = mock(Store.class);
+        when(store.hasDocumentsGenerationEnabled()).thenReturn(true);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        verifyNoInteractions(dropshipItemLookup);
+    }
 }

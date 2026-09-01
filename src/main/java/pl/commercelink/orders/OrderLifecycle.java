@@ -59,7 +59,12 @@ public class OrderLifecycle {
 
         Store store = storesRepository.findById(order.getStoreId());
         boolean documentsGenerationEnabled = store != null && store.hasDocumentsGenerationEnabled();
-        boolean warehouseDocumentsRequired = warehouseDocumentsRequired(order, orderItems, documentsGenerationEnabled);
+        // The item fetch + dropship lookup below is only relevant once the order can possibly be Delivered
+        // (either already is, or has just reached that point earlier in this same update). Every other status
+        // short-circuits before paying for it, keeping this out of the hot path for New/Assembly/Shipping etc.
+        boolean warehouseDocumentsRequired = documentsGenerationEnabled
+                && (order.getStatus() == OrderStatus.Delivered || order.isDelivered())
+                && warehouseDocumentsRequired(order, orderItems);
 
         if (order.getStatus() == OrderStatus.New || order.getStatus() == OrderStatus.Assembly) {
             orderItems = getOrFetchOrderItems(order.getOrderId(), orderItems);
@@ -177,12 +182,10 @@ public class OrderLifecycle {
     }
 
     // Dropship goods never reach the warehouse, so they can never produce a goods issue note. Demanding one
-    // would keep such an order open forever. The check is lazy: order items are only fetched when the answer
-    // is not already settled by the store flag or by an existing document.
-    private boolean warehouseDocumentsRequired(Order order, List<OrderItem> orderItems, boolean documentsGenerationEnabled) {
-        if (!documentsGenerationEnabled) {
-            return false;
-        }
+    // would keep such an order open forever. The item fetch is lazy: it only runs when the answer is not
+    // already settled by an existing document. Callers only reach here once the cheaper preconditions
+    // (store flag on, order delivered) already hold.
+    private boolean warehouseDocumentsRequired(Order order, List<OrderItem> orderItems) {
         if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
             return true;
         }
