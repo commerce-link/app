@@ -300,7 +300,7 @@
 
             <h2 th:text="#{deliveries.items}"></h2>
 
-            <div class="notification is-warning is-light" th:if="${delivery.hasDirectToConsumerAllocations()}"
+            <div class="notification is-warning" th:if="${delivery.hasDirectToConsumerAllocations()}"
                  th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></div>
 
             <div class="notification is-warning" th:if="${delivery.dropship and delivery.trackingView.effectiveState().name() == 'CANCELLED_BY_SUPPLIER'}"

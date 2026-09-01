@@ -441,8 +441,28 @@ class DropshipTemplateTest {
         String html = read("deliveriesPreview.html");
 
         // then
-        assertThat(html).contains("orderId=${candidate.orderId}, provider=${candidate.provider}");
+        assertThat(html).contains("storeId=${storeId}, orderId=${candidate.orderId}, provider=${candidate.provider})}");
+        assertThat(html).contains("dropship(orderId=${candidate.orderId}, provider=${candidate.provider})}");
         assertThat(html).contains("<span class=\"has-text-grey\" th:text=\"${candidate.orderId}\"></span>");
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.badge");
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+    }
+
+    @Test
+    void deliveryDetailsWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+
+        // then
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+    }
+
+    @Test
+    void deliveryApprovalWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
+        // when
+        String html = read("deliveryApproval.html");
+
+        // then
         assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
     }
 }
