@@ -298,6 +298,17 @@ public class RMAController {
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
+    @PostMapping("/dashboard/rma/{rmaId}/resend-marketplace-decision")
+    public String resendMarketplaceDecision(@PathVariable String rmaId, RedirectAttributes redirectAttributes,
+                                            Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        boolean resent = marketplaceReturnDecisions.resendLastDecision(rma);
+        redirectAttributes.addFlashAttribute(resent ? "successMessage" : "errorMessage",
+                messageSource.getMessage(resent ? "rma.marketplace.resend.success" : "rma.marketplace.resend.unavailable",
+                        null, locale));
+        return "redirect:/dashboard/rma/" + rmaId;
+    }
+
     @PostMapping("/dashboard/rma/{rmaId}/add-item")
     public String addRmaItemFromOrder(
             @PathVariable String rmaId,

@@ -53,6 +53,10 @@ public class RMA {
     @DynamoDBAttribute(attributeName = "externalReturnStatus")
     @DynamoDBTypeConvertedEnum
     private MarketplaceReturnStatus externalReturnStatus;
+    @DynamoDBAttribute(attributeName = "marketplaceActionType")
+    private String marketplaceActionType;
+    @DynamoDBAttribute(attributeName = "marketplaceActionPayload")
+    private String marketplaceActionPayload;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -275,6 +279,23 @@ public class RMA {
     @DynamoDBIgnore
     public boolean isMarketplaceReturn() {
         return externalReturnId != null && !externalReturnId.isBlank();
+    }
+
+    public String getMarketplaceActionType() {
+        return marketplaceActionType;
+    }
+
+    public void setMarketplaceActionType(String marketplaceActionType) {
+        this.marketplaceActionType = marketplaceActionType;
+    }
+
+    /** Serialized MarketplaceReturnAction of the last published decision, so it can be republished verbatim. */
+    public String getMarketplaceActionPayload() {
+        return marketplaceActionPayload;
+    }
+
+    public void setMarketplaceActionPayload(String marketplaceActionPayload) {
+        this.marketplaceActionPayload = marketplaceActionPayload;
     }
 
     public Long getVersion() {

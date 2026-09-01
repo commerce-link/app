@@ -1,5 +1,7 @@
 package pl.commercelink.marketplace;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,8 @@ public class MarketplaceReturnDecisions {
     private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnDecisions.class);
 
     private static final int MAX_REJECTION_REASON_LENGTH = 250;
+
+    private static final ObjectMapper ACTION_MAPPER = new ObjectMapper();
 
     @Autowired
     private OrdersRepository ordersRepository;
@@ -82,6 +86,7 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
+        rememberAction(rma, OrderLifecycleEventType.ReturnAccepted, action);
         rma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
         rmaRepository.save(rma);
     }
@@ -112,8 +117,41 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 List.of(), false, null, rma.getRejectionReason());
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
+        rememberAction(rma, OrderLifecycleEventType.ReturnRejected, action);
         rma.addEvent(rejectionSent);
         rmaRepository.save(rma);
+    }
+
+    private void rememberAction(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
+        try {
+            rma.setMarketplaceActionType(type.name());
+            rma.setMarketplaceActionPayload(ACTION_MAPPER.writeValueAsString(action));
+        } catch (JsonProcessingException e) {
+            // Never fail the operator's action because the resend hint could not be stored.
+            LOGGER.warn("Could not store the marketplace action for RMA {}", rma.getRmaId(), e);
+        }
+    }
+
+    /** Republishes the last decision with its original commandId; Allegro deduplicates on it. */
+    public boolean resendLastDecision(RMA rma) {
+        if (!rma.isMarketplaceReturn() || rma.getMarketplaceActionPayload() == null) {
+            return false;
+        }
+        Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
+        if (order == null) {
+            LOGGER.warn("Cannot resend the marketplace decision for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            return false;
+        }
+        try {
+            MarketplaceReturnAction action =
+                    ACTION_MAPPER.readValue(rma.getMarketplaceActionPayload(), MarketplaceReturnAction.class);
+            publisher.publishReturnAction(order, rma,
+                    OrderLifecycleEventType.valueOf(rma.getMarketplaceActionType()), action);
+            return true;
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            LOGGER.warn("Could not resend the marketplace decision for RMA {}", rma.getRmaId(), e);
+            return false;
+        }
     }
 
     /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */

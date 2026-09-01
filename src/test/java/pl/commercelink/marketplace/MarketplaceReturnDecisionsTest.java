@@ -78,6 +78,18 @@ class MarketplaceReturnDecisionsTest {
         return item;
     }
 
+    private MarketplaceReturnAction capturePublishedAction() {
+        ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
+        verify(publisher, atLeastOnce()).publishReturnAction(any(), any(), any(), captor.capture());
+        return captor.getValue();
+    }
+
+    private OrderLifecycleEventType capturePublishedType() {
+        ArgumentCaptor<OrderLifecycleEventType> captor = ArgumentCaptor.forClass(OrderLifecycleEventType.class);
+        verify(publisher, atLeastOnce()).publishReturnAction(any(), any(), captor.capture(), any());
+        return captor.getValue();
+    }
+
     private static OrderItem shippingOrderItem(String itemId) {
         OrderItem item = mock(OrderItem.class);
         when(item.getItemId()).thenReturn(itemId);
@@ -335,6 +347,57 @@ class MarketplaceReturnDecisionsTest {
         // then
         verify(publisher, never()).publishReturnAction(any(), any(), any(), any());
         verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void resendRepublishesTheStoredActionWithTheSameCommandId() {
+        // given
+        List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), true);
+        MarketplaceReturnAction first = capturePublishedAction();
+        reset(publisher);
+
+        // when
+        boolean resent = decisions.resendLastDecision(marketplaceRma);
+
+        // then
+        assertTrue(resent);
+        MarketplaceReturnAction second = capturePublishedAction();
+        assertEquals(first.getCommandId(), second.getCommandId());
+        assertEquals(OrderLifecycleEventType.ReturnAccepted, capturePublishedType());
+    }
+
+    @Test
+    void resendReturnsFalseWhenNoDecisionWasEverPublished() {
+        // when / then
+        assertFalse(decisions.resendLastDecision(marketplaceRma));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void resendReturnsFalseForManualRmaEvenWithAStoredPayload() {
+        // given
+        RMA manual = new RMA(STORE_ID);
+        manual.setOrderId(ORDER_ID);
+        manual.setMarketplaceActionType(OrderLifecycleEventType.ReturnAccepted.name());
+        manual.setMarketplaceActionPayload("{}");
+
+        // when / then
+        assertFalse(decisions.resendLastDecision(manual));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void resendReturnsFalseWhenOrderIsMissing() {
+        // given
+        marketplaceRma.setMarketplaceActionType(OrderLifecycleEventType.ReturnAccepted.name());
+        marketplaceRma.setMarketplaceActionPayload("{\"rmaId\":\"r-1\"}");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+        // when / then
+        assertFalse(decisions.resendLastDecision(marketplaceRma));
+        verifyNoInteractions(publisher);
     }
 
     @Test

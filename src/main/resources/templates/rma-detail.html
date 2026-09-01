@@ -137,6 +137,11 @@
                           th:text="${enumI18n.localize(rma.externalReturnStatus)}"></span>
                 </p>
                 <p class="is-size-7 has-text-grey" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
+                <form th:if="${rma.marketplaceActionPayload != null}" method="post"
+                      th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
+                    <button class="button is-small is-light mt-2" type="submit"
+                            th:text="#{rma.marketplace.resend}"></button>
+                </form>
             </div>
         </div>
     </div>
