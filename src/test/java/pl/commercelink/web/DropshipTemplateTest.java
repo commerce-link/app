@@ -429,7 +429,9 @@ class DropshipTemplateTest {
         String html = read("orderDetails.html");
 
         // then
+        // th:if on the goods-issue form: only rendered when there are warehouse items to issue
         assertThat(html).contains("${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}");
-        assertThat(html).doesNotContain("${hasWarehouseDocumentsEnabled and !hasWarehouseDocument}");
+        // th:disabled on the dropdown trigger: the same clause, negated, inside the compound condition
+        assertThat(html).contains("!(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}");
     }
 }
