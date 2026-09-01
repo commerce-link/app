@@ -22,17 +22,22 @@ class OrderLifecycleEventWireFormatTest {
         ObjectMapper mapper = new ObjectMapper();
         MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "ret-1",
                 List.of(new MarketplaceReturnAction.Item("sku-a", 2)), true, "cmd-1", null);
+        // externalReturnReference is the newest field: it is only reachable via its setter and is
+        // deliberately excluded from the 6-arg constructor, making it the field most likely to be
+        // silently dropped by an accidental @JsonIgnore or a future @JsonCreator that omits it.
+        action.setExternalReturnReference("XGQX/2026");
         OrderLifecycleEvent event = new OrderLifecycleEvent("store-1", "order-1", OrderLifecycleEventType.ReturnAccepted,
                 "ALLEGRO-1", "Allegro", action);
 
         // when
         OrderLifecycleEvent parsed = mapper.readValue(mapper.writeValueAsString(event), OrderLifecycleEvent.class);
 
-        // then: these four fields are the refund; losing any of them moves the wrong amount of money
+        // then: these five fields are the refund; losing any of them moves the wrong amount of money
         assertEquals("cmd-1", parsed.getReturnAction().getCommandId());
         assertTrue(parsed.getReturnAction().isRefundDelivery());
         assertEquals("sku-a", parsed.getReturnAction().getItems().get(0).getManufacturerCode());
         assertEquals(2, parsed.getReturnAction().getItems().get(0).getQuantity());
+        assertEquals("XGQX/2026", parsed.getReturnAction().getExternalReturnReference());
     }
 
     @Test
