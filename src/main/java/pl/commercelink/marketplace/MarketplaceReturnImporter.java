@@ -97,7 +97,7 @@ public class MarketplaceReturnImporter {
                 Event refundedByMarketplace = new Event(EventType.action, EVENT_REFUNDED_BY_MARKETPLACE, LocalDateTime.now());
                 if (!rma.hasEvent(refundedByMarketplace)) {
                     rma.addEvent(refundedByMarketplace);
-                    store.getNotifications().add(new StoreNotification(
+                    store.addNotification(new StoreNotification(
                             StoreNotificationSeverity.WARNING,
                             StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
                             rma.getRmaId(),
@@ -176,10 +176,11 @@ public class MarketplaceReturnImporter {
                 ret.externalReturnId(),
                 marketplace + " return " + referenceOf(ret)
                         + " could not be matched to an order in the application — handle it in the marketplace panel");
-        if (!store.getNotifications().contains(notification)) {
-            store.getNotifications().add(notification);
-            storesRepository.save(store);
+        if (store.getNotifications().contains(notification)) {
+            return;
         }
+        store.addNotification(notification);
+        storesRepository.save(store);
     }
 
     private static String referenceOf(MarketplaceReturn ret) {

@@ -20,6 +20,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @DynamoDBTable(tableName = "Stores")
 public class Store {
 
+    private static final int MAX_NOTIFICATIONS = 200;
+
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
     @DynamoDBAttribute(attributeName = "name")
@@ -110,8 +112,18 @@ public class Store {
                 tokenName,
                 "Your connection to " + marketplace + " marketplace has expired, reauthenticate it in the settings");
 
-        if (!notifications.contains(notification)) {
-            notifications.add(notification);
+        addNotification(notification);
+    }
+
+    /** Notifications have no dismiss path, so the oldest ones are dropped to keep the Stores item small. */
+    @DynamoDBIgnore
+    public void addNotification(StoreNotification notification) {
+        if (notifications.contains(notification)) {
+            return;
+        }
+        notifications.add(notification);
+        while (notifications.size() > MAX_NOTIFICATIONS) {
+            notifications.remove(0);
         }
     }
 

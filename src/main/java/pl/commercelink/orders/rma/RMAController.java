@@ -17,10 +17,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.marketplace.MarketplaceReturnDecisions;
+import pl.commercelink.marketplace.MarketplaceReturnImporter;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -263,7 +266,6 @@ public class RMAController {
                     messageSource.getMessage("rma.rejection.after.refund", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
-        boolean turnsRejected = rma.getStatus() == RMAStatus.Rejected && existingRma.getStatus() != RMAStatus.Rejected;
         existingRma.setStatus(rma.getStatus());
         existingRma.setEmail(rma.getEmail());
         existingRma.setRejectionReason(rma.getRejectionReason());
@@ -290,7 +292,12 @@ public class RMAController {
 
         rmaLifecycle.update(existingRma);
 
-        if (turnsRejected) {
+        // Gate on the event, not the status transition, so a rejection whose publish previously failed
+        // (RMA already Rejected, but RejectionSent never recorded) is retried on the next save.
+        boolean rejectionPending = existingRma.getStatus() == RMAStatus.Rejected
+                && !existingRma.hasEvent(new Event(EventType.action,
+                        MarketplaceReturnImporter.EVENT_REJECTION_SENT, null));
+        if (rejectionPending) {
             marketplaceReturnDecisions.returnRejected(existingRma);
         }
 
