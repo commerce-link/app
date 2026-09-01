@@ -58,6 +58,10 @@ public class MarketplaceReturnDecisions {
         if (!rma.isMarketplaceReturn()) {
             return;
         }
+        if (rma.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, null))) {
+            LOGGER.warn("Refusing to refund RMA {}: a rejection was already sent to the marketplace", rma.getRmaId());
+            return;
+        }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
             LOGGER.warn("Cannot publish return acceptance for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
@@ -117,6 +121,13 @@ public class MarketplaceReturnDecisions {
         boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
         return existing.isMarketplaceReturn() && turnsRejected
                 && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
+    }
+
+    /** A refunded return must not also be rejected: the buyer would keep the money and get a rejection notice. */
+    public boolean blocksRejectionAfterRefund(RMA existing, RMAStatus newStatus) {
+        boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
+        return existing.isMarketplaceReturn() && turnsRejected
+                && existing.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, null));
     }
 
     /** True when the RMA items cover the full quantity of every non-service order item not yet returned/replaced. */

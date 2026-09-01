@@ -25,6 +25,7 @@ import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -277,6 +278,63 @@ class MarketplaceReturnDecisionsTest {
         // when / then
         assertTrue(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, tooLong));
         assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, maxAllowed));
+    }
+
+    @Test
+    void blocksRejectionOnceARefundWasRequested() {
+        // given
+        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+
+        // when / then
+        assertTrue(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
+    }
+
+    @Test
+    void doesNotBlockRejectionWhenNoRefundWasRequested() {
+        // when / then
+        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
+    }
+
+    @Test
+    void doesNotBlockRejectionForManualRmaEvenAfterARefundEvent() {
+        // given
+        RMA manual = new RMA(STORE_ID);
+        manual.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+
+        // when / then
+        assertFalse(decisions.blocksRejectionAfterRefund(manual, RMAStatus.Rejected));
+    }
+
+    @Test
+    void doesNotBlockWhenNewStatusIsNotRejected() {
+        // given
+        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+
+        // when / then
+        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Processing));
+    }
+
+    @Test
+    void doesNotBlockWhenRmaIsAlreadyRejected() {
+        // given
+        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.setStatus(RMAStatus.Rejected);
+
+        // when / then
+        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
+    }
+
+    @Test
+    void doesNotPublishAcceptanceAfterARejectionWasSent() {
+        // given
+        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, LocalDateTime.now()));
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        verify(publisher, never()).publishReturnAction(any(), any(), any(), any());
+        verify(rmaRepository, never()).save(any());
     }
 
     @Test

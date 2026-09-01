@@ -258,6 +258,11 @@ public class RMAController {
                     messageSource.getMessage("rma.rejection.reason.required", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
+        if (marketplaceReturnDecisions.blocksRejectionAfterRefund(existingRma, rma.getStatus())) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("rma.rejection.after.refund", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
         boolean turnsRejected = rma.getStatus() == RMAStatus.Rejected && existingRma.getStatus() != RMAStatus.Rejected;
         existingRma.setStatus(rma.getStatus());
         existingRma.setEmail(rma.getEmail());
