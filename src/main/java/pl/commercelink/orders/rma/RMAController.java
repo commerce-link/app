@@ -315,11 +315,18 @@ public class RMAController {
             @RequestParam("orderItemId") String orderItemId,
             @RequestParam("quantity") int quantity,
             @RequestParam("desiredResolution") String desiredResolution,
-            @RequestParam(value = "reason", required = false) String reason
+            @RequestParam(value = "reason", required = false) String reason,
+            RedirectAttributes redirectAttributes, Locale locale
     ) {
         String storeId = getStoreId();
         RMA rma = rmaRepository.findById(storeId, rmaId);
         OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), orderItemId);
+        if (orderItem == null || orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)
+                || quantity <= 0 || quantity > orderItem.getQty()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("rma.item.invalid.quantity", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
 
         RMAItem source = new RMAItem();
         source.setRmaId(rmaId);
