@@ -538,6 +538,11 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
+    public boolean isOrderOutcomeUnknown() {
+        return orderStatus == DeliveryOrderStatus.ORDER_DISPATCHED && orderErrorMessage != null;
+    }
+
+    @DynamoDBIgnore
     public boolean isOrderFailed() {
         return orderStatus == DeliveryOrderStatus.FAILED;
     }

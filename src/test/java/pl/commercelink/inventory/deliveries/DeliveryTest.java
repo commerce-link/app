@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -141,5 +142,37 @@ class DeliveryTest {
                 .getValue(context, String.class));
         assertNull(parser.parseExpression("trackingView.lastCheckedAt").getValue(context));
         assertNull(delivery.getTracking());
+    }
+
+    @Test
+    void orderOutcomeIsUnknownWhenDispatchedWithAnErrorMessage() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setOrderErrorMessage("Supplier did not return an order number");
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isTrue();
+    }
+
+    @Test
+    void orderOutcomeIsNotUnknownWhileTheOrderIsStillBeingPlaced() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isFalse();
+    }
+
+    @Test
+    void orderOutcomeIsNotUnknownForAFailedDeliveryWithAnErrorMessage() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage("Supplier rejected the order");
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isFalse();
     }
 }
