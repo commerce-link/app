@@ -30,6 +30,7 @@ import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
@@ -57,6 +58,7 @@ class MarketplaceReturnImporterTest {
     @Mock private OrdersRepository ordersRepository;
     @Mock private OrderItemsRepository orderItemsRepository;
     @Mock private StoresRepository storesRepository;
+    @Mock private OrderItemFamily orderItemFamily;
     @Mock private Order order;
     @Mock private OrderItem orderItem;
 
@@ -249,6 +251,8 @@ class MarketplaceReturnImporterTest {
         assertEquals(1, store.getNotifications().size());
         assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
         assertEquals("r-1", store.getNotifications().get(0).getObject());
+        // No RMA was created, so the wording must send the operator to the marketplace panel directly
+        assertTrue(store.getNotifications().get(0).getMessage().contains("could not be matched"));
         verify(storesRepository).save(store);
     }
 
@@ -265,8 +269,14 @@ class MarketplaceReturnImporterTest {
 
         // then: the RMA is still created, but the shortfall must not be silent
         verify(rmaRepository).save(any(RMA.class));
-        assertTrue(store.getNotifications().stream()
-                .anyMatch(n -> n.getType() == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
+        StoreNotification notification = store.getNotifications().stream()
+                .filter(n -> n.getType() == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED)
+                .findFirst()
+                .orElseThrow();
+        // M1: an RMA WAS created for the matched items - the wording must not read as a total miss, which
+        // would invite a manual marketplace refund on top of the app's own partial one (a double refund)
+        assertTrue(notification.getMessage().contains("RMA was created"));
+        assertFalse(notification.getMessage().contains("could not be matched to an order"));
     }
 
     @Test
@@ -293,11 +303,8 @@ class MarketplaceReturnImporterTest {
         // given: the returned item now lives on an order split off from the one the marketplace still tracks
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        Order child = new Order(STORE_ID);
-        child.setSplitFromOrderId(ORDER_ID);
-        when(ordersRepository.findBySplitFromOrderId(STORE_ID, ORDER_ID)).thenReturn(List.of(child));
         OrderItem moved = orderItem("item-2", "sku-a", 1);
-        when(orderItemsRepository.findByOrderId(child.getOrderId())).thenReturn(List.of(moved));
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when
@@ -305,6 +312,19 @@ class MarketplaceReturnImporterTest {
 
         // then
         verify(rmaRepository).save(any(RMA.class));
+    }
+
+    @Test
+    void doesNotConsultTheSplitFamilyWhenTheParentsOwnItemsAlreadyMatch() {
+        // given: no split ever happened - the item matches straight away against the parent's own items
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
+        MarketplaceReturn ret = returnWithItem("SKU-1", 2);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then: the expensive whole-partition family read is skipped on the common path
+        verifyNoInteractions(orderItemFamily);
     }
 
     @Test

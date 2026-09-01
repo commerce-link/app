@@ -66,6 +66,9 @@ public class MarketplaceReturnImporter {
     @Autowired
     private StoresRepository storesRepository;
 
+    @Autowired
+    private OrderItemFamily orderItemFamily;
+
     public void importReturn(Store store, String marketplace, MarketplaceReturn ret) {
         RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), marketplace, ret.externalReturnId());
         if (existing != null) {
@@ -124,12 +127,12 @@ public class MarketplaceReturnImporter {
         if (order == null) {
             LOGGER.warn("Skipping {} return {}: order {} not found in store {}", marketplace, ret.externalReturnId(),
                     ret.externalOrderId(), store.getStoreId());
-            notifyUnmatched(store, marketplace, ret);
+            notifyUnmatched(store, marketplace, ret, false);
             return;
         }
         if (order.getStatus() == OrderStatus.Cancelled) {
             LOGGER.warn("Skipping {} return {}: order {} is cancelled", marketplace, ret.externalReturnId(), order.getOrderId());
-            notifyUnmatched(store, marketplace, ret);
+            notifyUnmatched(store, marketplace, ret, false);
             return;
         }
 
@@ -138,14 +141,16 @@ public class MarketplaceReturnImporter {
         if (rmaItems.isEmpty()) {
             LOGGER.warn("Skipping {} return {}: none of its items match order {}", marketplace, ret.externalReturnId(),
                     order.getOrderId());
-            notifyUnmatched(store, marketplace, ret);
+            notifyUnmatched(store, marketplace, ret, false);
             return;
         }
         if (rmaItems.size() < ret.items().size()) {
             LOGGER.warn("{} return {}: only {} of {} items matched order {}", marketplace, ret.externalReturnId(),
                     rmaItems.size(), ret.items().size(), order.getOrderId());
             // A partial refund disarms the marketplace auto-refund, so the operator must see the shortfall.
-            notifyUnmatched(store, marketplace, ret);
+            // An RMA WAS created here (unlike the zero-match cases above), so the message must not read as
+            // if nothing happened - that wording would invite a manual marketplace refund on top of ours.
+            notifyUnmatched(store, marketplace, ret, true);
         }
 
         rma.setStatus(RMAStatus.WaitingForItems);
@@ -169,13 +174,18 @@ public class MarketplaceReturnImporter {
                 order.getOrderId());
     }
 
-    private void notifyUnmatched(Store store, String marketplace, MarketplaceReturn ret) {
+    private void notifyUnmatched(Store store, String marketplace, MarketplaceReturn ret, boolean partiallyMatched) {
+        String message = partiallyMatched
+                ? marketplace + " return " + referenceOf(ret)
+                        + " only partially matched an order — an RMA was created for the matched items, but the "
+                        + "rest could not be matched and needs a manual refund in the marketplace panel"
+                : marketplace + " return " + referenceOf(ret)
+                        + " could not be matched to an order in the application — handle it in the marketplace panel";
         StoreNotification notification = new StoreNotification(
                 StoreNotificationSeverity.WARNING,
                 StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED,
                 ret.externalReturnId(),
-                marketplace + " return " + referenceOf(ret)
-                        + " could not be matched to an order in the application — handle it in the marketplace panel");
+                message);
         if (store.getNotifications().contains(notification)) {
             return;
         }
@@ -188,17 +198,20 @@ public class MarketplaceReturnImporter {
     }
 
     private List<RMAItem> matchItems(String rmaId, Order order, MarketplaceReturn ret, String marketplace) {
-        List<OrderItem> orderItems = orderItemsOfFamily(order);
+        List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
+        // Lazily fetched: consulting the split family reads the store's whole Orders partition, so it is
+        // only worth it once a straight match against the order's own items misses (the rare case).
+        List<OrderItem> siblingItems = null;
         Set<String> used = new HashSet<>();
         List<RMAItem> result = new ArrayList<>();
         for (MarketplaceReturn.Item item : ret.items()) {
-            OrderItem match = orderItems.stream()
-                    .filter(oi -> !used.contains(oi.getItemId()))
-                    .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
-                    .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
-                    .filter(oi -> !coveredByOpenRma(order.getStoreId(), oi.getItemId()))
-                    .findFirst()
-                    .orElse(null);
+            OrderItem match = findMatch(orderItems, used, order.getStoreId(), item);
+            if (match == null) {
+                if (siblingItems == null) {
+                    siblingItems = orderItemFamily.siblingItems(order);
+                }
+                match = findMatch(siblingItems, used, order.getStoreId(), item);
+            }
             if (match == null) {
                 LOGGER.warn("{} return {}: no order item with key {} in order {}", marketplace,
                         ret.externalReturnId(), item.manufacturerCode(), order.getOrderId());
@@ -220,17 +233,14 @@ public class MarketplaceReturnImporter {
         return result;
     }
 
-    /**
-     * Order.createSplit() does not copy externalOrderId (it must stay unique per store), so items moved to a
-     * split-off order are no longer reachable from the marketplace order itself. This collects order items
-     * from the marketplace order and from every order split off from it.
-     */
-    private List<OrderItem> orderItemsOfFamily(Order order) {
-        List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
-        for (Order sibling : ordersRepository.findBySplitFromOrderId(order.getStoreId(), order.getOrderId())) {
-            orderItems.addAll(orderItemsRepository.findByOrderId(sibling.getOrderId()));
-        }
-        return orderItems;
+    private OrderItem findMatch(List<OrderItem> candidates, Set<String> used, String storeId, MarketplaceReturn.Item item) {
+        return candidates.stream()
+                .filter(oi -> !used.contains(oi.getItemId()))
+                .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
+                .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
+                .filter(oi -> !coveredByOpenRma(storeId, oi.getItemId()))
+                .findFirst()
+                .orElse(null);
     }
 
     /**

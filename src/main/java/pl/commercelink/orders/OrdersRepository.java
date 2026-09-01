@@ -56,15 +56,25 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return orders.isEmpty() ? null : orders.get(0);
     }
 
+    /**
+     * This query is a filter over the store's whole Orders partition (splitFromOrderId is not a key), so it
+     * is expensive relative to a keyed lookup. Callers should call it only when needed (e.g. on a miss
+     * against the parent's own data), and it fetches only the attributes those callers actually use.
+     */
     public List<Order> findBySplitFromOrderId(String storeId, String orderId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
         eav.put(":splitFromOrderId", new AttributeValue().withS(orderId));
 
+        Map<String, String> expressionAttributeNames = new HashMap<>();
+        expressionAttributeNames.put("#status", "status");
+
         DynamoDBQueryExpression<Order> queryExpression = new DynamoDBQueryExpression<Order>()
                 .withKeyConditionExpression("storeId = :storeId")
                 .withFilterExpression("splitFromOrderId = :splitFromOrderId")
-                .withExpressionAttributeValues(eav);
+                .withExpressionAttributeValues(eav)
+                .withProjectionExpression("storeId, orderId, #status")
+                .withExpressionAttributeNames(expressionAttributeNames);
 
         return dynamoDBMapper.query(Order.class, queryExpression);
     }
