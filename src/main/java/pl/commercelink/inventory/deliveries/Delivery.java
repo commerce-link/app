@@ -559,9 +559,11 @@ public class Delivery {
 
     // A warehouse delivery can still carry goods bought for a direct-to-consumer order: the supplier simply
     // cannot ship them to the customer. They arrive at the warehouse and have to be forwarded by hand.
+    // A dropship delivery serves such an order by construction and does not go through the warehouse at all,
+    // so it is excluded here even though its allocations also carry the direct-to-consumer flag.
     @DynamoDBIgnore
     public boolean hasDirectToConsumerAllocations() {
-        return getAllocations() != null && getAllocations().stream().anyMatch(Allocation::isDirectToConsumer);
+        return !isDropship() && getAllocations() != null && getAllocations().stream().anyMatch(Allocation::isDirectToConsumer);
     }
 
     @DynamoDBIgnore

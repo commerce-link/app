@@ -214,4 +214,17 @@ class DeliveryTest {
         // when / then
         assertThat(delivery.hasDirectToConsumerAllocations()).isFalse();
     }
+
+    @Test
+    void aDropshipDeliveryDoesNotCarryGoodsForTheWarehouseToForward() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Elko");
+        delivery.setType(DeliveryType.DROPSHIP);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(true);
+        delivery.setAllocations(List.of(allocation));
+
+        // when / then
+        assertThat(delivery.hasDirectToConsumerAllocations()).isFalse();
+    }
 }

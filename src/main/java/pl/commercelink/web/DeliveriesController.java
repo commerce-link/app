@@ -811,7 +811,7 @@ public class DeliveriesController {
     public String showApprovalScreen(@PathVariable("storeId") String storeId,
                                      @PathVariable("deliveryId") String deliveryId,
                                      Model model, RedirectAttributes redirectAttributes) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
         if (delivery == null || !delivery.isAwaitingApproval()) {
             if (model.containsAttribute("errorMessage")) {
                 redirectAttributes.addFlashAttribute("errorMessage", model.getAttribute("errorMessage"));

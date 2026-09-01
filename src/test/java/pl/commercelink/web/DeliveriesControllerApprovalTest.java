@@ -58,6 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -462,7 +463,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("1", "ul. Testowa 1", "Kraków", "31-140", "PL")));
         Model model = new ConcurrentModel();
@@ -477,13 +478,36 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void approvalScreenWarnsWhenWarehouseGoodsAreBoundForTheCustomer() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(true);
+        delivery.setAllocations(List.of(allocation));
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(((Delivery) model.getAttribute("delivery")).hasDirectToConsumerAllocations()).isTrue();
+    }
+
+    @Test
     void approvalScreenRedirectsToDetailsWhenTheDeliveryIsNotAwaitingApproval() {
         // given
         Delivery delivery = new Delivery();
         delivery.setStoreId(STORE_ID);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         Model model = new ConcurrentModel();
 
         // when
@@ -502,7 +526,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setStoreId(STORE_ID);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         Model model = new ConcurrentModel();
         model.addAttribute("errorMessage", "Delivery is no longer awaiting approval");
 
@@ -554,7 +578,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
 
@@ -1754,7 +1778,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
@@ -1840,7 +1864,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setProvider(PROVIDER);
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         Order order = new Order(STORE_ID);
         order.setOrderId("order-1");
         ShippingDetails consignee = new ShippingDetails();
@@ -1869,7 +1893,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setProvider(PROVIDER);
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
         Order order = new Order(STORE_ID);
         order.setOrderId("order-1");

@@ -31,6 +31,9 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -574,5 +577,30 @@ class DropshipControllerTest {
         // then
         assertThat(view).isEqualTo("dropshipConfirmation");
         assertThat(model.getAttribute("errorMessage")).isEqualTo("unsupported");
+    }
+
+    @Test
+    void everyRejectionReasonHasAMessageKeyInBothLanguageFiles() throws Exception {
+        // given: mirrors DropshipController.messageKeyFor's derivation, so a new DropshipRejection
+        // constant added without matching entries in both property files fails here instead of
+        // surfacing as a NoSuchMessageException (500) on the redirect that reports the rejection
+        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
+
+        // when / then
+        for (DropshipRejection rejection : DropshipRejection.values()) {
+            String key = messageKeyFor(rejection);
+            assertThat(pl).contains("\n" + key + "=");
+            assertThat(en).contains("\n" + key + "=");
+        }
+    }
+
+    private static String messageKeyFor(DropshipRejection rejection) {
+        String[] parts = rejection.name().toLowerCase(Locale.ROOT).split("_");
+        StringBuilder key = new StringBuilder("orders.dropship.rejected.").append(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            key.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+        }
+        return key.toString();
     }
 }

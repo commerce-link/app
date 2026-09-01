@@ -42,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -332,6 +333,38 @@ class GoodsOutServiceTest {
 
         // then
         verifyNoInteractions(orderLifecycle);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut reads the order only once, reusing the entity modifyAndSave saved instead of re-reading it")
+    void issueGoodsOutReadsTheOrderOnlyOnceWhenAttachingANewDocument() {
+        // given
+        Order order = orderWithoutDocuments();
+        Document warehouseDocument = new Document("doc-8", "WZ/8/2026", "https://example.com/wz/8", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then: the only read of the order is the loader inside modifyAndSave; the lifecycle is
+        // re-evaluated using the entity that call saved, not a second eventually-consistent read
+        verify(ordersRepository, times(1)).findById(STORE_ID, ORDER_ID);
+        verify(orderLifecycle).update(order);
     }
 
     private OrderItem productItem(String itemId) {

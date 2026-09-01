@@ -138,7 +138,7 @@ class GoodsOutService {
         if (result.hasPayload()) {
             Document document = result.getPayload();
             AtomicBoolean attached = new AtomicBoolean(false);
-            optimisticLockingExecutor.modifyAndSave(
+            Order saved = optimisticLockingExecutor.modifyAndSave(
                     () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
                     fresh -> {
                         // modifyAndSave is @Retryable on ConditionalCheckFailedException, so this mutator can run
@@ -155,11 +155,10 @@ class GoodsOutService {
             // The goods issue note arrives asynchronously long after the lifecycle last ran, so the order has to be
             // re-evaluated or it stays open until the production-only cron picks it up. Only on a fresh attachment:
             // re-evaluating an order that already had the document would re-publish the goods-out event in a loop.
+            // Reuse the entity modifyAndSave just saved instead of re-reading it: a fresh findById is an
+            // eventually-consistent read that can still return the pre-save version.
             if (attached.get()) {
-                Order fresh = ordersRepository.findById(order.getStoreId(), order.getOrderId());
-                if (fresh != null) {
-                    orderLifecycle.update(fresh);
-                }
+                orderLifecycle.update(saved);
             }
             return OperationResult.success(document);
         }

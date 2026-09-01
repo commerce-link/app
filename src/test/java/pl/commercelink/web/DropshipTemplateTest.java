@@ -452,17 +452,25 @@ class DropshipTemplateTest {
     void deliveryDetailsWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
         // when
         String html = read("deliveryDetails.html");
+        int conditionAt = html.indexOf("th:if=\"${delivery.hasDirectToConsumerAllocations()}\"");
+        int noticeAt = html.indexOf("deliveries.directToConsumer.viaWarehouse.notice");
 
-        // then
-        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+        // then: the message key sits inside the element guarded by that exact condition, not
+        // merely somewhere in the file
+        assertThat(conditionAt).isGreaterThan(-1);
+        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 150);
     }
 
     @Test
     void deliveryApprovalWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
         // when
         String html = read("deliveryApproval.html");
+        int conditionAt = html.indexOf("th:if=\"${delivery.hasDirectToConsumerAllocations()}\"");
+        int noticeAt = html.indexOf("deliveries.directToConsumer.viaWarehouse.notice");
 
-        // then
-        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+        // then: the message key sits inside the element guarded by that exact condition, not
+        // merely somewhere in the file
+        assertThat(conditionAt).isGreaterThan(-1);
+        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 150);
     }
 }

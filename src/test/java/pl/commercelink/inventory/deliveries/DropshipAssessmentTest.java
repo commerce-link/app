@@ -11,8 +11,10 @@ class DropshipAssessmentTest {
 
     @Test
     void anAssessmentWithProvidersCarriesNoRejection() {
+        // given
         DropshipAssessment assessment = DropshipAssessment.of(List.of("Acme", "Elko"));
 
+        // when / then
         assertThat(assessment.hasProviders()).isTrue();
         assertThat(assessment.providers()).containsExactly("Acme", "Elko");
         assertThat(assessment.rejection()).isNull();
@@ -20,8 +22,10 @@ class DropshipAssessmentTest {
 
     @Test
     void aRejectedAssessmentCarriesNoProviders() {
+        // given
         DropshipAssessment assessment = DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS);
 
+        // when / then
         assertThat(assessment.hasProviders()).isFalse();
         assertThat(assessment.providers()).isEmpty();
         assertThat(assessment.rejection()).isEqualTo(DropshipRejection.NO_SHIPPING_DETAILS);
@@ -29,8 +33,10 @@ class DropshipAssessmentTest {
 
     @Test
     void supportsAnswersOnlyForListedProviders() {
+        // given
         DropshipAssessment assessment = DropshipAssessment.of(List.of("Acme"));
 
+        // when / then
         assertThat(assessment.supports("Acme")).isTrue();
         assertThat(assessment.supports("Elko")).isFalse();
     }
@@ -47,8 +53,10 @@ class DropshipAssessmentTest {
 
     @Test
     void aRejectedAssessmentSupportsNobody() {
+        // given
         DropshipAssessment assessment = DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED);
 
+        // when / then
         assertThat(assessment.supports("Acme")).isFalse();
     }
 
