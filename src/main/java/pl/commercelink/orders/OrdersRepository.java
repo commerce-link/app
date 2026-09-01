@@ -91,12 +91,34 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#status", "status");
 
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND #status <> :statusCompleted AND #status <> :statusCancelled")
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(expressionAttributeNames);
+        List<Order> activeOrders = new ArrayList<>();
+        Map<String, AttributeValue> exclusiveStartKey = null;
 
-        return dynamoDBMapper.scan(Order.class, scanExpression);
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName("Orders")
+                    .withKeyConditionExpression("storeId = :storeId")
+                    .withFilterExpression("#status <> :statusCompleted AND #status <> :statusCancelled")
+                    .withExpressionAttributeValues(eav)
+                    .withExpressionAttributeNames(expressionAttributeNames);
+
+            if (hasMorePages(exclusiveStartKey)) {
+                queryRequest.withExclusiveStartKey(exclusiveStartKey);
+            }
+
+            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
+            queryResult.getItems().stream()
+                    .map(item -> dynamoDBMapper.marshallIntoObject(Order.class, item))
+                    .forEach(activeOrders::add);
+
+            exclusiveStartKey = queryResult.getLastEvaluatedKey();
+        } while (hasMorePages(exclusiveStartKey));
+
+        return activeOrders;
+    }
+
+    private boolean hasMorePages(Map<String, AttributeValue> lastEvaluatedKey) {
+        return lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty();
     }
 
     public List<OrderIndexEntry> findAllWarehouseFulfilmentOrder(String storeId) {
