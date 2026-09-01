@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -8,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -54,16 +55,32 @@ class MarketplaceOrdersImportEventListenerTest {
         when(returns.fetchReturns()).thenReturn(List.of(aReturn));
     }
 
-    private static MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload(String scope) {
-        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload =
-                new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload();
-        ReflectionTestUtils.setField(payload, "marketplace", MARKETPLACE);
-        ReflectionTestUtils.setField(payload, "scope", scope);
-        return payload;
+    // Deserialized through the real Jackson ObjectMapper (the same path the SQS/scheduler
+    // message travels in production), not ReflectionTestUtils: that only proves the branch
+    // logic below, never that `scope` actually arrives from real JSON input.
+    private static MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload(String scope) throws Exception {
+        String json = scope == null
+                ? "{\"marketplace\":\"" + MARKETPLACE + "\"}"
+                : "{\"marketplace\":\"" + MARKETPLACE + "\",\"scope\":\"" + scope + "\"}";
+        return new ObjectMapper().readValue(json, MarketplaceOrdersImportEventListener.MarketplaceOrderPayload.class);
     }
 
     @Test
-    void payloadWithoutScopeImportsOrdersOnly() {
+    void schedulerPayloadCarriesTheReturnsScope() throws Exception {
+        // given: exactly the input configured on the EventBridge schedule
+        String input = "{\"marketplace\":\"Allegro\",\"scope\":\"returns\"}";
+
+        // when
+        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload =
+                new ObjectMapper().readValue(input, MarketplaceOrdersImportEventListener.MarketplaceOrderPayload.class);
+
+        // then
+        assertEquals("Allegro", payload.getMarketplace());
+        assertEquals("returns", payload.getScope());
+    }
+
+    @Test
+    void payloadWithoutScopeImportsOrdersOnly() throws Exception {
         // when
         listener.handleMessage(payload(null));
 
@@ -75,7 +92,7 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
-    void returnsScopeImportsReturnsOnly() {
+    void returnsScopeImportsReturnsOnly() throws Exception {
         // when
         listener.handleMessage(payload("returns"));
 
@@ -86,7 +103,7 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
-    void returnsScopeIsSkippedWhenProviderHasNoReturns() {
+    void returnsScopeIsSkippedWhenProviderHasNoReturns() throws Exception {
         // given
         when(provider.returns()).thenReturn(Optional.empty());
 
@@ -98,7 +115,7 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
-    void ordersScopeImportsOrdersOnly() {
+    void ordersScopeImportsOrdersOnly() throws Exception {
         // when
         listener.handleMessage(payload("orders"));
 
@@ -108,7 +125,7 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
-    void unknownScopeIsIgnoredRatherThanFallingBackToAFullOrdersImport() {
+    void unknownScopeIsIgnoredRatherThanFallingBackToAFullOrdersImport() throws Exception {
         // when: a rollback might send a scope this build no longer recognises
         listener.handleMessage(payload("legacy-unknown-scope"));
 
