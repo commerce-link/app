@@ -301,6 +301,39 @@ class GoodsOutServiceTest {
         verifyNoInteractions(orderLifecycle);
     }
 
+    @Test
+    @DisplayName("issueGoodsOut does not re-evaluate the lifecycle when a concurrent call already attached the document")
+    void issueGoodsOutDoesNotReEvaluateTheLifecycleWhenAConcurrentCallAlreadyAttachedTheDocument() {
+        // given: the order passed in has no GoodsIssue document yet, so the top-of-method check passes and the
+        // handler runs, but by the time the mutator re-reads the order a concurrent call has already attached one.
+        Order order = orderWithoutDocuments();
+        Document existing = new Document("doc-6", "WZ/6/2026", "https://example.com/wz/6", DocumentType.GoodsIssue);
+        Order concurrentlyUpdatedOrder = orderWithDocument(existing);
+        Document warehouseDocument = new Document("doc-7", "WZ/7/2026", "https://example.com/wz/7", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(concurrentlyUpdatedOrder);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        verifyNoInteractions(orderLifecycle);
+    }
+
     private OrderItem productItem(String itemId) {
         OrderItem item = mock(OrderItem.class);
         when(item.isProduct()).thenReturn(true);

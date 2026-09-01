@@ -141,6 +141,10 @@ class GoodsOutService {
             optimisticLockingExecutor.modifyAndSave(
                     () -> ordersRepository.findById(order.getStoreId(), order.getOrderId()),
                     fresh -> {
+                        // modifyAndSave is @Retryable on ConditionalCheckFailedException, so this mutator can run
+                        // more than once per call: reset on every attempt so the flag reflects only the outcome of
+                        // the attempt that actually wins the conditional save, not a stale attempt that lost the race.
+                        attached.set(false);
                         if (fresh.getDocumentByType(DocumentType.GoodsIssue).isEmpty()) {
                             fresh.getDocuments().add(document);
                             attached.set(true);
