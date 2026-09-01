@@ -186,6 +186,7 @@ public class MarketplaceReturnImporter {
                     .filter(oi -> !used.contains(oi.getItemId()))
                     .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
                     .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
+                    .filter(oi -> !coveredByOpenRma(order.getStoreId(), oi.getItemId()))
                     .findFirst()
                     .orElse(null);
             if (match == null) {
@@ -207,6 +208,20 @@ public class MarketplaceReturnImporter {
             result.add(new RMAItem(rmaId, match, draft));
         }
         return result;
+    }
+
+    /**
+     * Merely having an RMAItem for this order item is too broad a filter: after a return is rejected, the
+     * order item must become matchable again. Items from RMAs that completed via acceptance are already
+     * excluded above by the Returned/Replaced fulfilment-status filter, so this only needs to exclude RMAs
+     * that are still open (i.e. not Rejected).
+     */
+    private boolean coveredByOpenRma(String storeId, String orderItemId) {
+        return rmaItemsRepository.findByOrderItemId(orderItemId).stream()
+                .anyMatch(rmaItem -> {
+                    RMA owningRma = rmaRepository.findById(storeId, rmaItem.getRmaId());
+                    return owningRma != null && owningRma.getStatus() != RMAStatus.Rejected;
+                });
     }
 
     /**

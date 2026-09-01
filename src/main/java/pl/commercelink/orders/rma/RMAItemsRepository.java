@@ -43,6 +43,16 @@ public class RMAItemsRepository extends DynamoDbRepository<RMAItem> {
         return dynamoDBMapper.scan(RMAItem.class, scanExpression);
     }
 
+    /** All RMA items referencing a given order item, regardless of the owning RMA's status. */
+    public List<RMAItem> findByOrderItemId(String orderItemId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":itemId", new AttributeValue().withS(orderItemId));
+        DynamoDBScanExpression scan = new DynamoDBScanExpression()
+                .withFilterExpression("itemId = :itemId")
+                .withExpressionAttributeValues(eav);
+        return dynamoDBMapper.scan(RMAItem.class, scan);
+    }
+
     public List<RMAItem> findByDeliveryId(String deliveryId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":deliveryId", new AttributeValue().withS(deliveryId));

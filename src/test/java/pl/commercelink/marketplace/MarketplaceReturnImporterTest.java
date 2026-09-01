@@ -113,6 +113,13 @@ class MarketplaceReturnImporterTest {
         return orderItem(itemId, sku, sku, qty);
     }
 
+    private static RMAItem rmaItem(String rmaId, String orderItemId) {
+        RMAItem item = new RMAItem();
+        item.setRmaId(rmaId);
+        item.setItemId(orderItemId);
+        return item;
+    }
+
     @Test
     void createsWaitingForItemsRmaWithMatchedItemsAndParcel() {
         // given
@@ -258,6 +265,44 @@ class MarketplaceReturnImporterTest {
         verify(rmaRepository).save(any(RMA.class));
         assertTrue(store.getNotifications().stream()
                 .anyMatch(n -> n.getType() == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
+    }
+
+    @Test
+    void skipsOrderItemsAlreadyCoveredByAnOpenRma() {
+        // given: an open RMA already claims item-1
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        OrderItem matched = orderItem("item-1", "sku-a", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
+        when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("open-rma-1", "item-1")));
+        RMA openRma = new RMA(STORE_ID);
+        openRma.setStatus(RMAStatus.WaitingForItems);
+        when(rmaRepository.findById(STORE_ID, "open-rma-1")).thenReturn(openRma);
+        MarketplaceReturn ret = returnWithItem("sku-a", 1);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then: no second RMA competing for the same order item
+        verify(rmaRepository, never()).save(any(RMA.class));
+    }
+
+    @Test
+    void matchesOrderItemsWhoseOnlyReferencingRmaWasRejected() {
+        // given: the earlier RMA on this order item was rejected, so it must become matchable again
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        OrderItem matched = orderItem("item-1", "sku-a", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
+        when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("rejected-rma-1", "item-1")));
+        RMA rejectedRma = new RMA(STORE_ID);
+        rejectedRma.setStatus(RMAStatus.Rejected);
+        when(rmaRepository.findById(STORE_ID, "rejected-rma-1")).thenReturn(rejectedRma);
+        MarketplaceReturn ret = returnWithItem("sku-a", 1);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then
+        verify(rmaRepository).save(any(RMA.class));
     }
 
     @Test
