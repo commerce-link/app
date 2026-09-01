@@ -178,7 +178,7 @@ public class MarketplaceReturnImporter {
     }
 
     private List<RMAItem> matchItems(String rmaId, Order order, MarketplaceReturn ret, String marketplace) {
-        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        List<OrderItem> orderItems = orderItemsOfFamily(order);
         Set<String> used = new HashSet<>();
         List<RMAItem> result = new ArrayList<>();
         for (MarketplaceReturn.Item item : ret.items()) {
@@ -208,6 +208,19 @@ public class MarketplaceReturnImporter {
             result.add(new RMAItem(rmaId, match, draft));
         }
         return result;
+    }
+
+    /**
+     * Order.createSplit() does not copy externalOrderId (it must stay unique per store), so items moved to a
+     * split-off order are no longer reachable from the marketplace order itself. This collects order items
+     * from the marketplace order and from every order split off from it.
+     */
+    private List<OrderItem> orderItemsOfFamily(Order order) {
+        List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
+        for (Order sibling : ordersRepository.findBySplitFromOrderId(order.getStoreId(), order.getOrderId())) {
+            orderItems.addAll(orderItemsRepository.findByOrderId(sibling.getOrderId()));
+        }
+        return orderItems;
     }
 
     /**

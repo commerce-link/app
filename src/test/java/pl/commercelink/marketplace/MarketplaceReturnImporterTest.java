@@ -287,6 +287,25 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
+    void matchesItemsMovedToASplitOrder() {
+        // given: the returned item now lives on an order split off from the one the marketplace still tracks
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        Order child = new Order(STORE_ID);
+        child.setSplitFromOrderId(ORDER_ID);
+        when(ordersRepository.findBySplitFromOrderId(STORE_ID, ORDER_ID)).thenReturn(List.of(child));
+        OrderItem moved = orderItem("item-2", "sku-a", 1);
+        when(orderItemsRepository.findByOrderId(child.getOrderId())).thenReturn(List.of(moved));
+        MarketplaceReturn ret = returnWithItem("sku-a", 1);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then
+        verify(rmaRepository).save(any(RMA.class));
+    }
+
+    @Test
     void matchesOrderItemsWhoseOnlyReferencingRmaWasRejected() {
         // given: the earlier RMA on this order item was rejected, so it must become matchable again
         when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);

@@ -27,6 +27,9 @@ public class Order {
     @DynamoDBAttribute(attributeName = "externalOrderId")
     @DynamoDBIndexRangeKey(globalSecondaryIndexName = "ExternalOrderIdIndex", attributeName = "externalOrderId")
     private String externalOrderId;
+    // set on the child order created by createSplit(); externalOrderId stays unique to the parent
+    @DynamoDBAttribute(attributeName = "splitFromOrderId")
+    private String splitFromOrderId;
 
     @DynamoDBAttribute(attributeName = "affiliateId")
     private String affiliateId;
@@ -364,6 +367,7 @@ public class Order {
         payment.setSource(payments.isEmpty() ? PaymentSource.BankTransfer : payments.get(0).getSource());
         copy.addPayment(payment);
 
+        copy.setSplitFromOrderId(this.orderId);
         return copy;
     }
 
@@ -587,6 +591,14 @@ public class Order {
 
     public void setExternalOrderId(String externalOrderId) {
         this.externalOrderId = externalOrderId;
+    }
+
+    public String getSplitFromOrderId() {
+        return splitFromOrderId;
+    }
+
+    public void setSplitFromOrderId(String splitFromOrderId) {
+        this.splitFromOrderId = splitFromOrderId;
     }
 
     public String getGclid() {

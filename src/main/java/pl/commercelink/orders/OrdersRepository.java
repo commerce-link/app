@@ -1,6 +1,7 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
@@ -53,6 +54,19 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
 
         List<Order> orders = query(queryRequest, Order.class);
         return orders.isEmpty() ? null : orders.get(0);
+    }
+
+    public List<Order> findBySplitFromOrderId(String storeId, String orderId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":splitFromOrderId", new AttributeValue().withS(orderId));
+
+        DynamoDBQueryExpression<Order> queryExpression = new DynamoDBQueryExpression<Order>()
+                .withKeyConditionExpression("storeId = :storeId")
+                .withFilterExpression("splitFromOrderId = :splitFromOrderId")
+                .withExpressionAttributeValues(eav);
+
+        return dynamoDBMapper.query(Order.class, queryExpression);
     }
 
     public List<Order> findAllByStoreIdAndStatus(String storeId, OrderStatus... statuses) {
