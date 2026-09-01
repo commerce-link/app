@@ -21,14 +21,17 @@
                             <h2 class="title is-4 mb-0" th:text="${candidate.provider}"></h2>
                         </div>
                         <div class="level-item">
+                            <span class="has-text-grey" th:text="${candidate.orderId}"></span>
+                        </div>
+                        <div class="level-item">
                             <span class="tag is-info" th:text="#{deliveries.dropship.badge}">Dropshipping</span>
                         </div>
                     </div>
                     <div class="level-right">
                         <div class="level-item">
                             <a th:href="${isSuperAdmin}
-                                    ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship(storeId=${storeId}, orderId=${candidate.orderId})}
-                                    : @{/dashboard/orders/{orderId}/dropship(orderId=${candidate.orderId})}"
+                                    ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship(storeId=${storeId}, orderId=${candidate.orderId}, provider=${candidate.provider})}
+                                    : @{/dashboard/orders/{orderId}/dropship(orderId=${candidate.orderId}, provider=${candidate.provider})}"
                                class="button is-primary" th:text="#{deliveries.preview.create}">Create Delivery</a>
                         </div>
                     </div>
@@ -90,6 +93,10 @@
                         <div class="level-item">
                             <h2 class="title is-4" th:text="${delivery.provider}"></h2>
                         </div>
+                        <div class="level-item">
+                            <span class="tag is-warning" th:if="${delivery.hasDirectToConsumerAllocations()}"
+                                  th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span>
+                        </div>
                     </div>
                     <div class="level-right">
                         <div class="level-item">
@@ -100,6 +107,9 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="notification is-warning is-light" th:if="${delivery.hasDirectToConsumerAllocations()}"
+                     th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></div>
 
                 <h4 class="title is-5" th:text="#{deliveries.items}">Items</h4>
                 <table class="table is-fullwidth is-narrow">

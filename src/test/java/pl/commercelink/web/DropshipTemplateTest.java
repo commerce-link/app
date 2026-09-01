@@ -434,4 +434,15 @@ class DropshipTemplateTest {
         // th:disabled on the dropdown trigger: the same clause, negated, inside the compound condition
         assertThat(html).contains("!(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}");
     }
+
+    @Test
+    void deliveriesPreviewCarriesTheSupplierIntoTheDropshipCreateLink() throws Exception {
+        // when
+        String html = read("deliveriesPreview.html");
+
+        // then
+        assertThat(html).contains("orderId=${candidate.orderId}, provider=${candidate.provider}");
+        assertThat(html).contains("<span class=\"has-text-grey\" th:text=\"${candidate.orderId}\"></span>");
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+    }
 }
