@@ -67,7 +67,7 @@ public class MarketplaceReturnImporter {
     private StoresRepository storesRepository;
 
     public void importReturn(Store store, String marketplace, MarketplaceReturn ret) {
-        RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), ret.externalReturnId());
+        RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), marketplace, ret.externalReturnId());
         if (existing != null) {
             refreshExternalStatus(store, marketplace, existing, ret);
             return;

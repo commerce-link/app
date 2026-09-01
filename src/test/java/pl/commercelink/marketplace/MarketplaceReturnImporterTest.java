@@ -123,7 +123,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void createsWaitingForItemsRmaWithMatchedItemsAndParcel() {
         // given
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 2)));
@@ -165,7 +165,7 @@ class MarketplaceReturnImporterTest {
         // given
         when(orderItem.getExternalItemId()).thenReturn("SKU-1");
         when(orderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
@@ -208,7 +208,7 @@ class MarketplaceReturnImporterTest {
     void fallsBackToManufacturerCodeWhenExternalItemIdIsBlank() {
         // given
         when(orderItem.getExternalItemId()).thenReturn(null);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
@@ -222,7 +222,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void clampsQuantityToOrderedQuantity() {
         // given
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 5)));
@@ -236,7 +236,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void skipsWhenNoItemMatches() {
         // given
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("OTHER", 1)));
@@ -253,7 +253,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void notifiesTheStoreWhenOnlySomeReturnItemsMatched() {
         // given: a two-item return where one item has no counterpart in the order
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
         MarketplaceReturn ret = returnWithItems(item("sku-a", 1), item("sku-missing", 1));
@@ -270,7 +270,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void skipsOrderItemsAlreadyCoveredByAnOpenRma() {
         // given: an open RMA already claims item-1
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
         when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("open-rma-1", "item-1")));
@@ -289,7 +289,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void matchesItemsMovedToASplitOrder() {
         // given: the returned item now lives on an order split off from the one the marketplace still tracks
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         Order child = new Order(STORE_ID);
         child.setSplitFromOrderId(ORDER_ID);
@@ -308,7 +308,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void matchesOrderItemsWhoseOnlyReferencingRmaWasRejected() {
         // given: the earlier RMA on this order item was rejected, so it must become matchable again
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
         when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("rejected-rma-1", "item-1")));
@@ -327,7 +327,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void notifiesStoreOnceWhenTheSameUnmatchedReturnIsPolledAgain() {
         // given
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         MarketplaceReturn unmatched = marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("OTHER", 1));
 
         // when
@@ -342,7 +342,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void skipsWhenOrderIsUnknownOrCancelled() {
         // given
-        when(rmaRepository.findByExternalReturnId(eq(STORE_ID), any())).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(eq(STORE_ID), eq(MARKETPLACE), any())).thenReturn(null);
         when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, EXTERNAL_ORDER_ID)).thenReturn(null);
 
         // when
@@ -362,7 +362,7 @@ class MarketplaceReturnImporterTest {
     @Test
     void skipsUnknownClosedReturns() {
         // given
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1)));
@@ -378,7 +378,7 @@ class MarketplaceReturnImporterTest {
         RMA existing = new RMA(STORE_ID);
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DECLARED);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(existing);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DELIVERED, item("SKU-1", 1)));
@@ -396,7 +396,7 @@ class MarketplaceReturnImporterTest {
         RMA existing = new RMA(STORE_ID);
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(existing);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DELIVERED, item("SKU-1", 1)));
@@ -412,7 +412,7 @@ class MarketplaceReturnImporterTest {
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnReference("REF/r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(existing);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
         MarketplaceReturn refunded = marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1));
 
         // when
@@ -435,7 +435,7 @@ class MarketplaceReturnImporterTest {
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
         existing.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
-        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(existing);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
 
         // when
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1)));

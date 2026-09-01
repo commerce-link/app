@@ -96,4 +96,25 @@ class MarketplaceOrdersImportEventListenerTest {
         // then
         verifyNoInteractions(marketplaceReturnImporter);
     }
+
+    @Test
+    void ordersScopeImportsOrdersOnly() {
+        // when
+        listener.handleMessage(payload("orders"));
+
+        // then
+        verify(marketplaceOrderImporter).importOrder(eq(store), eq(MARKETPLACE), any());
+        verifyNoInteractions(marketplaceReturnImporter);
+    }
+
+    @Test
+    void unknownScopeIsIgnoredRatherThanFallingBackToAFullOrdersImport() {
+        // when: a rollback might send a scope this build no longer recognises
+        listener.handleMessage(payload("legacy-unknown-scope"));
+
+        // then: fail closed instead of silently re-importing all orders
+        verifyNoInteractions(marketplaceOrderImporter);
+        verifyNoInteractions(marketplaceReturnImporter);
+        verify(store, never()).updateLastFetchedAt(any());
+    }
 }

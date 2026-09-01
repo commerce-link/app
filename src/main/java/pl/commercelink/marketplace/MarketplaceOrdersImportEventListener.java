@@ -1,6 +1,8 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,9 @@ import java.util.List;
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 public class MarketplaceOrdersImportEventListener {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceOrdersImportEventListener.class);
+
+    public static final String SCOPE_ORDERS = "orders";
     public static final String SCOPE_RETURNS = "returns";
 
     @Autowired
@@ -38,7 +43,13 @@ public class MarketplaceOrdersImportEventListener {
             pollTimeoutSeconds = "20"
     )
     public void handleMessage(MarketplaceOrderPayload payload) {
-        boolean returnsScope = SCOPE_RETURNS.equals(payload.getScope());
+        String scope = payload.getScope();
+        if (scope != null && !scope.isBlank() && !SCOPE_ORDERS.equals(scope) && !SCOPE_RETURNS.equals(scope)) {
+            // Fail closed: an unrecognised scope must not fall back to a full orders import (e.g. during a rollback).
+            LOGGER.error("Unknown marketplace import scope {}; message ignored", scope);
+            return;
+        }
+        boolean returnsScope = SCOPE_RETURNS.equals(scope);
         storesRepository.findAll()
                 .stream()
                 .filter(s -> s.hasActiveMarketplaceIntegration(payload.getMarketplace()))
