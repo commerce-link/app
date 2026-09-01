@@ -473,6 +473,26 @@ class MarketplaceOrderLifecycleEventListenerTest {
     }
 
     @Test
+    void redeliveredReturnAcceptedRefundsWithTheSameCommandId() {
+        // given
+        when(provider.returns()).thenReturn(Optional.of(returns));
+        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1",
+                List.of(new MarketplaceReturnAction.Item("SKU-1", 2)), true, "cmd-1", null);
+        OrderLifecycleEvent event = new OrderLifecycleEvent(STORE_ID, ORDER_ID,
+                OrderLifecycleEventType.ReturnAccepted, EXTERNAL_ORDER_ID, MARKETPLACE, action);
+
+        // when: at-least-once delivery hands us the same message twice
+        listener.handleMessage(event);
+        listener.handleMessage(event);
+
+        // then: the payload's commandId is forwarded, never regenerated - Allegro deduplicates on it
+        ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
+        verify(returns, times(2)).refundReturn(any(), any(), captor.capture());
+        assertEquals("cmd-1", captor.getAllValues().get(0).commandId());
+        assertEquals("cmd-1", captor.getAllValues().get(1).commandId());
+    }
+
+    @Test
     void returnRejectedEventRejectsThroughProviderReturns() {
         // given
         when(provider.returns()).thenReturn(Optional.of(returns));
