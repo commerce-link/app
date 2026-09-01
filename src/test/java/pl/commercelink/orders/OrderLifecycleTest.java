@@ -11,12 +11,15 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +46,7 @@ class OrderLifecycleTest {
     @Mock private DeliveriesRepository deliveriesRepository;
     @Mock private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
+    @Mock private DropshipItemLookup dropshipItemLookup;
 
     @InjectMocks
     private OrderLifecycle orderLifecycle;
@@ -206,5 +210,69 @@ class OrderLifecycleTest {
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void aDropshipOnlyOrderDoesNotWaitForAWarehouseDocument() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isProduct()).thenReturn(true);
+        when(item.getItemId()).thenReturn("item-1");
+        when(item.isReturned()).thenReturn(false);
+
+        Store store = mock(Store.class);
+        when(store.hasDocumentsGenerationEnabled()).thenReturn(true);
+        when(store.getStoreId()).thenReturn("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq("store-1"), any())).thenReturn(Set.of("item-1"));
+
+        doReturn(true).when(order).isDelivered();
+        doReturn(true).when(order).isFullyPaid();
+        doReturn(true).when(order).isInvoiced();
+        doReturn(false).when(order).isAwaitingReview();
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Completed, order.getStatus());
+        verifyNoInteractions(goodsOutEventPublisher);
+    }
+
+    @Test
+    void aMixedOrderStillWaitsForAWarehouseDocument() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        OrderItem dropshipItem = mock(OrderItem.class);
+        when(dropshipItem.isProduct()).thenReturn(true);
+        when(dropshipItem.getItemId()).thenReturn("item-1");
+        when(dropshipItem.isReturned()).thenReturn(false);
+        OrderItem warehouseItem = mock(OrderItem.class);
+        when(warehouseItem.isProduct()).thenReturn(true);
+        when(warehouseItem.getItemId()).thenReturn("item-2");
+        when(warehouseItem.isReturned()).thenReturn(false);
+
+        Store store = mock(Store.class);
+        when(store.hasDocumentsGenerationEnabled()).thenReturn(true);
+        when(store.getStoreId()).thenReturn("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq("store-1"), any())).thenReturn(Set.of("item-1"));
+
+        doReturn(true).when(order).isDelivered();
+        doReturn(true).when(order).isFullyPaid();
+        doReturn(true).when(order).isInvoiced();
+        doReturn(false).when(order).isAwaitingReview();
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+
+        // when
+        orderLifecycle.update(order, List.of(dropshipItem, warehouseItem));
+
+        // then
+        assertEquals(OrderStatus.Delivered, order.getStatus());
+        verify(goodsOutEventPublisher).publish(eq(order), any());
     }
 }
