@@ -132,6 +132,12 @@ public class MarketplaceReturnImporter {
             notifyUnmatched(store, marketplace, ret);
             return;
         }
+        if (rmaItems.size() < ret.items().size()) {
+            LOGGER.warn("{} return {}: only {} of {} items matched order {}", marketplace, ret.externalReturnId(),
+                    rmaItems.size(), ret.items().size(), order.getOrderId());
+            // A partial refund disarms the marketplace auto-refund, so the operator must see the shortfall.
+            notifyUnmatched(store, marketplace, ret);
+        }
 
         rma.setStatus(RMAStatus.WaitingForItems);
         rma.setOrderId(order.getOrderId());

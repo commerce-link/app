@@ -95,6 +95,10 @@ class MarketplaceReturnImporterTest {
         return marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item(marketplaceKey, qty));
     }
 
+    private static MarketplaceReturn returnWithItems(MarketplaceReturn.Item... items) {
+        return marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, items);
+    }
+
     private static OrderItem orderItem(String itemId, String externalItemId, String manufacturerCode, int qty) {
         OrderItem item = mock(OrderItem.class);
         when(item.getItemId()).thenReturn(itemId);
@@ -103,6 +107,10 @@ class MarketplaceReturnImporterTest {
         when(item.getQty()).thenReturn(qty);
         when(item.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)).thenReturn(false);
         return item;
+    }
+
+    private static OrderItem orderItem(String itemId, String sku, int qty) {
+        return orderItem(itemId, sku, sku, qty);
     }
 
     @Test
@@ -233,6 +241,23 @@ class MarketplaceReturnImporterTest {
         assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
         assertEquals("r-1", store.getNotifications().get(0).getObject());
         verify(storesRepository).save(store);
+    }
+
+    @Test
+    void notifiesTheStoreWhenOnlySomeReturnItemsMatched() {
+        // given: a two-item return where one item has no counterpart in the order
+        when(rmaRepository.findByExternalReturnId(STORE_ID, "r-1")).thenReturn(null);
+        OrderItem matched = orderItem("item-1", "sku-a", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
+        MarketplaceReturn ret = returnWithItems(item("sku-a", 1), item("sku-missing", 1));
+
+        // when
+        importer.importReturn(store, MARKETPLACE, ret);
+
+        // then: the RMA is still created, but the shortfall must not be silent
+        verify(rmaRepository).save(any(RMA.class));
+        assertTrue(store.getNotifications().stream()
+                .anyMatch(n -> n.getType() == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
     }
 
     @Test
