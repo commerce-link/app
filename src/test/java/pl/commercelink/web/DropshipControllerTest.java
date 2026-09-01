@@ -120,7 +120,7 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, model);
+            view = controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
         }
 
         // then
@@ -154,7 +154,7 @@ class DropshipControllerTest {
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.dropshipCreate(ORDER_ID, model);
+            controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
         }
 
         // then
@@ -181,7 +181,8 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.backFromDropshipConfirmation(ORDER_ID, posted, model);
+            view = controller.backFromDropshipConfirmation(ORDER_ID, posted, model, redirectAttributes,
+                    Locale.ENGLISH);
         }
 
         // then
@@ -207,7 +208,7 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipPurchase(ORDER_ID, form, model);
+            view = controller.dropshipPurchase(ORDER_ID, form, model, redirectAttributes, Locale.ENGLISH);
         }
 
         // then
@@ -298,22 +299,128 @@ class DropshipControllerTest {
     }
 
     @Test
-    void createScreenRedirectsBackWhenTheOrderIsNotEligible() {
+    void theCreateScreenExplainsWhyTheOrderCannotBeDropshipped() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS));
+        when(messageSource.getMessage(eq("orders.dropship.rejected.noShippingDetails"), eq(null), any()))
+                .thenReturn("no address");
 
         // when
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, new ConcurrentModel());
+            view = controller.dropshipCreate(ORDER_ID, null, new ConcurrentModel(), redirectAttributes, Locale.ENGLISH);
         }
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "no address");
+    }
+
+    @Test
+    void theCreateScreenBuildsTheFormForTheRequestedSupplier() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.dropshipCreate(ORDER_ID, "Elko", model, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("dropshipCreate");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getProvider()).isEqualTo("Elko");
+    }
+
+    @Test
+    void theCreateScreenAsksForASupplierWhenTheOrderHasSeveral() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
+        when(messageSource.getMessage(eq("orders.dropship.chooseProvider"), eq(null), any()))
+                .thenReturn("pick one");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.dropshipCreate(ORDER_ID, null, new ConcurrentModel(), redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "pick one");
+    }
+
+    @Test
+    void theCreateScreenKeepsWorkingWithoutAProviderWhenThereIsExactlyOne() {
+        // given
+        Order order = order();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("dropshipCreate");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getProvider()).isEqualTo(PROVIDER);
+    }
+
+    @Test
+    void theCreateScreenTakesOnlyTheItemsOfTheChosenSupplier() {
+        // given
+        Order order = order();
+        OrderItem acmeItem = new OrderItem();
+        acmeItem.setItemId("item-1");
+        acmeItem.setDeliveryId("Acme");
+        acmeItem.setStatus(FulfilmentStatus.Allocation);
+        acmeItem.setEan("5900000000001");
+        acmeItem.setManufacturerCode("MFN-1");
+        OrderItem elkoItem = new OrderItem();
+        elkoItem.setItemId("item-2");
+        elkoItem.setDeliveryId("Elko");
+        elkoItem.setStatus(FulfilmentStatus.Allocation);
+        elkoItem.setEan("5900000000002");
+        elkoItem.setManufacturerCode("MFN-2");
+
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(acmeItem, elkoItem));
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.dropshipCreate(ORDER_ID, "Elko", model, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then: the Acme item must not leak into an Elko delivery
+        DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(form.getItems()).hasSize(1);
+        assertThat(form.getItems().getFirst().getMfn()).isEqualTo("MFN-2");
     }
 
     @Test
@@ -332,7 +439,8 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), Locale.forLanguageTag("pl"));
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
         }
 
         // then
@@ -346,7 +454,8 @@ class DropshipControllerTest {
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
+        when(dropshipEligibility.assess(same(order), any()))
+                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider(PROVIDER);
 
@@ -354,7 +463,8 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), Locale.forLanguageTag("pl"));
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
         }
 
         // then
@@ -376,7 +486,8 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), Locale.forLanguageTag("pl"));
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
         }
 
         // then
@@ -403,7 +514,8 @@ class DropshipControllerTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, model, Locale.forLanguageTag("pl"));
+            view = controller.confirmDropship(ORDER_ID, "ref-1", form, model, redirectAttributes,
+                    Locale.forLanguageTag("pl"));
         }
 
         // then

@@ -17,6 +17,7 @@ import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DropshipAssessment;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
 import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
+import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.orders.Order;
@@ -45,45 +46,54 @@ public class DropshipController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}/dropship")
     @PreAuthorize("hasRole('ADMIN')")
-    public String dropshipCreate(@PathVariable("orderId") String orderId, Model model) {
-        return showDropshipCreate(getStoreId(), orderId, model);
+    public String dropshipCreate(@PathVariable("orderId") String orderId,
+                                 @RequestParam(value = "provider", required = false) String provider,
+                                 Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipCreate(getStoreId(), orderId, provider, model, redirectAttributes, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}/dropship")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String dropshipCreateForSuperAdmin(@PathVariable("storeId") String storeId,
-                                              @PathVariable("orderId") String orderId, Model model) {
-        return showDropshipCreate(storeId, orderId, model);
+                                              @PathVariable("orderId") String orderId,
+                                              @RequestParam(value = "provider", required = false) String provider,
+                                              Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipCreate(storeId, orderId, provider, model, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/dropship/purchase")
     @PreAuthorize("hasRole('ADMIN')")
     public String dropshipPurchase(@PathVariable("orderId") String orderId,
-                                   @ModelAttribute DeliveryCreationForm form, Model model) {
-        return showDropshipConfirmation(getStoreId(), orderId, form, model);
+                                   @ModelAttribute DeliveryCreationForm form, Model model,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipConfirmation(getStoreId(), orderId, form, model, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String dropshipPurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
                                                 @PathVariable("orderId") String orderId,
-                                                @ModelAttribute DeliveryCreationForm form, Model model) {
-        return showDropshipConfirmation(storeId, orderId, form, model);
+                                                @ModelAttribute DeliveryCreationForm form, Model model,
+                                                RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipConfirmation(storeId, orderId, form, model, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/dropship/purchase/back")
     @PreAuthorize("hasRole('ADMIN')")
     public String backFromDropshipConfirmation(@PathVariable("orderId") String orderId,
-                                               @ModelAttribute DeliveryCreationForm posted, Model model) {
-        return showDropshipCreate(getStoreId(), orderId, model, posted);
+                                               @ModelAttribute DeliveryCreationForm posted, Model model,
+                                               RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipCreate(getStoreId(), orderId, posted.getProvider(), model, redirectAttributes, locale,
+                posted);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase/back")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String backFromDropshipConfirmationForSuperAdmin(@PathVariable("storeId") String storeId,
                                                             @PathVariable("orderId") String orderId,
-                                                            @ModelAttribute DeliveryCreationForm posted, Model model) {
-        return showDropshipCreate(storeId, orderId, model, posted);
+                                                            @ModelAttribute DeliveryCreationForm posted, Model model,
+                                                            RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipCreate(storeId, orderId, posted.getProvider(), model, redirectAttributes, locale, posted);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/dropship/create")
@@ -122,8 +132,9 @@ public class DropshipController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     public String confirmDropship(@PathVariable("orderId") String orderId,
                                   @RequestParam("purchaseRef") String purchaseRef,
-                                  @ModelAttribute DeliveryCreationForm form, Model model, Locale locale) {
-        return executeDropship(getStoreId(), orderId, purchaseRef, form, model, locale);
+                                  @ModelAttribute DeliveryCreationForm form, Model model,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
+        return executeDropship(getStoreId(), orderId, purchaseRef, form, model, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/{orderId}/dropship/confirm")
@@ -131,15 +142,19 @@ public class DropshipController extends BaseController {
     public String confirmDropshipForSuperAdmin(@PathVariable("storeId") String storeId,
                                                @PathVariable("orderId") String orderId,
                                                @RequestParam("purchaseRef") String purchaseRef,
-                                               @ModelAttribute DeliveryCreationForm form, Model model, Locale locale) {
-        return executeDropship(storeId, orderId, purchaseRef, form, model, locale);
+                                               @ModelAttribute DeliveryCreationForm form, Model model,
+                                               RedirectAttributes redirectAttributes, Locale locale) {
+        return executeDropship(storeId, orderId, purchaseRef, form, model, redirectAttributes, locale);
     }
 
-    private String showDropshipCreate(String storeId, String orderId, Model model) {
-        return showDropshipCreate(storeId, orderId, model, null);
+    private String showDropshipCreate(String storeId, String orderId, String requestedProvider, Model model,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        return showDropshipCreate(storeId, orderId, requestedProvider, model, redirectAttributes, locale, null);
     }
 
-    private String showDropshipCreate(String storeId, String orderId, Model model, DeliveryCreationForm posted) {
+    private String showDropshipCreate(String storeId, String orderId, String requestedProvider, Model model,
+                                      RedirectAttributes redirectAttributes, Locale locale,
+                                      DeliveryCreationForm posted) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
             return orderDetailsRedirect(storeId, orderId);
@@ -147,10 +162,24 @@ public class DropshipController extends BaseController {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
         DropshipAssessment assessment = dropshipEligibility.assess(order, orderItems);
         if (!assessment.hasProviders()) {
+            return rejectedRedirect(storeId, orderId, assessment.rejection(), redirectAttributes, locale);
+        }
+
+        String provider = requestedProvider;
+        if (provider == null) {
+            if (assessment.providers().size() > 1) {
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        messageSource.getMessage("orders.dropship.chooseProvider", null, locale));
+                return deliveriesPreviewRedirect(storeId);
+            }
+            provider = assessment.providers().getFirst();
+        } else if (!assessment.supports(provider)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("orders.dropship.rejected.providerMismatch", null, locale));
             return orderDetailsRedirect(storeId, orderId);
         }
 
-        DeliveryCreationForm form = buildForm(storeId, order, orderItems, assessment.providers().getFirst());
+        DeliveryCreationForm form = buildForm(storeId, order, orderItems, provider);
         if (posted != null) {
             form.applyUserSelections(posted);
         }
@@ -158,22 +187,47 @@ public class DropshipController extends BaseController {
         return "dropshipCreate";
     }
 
+    private String rejectedRedirect(String storeId, String orderId, DropshipRejection rejection,
+                                    RedirectAttributes redirectAttributes, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage(messageKeyFor(rejection), null, locale));
+        return orderDetailsRedirect(storeId, orderId);
+    }
+
+    // The enum constant is the message key: NO_SHIPPING_DETAILS -> orders.dropship.rejected.noShippingDetails
+    private String messageKeyFor(DropshipRejection rejection) {
+        String[] parts = rejection.name().toLowerCase(Locale.ROOT).split("_");
+        StringBuilder key = new StringBuilder("orders.dropship.rejected.").append(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            key.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+        }
+        return key.toString();
+    }
+
+    private String providerMismatchRedirect(String storeId, String orderId, RedirectAttributes redirectAttributes,
+                                            Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage",
+                messageSource.getMessage("orders.dropship.rejected.providerMismatch", null, locale));
+        return orderDetailsRedirect(storeId, orderId);
+    }
+
     private Optional<Order> eligibleOrderMatching(String storeId, String orderId, DeliveryCreationForm form) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
             return Optional.empty();
         }
-        Optional<String> provider = eligibleProviderFor(order);
-        if (provider.isEmpty() || !provider.get().equals(form.getProvider())) {
+        DropshipAssessment assessment = dropshipEligibility.assess(order, orderItemsRepository.findByOrderId(orderId));
+        if (!assessment.supports(form.getProvider())) {
             return Optional.empty();
         }
         return Optional.of(order);
     }
 
-    private String showDropshipConfirmation(String storeId, String orderId, DeliveryCreationForm form, Model model) {
+    private String showDropshipConfirmation(String storeId, String orderId, DeliveryCreationForm form, Model model,
+                                            RedirectAttributes redirectAttributes, Locale locale) {
         Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
         if (order.isEmpty()) {
-            return orderDetailsRedirect(storeId, orderId);
+            return providerMismatchRedirect(storeId, orderId, redirectAttributes, locale);
         }
         form.setStoreId(storeId);
         addConfirmationModel(model, storeId, order.get(), form);
@@ -185,7 +239,7 @@ public class DropshipController extends BaseController {
                                          RedirectAttributes redirectAttributes, Locale locale) {
         Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
         if (order.isEmpty()) {
-            return orderDetailsRedirect(storeId, orderId);
+            return providerMismatchRedirect(storeId, orderId, redirectAttributes, locale);
         }
         form.setStoreId(storeId);
         if (!form.hasRequestedItems() && form.isRemoveUnselected()) {
@@ -203,12 +257,6 @@ public class DropshipController extends BaseController {
         return deliveryDetailsRedirect(storeId, result.getPayload());
     }
 
-    private Optional<String> eligibleProviderFor(Order order) {
-        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
-        DropshipAssessment assessment = dropshipEligibility.assess(order, orderItems);
-        return assessment.hasProviders() ? Optional.of(assessment.providers().getFirst()) : Optional.empty();
-    }
-
     private DeliveryCreationForm buildForm(String storeId, Order order, List<OrderItem> orderItems, String provider) {
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setStoreId(storeId);
@@ -217,6 +265,7 @@ public class DropshipController extends BaseController {
 
         List<Allocation> allocations = orderItems.stream()
                 .filter(OrderItem::isInAllocation)
+                .filter(item -> provider.equals(item.getDeliveryId()))
                 .map(item -> Allocation.fromOrderItem(order, item))
                 .toList();
         form.setItems(DeliveryItem.groupAndUnify(allocations));
@@ -256,11 +305,11 @@ public class DropshipController extends BaseController {
         return "deliveryPurchaseConfirmation :: validationResult";
     }
 
-    private String executeDropship(String storeId, String orderId, String purchaseRef,
-                                   DeliveryCreationForm form, Model model, Locale locale) {
+    private String executeDropship(String storeId, String orderId, String purchaseRef, DeliveryCreationForm form,
+                                   Model model, RedirectAttributes redirectAttributes, Locale locale) {
         Optional<Order> order = eligibleOrderMatching(storeId, orderId, form);
         if (order.isEmpty()) {
-            return orderDetailsRedirect(storeId, orderId);
+            return providerMismatchRedirect(storeId, orderId, redirectAttributes, locale);
         }
         form.setStoreId(storeId);
         OperationResult<PurchaseSubmission> result =
@@ -285,6 +334,12 @@ public class DropshipController extends BaseController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/deliveries/details?deliveryId=%s", storeId, deliveryId)
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+    }
+
+    private String deliveriesPreviewRedirect(String storeId) {
+        return isSuperAdmin()
+                ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
+                : "redirect:/dashboard/deliveries/preview";
     }
 
     private String dropshipCreateRedirect(String storeId, String orderId) {
