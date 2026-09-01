@@ -18,6 +18,8 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -391,11 +393,15 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
-    void doesNotSaveWhenExternalStatusUnchanged() {
-        // given
+    void doesNotSaveWhenNothingChanged() {
+        // given: status and shipments both already match what the marketplace reports
         RMA existing = new RMA(STORE_ID);
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setTrackingNo("0000123456");
+        shipment.setCarrier("INPOST");
+        existing.setShipments(List.of(shipment));
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
 
         // when
@@ -403,6 +409,25 @@ class MarketplaceReturnImporterTest {
 
         // then
         verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void fillsInShipmentsOnALaterPollEvenWhenStatusIsUnchanged() {
+        // given: the return was declared before the buyer generated a waybill, so it imported with no parcels
+        RMA existing = new RMA(STORE_ID);
+        existing.setExternalReturnId("r-1");
+        existing.setExternalReturnStatus(MarketplaceReturnStatus.DECLARED);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
+
+        // when: the marketplace status is still DECLARED, but a waybill now exists
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 1)));
+
+        // then
+        assertEquals(MarketplaceReturnStatus.DECLARED, existing.getExternalReturnStatus());
+        assertEquals(1, existing.getShipments().size());
+        assertEquals("0000123456", existing.getShipments().get(0).getTrackingNo());
+        assertEquals("INPOST", existing.getShipments().get(0).getCarrier());
+        verify(rmaRepository).save(existing);
     }
 
     @Test

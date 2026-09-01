@@ -81,21 +81,30 @@ public class MarketplaceReturnImporter {
     }
 
     private void refreshExternalStatus(Store store, String marketplace, RMA rma, MarketplaceReturn ret) {
-        if (rma.getExternalReturnStatus() == ret.status()) {
+        // A return declared before the buyer generated a waybill has no parcels at creation time; fill
+        // them in once they appear, even on a poll where the status itself did not change.
+        boolean shipmentsMissing = (rma.getShipments() == null || rma.getShipments().isEmpty()) && !ret.parcels().isEmpty();
+        boolean statusChanged = rma.getExternalReturnStatus() != ret.status();
+        if (!statusChanged && !shipmentsMissing) {
             return;
         }
-        rma.setExternalReturnStatus(ret.status());
-        if (ret.status() == MarketplaceReturnStatus.REFUNDED && !appDecidedRefund(rma)) {
-            Event refundedByMarketplace = new Event(EventType.action, EVENT_REFUNDED_BY_MARKETPLACE, LocalDateTime.now());
-            if (!rma.hasEvent(refundedByMarketplace)) {
-                rma.addEvent(refundedByMarketplace);
-                store.getNotifications().add(new StoreNotification(
-                        StoreNotificationSeverity.WARNING,
-                        StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
-                        rma.getRmaId(),
-                        marketplace + " refunded the buyer for return " + referenceOf(rma)
-                                + " without a decision in the application"));
-                storesRepository.save(store);
+        if (shipmentsMissing) {
+            rma.setShipments(toShipments(ret));
+        }
+        if (statusChanged) {
+            rma.setExternalReturnStatus(ret.status());
+            if (ret.status() == MarketplaceReturnStatus.REFUNDED && !appDecidedRefund(rma)) {
+                Event refundedByMarketplace = new Event(EventType.action, EVENT_REFUNDED_BY_MARKETPLACE, LocalDateTime.now());
+                if (!rma.hasEvent(refundedByMarketplace)) {
+                    rma.addEvent(refundedByMarketplace);
+                    store.getNotifications().add(new StoreNotification(
+                            StoreNotificationSeverity.WARNING,
+                            StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
+                            rma.getRmaId(),
+                            marketplace + " refunded the buyer for return " + referenceOf(rma)
+                                    + " without a decision in the application"));
+                    storesRepository.save(store);
+                }
             }
         }
         rmaRepository.save(rma);

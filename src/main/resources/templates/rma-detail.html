@@ -197,6 +197,7 @@
                                   rows="4"
                                   th:field="*{rejectionReason}"
                                   th:disabled="${isClosed}"
+                                  th:attr="data-marketplace=${rma.marketplaceReturn}"
                                   th:placeholder="#{rma.reject.reason.placeholder}"></textarea>
                         <p class="help" th:if="${rma.marketplaceReturn}" th:text="#{rma.rejection.reason.marketplace.hint}"></p>
                     </div>
@@ -703,6 +704,13 @@
     </div>
 
     <script>
+        function toggleRejectionReasonRequired(statusSelect) {
+            const textarea = document.querySelector('textarea[name="rejectionReason"]');
+            if (!textarea) return;
+            // Only a marketplace rejection requires a reason; other saves must stay unblocked.
+            textarea.required = statusSelect.value === 'Rejected' && textarea.dataset.marketplace === 'true';
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll(".rma-media-delete-btn").forEach(btn => {
                 btn.addEventListener("click", function() {
@@ -722,6 +730,14 @@
                     icon.classList.toggle("fa-chevron-down", isHidden);
                 });
             });
+
+            const statusSelect = document.getElementById("status");
+            if (statusSelect) {
+                toggleRejectionReasonRequired(statusSelect);
+                statusSelect.addEventListener("change", function() {
+                    toggleRejectionReasonRequired(statusSelect);
+                });
+            }
         });
 
         const actionsRequiringCondition = ['replaceItems?broken=false', 'replaceItems?broken=true', 'acceptReturn'];
