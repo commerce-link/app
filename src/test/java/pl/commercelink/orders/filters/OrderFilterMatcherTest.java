@@ -1,5 +1,7 @@
 package pl.commercelink.orders.filters;
 
+import pl.commercelink.orders.filters.model.OrderFilter;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Order;

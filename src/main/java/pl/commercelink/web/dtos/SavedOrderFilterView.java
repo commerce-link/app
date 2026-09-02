@@ -1,6 +1,6 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.orders.filters.OrderFilter;
+import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.OrderFilterCondition;
 
 import java.util.LinkedHashMap;

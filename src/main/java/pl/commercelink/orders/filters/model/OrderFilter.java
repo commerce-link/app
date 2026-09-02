@@ -1,6 +1,10 @@
-package pl.commercelink.orders.filters;
+package pl.commercelink.orders.filters.model;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
+import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.OrderFilterAccessDeniedException;
+import pl.commercelink.orders.filters.OrderFilterConditions;
+import pl.commercelink.orders.filters.OrderFilterInvalidException;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;

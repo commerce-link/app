@@ -1,6 +1,12 @@
-package pl.commercelink.orders.filters;
+package pl.commercelink.orders.filters.handlers;
 
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.OrderFilterCondition;
+import pl.commercelink.orders.filters.OrderFilterConditions;
+import pl.commercelink.orders.filters.OrderFilterInvalidException;
+import pl.commercelink.orders.filters.OrderFiltersRepository;
 
 import java.util.List;
 

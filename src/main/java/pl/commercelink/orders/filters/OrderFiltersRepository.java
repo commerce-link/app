@@ -1,5 +1,7 @@
 package pl.commercelink.orders.filters;
 
+import pl.commercelink.orders.filters.model.OrderFilter;
+
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;

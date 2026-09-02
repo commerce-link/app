@@ -1,7 +1,7 @@
 package pl.commercelink.orders;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.orders.filters.OrderFilter;
+import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.OrderFilterMatcher;
 
 import java.util.Comparator;

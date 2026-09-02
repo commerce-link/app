@@ -1,6 +1,8 @@
-package pl.commercelink.orders.filters;
+package pl.commercelink.orders.filters.handlers;
 
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.OrderFiltersRepository;
 
 @Component
 public class DeleteOrderFilterHandler {
