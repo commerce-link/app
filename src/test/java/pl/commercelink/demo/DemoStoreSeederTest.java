@@ -804,7 +804,7 @@ class DemoStoreSeederTest {
         // when
         DemoOrders open = DemoStoreSeeder.buildDemoOrders("store-1", rows);
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, true);
 
         // then
         Map<String, Double> itemsCostByDeliveryId = new HashMap<>();
@@ -837,7 +837,7 @@ class DemoStoreSeederTest {
         // when
         DemoOrders open = DemoStoreSeeder.buildDemoOrders("store-1", rows);
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, true);
 
         // then
         List<Delivery> deliveries = new ArrayList<>();
