@@ -73,6 +73,8 @@ class ShipmentTrackingSubscriberTest {
     void passThroughOptimisticLocking() {
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+        when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
     }
 
     private static Shipment courier(String trackingNo) {
@@ -414,7 +416,7 @@ class ShipmentTrackingSubscriberTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.pending("cmd-9"));
 
-        // then
+        // when / then
         assertThatThrownBy(() -> subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 2))
                 .isInstanceOf(ShipmentTrackingPendingException.class);
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
@@ -432,7 +434,7 @@ class ShipmentTrackingSubscriberTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 401: token revoked"));
 
-        // then
+        // when / then
         assertThatThrownBy(() -> subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 1))
                 .isInstanceOf(ShipmentTrackingPendingException.class);
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
@@ -483,5 +485,24 @@ class ShipmentTrackingSubscriberTest {
         verify(ordersRepository).save(freshOrder);
         verify(ordersRepository, never()).save(staleOrder);
         verify(ordersRepository, times(2)).findById(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void checkLeavesTheOrderAloneWhenTheFreshOrderNoLongerHasThePendingShipment() {
+        // given: the tracking number was edited while the re-check was queued
+        providerAvailable();
+        Shipment stale = courier("PKG-1");
+        stale.markTrackingPending("cmd-1", LocalDateTime.now());
+        Order staleOrder = orderWith(stale);
+        Order freshOrder = orderWith(courier("PKG-2"));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(staleOrder, freshOrder);
+        when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 502: bad gateway"));
+
+        // when
+        subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), ShipmentTrackingSubscriber.MAX_CHECK_ATTEMPTS);
+
+        // then
+        verify(ordersRepository, never()).save(any());
+        verify(orderEventsRepository, never()).save(any());
     }
 }

@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @RequiredArgsConstructor
@@ -165,24 +166,32 @@ public class ShipmentTrackingSubscriber {
             }
             result = ParcelTrackingSubscription.failed(result.subscriptionId(), CHECK_TIMED_OUT);
         }
-        persist(request, result, now);
-        if (result.status() == ParcelTrackingSubscription.Status.FAILED) {
+        boolean applied = persist(request, result, now);
+        if (applied && result.status() == ParcelTrackingSubscription.Status.FAILED) {
             orderEventsRepository.save(new OrderEvent(request.getOrderId(), EventType.action, TRACKING_FAILED_EVENT, now));
         }
     }
 
     // the order may have been edited while the re-check was queued: apply the outcome to the freshly
-    // loaded entity and let the executor retry on a version conflict instead of burning a delivery attempt
-    private void persist(ShipmentTrackingCheckRequest request, ParcelTrackingSubscription result, LocalDateTime now) {
+    // loaded entity and let the executor retry on a version conflict instead of burning a delivery attempt;
+    // returns false when the fresh order no longer has that shipment pending (nothing was changed)
+    private boolean persist(ShipmentTrackingCheckRequest request, ParcelTrackingSubscription result, LocalDateTime now) {
+        AtomicBoolean changed = new AtomicBoolean();
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(request.getStoreId(), request.getOrderId()),
                 fresh -> {
                     Shipment target = pendingShipment(fresh, request.getTrackingNo());
+                    changed.set(target != null);
                     if (target != null) {
                         apply(target, result, now);
                     }
                 },
-                ordersRepository::save);
+                fresh -> {
+                    if (changed.get()) {
+                        ordersRepository.save(fresh);
+                    }
+                });
+        return changed.get();
     }
 
     private static Shipment pendingShipment(Order order, String trackingNo) {
