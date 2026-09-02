@@ -30,6 +30,18 @@ public class Shipment {
     @DynamoDBAttribute(attributeName = "deliveredAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime deliveredAt;
+    @DynamoDBAttribute(attributeName = "trackingSubscriptionStatus")
+    @DynamoDBTypeConvertedEnum
+    private ShipmentTrackingStatus trackingSubscriptionStatus;
+    @DynamoDBAttribute(attributeName = "trackingSubscriptionId")
+    private String trackingSubscriptionId;
+    @DynamoDBAttribute(attributeName = "trackingExternalId")
+    private String trackingExternalId;
+    @DynamoDBAttribute(attributeName = "trackingSubscriptionError")
+    private String trackingSubscriptionError;
+    @DynamoDBAttribute(attributeName = "trackingSubscribedAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime trackingSubscribedAt;
 
     public Shipment() {
     }
@@ -137,5 +149,89 @@ public class Shipment {
 
     public void setTrackingUrl(String trackingUrl) {
         this.trackingUrl = trackingUrl;
+    }
+
+    public ShipmentTrackingStatus getTrackingSubscriptionStatus() {
+        return trackingSubscriptionStatus;
+    }
+
+    public void setTrackingSubscriptionStatus(ShipmentTrackingStatus trackingSubscriptionStatus) {
+        this.trackingSubscriptionStatus = trackingSubscriptionStatus;
+    }
+
+    public String getTrackingSubscriptionId() {
+        return trackingSubscriptionId;
+    }
+
+    public void setTrackingSubscriptionId(String trackingSubscriptionId) {
+        this.trackingSubscriptionId = trackingSubscriptionId;
+    }
+
+    public String getTrackingExternalId() {
+        return trackingExternalId;
+    }
+
+    public void setTrackingExternalId(String trackingExternalId) {
+        this.trackingExternalId = trackingExternalId;
+    }
+
+    public String getTrackingSubscriptionError() {
+        return trackingSubscriptionError;
+    }
+
+    public void setTrackingSubscriptionError(String trackingSubscriptionError) {
+        this.trackingSubscriptionError = trackingSubscriptionError;
+    }
+
+    public LocalDateTime getTrackingSubscribedAt() {
+        return trackingSubscribedAt;
+    }
+
+    public void setTrackingSubscribedAt(LocalDateTime trackingSubscribedAt) {
+        this.trackingSubscribedAt = trackingSubscribedAt;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasTrackingSubscription() {
+        return trackingSubscriptionStatus != null;
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackingPending() {
+        return trackingSubscriptionStatus == ShipmentTrackingStatus.PENDING;
+    }
+
+    public void markTrackingPending(String subscriptionId, LocalDateTime at) {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.PENDING;
+        this.trackingSubscriptionId = subscriptionId;
+        this.trackingSubscriptionError = null;
+        this.trackingSubscribedAt = at;
+    }
+
+    public void markTrackingActive(String externalId, LocalDateTime at) {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.ACTIVE;
+        this.trackingExternalId = externalId;
+        this.trackingSubscriptionError = null;
+        this.trackingSubscribedAt = at;
+    }
+
+    public void markTrackingFailed(String error, LocalDateTime at) {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
+        this.trackingSubscriptionError = error;
+        this.trackingSubscribedAt = at;
+    }
+
+    public void inheritTrackingSubscriptionFrom(Shipment previous) {
+        if (previous == null || !previous.hasTrackingNo(trackingNo)) {
+            return;
+        }
+        this.trackingSubscriptionStatus = previous.trackingSubscriptionStatus;
+        this.trackingSubscriptionId = previous.trackingSubscriptionId;
+        this.trackingExternalId = previous.trackingExternalId;
+        this.trackingSubscriptionError = previous.trackingSubscriptionError;
+        this.trackingSubscribedAt = previous.trackingSubscribedAt;
+        if (externalId == null) {
+            this.externalId = previous.externalId;
+        }
     }
 }
