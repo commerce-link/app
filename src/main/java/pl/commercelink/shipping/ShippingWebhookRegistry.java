@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Configuration
+@Slf4j
 public class ShippingWebhookRegistry {
 
     private final StoresRepository storesRepository;
@@ -75,6 +77,8 @@ public class ShippingWebhookRegistry {
         }
         Optional<ShipmentTracking> tracking = shipmentTrackingsRepository.find(storeId, result.trackingNo());
         if (tracking.isEmpty()) {
+            log.info("Shipping webhook ignored: no tracked shipment for store={} trackingNo={} state={}",
+                    storeId, result.trackingNo(), result.state());
             return;
         }
         if (tracking.get().getOrderId() != null) {
@@ -93,10 +97,13 @@ public class ShippingWebhookRegistry {
     }
 
     private void handleOrderShipmentStatusChange(Order order, ShippingWebhookResult result) {
-        if (result.state() == ShippingWebhookResult.ShipmentState.COLLECTED
-                && order.getStatus().isOneOf(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed)) {
-            orderEventsRepository.save(new OrderEvent(order.getOrderId(), EventType.action, "SHIPMENT_COLLECTED", result.datetime()));
-            goodsOutEventPublisher.publish(order, "System");
+        if (result.state() == ShippingWebhookResult.ShipmentState.COLLECTED) {
+            if (order.getStatus().isOneOf(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed)) {
+                orderEventsRepository.save(new OrderEvent(order.getOrderId(), EventType.action, "SHIPMENT_COLLECTED", result.datetime()));
+                goodsOutEventPublisher.publish(order, "System");
+            } else {
+                log.info("Shipping webhook COLLECTED ignored: order={} status={}", order.getOrderId(), order.getStatus());
+            }
         }
 
         if (result.state() == ShippingWebhookResult.ShipmentState.DELIVERED) {
@@ -116,12 +123,16 @@ public class ShippingWebhookRegistry {
             // a stale index row (tracking number edited afterwards) must not add a misleading timeline entry
             if (matched) {
                 orderEventsRepository.save(new OrderEvent(orderId, EventType.action, "SHIPMENT_DELIVERED", result.datetime()));
+            } else {
+                log.info("Shipping webhook DELIVERED matched no shipment: order={} trackingNo={} (index row stale?)",
+                        orderId, result.trackingNo());
             }
         }
     }
 
     private void handleRmaShipmentStatusChange(RMA rma, ShippingWebhookResult result) {
         if (rma.getStatus() != RMAStatus.WaitingForItems) {
+            log.info("Shipping webhook ignored: rma={} status={}", rma.getRmaId(), rma.getStatus());
             return;
         }
 
