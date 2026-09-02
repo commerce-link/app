@@ -354,7 +354,11 @@ public class OrdersController extends BaseController {
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
-        model.addAttribute("hasDropshipItems", !dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems).isEmpty());
+        Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems);
+        model.addAttribute("hasDropshipItems", !dropshipItemIds.isEmpty());
+        model.addAttribute("hasWarehouseItems", orderItems.stream()
+                .filter(OrderItem::isProduct)
+                .anyMatch(item -> !dropshipItemIds.contains(item.getItemId())));
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
         model.addAttribute("isSuperAdmin", isSuperAdmin());

@@ -46,6 +46,9 @@
             <div class="notification is-light" th:if="${!delivery.dropship and suggestedAddress == null}"
                  th:text="#{deliveries.approval.suggestedAddress.none}"></div>
 
+            <div class="notification is-warning is-light" th:if="${delivery.hasDirectToConsumerAllocations()}"
+                 th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></div>
+
             <form id="approval-approve-form" method="post"
                   th:action="@{/dashboard/store/{storeId}/deliveries/{deliveryId}/approve(storeId=${delivery.storeId},deliveryId=${delivery.deliveryId})}"
                   onsubmit="document.getElementById('approval-approve-button').disabled = true;">

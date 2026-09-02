@@ -9,9 +9,6 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -20,26 +17,22 @@ public class DropshipEligibility {
     private final DropshipPurchaseService dropshipPurchaseService;
     private final DeliveriesRepository deliveriesRepository;
 
-    public Optional<String> eligibleProvider(Order order, List<OrderItem> orderItems) {
-        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer || !order.hasShippingDetails()) {
-            return Optional.empty();
+    public DropshipAssessment assess(Order order, List<OrderItem> orderItems) {
+        if (order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            return DropshipAssessment.rejected(DropshipRejection.WAREHOUSE_FULFILMENT);
+        }
+        if (!order.hasShippingDetails()) {
+            return DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS);
         }
         List<OrderItem> allocated = orderItems.stream()
                 .filter(OrderItem::isInAllocation)
                 .toList();
         if (allocated.isEmpty()) {
-            return Optional.empty();
+            return DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED);
         }
-        Set<String> providers = allocated.stream()
-                .map(OrderItem::getDeliveryId)
-                .collect(Collectors.toSet());
-        if (providers.size() != 1) {
-            return Optional.empty();
-        }
-        String provider = providers.iterator().next();
-        if (OrderItem.GENERIC_WAREHOUSE_ORDER_NO.equalsIgnoreCase(provider)) {
-            return Optional.empty();
-        }
+
+        // Items outside the allocation must already be accounted for. We happily ship from several suppliers at
+        // once, but we will not fire a supplier purchase for an order that is not fully planned yet.
         List<OrderItem> otherItems = orderItems.stream()
                 .filter(item -> !item.isInAllocation())
                 .toList();
@@ -53,11 +46,22 @@ public class DropshipEligibility {
         boolean everyOtherItemSettled = otherItems.stream()
                 .allMatch(item -> isSettled(item, deliveriesById));
         if (!everyOtherItemSettled) {
-            return Optional.empty();
+            return DropshipAssessment.rejected(DropshipRejection.UNSETTLED_ITEMS);
         }
-        return dropshipPurchaseService.isDropshipAvailable(order.getStoreId(), provider)
-                ? Optional.of(provider)
-                : Optional.empty();
+
+        // Each supplier that can ship straight to the customer becomes its own dropship delivery. Items sitting
+        // at the warehouse, or at a supplier without dropshipping, travel the ordinary warehouse route.
+        List<String> providers = allocated.stream()
+                .map(OrderItem::getDeliveryId)
+                .filter(provider -> !OrderItem.GENERIC_WAREHOUSE_ORDER_NO.equalsIgnoreCase(provider))
+                .distinct()
+                .filter(provider -> dropshipPurchaseService.isDropshipAvailable(order.getStoreId(), provider))
+                .sorted()
+                .toList();
+        if (providers.isEmpty()) {
+            return DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER);
+        }
+        return DropshipAssessment.of(providers);
     }
 
     private boolean isSettled(OrderItem item, Map<String, Delivery> deliveriesById) {

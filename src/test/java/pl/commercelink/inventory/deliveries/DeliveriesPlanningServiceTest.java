@@ -15,7 +15,6 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.times;
@@ -71,7 +70,7 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
 
         // when
         List<Delivery> deliveries = service.run(STORE_ID);
@@ -94,10 +93,10 @@ class DeliveriesPlanningServiceTest {
                 allocation("order-3", "4", "Acme", true)));
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order2);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order2, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order2, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
         when(ordersRepository.findById(STORE_ID, "order-3")).thenReturn(order3);
         when(orderItemsRepository.findByOrderId("order-3")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order3, List.of())).thenReturn(Optional.of("Acme"));
+        when(dropshipEligibility.assess(order3, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
@@ -122,7 +121,8 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of()))
+                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
@@ -136,7 +136,7 @@ class DeliveriesPlanningServiceTest {
     }
 
     @Test
-    void directToConsumerAllocationsOfAnIneligibleOrderGroupIntoProviderBatches() {
+    void directToConsumerAllocationsYieldOneDropshipCandidatePerSupplier() {
         // given
         Order order = new Order();
         when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
@@ -145,15 +145,41 @@ class DeliveriesPlanningServiceTest {
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of()))
+                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
 
         // when
         List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
         List<Delivery> deliveries = service.run(STORE_ID);
 
         // then
-        assertThat(candidates).isEmpty();
-        assertThat(deliveries).hasSize(2);
+        assertThat(candidates).extracting(DropshipCandidate::provider).containsExactly("Acme", "Elko");
+        assertThat(candidates).extracting(DropshipCandidate::orderId).containsExactly("order-2", "order-2");
+        assertThat(deliveries).isEmpty();
+    }
+
+    @Test
+    void aMixedOrderYieldsADropshipCandidateAndAWarehouseDeliverySideBySide() {
+        // given
+        Order order = new Order();
+        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+                allocation("order-3", "4", "Acme", true),
+                allocation("order-3", "5", "Elko", true)));
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+        when(ordersRepository.findById(STORE_ID, "order-3")).thenReturn(order);
+        when(orderItemsRepository.findByOrderId("order-3")).thenReturn(List.of());
+        when(dropshipEligibility.assess(order, List.of()))
+                .thenReturn(DropshipAssessment.of(List.of("Acme")));
+
+        // when
+        List<DropshipCandidate> candidates = service.plan(STORE_ID).dropshipCandidates();
+        List<Delivery> deliveries = service.run(STORE_ID);
+
+        // then
+        assertThat(candidates).extracting(DropshipCandidate::provider).containsExactly("Acme");
+        assertThat(deliveries).extracting(Delivery::getProvider).containsExactly("Elko");
+        assertThat(deliveries.getFirst().getType()).isEqualTo(DeliveryType.WAREHOUSE);
+        assertThat(deliveries.getFirst().hasDirectToConsumerAllocations()).isTrue();
     }
 
     @Test
@@ -175,7 +201,8 @@ class DeliveriesPlanningServiceTest {
         Order order = new Order();
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of());
-        when(dropshipEligibility.eligibleProvider(order, List.of())).thenReturn(Optional.empty());
+        when(dropshipEligibility.assess(order, List.of()))
+                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
 
         // when
         DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);

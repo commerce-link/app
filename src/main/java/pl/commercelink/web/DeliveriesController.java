@@ -356,7 +356,7 @@ public class DeliveriesController {
 
     private String deleteAllocations(String storeId, DeliveryAllocationsForm form,
                                      RedirectAttributes redirectAttributes, Locale locale) {
-        if (isOrderingInProgress(storeId, form.getDeliveryId())) {
+        if (isPurchaseInFlight(storeId, form.getDeliveryId())) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
         deliveriesManager.deleteAllocations(storeId, form.getDeliveryId(), form.getSelectedAllocations());
@@ -811,7 +811,7 @@ public class DeliveriesController {
     public String showApprovalScreen(@PathVariable("storeId") String storeId,
                                      @PathVariable("deliveryId") String deliveryId,
                                      Model model, RedirectAttributes redirectAttributes) {
-        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
         if (delivery == null || !delivery.isAwaitingApproval()) {
             if (model.containsAttribute("errorMessage")) {
                 redirectAttributes.addFlashAttribute("errorMessage", model.getAttribute("errorMessage"));
@@ -1331,6 +1331,14 @@ public class DeliveriesController {
     private boolean isOrderingInProgress(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         return delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched());
+    }
+
+    // Removing allocations is the operator's way out of a purchase that ended badly, so it is blocked only
+    // while the placement is genuinely in flight - not once the supplier left us with an unknown outcome.
+    private boolean isPurchaseInFlight(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        return delivery != null
+                && (delivery.isOrderPending() || (delivery.isOrderDispatched() && !delivery.isOrderOutcomeUnknown()));
     }
 
     private String redirectOrderingInProgress(String storeId, String deliveryId,

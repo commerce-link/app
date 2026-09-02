@@ -205,6 +205,17 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void deliveryDetailsOffersAllocationRemovalWhenTheSupplierOrderOutcomeIsUnknown() throws Exception {
+        // when
+        String template = Files.readString(Path.of("src/main/resources/templates/deliveryDetails.html"));
+
+        // then
+        assertThat(template).contains(
+                "!delivery.orderPending and (!delivery.orderDispatched or delivery.orderOutcomeUnknown)}\" value=\"deleteSelectedAllocations\"");
+        assertThat(template).contains("deliveries.unknownOutcome.confirm.deleteAllocation");
+    }
+
+    @Test
     void deliveryDetailsOffersDropshipShipmentConfirmationInsteadOfWarehouseReceipt() throws Exception {
         // when
         String html = read("deliveryDetails.html");
@@ -410,5 +421,56 @@ class DropshipTemplateTest {
         int refreshStart = script.indexOf("function refreshSubmitState()");
         int refreshEnd = script.indexOf("}", refreshStart);
         assertThat(script.substring(refreshStart, refreshEnd)).contains("orderOptionsComplete()");
+    }
+
+    @Test
+    void orderDetailsHidesTheGoodsIssueActionForOrdersWithoutWarehouseItems() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        // th:if on the goods-issue form: only rendered when there are warehouse items to issue
+        assertThat(html).contains("${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}");
+        // th:disabled on the dropdown trigger: the same clause, negated, inside the compound condition
+        assertThat(html).contains("!(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}");
+    }
+
+    @Test
+    void deliveriesPreviewCarriesTheSupplierIntoTheDropshipCreateLink() throws Exception {
+        // when
+        String html = read("deliveriesPreview.html");
+
+        // then
+        assertThat(html).contains("storeId=${storeId}, orderId=${candidate.orderId}, provider=${candidate.provider})}");
+        assertThat(html).contains("dropship(orderId=${candidate.orderId}, provider=${candidate.provider})}");
+        assertThat(html).contains("<span class=\"has-text-grey\" th:text=\"${candidate.orderId}\"></span>");
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.badge");
+        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
+    }
+
+    @Test
+    void deliveryDetailsWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
+        // when
+        String html = read("deliveryDetails.html");
+        int conditionAt = html.indexOf("th:if=\"${delivery.hasDirectToConsumerAllocations()}\"");
+        int noticeAt = html.indexOf("deliveries.directToConsumer.viaWarehouse.notice");
+
+        // then: the message key sits inside the element guarded by that exact condition, not
+        // merely somewhere in the file
+        assertThat(conditionAt).isGreaterThan(-1);
+        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 150);
+    }
+
+    @Test
+    void deliveryApprovalWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
+        // when
+        String html = read("deliveryApproval.html");
+        int conditionAt = html.indexOf("th:if=\"${delivery.hasDirectToConsumerAllocations()}\"");
+        int noticeAt = html.indexOf("deliveries.directToConsumer.viaWarehouse.notice");
+
+        // then: the message key sits inside the element guarded by that exact condition, not
+        // merely somewhere in the file
+        assertThat(conditionAt).isGreaterThan(-1);
+        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 150);
     }
 }
