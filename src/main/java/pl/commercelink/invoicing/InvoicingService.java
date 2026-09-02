@@ -75,6 +75,10 @@ public class InvoicingService {
         );
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + basket.getStoreId());
+        }
+
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.standardInvoice()
                 .invoiceKind(InvoiceKind.Proforma)
                 .orderId(basket.getBasketId())
@@ -144,6 +148,10 @@ public class InvoicingService {
         }
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+        }
+
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.advanceInvoice()
                 .orderId(order.getOrderId())
                 .wmsOrderNo(wmsOrderNo)
@@ -172,6 +180,10 @@ public class InvoicingService {
         }
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+        }
+
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.finalInvoice()
                 .orderId(order.getOrderId())
                 .wmsOrderNo(wmsOrderNo)
@@ -198,6 +210,10 @@ public class InvoicingService {
             boolean send
     ) {
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+        }
+
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.standardInvoice()
                 .invoiceKind(invoiceKind)
                 .orderId(order.getOrderId())
