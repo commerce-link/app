@@ -71,6 +71,59 @@ class CarrierDictionaryTest {
     }
 
     @Test
+    void findsTheCarrierInsideACeneoDeliveryFormName() {
+        // given
+        CarrierDictionary ceneo = new CarrierDictionary();
+        ceneo.setCarriers(Map.of("Ceneo", Map.of("furgonetka",
+                "{\"InPost\":\"InPost\",\"DHL\":\"DHL\",\"Poczta Polska\":\"Poczta Polska\"}")));
+
+        // when / then
+        assertEquals(Optional.of("DHL"),
+                ceneo.translate("Ceneo", "furgonetka", "DHL, P\u0142atno\u015b\u0107 z g\u00f3ry,Przesy\u0142ka kurierska"));
+        assertEquals(Optional.of("InPost"),
+                ceneo.translate("Ceneo", "furgonetka",
+                        "Paczkomaty InPost, P\u0142atno\u015b\u0107 z g\u00f3ry,Przesy\u0142ka, Przesy\u0142ka paczkomat"));
+        assertEquals(Optional.of("Poczta Polska"),
+                ceneo.translate("Ceneo", "furgonetka",
+                        "Poczta Polska, P\u0142atno\u015b\u0107 z g\u00f3ry, List polecony ekonomiczny"));
+    }
+
+    @Test
+    void matchesACeneoDeliveryFormThatIsNothingButTheCarrierName() {
+        // given
+        CarrierDictionary ceneo = new CarrierDictionary();
+        ceneo.setCarriers(Map.of("Ceneo", Map.of("furgonetka", "{\"InPost\":\"InPost\",\"DHL\":\"DHL\"}")));
+
+        // when / then
+        assertEquals(Optional.of("DHL"), ceneo.translate("Ceneo", "furgonetka", "DHL"));
+        assertEquals(Optional.of("DHL"), ceneo.translate("Ceneo", "furgonetka", "  DHL  "));
+        assertEquals(Optional.of("DHL"), ceneo.translate("Ceneo", "furgonetka", "dhl"));
+    }
+
+    @Test
+    void treatsAnEmptyCeneoDeliveryFormAsNothingToTranslate() {
+        // given
+        CarrierDictionary ceneo = new CarrierDictionary();
+        ceneo.setCarriers(Map.of("Ceneo", Map.of("furgonetka", "{\"InPost\":\"InPost\",\"DHL\":\"DHL\"}")));
+
+        // when / then
+        assertEquals(Optional.empty(), ceneo.translate("Ceneo", "furgonetka", ""));
+        assertEquals(Optional.empty(), ceneo.translate("Ceneo", "furgonetka", "   "));
+        assertEquals(Optional.empty(), ceneo.translate("Ceneo", "furgonetka", null));
+    }
+
+    @Test
+    void leavesACeneoDeliveryFormWithNoRecognisableCarrierUntranslated() {
+        // given
+        CarrierDictionary ceneo = new CarrierDictionary();
+        ceneo.setCarriers(Map.of("Ceneo", Map.of("furgonetka", "{\"InPost\":\"InPost\",\"DHL\":\"DHL\"}")));
+
+        // when / then
+        assertEquals(Optional.empty(),
+                ceneo.translate("Ceneo", "furgonetka", "Dostawa standardowa, P\u0142atno\u015b\u0107 z g\u00f3ry,Przesy\u0142ka"));
+    }
+
+    @Test
     void collectsEveryCarrierNameKnownToTheShippingProvider() {
         // when / then
         assertEquals(Set.of("InPost", "Orlen", "Zabka"), dictionary.namesUsedBy("furgonetka"));
