@@ -197,8 +197,10 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyStoreConfiguration(store, storeId, storeName, demo);
         enableDevInvoicing(store, invoicingProviderFactory);
         mapper.save(store);
-        seedStoreData(storeId, loadFilteredRows());
+        List<CatalogSeedRow> rows = loadFilteredRows();
+        seedStoreData(storeId, rows);
         enableAcmeBDropship(store);
+        saveInvoicingFixtures(storeId, rows);
         return store;
     }
 
@@ -234,6 +236,15 @@ public class DemoStoreSeeder implements StoreSeeder {
             return;
         }
         store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, DEV_INVOICING);
+    }
+
+    /**
+     * The single gate shared by every invoicing-fixture seeding path: fixtures are synthesised for
+     * the dev invoicing adapter's responses, so seeding them without that adapter on the classpath
+     * would leave the deployed demo with deliveries nothing can ever invoice or pay.
+     */
+    static boolean shouldSeedInvoicingFixtures(InvoicingProviderFactory invoicingProviderFactory) {
+        return invoicingProviderFactory.getDescriptor(DEV_INVOICING) != null;
     }
 
     private List<CatalogSeedRow> loadFilteredRows() {
@@ -633,12 +644,37 @@ public class DemoStoreSeeder implements StoreSeeder {
                 .build();
         WarehouseStock stock = buildWarehouseStock(
                 store.getStoreId(), ownerEmailOrFallback(store.getDemo()), rows,
-                invoicingProviderFactory.getDescriptor(DEV_INVOICING) != null);
+                shouldSeedInvoicingFixtures(invoicingProviderFactory));
         mapper.batchSave(stock.items());
         stock.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
         stock.documents().forEach(document -> mapper.save(document, clobber));
         mapper.batchSave(stock.documentItems());
         stock.sequences().forEach(sequence -> mapper.save(sequence, clobber));
+    }
+
+    /**
+     * Seeds the three invoicing-flow fixture deliveries and their warehouse items on the local
+     * bootstrap path, independently of {@link #seedStoreData}. That method only runs once per
+     * store (short-circuited by {@link #isAlreadySeeded}), but {@code V006_LocalDevelopmentBootstrapSeed}
+     * is {@code runAlways = true} and re-invokes {@link #seedStore} on every application start, so
+     * this step must run every time too — the same pattern as {@link #enableAcmeBDropship}. It is
+     * safe to repeat: the fixtures have deterministic ids from {@code demoId(...)} and are saved
+     * with a CLOBBER save behavior, so re-seeding converges on the same rows instead of duplicating
+     * them. Gated identically to {@link #saveWarehouseStock}: nothing is written when the dev
+     * invoicing adapter is absent from the classpath.
+     */
+    private void saveInvoicingFixtures(String storeId, List<CatalogSeedRow> rows) {
+        if (!shouldSeedInvoicingFixtures(invoicingProviderFactory)) {
+            return;
+        }
+        List<CatalogSeedRow> warehouseRows = rows.stream().filter(CatalogSeedRow::inWarehouse).toList();
+        InvoicingFixtures fixtures = invoicingFixtures(storeId, warehouseRows);
+        DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
+        DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build();
+        fixtures.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
+        mapper.batchSave(fixtures.items());
     }
 
     static WarehouseStock buildWarehouseStock(String storeId, String ownerEmail,

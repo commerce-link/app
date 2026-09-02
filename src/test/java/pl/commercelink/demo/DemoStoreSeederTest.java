@@ -1070,6 +1070,27 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void shouldSeedInvoicingFixturesWhenTheDevAdapterIsOnTheClasspath() {
+        // Guards DemoStoreSeeder#saveInvoicingFixtures, the method the local bootstrap path
+        // (V006_LocalDevelopmentBootstrapSeed -> seedStore) now calls on every application start
+        // to reach the invoicing fixtures. saveWarehouseStock's registration-path gate for the
+        // same fixtures is expressed through this identical helper too, so a regression to either
+        // gate shows up here without needing DynamoDB or a Spring context.
+        InvoicingProviderFactory factory = mock(InvoicingProviderFactory.class);
+        when(factory.getDescriptor("invoicing-dev")).thenReturn(mock(InvoicingProviderDescriptor.class));
+
+        assertTrue(DemoStoreSeeder.shouldSeedInvoicingFixtures(factory));
+    }
+
+    @Test
+    void shouldNotSeedInvoicingFixturesWhenTheDevAdapterIsAbsent() {
+        InvoicingProviderFactory factory = mock(InvoicingProviderFactory.class);
+        when(factory.getDescriptor("invoicing-dev")).thenReturn(null);
+
+        assertFalse(DemoStoreSeeder.shouldSeedInvoicingFixtures(factory));
+    }
+
+    @Test
     void seedsInvoicingFixturesOnlyWhenTheDevAdapterIsPresent() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
