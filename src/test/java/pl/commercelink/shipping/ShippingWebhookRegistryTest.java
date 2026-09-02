@@ -106,6 +106,25 @@ class ShippingWebhookRegistryTest {
     }
 
     @Test
+    void deliveredWebhookMatchesTheShipmentRegardlessOfTrackingNumberCase() {
+        // given: operator typed the number in lower case, Furgonetka echoes it upper-cased
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        order.setStatus(OrderStatus.Shipping);
+        order.setShipments(new ArrayList<>(List.of(courier("acmebtrkd89eaa836bc7"))));
+        when(shipmentTrackingsRepository.find(STORE_ID, "ACMEBTRKD89EAA836BC7"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "ACMEBTRKD89EAA836BC7", "order-1", null, DELIVERED_AT)));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        process(new ShippingWebhookResult("ACMEBTRKD89EAA836BC7", ShippingWebhookResult.ShipmentState.DELIVERED, DELIVERED_AT));
+
+        // then
+        assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(DELIVERED_AT);
+        verify(orderEventsRepository).save(any());
+    }
+
+    @Test
     void unknownTrackingNoIsIgnored() {
         // given
         when(shipmentTrackingsRepository.find(STORE_ID, "PKG-X")).thenReturn(Optional.empty());

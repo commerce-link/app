@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
@@ -119,9 +120,15 @@ public class Shipment {
         this.deliveredAt = deliveredAt;
     }
 
+    /** Carriers (and Furgonetka's webhooks) echo tracking numbers upper-cased; compare and index them case-insensitively. */
+    public static String normalizeTrackingNo(String trackingNo) {
+        return trackingNo == null ? null : trackingNo.trim().toUpperCase(Locale.ROOT);
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingNo(String other) {
-        return trackingNo != null && trackingNo.equals(other);
+        return trackingNo != null && other != null
+                && normalizeTrackingNo(trackingNo).equals(normalizeTrackingNo(other));
     }
 
     @DynamoDBIgnore

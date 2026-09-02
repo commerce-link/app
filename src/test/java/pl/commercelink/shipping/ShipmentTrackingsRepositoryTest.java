@@ -82,4 +82,19 @@ class ShipmentTrackingsRepositoryTest {
         assertThat(found).contains(tracking);
         assertThat(missing).isEmpty();
     }
+
+    @Test
+    void findAndSaveNormalizeTheTrackingNumberKey() {
+        // given
+        ShipmentTracking tracking = new ShipmentTracking("store-1", " pkg-1 ", "order-1", null, LocalDateTime.now());
+
+        // when
+        repository.find("store-1", "pkg-1");
+        boolean saved = repository.saveIfAbsent(tracking);
+
+        // then: Furgonetka echoes numbers upper-cased, so the index key must not depend on how the operator typed it
+        verify(dynamoDBMapper).load(ShipmentTracking.class, "store-1", "PKG-1");
+        assertThat(saved).isTrue();
+        assertThat(tracking.getTrackingNo()).isEqualTo("PKG-1");
+    }
 }

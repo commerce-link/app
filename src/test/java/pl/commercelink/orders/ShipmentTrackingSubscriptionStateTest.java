@@ -93,4 +93,17 @@ class ShipmentTrackingSubscriptionStateTest {
         // then
         assertThat(edited.hasTrackingSubscription()).isFalse();
     }
+
+    @Test
+    void hasTrackingNoIgnoresCaseAndSurroundingWhitespace() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setTrackingNo("acmebtrkd89eaa836bc7");
+
+        assertThat(shipment.hasTrackingNo("ACMEBTRKD89EAA836BC7")).isTrue();
+        assertThat(shipment.hasTrackingNo("  acmebtrkd89eaa836bc7 ")).isTrue();
+        assertThat(shipment.hasTrackingNo("ACMEBTRKD89EAA836BC8")).isFalse();
+        assertThat(shipment.hasTrackingNo(null)).isFalse();
+        assertThat(Shipment.normalizeTrackingNo(null)).isNull();
+        assertThat(Shipment.normalizeTrackingNo(" pkg-1 ")).isEqualTo("PKG-1");
+    }
 }
