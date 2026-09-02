@@ -59,7 +59,7 @@ public class MarketplaceOrderImporter {
             ));
         }
 
-        basketItems.add(BasketItem.shipping(marketplaceOrder.shippingCost().doubleValue()));
+        basketItems.add(BasketItem.shipping(marketplaceOrder.shipping().cost().doubleValue()));
 
         Basket basket = Basket.builder(store)
                 .withSource(new OrderSource(marketplaceName, OrderSourceType.Marketplace))
@@ -69,9 +69,9 @@ public class MarketplaceOrderImporter {
                 .build();
 
         Payment payment = new Payment(
-                marketplaceOrder.paymentTransactionId(),
+                marketplaceOrder.payment().transactionId(),
                 "",
-                resolvePaymentSource(marketplaceOrder.paymentType()),
+                resolvePaymentSource(marketplaceOrder.payment().type()),
                 0,
                 commission.doubleValue()
         );
@@ -79,10 +79,10 @@ public class MarketplaceOrderImporter {
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withPayment(payment)
-                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shippingCarrier()))
-                .withEstimatedShippingAt(marketplaceOrder.estimatedShippingAt());
+                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shipping().carrier()))
+                .withEstimatedShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
 
-        String collectionPointCode = toCollectionPointCode(marketplaceOrder.pickupPoint());
+        String collectionPointCode = toCollectionPointCode(marketplaceOrder.shipping().pickupPoint());
         if (collectionPointCode != null) {
             orderBuilder.withCollectionPointCode(collectionPointCode).withShipmentType(ShipmentType.PickupPoint);
         }
