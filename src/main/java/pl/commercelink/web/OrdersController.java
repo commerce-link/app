@@ -243,6 +243,20 @@ public class OrdersController extends BaseController {
         return "redirect:/dashboard/orders";
     }
 
+    @PostMapping("/dashboard/orders/filters/update")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String updateOrderFilter(@RequestParam String filterKey, OrderFilterForm form,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            OrderFilter updated = orderFiltersManager.update(
+                    getStoreId(), getUserId(), isAdmin(), filterKey, form.getLabel(), form.toConditions());
+            redirectAttributes.addAttribute("filterKey", updated.getFilterKey());
+        } catch (OrderFilterAccessDeniedException | OrderFilterInvalidException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/dashboard/orders";
+    }
+
     @PostMapping("/dashboard/orders/filters/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String deleteOrderFilter(@RequestParam String filterKey, RedirectAttributes redirectAttributes) {

@@ -7,8 +7,10 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 @DynamoDBTable(tableName = "OrderFilters")
 public class OrderFilter {
@@ -69,6 +71,21 @@ public class OrderFilter {
     @DynamoDBIgnore
     public OrderFilterConditions conditions() {
         return OrderFilterConditions.ofStored(conditions);
+    }
+
+    @DynamoDBIgnore
+    public OrderFilter withConditions(String label, OrderFilterConditions conditions) {
+        return new OrderFilter(storeId, getScope(), label, conditions);
+    }
+
+    @DynamoDBIgnore
+    public Map<String, String> getConditionsByField() {
+        Map<String, String> byField = new LinkedHashMap<>();
+        for (String entry : conditions) {
+            OrderFilterConditions.fieldOf(entry)
+                    .ifPresent(field -> byField.put(field.name(), OrderFilterConditions.valueOf(entry)));
+        }
+        return byField;
     }
 
     public String getStoreId() {

@@ -51,17 +51,50 @@ public class OrderFiltersManager {
         return filter;
     }
 
+    public OrderFilter update(String storeId, String userId, boolean administrator,
+                              String filterKey, String label, List<String> rawConditions) {
+        OrderFilter existing = orderFiltersRepository.findById(storeId, filterKey);
+        if (existing == null) {
+            throw new OrderFilterInvalidException("The filter no longer exists");
+        }
+        requireWriteAccess(existing, userId, administrator);
+        if (label == null || label.isBlank()) {
+            throw new OrderFilterInvalidException("A filter needs a label");
+        }
+
+        OrderFilter replacement = existing.withConditions(label.trim(), OrderFilterConditions.of(rawConditions));
+
+        if (replacement.getFilterKey().equals(existing.getFilterKey())) {
+            existing.setLabel(label.trim());
+            orderFiltersRepository.save(existing);
+            return existing;
+        }
+
+        OrderFilter clash = orderFiltersRepository.findById(storeId, replacement.getFilterKey());
+        if (clash != null) {
+            throw new OrderFilterInvalidException("The same filter already exists under the label " + clash.getLabel());
+        }
+
+        orderFiltersRepository.save(replacement);
+        orderFiltersRepository.delete(existing);
+        return replacement;
+    }
+
+    private void requireWriteAccess(OrderFilter filter, String userId, boolean administrator) {
+        if (filter.isSharedWithStore() && !administrator) {
+            throw new OrderFilterAccessDeniedException("Only an administrator can change a filter shared with the store");
+        }
+        if (!filter.isSharedWithStore() && !filter.getScope().equals(userId)) {
+            throw new OrderFilterAccessDeniedException("A private filter can be changed only by its owner");
+        }
+    }
+
     public void delete(String storeId, String userId, boolean administrator, String filterKey) {
         OrderFilter filter = orderFiltersRepository.findById(storeId, filterKey);
         if (filter == null) {
             return;
         }
-        if (filter.isSharedWithStore() && !administrator) {
-            throw new OrderFilterAccessDeniedException("Only an administrator can remove a filter shared with the store");
-        }
-        if (!filter.isSharedWithStore() && !filter.getScope().equals(userId)) {
-            throw new OrderFilterAccessDeniedException("A private filter can be removed only by its owner");
-        }
+        requireWriteAccess(filter, userId, administrator);
         orderFiltersRepository.delete(filter);
     }
 

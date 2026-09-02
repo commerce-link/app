@@ -78,6 +78,14 @@
                         </a>
                     </p>
                     <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
+                        <button type="button" class="button is-small edit-filter"
+                                th:data-filter-key="${saved.filterKey}"
+                                th:data-label="${saved.label}"
+                                th:data-conditions="${saved.conditionsByField}">
+                            <span class="icon is-small"><i class="fas fa-pen"></i></span>
+                        </button>
+                    </p>
+                    <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
                         <form method="post" action="/dashboard/orders/filters/delete">
                             <input type="hidden" name="filterKey" th:value="${saved.filterKey}"/>
                             <button type="submit" class="button is-small is-danger is-light">
@@ -93,6 +101,7 @@
         </div>
 
         <form method="post" action="/dashboard/orders/filters" id="filterForm" style="display: none;" class="mt-4">
+            <input type="hidden" name="filterKey" id="filterKeyField"/>
             <div class="field">
                 <label class="label is-small">Name</label>
                 <div class="control">
@@ -231,9 +240,44 @@
             window.location.href = '/dashboard/orders?showAll=true';
         });
 
+        const filterForm = document.getElementById('filterForm');
+        const filterKeyField = document.getElementById('filterKeyField');
+
+        function openFilterForm(creating) {
+            filterForm.action = creating ? '/dashboard/orders/filters' : '/dashboard/orders/filters/update';
+            filterForm.style.display = 'block';
+        }
+
         document.getElementById('toggleFilterForm').addEventListener('click', function() {
-            const form = document.getElementById('filterForm');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (filterForm.style.display === 'block') {
+                filterForm.style.display = 'none';
+                return;
+            }
+            filterForm.reset();
+            filterKeyField.value = '';
+            openFilterForm(true);
+        });
+
+        document.querySelectorAll('.edit-filter').forEach(button => {
+            button.addEventListener('click', function() {
+                filterForm.reset();
+                filterKeyField.value = this.getAttribute('data-filter-key');
+                filterForm.elements['label'].value = this.getAttribute('data-label');
+
+                const conditions = this.getAttribute('data-conditions') || '';
+                conditions.replace(/[{}]/g, '').split(',').forEach(pair => {
+                    const [field, value] = pair.split('=').map(part => part && part.trim());
+                    if (!field || !value) {
+                        return;
+                    }
+                    const input = filterForm.elements[field.charAt(0).toLowerCase() + field.slice(1)];
+                    if (input) {
+                        input.value = value;
+                    }
+                });
+
+                openFilterForm(false);
+            });
         });
     </script>
 
