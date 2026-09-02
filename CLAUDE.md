@@ -35,7 +35,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 ## Coding Conventions
 
 - **Lombok**: Prefer Lombok to remove boilerplate. Use `@RequiredArgsConstructor` (with `access = AccessLevel.PACKAGE`/`PRIVATE` to match the intended constructor visibility) for constructors that are pure `final`-field assignment, and `@Getter`/`@Value`/`@Builder` where they fit. Don't use it where the constructor has real logic (e.g. transforming varargs) or where a `record` already removes the boilerplate.
-- **No Logger**: We log all entries to Sentry automatically. Use `System.out`/`System.err` only in rare cases.
+- **No Logger**: New code logs through SLF4J (`@Slf4j`) — Sentry captures the log appender, and `System.out`/`System.err` bypasses it. `System.out`/`System.err` only in legacy code.
 - **No comments**: Code should be self-explanatory. Refactor instead of commenting.
 - **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.
 - **Email templates**: Stored per store in DynamoDB (`EmailTemplates` table) and rendered at runtime with Mustache by `EmailClient` — there are no `.mustache` files in resources.

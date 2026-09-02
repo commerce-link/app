@@ -18,13 +18,14 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ShipmentTrackingSubscriber {
 
-    static final int MAX_CHECK_ATTEMPTS = 5;
+    static final int MAX_CHECK_ATTEMPTS = 4;
     static final String TRACKING_FAILED_EVENT = "SHIPMENT_TRACKING_FAILED";
     static final String DUPLICATE_TRACKING_NO = "Tracking number is already tracked for another order";
     static final String CHECK_TIMED_OUT = "Furgonetka did not confirm the tracking request in time";
@@ -63,11 +64,22 @@ public class ShipmentTrackingSubscriber {
 
     private void subscribeOne(String storeId, String orderId, String rmaId, Shipment shipment, ShippingProvider provider) {
         LocalDateTime now = LocalDateTime.now();
-        boolean indexed = shipmentTrackingsRepository.saveIfAbsent(
-                new ShipmentTracking(storeId, shipment.getTrackingNo(), orderId, rmaId, now));
-        if (!indexed) {
-            fail(orderId, shipment, DUPLICATE_TRACKING_NO, now);
-            return;
+        Optional<ShipmentTracking> existing = shipmentTrackingsRepository.find(storeId, shipment.getTrackingNo());
+        if (existing.isPresent()) {
+            ShipmentTracking tracking = existing.get();
+            boolean sameEntity = (orderId != null && orderId.equals(tracking.getOrderId()))
+                    || (rmaId != null && rmaId.equals(tracking.getRmaId()));
+            if (!sameEntity) {
+                fail(orderId, shipment, DUPLICATE_TRACKING_NO, now);
+                return;
+            }
+        } else {
+            boolean indexed = shipmentTrackingsRepository.saveIfAbsent(
+                    new ShipmentTracking(storeId, shipment.getTrackingNo(), orderId, rmaId, now));
+            if (!indexed) {
+                fail(orderId, shipment, DUPLICATE_TRACKING_NO, now);
+                return;
+            }
         }
         if (shipment.getExternalId() != null) {
             shipment.markTrackingActive(shipment.getExternalId(), now);

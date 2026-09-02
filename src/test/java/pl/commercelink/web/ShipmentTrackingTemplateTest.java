@@ -21,6 +21,7 @@ class ShipmentTrackingTemplateTest {
             "order.shipment.tracking.status.PENDING",
             "order.shipment.tracking.status.ACTIVE",
             "order.shipment.tracking.status.FAILED",
+            "store.shipping.title",
             "store.shipping.webhook.title",
             "store.shipping.webhook.lead",
             "store.shipping.webhook.url",

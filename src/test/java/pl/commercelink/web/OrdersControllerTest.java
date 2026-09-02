@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -43,6 +44,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -381,6 +383,9 @@ class OrdersControllerTest {
         assertThat(existingOrder.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
         assertThat(existingOrder.getShipments().get(1).hasTrackingSubscription()).isFalse();
         verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
+        InOrder order = inOrder(shipmentTrackingSubscriber, orderLifecycle);
+        order.verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
+        order.verify(orderLifecycle).update(existingOrder);
     }
 
     @Test

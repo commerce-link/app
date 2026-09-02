@@ -19,8 +19,10 @@ import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.shipping.api.ShippingWebhookResult;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.time.LocalDateTime;
@@ -30,6 +32,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -50,6 +53,7 @@ class ShippingWebhookRegistryTest {
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private OrderEventsRepository orderEventsRepository;
     @Mock private ShipmentTrackingsRepository shipmentTrackingsRepository;
+    @Mock private OptimisticLockingExecutor optimisticLockingExecutor;
     @Mock private Store store;
 
     private ShippingWebhookRegistry registry;
@@ -58,8 +62,11 @@ class ShippingWebhookRegistryTest {
     void setUp() {
         when(shippingProviderFactory.availableProviders()).thenReturn(List.of());
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         registry = new ShippingWebhookRegistry(shippingProviderFactory, storesRepository, ordersRepository,
-                orderLifecycle, rmaRepository, goodsOutEventPublisher, orderEventsRepository, shipmentTrackingsRepository);
+                orderLifecycle, rmaRepository, goodsOutEventPublisher, orderEventsRepository, shipmentTrackingsRepository,
+                optimisticLockingExecutor);
     }
 
     private static Shipment courier(String trackingNo) {
@@ -113,6 +120,7 @@ class ShippingWebhookRegistryTest {
         // given
         Order order = new Order(STORE_ID);
         order.setOrderId("order-1");
+        order.setStatus(OrderStatus.Shipping);
         order.setShipments(new ArrayList<>(List.of(courier("PKG-1"))));
         when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
                 .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", "order-1", null, DELIVERED_AT)));
@@ -124,6 +132,26 @@ class ShippingWebhookRegistryTest {
         // then
         verify(goodsOutEventPublisher).publish(order, "System");
         verify(orderLifecycle, never()).update(order);
+    }
+
+    @Test
+    void collectedWebhookIsIgnoredWhileOrderIsStillInAssembly() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setShipments(new ArrayList<>(List.of(courier("PKG-1"))));
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", "order-1", null, DELIVERED_AT)));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        process(new ShippingWebhookResult("PKG-1", ShippingWebhookResult.ShipmentState.COLLECTED, DELIVERED_AT));
+
+        // then
+        verify(goodsOutEventPublisher, never()).publish(any(), any());
+        verify(orderEventsRepository, never()).save(any());
+        verify(orderLifecycle, never()).update(any());
     }
 
     @Test
@@ -145,5 +173,45 @@ class ShippingWebhookRegistryTest {
         assertThat(rma.getShipments().get(0).getDeliveredAt()).isEqualTo(DELIVERED_AT);
         assertThat(rma.getStatus()).isEqualTo(RMAStatus.ItemsReceived);
         verify(rmaRepository).save(rma);
+    }
+
+    @Test
+    void deliveredWebhookForRmaDoesNotRegressStatusWhenRmaIsNotWaitingForItems() {
+        // given
+        RMA rma = new RMA();
+        rma.setRmaId("rma-1");
+        rma.setStoreId(STORE_ID);
+        rma.setStatus(RMAStatus.Processing);
+        rma.setShipments(new ArrayList<>(List.of(courier("RET-1"))));
+        when(shipmentTrackingsRepository.find(STORE_ID, "RET-1"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "RET-1", null, "rma-1", DELIVERED_AT)));
+        when(rmaRepository.findById(STORE_ID, "rma-1")).thenReturn(rma);
+
+        // when
+        process(new ShippingWebhookResult("RET-1", ShippingWebhookResult.ShipmentState.DELIVERED, DELIVERED_AT));
+
+        // then
+        assertThat(rma.getStatus()).isEqualTo(RMAStatus.Processing);
+        assertThat(rma.getShipments().get(0).getDeliveredAt()).isNull();
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void deliveredWebhookMutatesTheFreshlyLoadedOrderThroughTheOptimisticLockingExecutor() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        order.setShipments(new ArrayList<>(List.of(courier("PKG-1"))));
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", "order-1", null, DELIVERED_AT)));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        process(new ShippingWebhookResult("PKG-1", ShippingWebhookResult.ShipmentState.DELIVERED, DELIVERED_AT));
+
+        // then
+        verify(ordersRepository, atLeastOnce()).findById(STORE_ID, "order-1");
+        assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(DELIVERED_AT);
+        verify(orderLifecycle).update(order);
     }
 }

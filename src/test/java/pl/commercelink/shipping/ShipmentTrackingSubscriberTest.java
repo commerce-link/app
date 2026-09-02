@@ -24,6 +24,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -189,6 +190,42 @@ class ShipmentTrackingSubscriberTest {
         assertThat(order.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
         assertThat(order.getShipments().get(0).getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.DUPLICATE_TRACKING_NO);
         verify(provider, never()).trackParcel(any());
+    }
+
+    @Test
+    void reindexingTheSameOrderForAnAlreadyTrackedTrackingNoStillCallsProvider() {
+        // given
+        providerAvailable();
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", ORDER_ID, null, LocalDateTime.now())));
+        when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.active("cmd-1", "21037943", "dpd"));
+        Order order = orderWith(courier("PKG-1"));
+
+        // when
+        subscriber.subscribe(STORE_ID, order);
+
+        // then
+        assertThat(order.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        verify(provider).trackParcel(any());
+        verify(shipmentTrackingsRepository, never()).saveIfAbsent(any());
+    }
+
+    @Test
+    void anotherOrderAlreadyOwningTheTrackingNoFailsWithoutCallingProvider() {
+        // given
+        providerAvailable();
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", "order-other", null, LocalDateTime.now())));
+        Order order = orderWith(courier("PKG-1"));
+
+        // when
+        subscriber.subscribe(STORE_ID, order);
+
+        // then
+        assertThat(order.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
+        assertThat(order.getShipments().get(0).getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.DUPLICATE_TRACKING_NO);
+        verify(provider, never()).trackParcel(any());
+        verify(shipmentTrackingsRepository, never()).saveIfAbsent(any());
     }
 
     @Test
