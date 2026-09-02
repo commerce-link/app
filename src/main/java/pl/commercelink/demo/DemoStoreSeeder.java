@@ -13,6 +13,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
@@ -52,6 +53,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Parcel;
@@ -147,6 +149,8 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String ACME_B_DROPSHIP_KNOB = "orderingDropshipEnabled";
     /** AcmeB is the demo supplier WITHOUT pickup-point deliveries (Acme has them), so both paths can be exercised. */
     static final String ACME_B_PICKUP_POINTS_KNOB = "orderingPickupPointsEnabled";
+    /** The dev invoicing adapter, present only under the `dev` Maven profile. */
+    static final String DEV_INVOICING = "invoicing-dev";
     private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
@@ -160,6 +164,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     private final FileStorage fileStorage;
     private final SupplierRegistry supplierRegistry;
     private final SupplierProviderFactory supplierProviderFactory;
+    private final InvoicingProviderFactory invoicingProviderFactory;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -183,6 +188,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
+        enableDevInvoicing(store, invoicingProviderFactory);
         mapper.save(store);
         seedStoreData(storeId, loadFilteredRows());
         enableAcmeBDropship(store);
@@ -205,6 +211,22 @@ public class DemoStoreSeeder implements StoreSeeder {
         if (!merged.equals(current)) {
             supplierProviderFactory.saveConfiguration(store, ACME_B, merged);
         }
+    }
+
+    /**
+     * Points the store at the in-memory invoicing adapter, so warehouse documents and invoices can
+     * be generated locally. Both guards matter: without the adapter on the classpath there is
+     * nothing to select, and a store that already has an invoicing integration keeps it, so a real
+     * Fakturownia configuration is never replaced by the mock.
+     */
+    static void enableDevInvoicing(Store store, InvoicingProviderFactory invoicingProviderFactory) {
+        if (invoicingProviderFactory.getDescriptor(DEV_INVOICING) == null) {
+            return;
+        }
+        if (store.hasIntegration(IntegrationType.INVOICING_PROVIDER)) {
+            return;
+        }
+        store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, DEV_INVOICING);
     }
 
     private List<CatalogSeedRow> loadFilteredRows() {

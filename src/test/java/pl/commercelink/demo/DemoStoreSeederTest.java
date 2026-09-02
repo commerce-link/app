@@ -2,6 +2,8 @@ package pl.commercelink.demo;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.invoicing.InvoicingProviderFactory;
+import pl.commercelink.invoicing.api.InvoicingProviderDescriptor;
 import pl.commercelink.localdev.CatalogSeed;
 import pl.commercelink.localdev.CatalogSeedRow;
 import pl.commercelink.orders.BillingDetails;
@@ -28,6 +30,7 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.stores.DemoStoreMetadata;
+import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.Store;
 
@@ -41,6 +44,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DemoStoreSeederTest {
 
@@ -1019,5 +1024,48 @@ class DemoStoreSeederTest {
         } catch (java.io.IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
+    }
+
+    @Test
+    void selectsDevInvoicingWhenTheAdapterIsOnTheClasspath() {
+        // given
+        Store store = new Store();
+        InvoicingProviderFactory factory = mock(InvoicingProviderFactory.class);
+        when(factory.getDescriptor("invoicing-dev")).thenReturn(mock(InvoicingProviderDescriptor.class));
+
+        // when
+        DemoStoreSeeder.enableDevInvoicing(store, factory);
+
+        // then
+        assertEquals("invoicing-dev", store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER));
+    }
+
+    @Test
+    void leavesInvoicingUntouchedWhenTheAdapterIsAbsent() {
+        // given
+        Store store = new Store();
+        InvoicingProviderFactory factory = mock(InvoicingProviderFactory.class);
+        when(factory.getDescriptor("invoicing-dev")).thenReturn(null);
+
+        // when
+        DemoStoreSeeder.enableDevInvoicing(store, factory);
+
+        // then
+        assertFalse(store.hasIntegration(IntegrationType.INVOICING_PROVIDER));
+    }
+
+    @Test
+    void neverOverwritesAnExistingInvoicingIntegration() {
+        // given
+        Store store = new Store();
+        store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, "fakturownia");
+        InvoicingProviderFactory factory = mock(InvoicingProviderFactory.class);
+        when(factory.getDescriptor("invoicing-dev")).thenReturn(mock(InvoicingProviderDescriptor.class));
+
+        // when
+        DemoStoreSeeder.enableDevInvoicing(store, factory);
+
+        // then
+        assertEquals("fakturownia", store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER));
     }
 }
