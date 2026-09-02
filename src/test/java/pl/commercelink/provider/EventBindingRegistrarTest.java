@@ -156,6 +156,58 @@ class EventBindingRegistrarTest {
     }
 
     @Test
+    void webhookOutcomeWithRejectedStatusAnswers401() throws Exception {
+        // given
+        WebhookStatusResponse rejected = new WebhookStatusResponse(EventBindingRegistrar.REJECTED_STATUS);
+        AtomicReference<Object> capturedResult = new AtomicReference<>("not-called");
+        TestDescriptor descriptor = new TestDescriptor("furgonetka",
+                List.of(new WebhookBinding<>("furgonetka", (event, ctx) -> WebhookOutcome.of(null, rejected))));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Shipping/",
+                        (d, storeId) -> Map.of(),
+                        (d, storeId, result) -> capturedResult.set(result))
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s1/Webhooks/Shipping/furgonetka");
+        http.setContent("{}".getBytes());
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        // when
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        // then
+        assertThat(response.statusCode().value()).isEqualTo(401);
+        assertThat(((org.springframework.web.servlet.function.EntityResponse<?>) response).entity()).isEqualTo(rejected);
+        assertThat(capturedResult.get()).isEqualTo("not-called");
+    }
+
+    @Test
+    void webhookOutcomeWithOkStatusAnswers200() throws Exception {
+        // given
+        TestDescriptor descriptor = new TestDescriptor("furgonetka",
+                List.of(new WebhookBinding<>("furgonetka",
+                        (event, ctx) -> WebhookOutcome.of(null, new WebhookStatusResponse("OK")))));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Shipping/",
+                        (d, storeId) -> Map.of(), (d, storeId, result) -> { })
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s1/Webhooks/Shipping/furgonetka");
+        http.setContent("{}".getBytes());
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        // when
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        // then
+        assertThat(response.statusCode().value()).isEqualTo(200);
+    }
+
+    @Test
     void webhookBindingWithFailingConfigLoaderReturns200() throws Exception {
         AtomicReference<Boolean> executorCalled = new AtomicReference<>(false);
         WebhookExecutor<String> executor = (event, ctx) -> {
