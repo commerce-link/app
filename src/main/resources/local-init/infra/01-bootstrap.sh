@@ -47,6 +47,11 @@ awslocal sqs create-queue --queue-name supplier-order-tracking-queue-dlq
 awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
   --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-tracking-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
 
+## Shipment tracking re-check queue (Furgonetka add-to-tracking command status), DLQ + redrive mirroring prod
+awslocal sqs create-queue --queue-name shipment-tracking-queue-dlq
+awslocal sqs create-queue --queue-name shipment-tracking-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-queue-dlq\",\"maxReceiveCount\":\"5\"}"}'
+
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,
 # PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
