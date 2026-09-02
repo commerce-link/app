@@ -172,6 +172,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     @Override
     public void seed(Store store) {
         applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
+        enableDevInvoicing(store, invoicingProviderFactory);
         applyDemoWarehouseId(store);
         applyDemoCompanyDetails(store);
         applyDemoInvoicingConfiguration(store);
