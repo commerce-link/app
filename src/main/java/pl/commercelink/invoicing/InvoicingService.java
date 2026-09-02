@@ -76,7 +76,7 @@ public class InvoicingService {
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
-            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + basket.getStoreId());
+            return invoicingProviderNotConfiguredFor(basket.getStoreId());
         }
 
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.standardInvoice()
@@ -149,7 +149,7 @@ public class InvoicingService {
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
-            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+            return invoicingProviderNotConfiguredFor(order.getStoreId());
         }
 
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.advanceInvoice()
@@ -181,7 +181,7 @@ public class InvoicingService {
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
-            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+            return invoicingProviderNotConfiguredFor(order.getStoreId());
         }
 
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.finalInvoice()
@@ -211,7 +211,7 @@ public class InvoicingService {
     ) {
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
-            return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + order.getStoreId());
+            return invoicingProviderNotConfiguredFor(order.getStoreId());
         }
 
         Invoice invoice = invoicingProvider.createInvoice(InvoiceRequest.standardInvoice()
@@ -288,6 +288,16 @@ public class InvoicingService {
 
     private List<OrderItem> getConsolidatedOrderItems(List<OrderItem> orderItems) {
         return orderItems.stream().filter(OrderItem::isConsolidated).collect(Collectors.toList());
+    }
+
+    /**
+     * Every document-creation path resolves the provider from the store and then dereferences it, so each one
+     * needs the same refusal when the store has no invoicing integration selected. Keeping the wording in one
+     * place stops the four messages from drifting apart; callers pass their own store id because they reach it
+     * through different objects.
+     */
+    private static OperationResult invoicingProviderNotConfiguredFor(String storeId) {
+        return new OperationResult(null, null, null, "Invoicing provider is not configured for store: " + storeId);
     }
 
     private void sendInvoiceIfRequested(boolean send, InvoicingProvider invoicingProvider, Invoice invoice, Order order, boolean isProforma, InvoicingConfiguration invoicingConfiguration) {
