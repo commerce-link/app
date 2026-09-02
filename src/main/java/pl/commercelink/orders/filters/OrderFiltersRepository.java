@@ -7,6 +7,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class OrderFiltersRepository extends DynamoDbRepository<OrderFilter> {
@@ -25,7 +26,7 @@ public class OrderFiltersRepository extends DynamoDbRepository<OrderFilter> {
         return new ArrayList<>(dynamoDBMapper.query(OrderFilter.class, query));
     }
 
-    public OrderFilter findById(String storeId, String filterKey) {
-        return dynamoDBMapper.load(OrderFilter.class, storeId, filterKey);
+    public Optional<OrderFilter> findById(String storeId, String filterKey) {
+        return Optional.ofNullable(dynamoDBMapper.load(OrderFilter.class, storeId, filterKey));
     }
 }

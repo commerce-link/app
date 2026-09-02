@@ -36,9 +36,12 @@ public class OrderFilter {
     }
 
     private OrderFilter(String storeId, String scope, String label, OrderFilterConditions conditions) {
+        if (label == null || label.isBlank()) {
+            throw new OrderFilterInvalidException("A filter needs a label");
+        }
         this.storeId = storeId;
         this.filterKey = scope + SCOPE_SEPARATOR + conditions.fingerprint();
-        this.label = label;
+        this.label = label.trim();
         this.conditions = new LinkedList<>(conditions.entries());
     }
 
@@ -59,6 +62,16 @@ public class OrderFilter {
     @DynamoDBIgnore
     public boolean isSharedWithStore() {
         return STORE_SCOPE.equals(getScope());
+    }
+
+    @DynamoDBIgnore
+    public void requireWritableBy(FilterActor actor) {
+        if (isSharedWithStore() && !actor.administrator()) {
+            throw new OrderFilterAccessDeniedException("Only an administrator can change a filter shared with the store");
+        }
+        if (!isSharedWithStore() && !getScope().equals(actor.userId())) {
+            throw new OrderFilterAccessDeniedException("A private filter can be changed only by its owner");
+        }
     }
 
     @DynamoDBIgnore
