@@ -27,7 +27,8 @@ class ShipmentTrackingTemplateTest {
             "store.shipping.webhook.url",
             "store.shipping.webhook.token",
             "store.shipping.webhook.states",
-            "store.shipping.webhook.help");
+            "store.shipping.webhook.help",
+            "store.shipping.webhook.tokenMissing");
 
     private static String read(Path path) throws Exception {
         return Files.readString(path, StandardCharsets.UTF_8);
@@ -53,6 +54,7 @@ class ShipmentTrackingTemplateTest {
         assertThat(html).contains("${shippingWebhookUrl}");
         assertThat(html).contains("th:if=\"${shippingWebhookUrl != null}\"");
         assertThat(html).contains("#{store.shipping.webhook.title}");
+        assertThat(html).contains("th:if=\"${webhookTokenMissing}\"");
     }
 
     @Test

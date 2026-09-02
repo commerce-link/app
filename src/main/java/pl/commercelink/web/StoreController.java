@@ -24,6 +24,7 @@ import pl.commercelink.printing.PrintProviderRegistry;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
+import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.stores.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
@@ -193,6 +194,7 @@ public class StoreController {
         model.addAttribute("availableProviders", shippingProviderFactory.availableProviders());
         model.addAttribute("selectedProviderName", form.getShippingProvider());
         model.addAttribute("shippingWebhookUrl", shippingWebhookUrl(storeId, form.getShippingProvider()));
+        model.addAttribute("webhookTokenMissing", webhookTokenMissing(store, form.getShippingProvider()));
         model.addAttribute("connectedIntegrations", connectedIntegration(form.getShippingProvider()));
         return "store-shipping";
     }
@@ -203,6 +205,19 @@ public class StoreController {
         }
         String domain = StringUtils.removeEnd(apiDomain, "/");
         return domain + "/Store/" + storeId + "/Webhooks/Shipping/" + providerName;
+    }
+
+    // password fields are masked in the UI configuration, so read the stored configuration to tell "empty" from "hidden"
+    boolean webhookTokenMissing(Store store, String providerName) {
+        if (StringUtils.isBlank(providerName)) {
+            return false;
+        }
+        ShippingProviderDescriptor descriptor = shippingProviderFactory.getDescriptor(providerName);
+        if (descriptor == null || descriptor.configurationFields().stream().noneMatch(f -> "webhookToken".equals(f.key()))) {
+            return false;
+        }
+        Map<String, String> configuration = shippingProviderFactory.loadConfiguration(store, providerName);
+        return configuration == null || StringUtils.isBlank(configuration.get("webhookToken"));
     }
 
     @GetMapping("/dashboard/store/shipping/templates/new")

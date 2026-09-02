@@ -21,6 +21,7 @@
             <div class="box mt-4" th:if="${shippingWebhookUrl != null}">
                 <h2 class="subtitle" th:text="#{store.shipping.webhook.title}">Webhook notifications</h2>
                 <p class="mb-3" th:text="#{store.shipping.webhook.lead}"></p>
+                <div class="notification is-warning is-light" th:if="${webhookTokenMissing}" th:text="#{store.shipping.webhook.tokenMissing}"></div>
                 <div class="field">
                     <label class="label" th:text="#{store.shipping.webhook.url}"></label>
                     <div class="control">
