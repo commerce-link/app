@@ -66,4 +66,22 @@ class ShipmentTrackingTemplateTest {
             assertThat(en).as(key + " in messages_en").contains("\n" + key + "=");
         }
     }
+
+    @Test
+    void shippingScreenHasHelpPanelWithFurgonetkaGuidance() throws Exception {
+        // when
+        String html = read(STORE_SHIPPING);
+        String pl = read(MESSAGES_PL);
+        String en = read(MESSAGES_EN);
+
+        // then
+        assertThat(html).contains("~{fragments/screen-intro :: panel('shipping'");
+        assertThat(html).contains("~{fragments/screen-intro :: toggle}");
+        for (String suffix : List.of("title", "lead", "item1", "item1.text", "item2", "item2.text", "item3", "item3.text")) {
+            assertThat(pl).contains("\nintro.shipping." + suffix + "=");
+            assertThat(en).contains("\nintro.shipping." + suffix + "=");
+        }
+        assertThat(pl).contains("Furgonetk");
+        assertThat(en).contains("Furgonetka");
+    }
 }
