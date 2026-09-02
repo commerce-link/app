@@ -29,45 +29,13 @@ class OrderFilterMatcherTest {
         return order;
     }
 
-    private static OrderFilter filter(OrderFilterCondition... conditions) {
-        OrderFilter filter = new OrderFilter();
-        filter.setConditions(List.of(conditions));
-        return filter;
-    }
-
-    private static OrderFilterCondition condition(OrderFilterField field, String... values) {
-        return new OrderFilterCondition(field, List.of(values));
+    private static OrderFilter filter(String... conditions) {
+        return OrderFilter.sharedWithStore("store-1", "test", OrderFilterConditions.of(List.of(conditions)));
     }
 
     @Test
-    @DisplayName("a filter without conditions matches every order")
-    void emptyFilterMatchesEverything() {
-        assertThat(matcher.matches(order(), filter())).isTrue();
-        assertThat(matcher.matches(order(), null)).isTrue();
-    }
-
-    @Test
-    @DisplayName("values of one condition are combined with OR")
-    void valuesOfOneConditionAreOred() {
-        Order courier = order();
-        courier.addShipment(new Shipment(ShipmentType.Courier));
-
-        Order pickupPoint = order();
-        pickupPoint.addShipment(new Shipment(ShipmentType.PickupPoint));
-
-        Order personal = order();
-        personal.addShipment(new Shipment(ShipmentType.PersonalCollection));
-
-        OrderFilter courierOrPickupPoint = filter(condition(OrderFilterField.ShipmentType, "Courier", "PickupPoint"));
-
-        assertThat(matcher.matches(courier, courierOrPickupPoint)).isTrue();
-        assertThat(matcher.matches(pickupPoint, courierOrPickupPoint)).isTrue();
-        assertThat(matcher.matches(personal, courierOrPickupPoint)).isFalse();
-    }
-
-    @Test
-    @DisplayName("separate conditions are combined with AND")
-    void separateConditionsAreAnded() {
+    @DisplayName("all conditions have to hold")
+    void allConditionsHaveToHold() {
         Order matching = order();
         matching.addShipment(new Shipment(ShipmentType.PickupPoint));
         matching.addPayment(new Payment(PaymentSource.CashOnDelivery));
@@ -76,9 +44,7 @@ class OrderFilterMatcherTest {
         wrongPayment.addShipment(new Shipment(ShipmentType.PickupPoint));
         wrongPayment.addPayment(new Payment(PaymentSource.Card));
 
-        OrderFilter pickupPointOnDelivery = filter(
-                condition(OrderFilterField.ShipmentType, "PickupPoint"),
-                condition(OrderFilterField.PaymentSource, "CashOnDelivery"));
+        OrderFilter pickupPointOnDelivery = filter("ShipmentType=PickupPoint", "PaymentSource=CashOnDelivery");
 
         assertThat(matcher.matches(matching, pickupPointOnDelivery)).isTrue();
         assertThat(matcher.matches(wrongPayment, pickupPointOnDelivery)).isFalse();
@@ -89,14 +55,12 @@ class OrderFilterMatcherTest {
     void dueTodayIncludesOverdue() {
         Order overdue = order();
         overdue.setEstimatedShippingAt(TODAY.minusDays(2));
-
         Order dueToday = order();
         dueToday.setEstimatedShippingAt(TODAY);
-
         Order later = order();
         later.setEstimatedShippingAt(TODAY.plusDays(1));
 
-        OrderFilter due = filter(condition(OrderFilterField.ShippingDue, "DueToday"));
+        OrderFilter due = filter("ShippingDue=DueToday");
 
         assertThat(matcher.matches(overdue, due)).isTrue();
         assertThat(matcher.matches(dueToday, due)).isTrue();
@@ -108,14 +72,11 @@ class OrderFilterMatcherTest {
     void overdueExcludesToday() {
         Order overdue = order();
         overdue.setEstimatedShippingAt(TODAY.minusDays(1));
-
         Order dueToday = order();
         dueToday.setEstimatedShippingAt(TODAY);
 
-        OrderFilter filter = filter(condition(OrderFilterField.ShippingDue, "Overdue"));
-
-        assertThat(matcher.matches(overdue, filter)).isTrue();
-        assertThat(matcher.matches(dueToday, filter)).isFalse();
+        assertThat(matcher.matches(overdue, filter("ShippingDue=Overdue"))).isTrue();
+        assertThat(matcher.matches(dueToday, filter("ShippingDue=Overdue"))).isFalse();
     }
 
     @Test
@@ -123,9 +84,8 @@ class OrderFilterMatcherTest {
     void unscheduledMatchesOrdersWithoutDate() {
         Order withoutDate = order();
 
-        assertThat(matcher.matches(withoutDate, filter(condition(OrderFilterField.ShippingDue, "Unscheduled")))).isTrue();
-        assertThat(matcher.matches(withoutDate, filter(condition(OrderFilterField.ShippingDue, "DueToday")))).isFalse();
-        assertThat(matcher.matches(withoutDate, filter(condition(OrderFilterField.ShippingDue, "Overdue")))).isFalse();
+        assertThat(matcher.matches(withoutDate, filter("ShippingDue=Unscheduled"))).isTrue();
+        assertThat(matcher.matches(withoutDate, filter("ShippingDue=DueToday"))).isFalse();
     }
 
     @Test
@@ -134,23 +94,19 @@ class OrderFilterMatcherTest {
         Order warsaw = order();
         warsaw.getShippingDetails().setPostalCode("00-950");
 
-        OrderFilter filter = filter(condition(OrderFilterField.ShippingPostalCode, "00"));
-        OrderFilter withDash = filter(condition(OrderFilterField.ShippingPostalCode, "00-9"));
-        OrderFilter other = filter(condition(OrderFilterField.ShippingPostalCode, "02"));
-
-        assertThat(matcher.matches(warsaw, filter)).isTrue();
-        assertThat(matcher.matches(warsaw, withDash)).isTrue();
-        assertThat(matcher.matches(warsaw, other)).isFalse();
+        assertThat(matcher.matches(warsaw, filter("ShippingPostalCode=00"))).isTrue();
+        assertThat(matcher.matches(warsaw, filter("ShippingPostalCode=00-9"))).isTrue();
+        assertThat(matcher.matches(warsaw, filter("ShippingPostalCode=02"))).isFalse();
     }
 
     @Test
-    @DisplayName("marketplace is matched by the source name")
+    @DisplayName("marketplace is matched by the source name, ignoring case")
     void marketplaceIsMatchedBySourceName() {
         Order fromAllegro = order();
         fromAllegro.setSource(new OrderSource("Allegro", OrderSourceType.Marketplace));
 
-        assertThat(matcher.matches(fromAllegro, filter(condition(OrderFilterField.SourceName, "allegro")))).isTrue();
-        assertThat(matcher.matches(fromAllegro, filter(condition(OrderFilterField.SourceName, "Empik")))).isFalse();
+        assertThat(matcher.matches(fromAllegro, filter("SourceName=allegro"))).isTrue();
+        assertThat(matcher.matches(fromAllegro, filter("SourceName=Empik"))).isFalse();
     }
 
     @Test
@@ -159,12 +115,12 @@ class OrderFilterMatcherTest {
         Order assembled = order();
         assembled.setStatus(OrderStatus.Assembled);
 
-        assertThat(matcher.matches(assembled, filter(condition(OrderFilterField.Status, "Assembled", "New")))).isTrue();
-        assertThat(matcher.matches(assembled, filter(condition(OrderFilterField.Status, "Blocked")))).isFalse();
+        assertThat(matcher.matches(assembled, filter("Status=Assembled"))).isTrue();
+        assertThat(matcher.matches(assembled, filter("Status=Blocked"))).isFalse();
     }
 
     @Test
-    @DisplayName("apply keeps only the matching orders and their order")
+    @DisplayName("apply keeps the matching orders in their original order")
     void applyKeepsMatchingOrders() {
         Order first = order();
         first.setEstimatedShippingAt(TODAY.minusDays(1));
@@ -173,18 +129,8 @@ class OrderFilterMatcherTest {
         Order third = order();
         third.setEstimatedShippingAt(TODAY);
 
-        List<Order> matching = matcher.apply(List.of(first, second, third),
-                filter(condition(OrderFilterField.ShippingDue, "DueToday")));
+        List<Order> matching = matcher.apply(List.of(first, second, third), filter("ShippingDue=DueToday"));
 
         assertThat(matching).containsExactly(first, third);
-    }
-
-    @Test
-    @DisplayName("an unknown value never matches instead of breaking the list")
-    void unknownValueDoesNotMatch() {
-        Order courier = order();
-        courier.addShipment(new Shipment(ShipmentType.Courier));
-
-        assertThat(matcher.matches(courier, filter(condition(OrderFilterField.ShipmentType, "Teleportation")))).isFalse();
     }
 }

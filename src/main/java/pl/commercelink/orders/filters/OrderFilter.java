@@ -9,12 +9,13 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
 
 @DynamoDBTable(tableName = "OrderFilters")
 public class OrderFilter {
 
-    public static final String GLOBAL_OWNER = "GLOBAL";
+    public static final String STORE_SCOPE = "STORE";
+
+    private static final char SCOPE_SEPARATOR = '#';
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -22,11 +23,11 @@ public class OrderFilter {
     @DynamoDBRangeKey(attributeName = "filterKey")
     private String filterKey;
 
-    @DynamoDBAttribute(attributeName = "name")
-    private String name;
+    @DynamoDBAttribute(attributeName = "label")
+    private String label;
 
     @DynamoDBAttribute(attributeName = "conditions")
-    private List<OrderFilterCondition> conditions = new LinkedList<>();
+    private List<String> conditions = new LinkedList<>();
 
     @DynamoDBVersionAttribute
     private Long version;
@@ -34,37 +35,40 @@ public class OrderFilter {
     public OrderFilter() {
     }
 
-    public static OrderFilter global(String storeId, String name, List<OrderFilterCondition> conditions) {
-        return create(storeId, GLOBAL_OWNER, name, conditions);
+    private OrderFilter(String storeId, String scope, String label, OrderFilterConditions conditions) {
+        this.storeId = storeId;
+        this.filterKey = scope + SCOPE_SEPARATOR + conditions.fingerprint();
+        this.label = label;
+        this.conditions = new LinkedList<>(conditions.entries());
     }
 
-    public static OrderFilter ownedBy(String storeId, String userId, String name, List<OrderFilterCondition> conditions) {
-        return create(storeId, userId, name, conditions);
+    public static OrderFilter sharedWithStore(String storeId, String label, OrderFilterConditions conditions) {
+        return new OrderFilter(storeId, STORE_SCOPE, label, conditions);
     }
 
-    private static OrderFilter create(String storeId, String owner, String name, List<OrderFilterCondition> conditions) {
-        OrderFilter filter = new OrderFilter();
-        filter.storeId = storeId;
-        filter.filterKey = owner + "#" + UUID.randomUUID();
-        filter.name = name;
-        filter.conditions = new LinkedList<>(conditions);
-        return filter;
-    }
-
-    @DynamoDBIgnore
-    public String getOwner() {
-        int separator = filterKey == null ? -1 : filterKey.indexOf('#');
-        return separator < 0 ? GLOBAL_OWNER : filterKey.substring(0, separator);
+    public static OrderFilter ownedBy(String storeId, String userId, String label, OrderFilterConditions conditions) {
+        return new OrderFilter(storeId, userId, label, conditions);
     }
 
     @DynamoDBIgnore
-    public boolean isGlobal() {
-        return GLOBAL_OWNER.equals(getOwner());
+    public String getScope() {
+        int separator = filterKey == null ? -1 : filterKey.indexOf(SCOPE_SEPARATOR);
+        return separator < 0 ? "" : filterKey.substring(0, separator);
+    }
+
+    @DynamoDBIgnore
+    public boolean isSharedWithStore() {
+        return STORE_SCOPE.equals(getScope());
     }
 
     @DynamoDBIgnore
     public boolean isVisibleTo(String userId) {
-        return isGlobal() || getOwner().equals(userId);
+        return isSharedWithStore() || (userId != null && userId.equals(getScope()));
+    }
+
+    @DynamoDBIgnore
+    public OrderFilterConditions conditions() {
+        return OrderFilterConditions.ofStored(conditions);
     }
 
     public String getStoreId() {
@@ -83,19 +87,19 @@ public class OrderFilter {
         this.filterKey = filterKey;
     }
 
-    public String getName() {
-        return name;
+    public String getLabel() {
+        return label;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setLabel(String label) {
+        this.label = label;
     }
 
-    public List<OrderFilterCondition> getConditions() {
+    public List<String> getConditions() {
         return conditions;
     }
 
-    public void setConditions(List<OrderFilterCondition> conditions) {
+    public void setConditions(List<String> conditions) {
         this.conditions = conditions;
     }
 

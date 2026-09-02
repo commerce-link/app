@@ -9,34 +9,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderFilterTest {
 
-    @Test
-    @DisplayName("a global filter is owned by nobody and visible to everyone")
-    void globalFilterIsVisibleToEveryone() {
-        OrderFilter filter = OrderFilter.global("store-1", "Due today", List.of());
+    private static OrderFilterConditions courier() {
+        return OrderFilterConditions.of(List.of("ShipmentType=Courier"));
+    }
 
-        assertThat(filter.isGlobal()).isTrue();
+    @Test
+    @DisplayName("a filter shared with the store is visible to everyone")
+    void sharedFilterIsVisibleToEveryone() {
+        OrderFilter filter = OrderFilter.sharedWithStore("store-1", "Courier", courier());
+
+        assertThat(filter.isSharedWithStore()).isTrue();
         assertThat(filter.isVisibleTo("user-1")).isTrue();
         assertThat(filter.isVisibleTo("user-2")).isTrue();
-        assertThat(filter.getFilterKey()).startsWith(OrderFilter.GLOBAL_OWNER + "#");
     }
 
     @Test
     @DisplayName("a private filter is visible only to its owner")
     void privateFilterIsVisibleOnlyToOwner() {
-        OrderFilter filter = OrderFilter.ownedBy("store-1", "user-1", "Mine", List.of());
+        OrderFilter filter = OrderFilter.ownedBy("store-1", "user-1", "Mine", courier());
 
-        assertThat(filter.isGlobal()).isFalse();
-        assertThat(filter.getOwner()).isEqualTo("user-1");
+        assertThat(filter.isSharedWithStore()).isFalse();
+        assertThat(filter.getScope()).isEqualTo("user-1");
         assertThat(filter.isVisibleTo("user-1")).isTrue();
         assertThat(filter.isVisibleTo("user-2")).isFalse();
     }
 
     @Test
-    @DisplayName("two filters of one user get distinct keys")
-    void filtersOfOneUserGetDistinctKeys() {
-        OrderFilter first = OrderFilter.ownedBy("store-1", "user-1", "First", List.of());
-        OrderFilter second = OrderFilter.ownedBy("store-1", "user-1", "Second", List.of());
+    @DisplayName("the same conditions in the same scope give the same key")
+    void sameConditionsGiveTheSameKey() {
+        OrderFilter first = OrderFilter.sharedWithStore("store-1", "Courier", courier());
+        OrderFilter second = OrderFilter.sharedWithStore("store-1", "Kurier", courier());
 
-        assertThat(first.getFilterKey()).isNotEqualTo(second.getFilterKey());
+        assertThat(first.getFilterKey()).isEqualTo(second.getFilterKey());
+    }
+
+    @Test
+    @DisplayName("the same conditions in different scopes give different keys")
+    void differentScopesGiveDifferentKeys() {
+        OrderFilter shared = OrderFilter.sharedWithStore("store-1", "Courier", courier());
+        OrderFilter mine = OrderFilter.ownedBy("store-1", "user-1", "Courier", courier());
+
+        assertThat(shared.getFilterKey()).isNotEqualTo(mine.getFilterKey());
     }
 }

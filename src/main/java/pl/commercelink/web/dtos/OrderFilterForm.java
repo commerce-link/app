@@ -1,109 +1,99 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.orders.filters.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterField;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 public class OrderFilterForm {
 
-    private String name;
-    private boolean global;
-    private List<String> statuses = new LinkedList<>();
-    private List<String> shipmentTypes = new LinkedList<>();
-    private List<String> paymentSources = new LinkedList<>();
-    private List<String> shippingDue = new LinkedList<>();
-    private String sourceNames;
-    private String postalCodePrefixes;
+    private String label;
+    private boolean sharedWithStore;
+    private String status;
+    private String shipmentType;
+    private String paymentSource;
+    private String shippingDue;
+    private String sourceName;
+    private String shippingPostalCode;
 
-    public List<OrderFilterCondition> toConditions() {
-        List<OrderFilterCondition> conditions = new LinkedList<>();
-        addCondition(conditions, OrderFilterField.Status, statuses);
-        addCondition(conditions, OrderFilterField.ShipmentType, shipmentTypes);
-        addCondition(conditions, OrderFilterField.PaymentSource, paymentSources);
-        addCondition(conditions, OrderFilterField.ShippingDue, shippingDue);
-        addCondition(conditions, OrderFilterField.SourceName, split(sourceNames));
-        addCondition(conditions, OrderFilterField.ShippingPostalCode, split(postalCodePrefixes));
+    public List<String> toConditions() {
+        List<String> conditions = new LinkedList<>();
+        add(conditions, OrderFilterField.Status, status);
+        add(conditions, OrderFilterField.ShipmentType, shipmentType);
+        add(conditions, OrderFilterField.PaymentSource, paymentSource);
+        add(conditions, OrderFilterField.ShippingDue, shippingDue);
+        add(conditions, OrderFilterField.SourceName, sourceName);
+        add(conditions, OrderFilterField.ShippingPostalCode, shippingPostalCode);
         return conditions;
     }
 
-    private static void addCondition(List<OrderFilterCondition> conditions, OrderFilterField field, List<String> values) {
-        List<String> cleaned = values == null ? List.of() : values.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(String::trim)
-                .toList();
-        if (!cleaned.isEmpty()) {
-            conditions.add(new OrderFilterCondition(field, cleaned));
+    private static void add(List<String> conditions, OrderFilterField field, String value) {
+        if (value != null && !value.isBlank()) {
+            conditions.add(field.name() + "=" + value.trim());
         }
     }
 
-    private static List<String> split(String value) {
-        return value == null ? List.of() : Arrays.stream(value.split(",")).toList();
+    public String getLabel() {
+        return label;
     }
 
-    public String getName() {
-        return name;
+    public void setLabel(String label) {
+        this.label = label;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public boolean isSharedWithStore() {
+        return sharedWithStore;
     }
 
-    public boolean isGlobal() {
-        return global;
+    public void setSharedWithStore(boolean sharedWithStore) {
+        this.sharedWithStore = sharedWithStore;
     }
 
-    public void setGlobal(boolean global) {
-        this.global = global;
+    public String getStatus() {
+        return status;
     }
 
-    public List<String> getStatuses() {
-        return statuses;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public void setStatuses(List<String> statuses) {
-        this.statuses = statuses;
+    public String getShipmentType() {
+        return shipmentType;
     }
 
-    public List<String> getShipmentTypes() {
-        return shipmentTypes;
+    public void setShipmentType(String shipmentType) {
+        this.shipmentType = shipmentType;
     }
 
-    public void setShipmentTypes(List<String> shipmentTypes) {
-        this.shipmentTypes = shipmentTypes;
+    public String getPaymentSource() {
+        return paymentSource;
     }
 
-    public List<String> getPaymentSources() {
-        return paymentSources;
+    public void setPaymentSource(String paymentSource) {
+        this.paymentSource = paymentSource;
     }
 
-    public void setPaymentSources(List<String> paymentSources) {
-        this.paymentSources = paymentSources;
-    }
-
-    public List<String> getShippingDue() {
+    public String getShippingDue() {
         return shippingDue;
     }
 
-    public void setShippingDue(List<String> shippingDue) {
+    public void setShippingDue(String shippingDue) {
         this.shippingDue = shippingDue;
     }
 
-    public String getSourceNames() {
-        return sourceNames;
+    public String getSourceName() {
+        return sourceName;
     }
 
-    public void setSourceNames(String sourceNames) {
-        this.sourceNames = sourceNames;
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
     }
 
-    public String getPostalCodePrefixes() {
-        return postalCodePrefixes;
+    public String getShippingPostalCode() {
+        return shippingPostalCode;
     }
 
-    public void setPostalCodePrefixes(String postalCodePrefixes) {
-        this.postalCodePrefixes = postalCodePrefixes;
+    public void setShippingPostalCode(String shippingPostalCode) {
+        this.shippingPostalCode = shippingPostalCode;
     }
 }

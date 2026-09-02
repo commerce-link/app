@@ -12,6 +12,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.when;
 class OrderFiltersManagerTest {
 
     private static final String STORE_ID = "store-1";
+    private static final List<String> COURIER = List.of("ShipmentType=Courier");
 
     @Mock
     private OrderFiltersRepository orderFiltersRepository;
@@ -27,32 +29,34 @@ class OrderFiltersManagerTest {
     @InjectMocks
     private OrderFiltersManager manager;
 
+    private static OrderFilterConditions courier() {
+        return OrderFilterConditions.of(COURIER);
+    }
+
     @Test
-    @DisplayName("a user sees the store wide filters and only their own private ones")
-    void userSeesGlobalAndOwnFilters() {
-        OrderFilter global = OrderFilter.global(STORE_ID, "Due today", List.of());
-        OrderFilter mine = OrderFilter.ownedBy(STORE_ID, "user-1", "Mine", List.of());
-        OrderFilter someoneElses = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", List.of());
-        when(orderFiltersRepository.findAllByStoreId(STORE_ID)).thenReturn(List.of(global, mine, someoneElses));
+    @DisplayName("a user sees the filters shared with the store and only their own private ones")
+    void userSeesSharedAndOwnFilters() {
+        OrderFilter shared = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
+        OrderFilter mine = OrderFilter.ownedBy(STORE_ID, "user-1", "Mine", courier());
+        OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
+        when(orderFiltersRepository.findAllByStoreId(STORE_ID)).thenReturn(List.of(shared, mine, theirs));
 
-        List<OrderFilter> visible = manager.visibleTo(STORE_ID, "user-1");
-
-        assertThat(visible).containsExactly(global, mine);
+        assertThat(manager.visibleTo(STORE_ID, "user-1")).containsExactly(shared, mine);
     }
 
     @Test
     @DisplayName("a filter of another user cannot be opened by key")
     void filterOfAnotherUserIsNotFound() {
-        OrderFilter someoneElses = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", List.of());
-        when(orderFiltersRepository.findById(STORE_ID, someoneElses.getFilterKey())).thenReturn(someoneElses);
+        OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
+        when(orderFiltersRepository.findById(STORE_ID, theirs.getFilterKey())).thenReturn(theirs);
 
-        assertThat(manager.find(STORE_ID, "user-1", someoneElses.getFilterKey())).isNull();
+        assertThat(manager.find(STORE_ID, "user-1", theirs.getFilterKey())).isNull();
     }
 
     @Test
-    @DisplayName("only an administrator can create a store wide filter")
-    void onlyAdministratorCreatesGlobalFilter() {
-        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", true, false, "Due today", List.of()))
+    @DisplayName("only an administrator shares a filter with the store")
+    void onlyAdministratorSharesWithStore() {
+        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", true, false, "Courier", COURIER))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
         verify(orderFiltersRepository, never()).save(any());
@@ -61,36 +65,56 @@ class OrderFiltersManagerTest {
     @Test
     @DisplayName("a regular user creates a private filter")
     void regularUserCreatesPrivateFilter() {
-        OrderFilter created = manager.create(STORE_ID, "user-1", false, false, "Mine", List.of());
+        OrderFilter created = manager.create(STORE_ID, "user-1", false, false, "Mine", COURIER);
 
-        assertThat(created.isGlobal()).isFalse();
-        assertThat(created.getOwner()).isEqualTo("user-1");
+        assertThat(created.isSharedWithStore()).isFalse();
+        assertThat(created.getScope()).isEqualTo("user-1");
         verify(orderFiltersRepository).save(created);
     }
 
     @Test
-    @DisplayName("a private filter cannot be removed by another user")
-    void privateFilterIsRemovedOnlyByOwner() {
-        OrderFilter someoneElses = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", List.of());
-        when(orderFiltersRepository.findById(STORE_ID, someoneElses.getFilterKey())).thenReturn(someoneElses);
+    @DisplayName("the same conditions cannot be saved twice in one scope")
+    void sameConditionsCannotBeSavedTwice() {
+        OrderFilter existing = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
+        when(orderFiltersRepository.findById(STORE_ID, existing.getFilterKey())).thenReturn(existing);
 
-        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", true, someoneElses.getFilterKey()))
+        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", true, true, "Kurier", COURIER))
+                .isInstanceOf(OrderFilterInvalidException.class)
+                .hasMessageContaining("Courier");
+
+        verify(orderFiltersRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a filter needs a label")
+    void filterNeedsALabel() {
+        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", false, false, "  ", COURIER))
+                .isInstanceOf(OrderFilterInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("a private filter can be removed only by its owner")
+    void privateFilterIsRemovedOnlyByOwner() {
+        OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
+        when(orderFiltersRepository.findById(STORE_ID, theirs.getFilterKey())).thenReturn(theirs);
+
+        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", true, theirs.getFilterKey()))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
         verify(orderFiltersRepository, never()).delete(any(OrderFilter.class));
     }
 
     @Test
-    @DisplayName("only an administrator can remove a store wide filter")
-    void onlyAdministratorRemovesGlobalFilter() {
-        OrderFilter global = OrderFilter.global(STORE_ID, "Due today", List.of());
-        when(orderFiltersRepository.findById(STORE_ID, global.getFilterKey())).thenReturn(global);
+    @DisplayName("any administrator removes a filter shared with the store")
+    void anyAdministratorRemovesSharedFilter() {
+        OrderFilter shared = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
+        when(orderFiltersRepository.findById(STORE_ID, shared.getFilterKey())).thenReturn(shared);
 
-        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", false, global.getFilterKey()))
+        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", false, shared.getFilterKey()))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
-        manager.delete(STORE_ID, "user-1", true, global.getFilterKey());
+        manager.delete(STORE_ID, "user-9", true, shared.getFilterKey());
 
-        verify(orderFiltersRepository).delete(global);
+        verify(orderFiltersRepository).delete(shared);
     }
 }

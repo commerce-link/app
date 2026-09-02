@@ -17,4 +17,14 @@ public enum OrderFilterField {
                 .filter(field -> field.name().equalsIgnoreCase(value))
                 .findFirst();
     }
+
+    public String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (this == ShippingPostalCode) {
+            return value.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        }
+        return value.trim().toUpperCase();
+    }
 }

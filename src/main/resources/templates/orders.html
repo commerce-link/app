@@ -72,12 +72,12 @@
                         <a class="button is-small"
                            th:classappend="${saved.filterKey == selectedFilterKey} ? 'is-link' : 'is-link is-light'"
                            th:href="@{/dashboard/orders(filterKey=${saved.filterKey})}">
-                            <span class="icon is-small" th:if="${saved.global}"><i class="fas fa-users"></i></span>
-                            <span class="icon is-small" th:unless="${saved.global}"><i class="fas fa-user"></i></span>
-                            <span th:text="${saved.name}"></span>
+                            <span class="icon is-small" th:if="${saved.sharedWithStore}"><i class="fas fa-users"></i></span>
+                            <span class="icon is-small" th:unless="${saved.sharedWithStore}"><i class="fas fa-user"></i></span>
+                            <span th:text="${saved.label}"></span>
                         </a>
                     </p>
-                    <p class="control" th:if="${!saved.global or canManageGlobalFilters}">
+                    <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
                         <form method="post" action="/dashboard/orders/filters/delete">
                             <input type="hidden" name="filterKey" th:value="${saved.filterKey}"/>
                             <button type="submit" class="button is-small is-danger is-light">
@@ -96,39 +96,43 @@
             <div class="field">
                 <label class="label is-small">Name</label>
                 <div class="control">
-                    <input class="input is-small" type="text" name="name" required/>
+                    <input class="input is-small" type="text" name="label" required/>
                 </div>
             </div>
 
             <div class="columns is-multiline">
                 <div class="column is-one-third">
                     <label class="label is-small">Shipping due</label>
-                    <div class="select is-small is-multiple is-fullwidth">
-                        <select name="shippingDue" multiple size="3">
+                    <div class="select is-small is-fullwidth">
+                        <select name="shippingDue">
+                            <option value="">—</option>
                             <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}" th:text="${due.name()}"></option>
                         </select>
                     </div>
                 </div>
                 <div class="column is-one-third">
                     <label class="label is-small">Shipment type</label>
-                    <div class="select is-small is-multiple is-fullwidth">
-                        <select name="shipmentTypes" multiple size="3">
+                    <div class="select is-small is-fullwidth">
+                        <select name="shipmentType">
+                            <option value="">—</option>
                             <option th:each="type : ${shipmentTypes}" th:value="${type.name()}" th:text="${type.name()}"></option>
                         </select>
                     </div>
                 </div>
                 <div class="column is-one-third">
                     <label class="label is-small">Payment</label>
-                    <div class="select is-small is-multiple is-fullwidth">
-                        <select name="paymentSources" multiple size="3">
+                    <div class="select is-small is-fullwidth">
+                        <select name="paymentSource">
+                            <option value="">—</option>
                             <option th:each="source : ${paymentSources}" th:value="${source.name()}" th:text="${source.name()}"></option>
                         </select>
                     </div>
                 </div>
                 <div class="column is-one-third">
                     <label class="label is-small">Status</label>
-                    <div class="select is-small is-multiple is-fullwidth">
-                        <select name="statuses" multiple size="3">
+                    <div class="select is-small is-fullwidth">
+                        <select name="status">
+                            <option value="">—</option>
                             <option th:each="status : ${statuses}" th:value="${status.name()}" th:text="${enumI18n.localize(status)}"></option>
                         </select>
                     </div>
@@ -136,20 +140,20 @@
                 <div class="column is-one-third">
                     <label class="label is-small">Marketplace</label>
                     <div class="control">
-                        <input class="input is-small" type="text" name="sourceNames" placeholder="Allegro, Empik"/>
+                        <input class="input is-small" type="text" name="sourceName" placeholder="Allegro"/>
                     </div>
                 </div>
                 <div class="column is-one-third">
                     <label class="label is-small">Postal code starts with</label>
                     <div class="control">
-                        <input class="input is-small" type="text" name="postalCodePrefixes" placeholder="00, 02-4"/>
+                        <input class="input is-small" type="text" name="shippingPostalCode" placeholder="00-9"/>
                     </div>
                 </div>
             </div>
 
-            <div class="field" th:if="${canManageGlobalFilters}">
+            <div class="field" th:if="${canManageStoreFilters}">
                 <label class="checkbox is-size-7">
-                    <input type="checkbox" name="global" value="true"/>
+                    <input type="checkbox" name="sharedWithStore" value="true"/>
                     Share with the whole store
                 </label>
             </div>

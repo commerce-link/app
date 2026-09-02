@@ -17,8 +17,9 @@ public class OrderFiltersManager {
     public List<OrderFilter> visibleTo(String storeId, String userId) {
         return orderFiltersRepository.findAllByStoreId(storeId).stream()
                 .filter(filter -> filter.isVisibleTo(userId))
-                .sorted(Comparator.comparing(OrderFilter::isGlobal).reversed()
-                        .thenComparing(filter -> filter.getName() == null ? "" : filter.getName(), String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(OrderFilter::isSharedWithStore).reversed()
+                        .thenComparing(filter -> filter.getLabel() == null ? "" : filter.getLabel(),
+                                String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
@@ -27,14 +28,24 @@ public class OrderFiltersManager {
         return filter != null && filter.isVisibleTo(userId) ? filter : null;
     }
 
-    public OrderFilter create(String storeId, String userId, boolean global, boolean administrator, String name, List<OrderFilterCondition> conditions) {
-        if (global && !administrator) {
-            throw new OrderFilterAccessDeniedException("Only an administrator can create a store wide filter");
+    public OrderFilter create(String storeId, String userId, boolean sharedWithStore, boolean administrator,
+                              String label, List<String> rawConditions) {
+        if (sharedWithStore && !administrator) {
+            throw new OrderFilterAccessDeniedException("Only an administrator can create a filter shared with the store");
+        }
+        if (label == null || label.isBlank()) {
+            throw new OrderFilterInvalidException("A filter needs a label");
         }
 
-        OrderFilter filter = global
-                ? OrderFilter.global(storeId, name, conditions)
-                : OrderFilter.ownedBy(storeId, userId, name, conditions);
+        OrderFilterConditions conditions = OrderFilterConditions.of(rawConditions);
+        OrderFilter filter = sharedWithStore
+                ? OrderFilter.sharedWithStore(storeId, label.trim(), conditions)
+                : OrderFilter.ownedBy(storeId, userId, label.trim(), conditions);
+
+        OrderFilter existing = orderFiltersRepository.findById(storeId, filter.getFilterKey());
+        if (existing != null) {
+            throw new OrderFilterInvalidException("The same filter already exists under the label " + existing.getLabel());
+        }
 
         orderFiltersRepository.save(filter);
         return filter;
@@ -45,10 +56,10 @@ public class OrderFiltersManager {
         if (filter == null) {
             return;
         }
-        if (filter.isGlobal() && !administrator) {
-            throw new OrderFilterAccessDeniedException("Only an administrator can remove a store wide filter");
+        if (filter.isSharedWithStore() && !administrator) {
+            throw new OrderFilterAccessDeniedException("Only an administrator can remove a filter shared with the store");
         }
-        if (!filter.isGlobal() && !filter.getOwner().equals(userId)) {
+        if (!filter.isSharedWithStore() && !filter.getScope().equals(userId)) {
             throw new OrderFilterAccessDeniedException("A private filter can be removed only by its owner");
         }
         orderFiltersRepository.delete(filter);

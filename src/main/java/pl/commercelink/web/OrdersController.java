@@ -25,6 +25,7 @@ import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.filters.OrderFilter;
 import pl.commercelink.orders.filters.OrderFilterAccessDeniedException;
+import pl.commercelink.orders.filters.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFiltersManager;
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
@@ -221,7 +222,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("selectedStatuses", selectedStatusList);
         model.addAttribute("savedFilters", savedFilters);
         model.addAttribute("selectedFilterKey", selectedFilter == null ? null : selectedFilter.getFilterKey());
-        model.addAttribute("canManageGlobalFilters", isAdmin());
+        model.addAttribute("canManageStoreFilters", isAdmin());
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("shippingDueOptions", ShippingDue.values());
@@ -231,16 +232,11 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/filters")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes) {
-        if (StringUtils.isBlank(form.getName())) {
-            redirectAttributes.addFlashAttribute("error", "Filter name is required");
-            return "redirect:/dashboard/orders";
-        }
-
         try {
             OrderFilter created = orderFiltersManager.create(
-                    getStoreId(), getUserId(), form.isGlobal(), isAdmin(), form.getName().trim(), form.toConditions());
+                    getStoreId(), getUserId(), form.isSharedWithStore(), isAdmin(), form.getLabel(), form.toConditions());
             redirectAttributes.addAttribute("filterKey", created.getFilterKey());
-        } catch (OrderFilterAccessDeniedException e) {
+        } catch (OrderFilterAccessDeniedException | OrderFilterInvalidException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
 
