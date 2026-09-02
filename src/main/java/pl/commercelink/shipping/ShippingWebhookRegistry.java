@@ -6,7 +6,6 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycle;
-import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
@@ -19,7 +18,6 @@ import pl.commercelink.shipping.api.ShippingWebhookResult;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
-import java.util.List;
 import java.util.Optional;
 
 @Configuration
@@ -31,6 +29,7 @@ public class ShippingWebhookRegistry {
     private final RMARepository rmaRepository;
     private final GoodsOutEventPublisher goodsOutEventPublisher;
     private final OrderEventsRepository orderEventsRepository;
+    private final ShipmentTrackingsRepository shipmentTrackingsRepository;
     private final RouterFunction<ServerResponse> routes;
 
     ShippingWebhookRegistry(ShippingProviderFactory shippingProviderFactory,
@@ -39,13 +38,15 @@ public class ShippingWebhookRegistry {
                             OrderLifecycle orderLifecycle,
                             RMARepository rmaRepository,
                             GoodsOutEventPublisher goodsOutEventPublisher,
-                            OrderEventsRepository orderEventsRepository) {
+                            OrderEventsRepository orderEventsRepository,
+                            ShipmentTrackingsRepository shipmentTrackingsRepository) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
         this.orderLifecycle = orderLifecycle;
         this.rmaRepository = rmaRepository;
         this.goodsOutEventPublisher = goodsOutEventPublisher;
         this.orderEventsRepository = orderEventsRepository;
+        this.shipmentTrackingsRepository = shipmentTrackingsRepository;
 
         this.routes = EventBindingRegistrar.forDescriptors(shippingProviderFactory.availableProviders())
                 .<ShippingWebhookResult>withWebhooks(
@@ -65,13 +66,22 @@ public class ShippingWebhookRegistry {
         if (storesRepository.findById(storeId) == null) {
             throw new RuntimeException("Internal error.");
         }
-
-        Optional<Order> order = findOrderByTrackingNo(storeId, result.trackingNo());
-        if (order.isPresent()) {
-            handleOrderShipmentStatusChange(order.get(), result);
-        } else {
-            findRmaByTrackingNo(storeId, result.trackingNo())
-                    .ifPresent(rma -> handleRmaShipmentStatusChange(rma, result));
+        Optional<ShipmentTracking> tracking = shipmentTrackingsRepository.find(storeId, result.trackingNo());
+        if (tracking.isEmpty()) {
+            return;
+        }
+        if (tracking.get().getOrderId() != null) {
+            Order order = ordersRepository.findById(storeId, tracking.get().getOrderId());
+            if (order != null) {
+                handleOrderShipmentStatusChange(order, result);
+            }
+            return;
+        }
+        if (tracking.get().getRmaId() != null) {
+            RMA rma = rmaRepository.findById(storeId, tracking.get().getRmaId());
+            if (rma != null) {
+                handleRmaShipmentStatusChange(rma, result);
+            }
         }
     }
 
@@ -102,19 +112,5 @@ public class ShippingWebhookRegistry {
         }
 
         rmaRepository.save(rma);
-    }
-
-    private Optional<Order> findOrderByTrackingNo(String storeId, String trackingNo) {
-        List<Order> orders = ordersRepository.findAllByStoreIdAndStatus(storeId, OrderStatus.Shipping);
-        return orders.stream()
-                .filter(o -> o.getShipments().stream().anyMatch(s -> s.hasTrackingNo(trackingNo)))
-                .findFirst();
-    }
-
-    private Optional<RMA> findRmaByTrackingNo(String storeId, String trackingNo) {
-        List<RMA> rmaList = rmaRepository.findAllByStoreIdAndStatus(storeId, RMAStatus.WaitingForItems);
-        return rmaList.stream()
-                .filter(r -> r.getShipments().stream().anyMatch(s -> s.hasTrackingNo(trackingNo)))
-                .findFirst();
     }
 }
