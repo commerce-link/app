@@ -69,9 +69,9 @@ public class MarketplaceOrderImporter {
                 .build();
 
         Payment payment = new Payment(
-                marketplaceOrder.payment().transactionId(),
+                marketplaceOrder.paymentTransactionId(),
                 "",
-                resolvePaymentSource(marketplaceOrder.payment().type()),
+                resolvePaymentSource(marketplaceOrder.paymentType()),
                 0,
                 commission.doubleValue()
         );
