@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -192,8 +193,23 @@ public class StoreController {
         model.addAttribute("form", form);
         model.addAttribute("availableProviders", shippingProviderFactory.availableProviders());
         model.addAttribute("selectedProviderName", form.getShippingProvider());
+        model.addAttribute("shippingWebhookUrl", shippingWebhookUrl(storeId, form.getShippingProvider()));
         model.addAttribute("connectedIntegrations", connectedIntegration(form.getShippingProvider()));
         return "store-shipping";
+    }
+
+    private static String shippingWebhookUrl(String storeId, String providerName) {
+        if (StringUtils.isBlank(providerName)) {
+            return null;
+        }
+        try {
+            return ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/Store/{storeId}/Webhooks/Shipping/{provider}")
+                    .buildAndExpand(storeId, providerName)
+                    .toUriString();
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     @GetMapping("/dashboard/store/shipping/templates/new")

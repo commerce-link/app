@@ -13,6 +13,20 @@
 
             <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.shipping.provider.label}, ${form.providerConfiguration}, 'shipping', ${form.store.storeId}, false)}"></div>
 
+            <div class="box mt-4" th:if="${shippingWebhookUrl != null}">
+                <h2 class="subtitle" th:text="#{store.shipping.webhook.title}">Webhook notifications</h2>
+                <p class="mb-3" th:text="#{store.shipping.webhook.lead}"></p>
+                <div class="field">
+                    <label class="label" th:text="#{store.shipping.webhook.url}"></label>
+                    <div class="control">
+                        <input class="input" type="text" readonly th:value="${shippingWebhookUrl}" onclick="this.select()"/>
+                    </div>
+                </div>
+                <p class="help" th:text="#{store.shipping.webhook.token}"></p>
+                <p class="help" th:text="#{store.shipping.webhook.states}"></p>
+                <p class="help" th:text="#{store.shipping.webhook.help}"></p>
+            </div>
+
             <!-- Authorized Carriers Section -->
             <div class="box mt-4">
                 <h2 class="subtitle" th:text="#{store.shipping.carriers.title}">Authorized Carriers</h2>
