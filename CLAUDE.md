@@ -168,7 +168,7 @@ Async work is driven through `@SqsListener` methods. Queue names follow `{domain
 - Every 5 min: `TaxonomyCategoryMatchScheduler` — taxonomy category match sweep
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
 - Hourly: `DemoStoreCleanupJob` — clean up demo stores
-- Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
+- Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
 
 ### Security
 

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class DropshipTrackingSweepListener {
 
-    static final String QUEUE_NAME = "dropship-tracking-sweep-queue";
+    static final String QUEUE_NAME = "supplier-dropship-tracking-sweep-queue";
 
     private final DropshipTrackingSweep sweep;
 
