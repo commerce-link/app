@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,12 +16,16 @@ import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.ParcelTrackingRequest;
 import pl.commercelink.shipping.api.ParcelTrackingSubscription;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -57,9 +63,17 @@ class ShipmentTrackingSubscriberTest {
     private Store store;
     @Mock
     private ShippingProvider provider;
+    @Mock
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
     private ShipmentTrackingSubscriber subscriber;
+
+    @BeforeEach
+    void passThroughOptimisticLocking() {
+        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+    }
 
     private static Shipment courier(String trackingNo) {
         Shipment shipment = new Shipment(ShipmentType.Courier);
@@ -329,5 +343,145 @@ class ShipmentTrackingSubscriberTest {
         // then
         verifyNoInteractions(shippingProviderFactory);
         verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    void rateLimitedTrackParcelLeavesShipmentPendingWithoutCommandIdAndSchedulesRetry() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("PKG-1");
+        when(provider.trackParcel(any())).thenThrow(
+                new ShippingException("HTTP 429: too many requests", new HttpClientException(429, "too many requests")));
+
+        // when
+        subscriber.subscribe(STORE_ID, orderWith(shipment));
+
+        // then
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
+        assertThat(shipment.getTrackingSubscriptionId()).isNull();
+        verify(publisher).publish(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"));
+        verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void rmaShipmentLeftPendingByProviderFailsInsteadOfWaitingForever() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("RMA-PKG");
+        RMA rma = new RMA(STORE_ID);
+        rma.setRmaId("rma-1");
+        rma.setShipments(new java.util.ArrayList<>(List.of(shipment)));
+        when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.pending("cmd-1"));
+
+        // when
+        subscriber.subscribe(STORE_ID, rma);
+
+        // then
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
+        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.RMA_RETRY_UNSUPPORTED);
+        verify(publisher, never()).publish(any());
+        verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void checkRepeatsTrackParcelWhenNoCommandIdWasRecorded() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("PKG-1");
+        shipment.markTrackingPending(null, LocalDateTime.now());
+        Order order = orderWith(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.active("cmd-2", "21037943", "dpd"));
+
+        // when
+        subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 2);
+
+        // then
+        verify(provider).trackParcel(new ParcelTrackingRequest("PKG-1", "DPD", "CommerceLink order " + ORDER_ID));
+        verify(provider, never()).checkParcelTracking(any());
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(shipment.getTrackingExternalId()).isEqualTo("21037943");
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    void checkPersistsNewlyAcceptedCommandIdBeforeRequestingRedelivery() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("PKG-1");
+        shipment.markTrackingPending(null, LocalDateTime.now());
+        Order order = orderWith(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.pending("cmd-9"));
+
+        // then
+        assertThatThrownBy(() -> subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 2))
+                .isInstanceOf(ShipmentTrackingPendingException.class);
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
+        assertThat(shipment.getTrackingSubscriptionId()).isEqualTo("cmd-9");
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    void checkRequestsRedeliveryWhenProviderCallFailsWhileAttemptsRemain() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("PKG-1");
+        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        Order order = orderWith(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 401: token revoked"));
+
+        // then
+        assertThatThrownBy(() -> subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 1))
+                .isInstanceOf(ShipmentTrackingPendingException.class);
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    void checkFailsShipmentWhenProviderCallFailsOnLastAttempt() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("PKG-1");
+        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        Order order = orderWith(shipment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 502: bad gateway"));
+
+        // when
+        subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), ShipmentTrackingSubscriber.MAX_CHECK_ATTEMPTS);
+
+        // then
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
+        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo("HTTP 502: bad gateway");
+        verify(ordersRepository).save(order);
+        ArgumentCaptor<OrderEvent> event = ArgumentCaptor.forClass(OrderEvent.class);
+        verify(orderEventsRepository).save(event.capture());
+        assertThat(event.getValue().getName()).isEqualTo(ShipmentTrackingSubscriber.TRACKING_FAILED_EVENT);
+    }
+
+    @Test
+    void checkAppliesTheOutcomeToTheFreshlyLoadedOrder() {
+        // given
+        providerAvailable();
+        Shipment stale = courier("PKG-1");
+        stale.markTrackingPending("cmd-1", LocalDateTime.now());
+        Shipment fresh = courier("PKG-1");
+        fresh.markTrackingPending("cmd-1", LocalDateTime.now());
+        Order staleOrder = orderWith(stale);
+        Order freshOrder = orderWith(fresh);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(staleOrder, freshOrder);
+        when(provider.checkParcelTracking("cmd-1")).thenReturn(ParcelTrackingSubscription.active("cmd-1", "77", "dpd"));
+
+        // when
+        subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 1);
+
+        // then
+        assertThat(fresh.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(stale.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.PENDING);
+        verify(ordersRepository).save(freshOrder);
+        verify(ordersRepository, never()).save(staleOrder);
+        verify(ordersRepository, times(2)).findById(STORE_ID, ORDER_ID);
     }
 }

@@ -64,6 +64,8 @@ class ShippingWebhookRegistryTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+        when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
         registry = new ShippingWebhookRegistry(shippingProviderFactory, storesRepository, ordersRepository,
                 orderLifecycle, rmaRepository, goodsOutEventPublisher, orderEventsRepository, shipmentTrackingsRepository,
                 optimisticLockingExecutor);
@@ -213,5 +215,24 @@ class ShippingWebhookRegistryTest {
         verify(ordersRepository, atLeastOnce()).findById(STORE_ID, "order-1");
         assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(DELIVERED_AT);
         verify(orderLifecycle).update(order);
+    }
+
+    @Test
+    void deliveredWebhookForStaleIndexRowRecordsNoEvent() {
+        // given: the tracking number was edited after the index row was written
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        order.setStatus(OrderStatus.Shipping);
+        order.setShipments(new ArrayList<>(List.of(courier("PKG-NEW"))));
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-OLD"))
+                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-OLD", "order-1", null, DELIVERED_AT)));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        process(new ShippingWebhookResult("PKG-OLD", ShippingWebhookResult.ShipmentState.DELIVERED, DELIVERED_AT));
+
+        // then
+        assertThat(order.getShipments().get(0).getDeliveredAt()).isNull();
+        verify(orderEventsRepository, never()).save(any());
     }
 }

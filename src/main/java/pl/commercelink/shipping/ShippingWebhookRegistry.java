@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
@@ -20,6 +21,7 @@ import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
+import java.util.List;
 import java.util.Optional;
 
 @Configuration
@@ -98,16 +100,23 @@ public class ShippingWebhookRegistry {
         }
 
         if (result.state() == ShippingWebhookResult.ShipmentState.DELIVERED) {
-            orderEventsRepository.save(new OrderEvent(order.getOrderId(), EventType.action, "SHIPMENT_DELIVERED", result.datetime()));
             String storeId = order.getStoreId();
             String orderId = order.getOrderId();
-            optimisticLockingExecutor.modifyAndSave(
+            boolean matched = optimisticLockingExecutor.modifyAndSaveReturning(
                     () -> ordersRepository.findById(storeId, orderId),
-                    fresh -> fresh.getShipments().stream()
-                            .filter(s -> s.hasTrackingNo(result.trackingNo()))
-                            .forEach(s -> s.setDeliveredAt(result.datetime())),
+                    fresh -> {
+                        List<Shipment> delivered = fresh.getShipments().stream()
+                                .filter(s -> s.hasTrackingNo(result.trackingNo()))
+                                .toList();
+                        delivered.forEach(s -> s.setDeliveredAt(result.datetime()));
+                        return !delivered.isEmpty();
+                    },
                     orderLifecycle::update
             );
+            // a stale index row (tracking number edited afterwards) must not add a misleading timeline entry
+            if (matched) {
+                orderEventsRepository.save(new OrderEvent(orderId, EventType.action, "SHIPMENT_DELIVERED", result.datetime()));
+            }
         }
     }
 
