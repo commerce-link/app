@@ -1,5 +1,6 @@
 package pl.commercelink.web.dtos;
 
+import pl.commercelink.orders.filters.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterField;
 
 import java.util.LinkedList;
@@ -16,8 +17,8 @@ public class OrderFilterForm {
     private String sourceName;
     private String shippingPostalCode;
 
-    public List<String> toConditions() {
-        List<String> conditions = new LinkedList<>();
+    public List<OrderFilterCondition> toConditions() {
+        List<OrderFilterCondition> conditions = new LinkedList<>();
         add(conditions, OrderFilterField.Status, status);
         add(conditions, OrderFilterField.ShipmentType, shipmentType);
         add(conditions, OrderFilterField.PaymentSource, paymentSource);
@@ -27,10 +28,8 @@ public class OrderFilterForm {
         return conditions;
     }
 
-    private static void add(List<String> conditions, OrderFilterField field, String value) {
-        if (value != null && !value.isBlank()) {
-            conditions.add(field.name() + "=" + value.trim());
-        }
+    private static void add(List<OrderFilterCondition> conditions, OrderFilterField field, String value) {
+        OrderFilterCondition.of(field, value).ifPresent(conditions::add);
     }
 
     public String getLabel() {

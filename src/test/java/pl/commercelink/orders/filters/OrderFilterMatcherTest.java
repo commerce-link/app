@@ -12,7 +12,9 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +23,8 @@ class OrderFilterMatcherTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 3);
 
-    private final OrderFilterMatcher matcher = new OrderFilterMatcher(TODAY);
+    private final OrderFilterMatcher matcher =
+            new OrderFilterMatcher(Clock.fixed(TODAY.atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
 
     private static Order order() {
         Order order = new Order("store-1");
@@ -30,7 +33,13 @@ class OrderFilterMatcherTest {
     }
 
     private static OrderFilter filter(String... conditions) {
-        return OrderFilter.sharedWithStore("store-1", "test", OrderFilterConditions.of(List.of(conditions)));
+        List<OrderFilterCondition> parsed = List.of(conditions).stream()
+                .map(entry -> {
+                    String[] parts = entry.split("=", 2);
+                    return OrderFilterCondition.of(OrderFilterField.parse(parts[0]).orElseThrow(), parts[1]).orElseThrow();
+                })
+                .toList();
+        return OrderFilter.sharedWithStore("store-1", "test", OrderFilterConditions.of(parsed));
     }
 
     @Test
@@ -117,6 +126,23 @@ class OrderFilterMatcherTest {
 
         assertThat(matcher.matches(assembled, filter("Status=Assembled"))).isTrue();
         assertThat(matcher.matches(assembled, filter("Status=Blocked"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("a filter whose stored conditions cannot be read matches nothing")
+    void unreadableFilterMatchesNothing() {
+        OrderFilter broken = new OrderFilter();
+        broken.setFilterKey("STORE#whatever");
+        broken.setConditions(List.of("RemovedField=WHATEVER"));
+
+        assertThat(matcher.matches(order(), broken)).isFalse();
+        assertThat(matcher.apply(List.of(order(), order()), broken)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("no filter at all lets every order through")
+    void noFilterLetsEverythingThrough() {
+        assertThat(matcher.matches(order(), null)).isTrue();
     }
 
     @Test

@@ -10,7 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderFilterTest {
 
     private static OrderFilterConditions courier() {
-        return OrderFilterConditions.of(List.of("ShipmentType=Courier"));
+        return OrderFilterConditions.of(List.of(
+                OrderFilterCondition.of(OrderFilterField.ShipmentType, "Courier").orElseThrow()));
     }
 
     @Test

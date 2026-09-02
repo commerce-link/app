@@ -23,7 +23,18 @@ import static org.mockito.Mockito.when;
 class OrderFiltersManagerTest {
 
     private static final String STORE_ID = "store-1";
-    private static final List<String> COURIER = List.of("ShipmentType=Courier");
+    private static final List<OrderFilterCondition> COURIER =
+            List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "Courier").orElseThrow());
+    private static final List<OrderFilterCondition> PICKUP_POINT =
+            List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint").orElseThrow());
+
+    private static FilterActor user(String userId) {
+        return new FilterActor(STORE_ID, userId, false);
+    }
+
+    private static FilterActor admin(String userId) {
+        return new FilterActor(STORE_ID, userId, true);
+    }
 
     @Mock
     private OrderFiltersRepository orderFiltersRepository;
@@ -43,7 +54,7 @@ class OrderFiltersManagerTest {
         OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
         when(orderFiltersRepository.findAllByStoreId(STORE_ID)).thenReturn(List.of(shared, mine, theirs));
 
-        assertThat(manager.visibleTo(STORE_ID, "user-1")).containsExactly(shared, mine);
+        assertThat(manager.visibleTo(user("user-1"))).containsExactly(shared, mine);
     }
 
     @Test
@@ -52,13 +63,13 @@ class OrderFiltersManagerTest {
         OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
         when(orderFiltersRepository.findById(STORE_ID, theirs.getFilterKey())).thenReturn(theirs);
 
-        assertThat(manager.find(STORE_ID, "user-1", theirs.getFilterKey())).isNull();
+        assertThat(manager.find(user("user-1"), theirs.getFilterKey())).isNull();
     }
 
     @Test
     @DisplayName("only an administrator shares a filter with the store")
     void onlyAdministratorSharesWithStore() {
-        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", true, false, "Courier", COURIER))
+        assertThatThrownBy(() -> manager.create(user("user-1"), true, "Courier", COURIER))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
         verify(orderFiltersRepository, never()).save(any());
@@ -67,7 +78,7 @@ class OrderFiltersManagerTest {
     @Test
     @DisplayName("a regular user creates a private filter")
     void regularUserCreatesPrivateFilter() {
-        OrderFilter created = manager.create(STORE_ID, "user-1", false, false, "Mine", COURIER);
+        OrderFilter created = manager.create(user("user-1"), false, "Mine", COURIER);
 
         assertThat(created.isSharedWithStore()).isFalse();
         assertThat(created.getScope()).isEqualTo("user-1");
@@ -80,7 +91,7 @@ class OrderFiltersManagerTest {
         OrderFilter existing = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
         when(orderFiltersRepository.findById(STORE_ID, existing.getFilterKey())).thenReturn(existing);
 
-        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", true, true, "Kurier", COURIER))
+        assertThatThrownBy(() -> manager.create(admin("user-1"), true, "Kurier", COURIER))
                 .isInstanceOf(OrderFilterInvalidException.class)
                 .hasMessageContaining("Courier");
 
@@ -90,7 +101,7 @@ class OrderFiltersManagerTest {
     @Test
     @DisplayName("a filter needs a label")
     void filterNeedsALabel() {
-        assertThatThrownBy(() -> manager.create(STORE_ID, "user-1", false, false, "  ", COURIER))
+        assertThatThrownBy(() -> manager.create(user("user-1"), false, "  ", COURIER))
                 .isInstanceOf(OrderFilterInvalidException.class);
     }
 
@@ -100,7 +111,7 @@ class OrderFiltersManagerTest {
         OrderFilter existing = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
         when(orderFiltersRepository.findById(STORE_ID, existing.getFilterKey())).thenReturn(existing);
 
-        OrderFilter updated = manager.update(STORE_ID, "user-1", true, existing.getFilterKey(), "Kurier", COURIER);
+        OrderFilter updated = manager.update(admin("user-1"), existing.getFilterKey(), "Kurier", COURIER);
 
         assertThat(updated.getFilterKey()).isEqualTo(existing.getFilterKey());
         assertThat(updated.getLabel()).isEqualTo("Kurier");
@@ -114,8 +125,7 @@ class OrderFiltersManagerTest {
         OrderFilter existing = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
         when(orderFiltersRepository.findById(STORE_ID, existing.getFilterKey())).thenReturn(existing);
 
-        OrderFilter updated = manager.update(STORE_ID, "user-1", true, existing.getFilterKey(),
-                "Paczkomaty", List.of("ShipmentType=PickupPoint"));
+        OrderFilter updated = manager.update(admin("user-1"), existing.getFilterKey(), "Paczkomaty", PICKUP_POINT);
 
         assertThat(updated.getFilterKey()).isNotEqualTo(existing.getFilterKey());
         assertThat(updated.isSharedWithStore()).isTrue();
@@ -130,12 +140,11 @@ class OrderFiltersManagerTest {
     void conditionsCannotCollideWithAnExistingFilter() {
         OrderFilter existing = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
         OrderFilter clash = OrderFilter.sharedWithStore(STORE_ID, "Paczkomaty",
-                OrderFilterConditions.of(List.of("ShipmentType=PickupPoint")));
+                OrderFilterConditions.of(PICKUP_POINT));
         when(orderFiltersRepository.findById(STORE_ID, existing.getFilterKey())).thenReturn(existing);
         when(orderFiltersRepository.findById(STORE_ID, clash.getFilterKey())).thenReturn(clash);
 
-        assertThatThrownBy(() -> manager.update(STORE_ID, "user-1", true, existing.getFilterKey(),
-                "Cokolwiek", List.of("ShipmentType=PickupPoint")))
+        assertThatThrownBy(() -> manager.update(admin("user-1"), existing.getFilterKey(), "Cokolwiek", PICKUP_POINT))
                 .isInstanceOf(OrderFilterInvalidException.class)
                 .hasMessageContaining("Paczkomaty");
 
@@ -148,8 +157,7 @@ class OrderFiltersManagerTest {
         OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
         when(orderFiltersRepository.findById(STORE_ID, theirs.getFilterKey())).thenReturn(theirs);
 
-        assertThatThrownBy(() -> manager.update(STORE_ID, "user-1", true, theirs.getFilterKey(),
-                "Mine now", COURIER))
+        assertThatThrownBy(() -> manager.update(admin("user-1"), theirs.getFilterKey(), "Mine now", COURIER))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
         verify(orderFiltersRepository, never()).save(any());
@@ -161,7 +169,7 @@ class OrderFiltersManagerTest {
         OrderFilter theirs = OrderFilter.ownedBy(STORE_ID, "user-2", "Theirs", courier());
         when(orderFiltersRepository.findById(STORE_ID, theirs.getFilterKey())).thenReturn(theirs);
 
-        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", true, theirs.getFilterKey()))
+        assertThatThrownBy(() -> manager.delete(admin("user-1"), theirs.getFilterKey()))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
         verify(orderFiltersRepository, never()).delete(any(OrderFilter.class));
@@ -173,10 +181,10 @@ class OrderFiltersManagerTest {
         OrderFilter shared = OrderFilter.sharedWithStore(STORE_ID, "Courier", courier());
         when(orderFiltersRepository.findById(STORE_ID, shared.getFilterKey())).thenReturn(shared);
 
-        assertThatThrownBy(() -> manager.delete(STORE_ID, "user-1", false, shared.getFilterKey()))
+        assertThatThrownBy(() -> manager.delete(user("user-1"), shared.getFilterKey()))
                 .isInstanceOf(OrderFilterAccessDeniedException.class);
 
-        manager.delete(STORE_ID, "user-9", true, shared.getFilterKey());
+        manager.delete(admin("user-9"), shared.getFilterKey());
 
         verify(orderFiltersRepository).delete(shared);
     }
