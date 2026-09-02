@@ -621,7 +621,7 @@ class DemoStoreSeederTest {
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
         // when
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         assertEquals(rows.stream().filter(CatalogSeedRow::inWarehouse).count(), stock.items().size());
@@ -644,7 +644,7 @@ class DemoStoreSeederTest {
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
         // when
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         List<Delivery> received = stock.deliveries().stream().filter(Delivery::hasBeenReceived).toList();
@@ -672,7 +672,7 @@ class DemoStoreSeederTest {
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
         // when
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         List<Delivery> pending = stock.deliveries().stream().filter(d -> !d.hasBeenReceived()).toList();
@@ -804,7 +804,7 @@ class DemoStoreSeederTest {
         // when
         DemoOrders open = DemoStoreSeeder.buildDemoOrders("store-1", rows);
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         Map<String, Double> itemsCostByDeliveryId = new HashMap<>();
@@ -837,7 +837,7 @@ class DemoStoreSeederTest {
         // when
         DemoOrders open = DemoStoreSeeder.buildDemoOrders("store-1", rows);
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         List<Delivery> deliveries = new ArrayList<>();
@@ -995,7 +995,7 @@ class DemoStoreSeederTest {
 
         // when
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
-        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows);
+        WarehouseStock stock = DemoStoreSeeder.buildWarehouseStock("store-1", "a@b.pl", rows, false);
 
         // then
         completed.itemsByOrderId().values().stream()
@@ -1067,5 +1067,91 @@ class DemoStoreSeederTest {
 
         // then
         assertEquals("fakturownia", store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER));
+    }
+
+    @Test
+    void seedsInvoicingFixturesOnlyWhenTheDevAdapterIsPresent() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        var without = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", rows, false);
+        var with = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", rows, true);
+
+        // then
+        assertEquals(without.deliveries().size() + 3, with.deliveries().size());
+        assertEquals(without.items().size() + 4, with.items().size());
+    }
+
+    @Test
+    void paymentSyncFixtureIsInvoicedUnpaidAndCarriesAnAdapterInvoiceDocument() {
+        // given
+        var stock = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", CatalogSeed.load(), true);
+
+        // when
+        Delivery fixture = stock.deliveries().stream()
+                .filter(delivery -> delivery.getExternalDeliveryId().contains("PAID"))
+                .findFirst()
+                .orElseThrow();
+
+        // then
+        assertTrue(fixture.isInvoiced());
+        assertTrue(fixture.getPayments().isEmpty());
+        assertTrue(fixture.isWaitingForPayment());
+        assertEquals("dev-pur-" + fixture.getExternalDeliveryId(),
+                fixture.getDocuments().stream()
+                        .filter(document -> document.getType() == DocumentType.InvoiceVat)
+                        .findFirst().orElseThrow().getId());
+    }
+
+    @Test
+    void invoicingFixturesCarryOrderedAtSoTheUnpaidDeliveryQuerySortDoesNotFail() {
+        // DeliveriesRepository.findUnpaidDeliveries sorts by getPaymentDueDate through
+        // Comparator.comparing, which throws on a delivery whose orderedAt is null.
+        var stock = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", CatalogSeed.load(), true);
+
+        stock.deliveries().forEach(delivery -> assertNotNull(delivery.getPaymentDueDate()));
+    }
+
+    @Test
+    void invoicingFixturesHaveNoGoodsReceiptDocumentSoTheirCounterpartyIsNeverOverwritten() {
+        // BuiltInInvoiceSyncHandler replaces a goods-receipt counterparty with the invoice seller.
+        var stock = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", CatalogSeed.load(), true);
+
+        List<String> fixtureIds = List.of(
+                DemoStoreSeeder.demoId("store-1", "demo-delivery-invoice-1"),
+                DemoStoreSeeder.demoId("store-1", "demo-delivery-invoice-paid"),
+                DemoStoreSeeder.demoId("store-1", "demo-delivery-no-invoice"));
+
+        List<Delivery> fixtures = stock.deliveries().stream()
+                .filter(delivery -> fixtureIds.contains(delivery.getDeliveryId()))
+                .toList();
+
+        assertEquals(3, fixtures.size());
+        fixtures.forEach(delivery -> assertTrue(delivery.getDocuments().stream()
+                .noneMatch(document -> document.getType() == DocumentType.GoodsReceipt)));
+    }
+
+    @Test
+    void invoicingFixtureItemsUseTheirOwnIdPrefixSoTheyDoNotCollideWithStockItems() {
+        var stock = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", CatalogSeed.load(), true);
+
+        assertEquals(stock.items().size(),
+                stock.items().stream().map(WarehouseItem::getItemId).distinct().count());
+    }
+
+    @Test
+    void seededInvoiceDocumentsUseTheAdapterInvoiceIdPrefix() {
+        // Matching the adapter's id makes InvoiceLinkingService refresh the existing document
+        // instead of adding a duplicate.
+        var stock = DemoStoreSeeder.buildWarehouseStock("store-1", "owner@example.com", CatalogSeed.load(), false);
+
+        stock.deliveries().stream()
+                .flatMap(delivery -> delivery.getDocuments().stream()
+                        .filter(document -> document.getType() == DocumentType.InvoiceVat)
+                        .map(document -> Map.entry(delivery, document)))
+                .forEach(entry -> assertEquals(
+                        "dev-pur-" + entry.getKey().getExternalDeliveryId(),
+                        entry.getValue().getId()));
     }
 }

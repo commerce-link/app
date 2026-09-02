@@ -151,6 +151,12 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String ACME_B_PICKUP_POINTS_KNOB = "orderingPickupPointsEnabled";
     /** The dev invoicing adapter, present only under the `dev` Maven profile. */
     static final String DEV_INVOICING = "invoicing-dev";
+    /**
+     * Id prefix the invoicing-dev adapter uses for synthesised supplier invoices. Mirrored here so
+     * a seeded invoice document matches what the adapter returns: InvoiceLinkingService then
+     * refreshes that document instead of adding a duplicate next to it.
+     */
+    static final String DEV_PURCHASE_INVOICE_ID_PREFIX = "dev-pur-";
     private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
@@ -615,13 +621,17 @@ public class DemoStoreSeeder implements StoreSeeder {
         return new CompletedOrderBundle(order, items, delivery, List.of(goodsReceipt, goodsIssue), documentItems, events);
     }
 
+    record InvoicingFixtures(List<Delivery> deliveries, List<WarehouseItem> items) {
+    }
+
     private void saveWarehouseStock(Store store, List<CatalogSeedRow> rows) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         DynamoDBMapperConfig clobber = DynamoDBMapperConfig.builder()
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
         WarehouseStock stock = buildWarehouseStock(
-                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), rows);
+                store.getStoreId(), ownerEmailOrFallback(store.getDemo()), rows,
+                invoicingProviderFactory.getDescriptor(DEV_INVOICING) != null);
         mapper.batchSave(stock.items());
         stock.deliveries().forEach(delivery -> mapper.save(delivery, clobber));
         stock.documents().forEach(document -> mapper.save(document, clobber));
@@ -629,7 +639,8 @@ public class DemoStoreSeeder implements StoreSeeder {
         stock.sequences().forEach(sequence -> mapper.save(sequence, clobber));
     }
 
-    static WarehouseStock buildWarehouseStock(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
+    static WarehouseStock buildWarehouseStock(String storeId, String ownerEmail,
+                                              List<CatalogSeedRow> rows, boolean devInvoicingAvailable) {
         List<CatalogSeedRow> warehouseRows = rows.stream().filter(CatalogSeedRow::inWarehouse).toList();
         String warehouseId = DEMO_WAREHOUSE_ID;
         String pzSequenceKey = DocumentType.GoodsReceipt.getSequenceKey(warehouseId);
@@ -666,8 +677,10 @@ public class DemoStoreSeeder implements StoreSeeder {
                     warehouseId, delivery.getReceivedAt(), ownerEmail, DocumentReason.SupplierDelivery, counterparty);
             goodsReceipt.setDeliveryId(delivery.getDeliveryId());
             delivery.addDocument(new Document(goodsReceipt.getDocumentId(), goodsReceipt.getDocumentNo(), null, DocumentType.GoodsReceipt));
-            delivery.addDocument(new Document(demoId(storeId, "demo-invoice-wh-" + number),
-                    "FV/" + LocalDate.now().getYear() + "/DEMO/" + String.format("%03d", number), null, DocumentType.InvoiceVat));
+            delivery.addDocument(new Document(
+                    DEV_PURCHASE_INVOICE_ID_PREFIX + delivery.getExternalDeliveryId(),
+                    "FV/" + LocalDate.now().getYear() + "/DEMO/" + String.format("%03d", number),
+                    null, DocumentType.InvoiceVat));
             documents.add(goodsReceipt);
             documentItems.addAll(warehouseDocumentItems(storeId, goodsReceipt, delivery.getDeliveryId(), deliveryItems));
         }
@@ -675,7 +688,14 @@ public class DemoStoreSeeder implements StoreSeeder {
         pending.increaseTotalCost(itemsByDeliveryId.get(pending.getDeliveryId()).stream()
                 .mapToDouble(item -> item.getCost() * item.getQty()).sum());
 
-        return new WarehouseStock(items, deliveries, documents, documentItems,
+        List<Delivery> allDeliveries = new ArrayList<>(deliveries);
+        if (devInvoicingAvailable) {
+            InvoicingFixtures fixtures = invoicingFixtures(storeId, warehouseRows);
+            allDeliveries.addAll(fixtures.deliveries());
+            items.addAll(fixtures.items());
+        }
+
+        return new WarehouseStock(items, allDeliveries, documents, documentItems,
                 List.of(new WarehouseDocumentSequence(storeId, pzSequenceKey, 5)));
     }
 
@@ -696,6 +716,74 @@ public class DemoStoreSeeder implements StoreSeeder {
         delivery.setReceivedAt(receivedAt);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_RECEIVED", receivedAt));
         return delivery;
+    }
+
+    /**
+     * Deliveries shaped for the invoicing flows: one waiting to be invoiced, one already invoiced
+     * and unpaid so the payment sync has something to settle, and one whose supplier order number
+     * carries the adapter's NOINV marker. Seeded only when the dev adapter is present, so the
+     * deployed demo never shows them.
+     *
+     * <p>None of them gets a goods-receipt document on purpose: BuiltInInvoiceSyncHandler replaces
+     * a goods-receipt counterparty with the invoice seller, and the adapter's synthesised seller
+     * would overwrite real supplier data.
+     */
+    static InvoicingFixtures invoicingFixtures(String storeId, List<CatalogSeedRow> warehouseRows) {
+        int year = LocalDate.now().getYear();
+        CatalogSeedRow firstRow = warehouseRows.get(0);
+        CatalogSeedRow secondRow = warehouseRows.get(1);
+
+        Delivery toInvoice = invoicingFixtureDelivery(
+                storeId, "demo-delivery-invoice-1", "ZS/104520/" + year);
+        Delivery invoicedUnpaid = invoicingFixtureDelivery(
+                storeId, "demo-delivery-invoice-paid", "ZS/PAID/104521/" + year);
+        Delivery withoutInvoice = invoicingFixtureDelivery(
+                storeId, "demo-delivery-no-invoice", "ZS/NOINV/104522/" + year);
+
+        invoicedUnpaid.setInvoiced(true);
+        invoicedUnpaid.addDocument(new Document(
+                DEV_PURCHASE_INVOICE_ID_PREFIX + invoicedUnpaid.getExternalDeliveryId(),
+                "FZ/" + year + "/DEMO/PAID", null, DocumentType.InvoiceVat));
+
+        List<WarehouseItem> fixtureItems = List.of(
+                invoicingFixtureItem(storeId, firstRow, toInvoice, "inv-1"),
+                invoicingFixtureItem(storeId, secondRow, toInvoice, "inv-1"),
+                invoicingFixtureItem(storeId, firstRow, invoicedUnpaid, "inv-paid"),
+                invoicingFixtureItem(storeId, firstRow, withoutInvoice, "inv-none"));
+
+        List<Delivery> fixtureDeliveries = List.of(toInvoice, invoicedUnpaid, withoutInvoice);
+        for (Delivery delivery : fixtureDeliveries) {
+            delivery.increaseTotalCost(fixtureItems.stream()
+                    .filter(item -> delivery.getDeliveryId().equals(item.getDeliveryId()))
+                    .mapToDouble(item -> item.getCost() * item.getQty())
+                    .sum());
+        }
+
+        return new InvoicingFixtures(fixtureDeliveries, fixtureItems);
+    }
+
+    private static Delivery invoicingFixtureDelivery(String storeId, String key, String externalDeliveryId) {
+        LocalDateTime receivedAt = LocalDateTime.now().minusDays(3);
+        Delivery delivery = warehouseDelivery(storeId, key, externalDeliveryId, ACME,
+                ConnectionMode.GLOBAL, receivedAt.minusDays(2), receivedAt.toLocalDate());
+        delivery.setReceivedAt(receivedAt);
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_RECEIVED", receivedAt));
+        return delivery;
+    }
+
+    /**
+     * A warehouse item under its own id prefix, so it never collides with the `local-wh-` stock
+     * items. WarehouseAllocationsManager maps every item assigned to a delivery to an allocation
+     * without filtering by status, which is what gives the sync screen its MFNs and unit costs.
+     */
+    private static WarehouseItem invoicingFixtureItem(String storeId, CatalogSeedRow row,
+                                                      Delivery delivery, String fixtureKey) {
+        double unitCost = Math.round(row.priceGross() / Price.DEFAULT_VAT_RATE * WAREHOUSE_MARGIN);
+        WarehouseItem item = new WarehouseItem(storeId, delivery.getDeliveryId(), row.category(),
+                row.name(), row.ean(), row.mfn(), unitCost, 1);
+        item.setItemId(demoId(storeId, "demo-wh-" + fixtureKey + "-" + row.pimId()));
+        item.setStatus(FulfilmentStatus.Delivered);
+        return item;
     }
 
     private static Delivery pendingWarehouseDelivery(String storeId, String key, String externalDeliveryId, String supplier) {
