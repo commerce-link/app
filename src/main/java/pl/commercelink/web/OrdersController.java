@@ -23,6 +23,10 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.orders.filters.OrderFilter;
+import pl.commercelink.orders.filters.OrderFilterAccessDeniedException;
+import pl.commercelink.orders.filters.OrderFiltersManager;
+import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -44,6 +48,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
@@ -120,11 +125,21 @@ public class OrdersController extends BaseController {
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
 
+    @Autowired
+    private OrderFiltersManager orderFiltersManager;
+
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam(required = false) List<String> statuses,
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
+                        @RequestParam(required = false) String filterKey,
                         Model model) {
+        String userId = getUserId();
+        List<OrderFilter> savedFilters = orderFiltersManager.visibleTo(getStoreId(), userId);
+        OrderFilter selectedFilter = StringUtils.isBlank(filterKey)
+                ? null
+                : orderFiltersManager.find(getStoreId(), userId, filterKey);
+
         // Fetch all active orders once (excluding Completed and Cancelled)
         List<Order> allActiveOrders = ordersRepository.findAllActiveOrders(getStoreId())
                 .stream()
@@ -132,10 +147,17 @@ public class OrdersController extends BaseController {
                 .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
 
+        if (selectedFilter != null) {
+            allActiveOrders = orderFiltersManager.apply(allActiveOrders, selectedFilter);
+        }
+
+        boolean statusChosenExplicitly = statuses != null && !statuses.isEmpty();
+        boolean skipDefaultStatus = showAll || (selectedFilter != null && !statusChosenExplicitly);
+
         List<OrderStatus> statusEnums = null;
         List<String> selectedStatusList;
 
-        if (showAll) {
+        if (skipDefaultStatus) {
             // Show all orders regardless of status
             statusEnums = null;
             selectedStatusList = Collections.emptyList();
@@ -197,7 +219,43 @@ public class OrdersController extends BaseController {
         model.addAttribute("itemCountsByStatus", itemCountsByStatus);
         model.addAttribute("statuses", availableStatuses);
         model.addAttribute("selectedStatuses", selectedStatusList);
+        model.addAttribute("savedFilters", savedFilters);
+        model.addAttribute("selectedFilterKey", selectedFilter == null ? null : selectedFilter.getFilterKey());
+        model.addAttribute("canManageGlobalFilters", isAdmin());
+        model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("shippingDueOptions", ShippingDue.values());
         return "orders";
+    }
+
+    @PostMapping("/dashboard/orders/filters")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes) {
+        if (StringUtils.isBlank(form.getName())) {
+            redirectAttributes.addFlashAttribute("error", "Filter name is required");
+            return "redirect:/dashboard/orders";
+        }
+
+        try {
+            OrderFilter created = orderFiltersManager.create(
+                    getStoreId(), getUserId(), form.isGlobal(), isAdmin(), form.getName().trim(), form.toConditions());
+            redirectAttributes.addAttribute("filterKey", created.getFilterKey());
+        } catch (OrderFilterAccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
+        return "redirect:/dashboard/orders";
+    }
+
+    @PostMapping("/dashboard/orders/filters/delete")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String deleteOrderFilter(@RequestParam String filterKey, RedirectAttributes redirectAttributes) {
+        try {
+            orderFiltersManager.delete(getStoreId(), getUserId(), isAdmin(), filterKey);
+        } catch (OrderFilterAccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/dashboard/orders";
     }
 
     @GetMapping("/dashboard/orders/new/from-basket")
