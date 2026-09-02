@@ -35,6 +35,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -119,6 +120,8 @@ public class OrdersController extends BaseController {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -873,8 +876,14 @@ public class OrdersController extends BaseController {
                 shipments.add(updatedOrder.getShipments().get(0));
             }
 
+            List<Shipment> previousShipments = existingOrder.getShipments();
+            shipments.forEach(shipment -> previousShipments.stream()
+                    .filter(previous -> previous.hasTrackingNo(shipment.getTrackingNo()))
+                    .findFirst()
+                    .ifPresent(shipment::inheritTrackingSubscriptionFrom));
             existingOrder.replaceShipments(shipments);
         }
+        shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         String view = save(existingOrder);
         boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()
                 .anyMatch(s -> s.hasShippingData() || s.hasCollectionData());

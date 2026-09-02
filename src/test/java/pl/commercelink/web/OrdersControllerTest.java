@@ -29,11 +29,14 @@ import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -67,6 +70,8 @@ class OrdersControllerTest {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock
     private RedirectAttributes redirectAttributes;
+    @Mock
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -343,6 +348,39 @@ class OrdersControllerTest {
 
         // then
         verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    @DisplayName("updateShipments keeps tracking subscription of an unchanged shipment and subscribes new ones")
+    void updateShipmentsKeepsTrackingSubscriptionOfUnchangedShipmentAndSubscribesNewOnes() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment tracked = new Shipment(ShipmentType.Courier);
+        tracked.setCarrier("DPD");
+        tracked.setTrackingNo("PKG-1");
+        tracked.setShippedAt(LocalDateTime.now());
+        tracked.markTrackingActive("21037943", LocalDateTime.now());
+        existingOrder.setShipments(new ArrayList<>(List.of(tracked)));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Shipment resubmittedFirst = new Shipment(ShipmentType.Courier);
+        resubmittedFirst.setCarrier("DPD");
+        resubmittedFirst.setTrackingNo("PKG-1");
+        resubmittedFirst.setShippedAt(LocalDateTime.now());
+        Shipment resubmittedSecond = new Shipment(ShipmentType.Courier);
+        resubmittedSecond.setCarrier("DPD");
+        resubmittedSecond.setTrackingNo("PKG-2");
+        resubmittedSecond.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedFirst, resubmittedSecond));
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        assertThat(existingOrder.getShipments()).hasSize(2);
+        assertThat(existingOrder.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(existingOrder.getShipments().get(1).hasTrackingSubscription()).isFalse();
+        verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
     }
 
     @Test
