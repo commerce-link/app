@@ -46,6 +46,16 @@ class ShipmentTrackingTemplateTest {
     }
 
     @Test
+    void trackingColumnIsHiddenWhenNoShipmentIsTracked() throws Exception {
+        // when
+        String html = read(ORDER_DETAILS);
+
+        // then
+        assertThat(html).contains("<th th:if=\"${order.hasTrackedShipments()}\" th:text=\"#{order.shipment.tracking.status}\">");
+        assertThat(html).contains("<td th:if=\"${order.hasTrackedShipments()}\">");
+    }
+
+    @Test
     void shippingConfigurationShowsWebhookUrlOnlyForSelectedProvider() throws Exception {
         // when
         String html = read(STORE_SHIPPING);

@@ -19,6 +19,30 @@ class ShipmentTrackingSubscriptionStateTest {
     }
 
     @Test
+    void orderWithoutSubscriptionsHasNoTrackedShipments() {
+        // given
+        Order order = new Order();
+        order.addShipment(courier("PKG-1"));
+        order.addShipment(new Shipment(ShipmentType.PersonalCollection));
+
+        // then
+        assertThat(order.hasTrackedShipments()).isFalse();
+    }
+
+    @Test
+    void orderWithOneSubscribedShipmentHasTrackedShipments() {
+        // given
+        Order order = new Order();
+        order.addShipment(courier("PKG-1"));
+        Shipment tracked = courier("PKG-2");
+        tracked.markTrackingFailed("rejected", AT);
+        order.addShipment(tracked);
+
+        // then
+        assertThat(order.hasTrackedShipments()).isTrue();
+    }
+
+    @Test
     void freshShipmentHasNoSubscription() {
         // given
         Shipment shipment = courier("PKG-1");
