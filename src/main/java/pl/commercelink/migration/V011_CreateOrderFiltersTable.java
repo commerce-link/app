@@ -25,8 +25,8 @@ public class V011_CreateOrderFiltersTable {
     public void createTable() {
         createTableIfAbsent(dynamoDB, new CreateTableRequest()
                 .withTableName("OrderFilters")
-                .withKeySchema(hashKey("storeId"), rangeKey("filterKey"))
-                .withAttributeDefinitions(stringAttribute("storeId"), stringAttribute("filterKey"))
+                .withKeySchema(hashKey("storeId"), rangeKey("userId"))
+                .withAttributeDefinitions(stringAttribute("storeId"), stringAttribute("userId"))
                 .withBillingMode(BillingMode.PAY_PER_REQUEST));
     }
 

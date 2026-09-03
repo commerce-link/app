@@ -70,8 +70,8 @@
                 <div class="field has-addons mb-0">
                     <p class="control">
                         <a class="button is-small"
-                           th:classappend="${saved.filterKey == selectedFilterKey} ? 'is-link' : 'is-link is-light'"
-                           th:href="@{/dashboard/orders(filterKey=${saved.filterKey})}">
+                           th:classappend="${saved.id == selectedFilterId} ? 'is-link' : 'is-link is-light'"
+                           th:href="@{/dashboard/orders(filterId=${saved.id})}">
                             <span class="icon is-small" th:if="${saved.sharedWithStore}"><i class="fas fa-users"></i></span>
                             <span class="icon is-small" th:unless="${saved.sharedWithStore}"><i class="fas fa-user"></i></span>
                             <span th:text="${saved.label}"></span>
@@ -79,7 +79,7 @@
                     </p>
                     <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
                         <button type="button" class="button is-small edit-filter"
-                                th:data-filter-key="${saved.filterKey}"
+                                th:data-filter-id="${saved.id}"
                                 th:data-label="${saved.label}"
                                 th:data-conditions="${saved.conditionsByField}">
                             <span class="icon is-small"><i class="fas fa-pen"></i></span>
@@ -87,7 +87,7 @@
                     </p>
                     <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
                         <form method="post" action="/dashboard/orders/filters/delete">
-                            <input type="hidden" name="filterKey" th:value="${saved.filterKey}"/>
+                            <input type="hidden" name="filterId" th:value="${saved.id}"/>
                             <button type="submit" class="button is-small is-danger is-light">
                                 <span class="icon is-small"><i class="fas fa-times"></i></span>
                             </button>
@@ -101,7 +101,7 @@
         </div>
 
         <form method="post" action="/dashboard/orders/filters" id="filterForm" style="display: none;" class="mt-4">
-            <input type="hidden" name="filterKey" id="filterKeyField"/>
+            <input type="hidden" name="filterId" id="filterIdField"/>
             <div class="field">
                 <label class="label is-small">Name</label>
                 <div class="control">
@@ -209,14 +209,14 @@
     <script th:inline="javascript">
         // Initialize from server-side selected values (includes defaults)
         const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
-        const selectedFilterKey = /*[[${selectedFilterKey}]]*/ null;
+        const selectedFilterKey = /*[[${selectedFilterId}]]*/ null;
 
         function navigateWithFilters() {
             const params = new URLSearchParams();
 
             selectedStatuses.forEach(status => params.append('statuses', status));
-            if (selectedFilterKey) {
-                params.append('filterKey', selectedFilterKey);
+            if (selectedFilterId) {
+                params.append('filterId', selectedFilterId);
             }
 
             window.location.href = '/dashboard/orders?' + params.toString();
@@ -241,7 +241,7 @@
         });
 
         const filterForm = document.getElementById('filterForm');
-        const filterKeyField = document.getElementById('filterKeyField');
+        const filterIdField = document.getElementById('filterIdField');
 
         function openFilterForm(creating) {
             filterForm.action = creating ? '/dashboard/orders/filters' : '/dashboard/orders/filters/update';
@@ -254,14 +254,14 @@
                 return;
             }
             filterForm.reset();
-            filterKeyField.value = '';
+            filterIdField.value = '';
             openFilterForm(true);
         });
 
         document.querySelectorAll('.edit-filter').forEach(button => {
             button.addEventListener('click', function() {
                 filterForm.reset();
-                filterKeyField.value = this.getAttribute('data-filter-key');
+                filterIdField.value = this.getAttribute('data-filter-id');
                 filterForm.elements['label'].value = this.getAttribute('data-label');
 
                 const conditions = this.getAttribute('data-conditions') || '';

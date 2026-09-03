@@ -1,31 +1,20 @@
 package pl.commercelink.orders.filters.model;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
-import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.OrderFilterAccessDeniedException;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.orders.filters.OrderFilterConditions;
 import pl.commercelink.orders.filters.OrderFilterInvalidException;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
-@DynamoDBTable(tableName = "OrderFilters")
+@DynamoDBDocument
 public class OrderFilter {
 
-    public static final String STORE_SCOPE = "STORE";
-
-    private static final char SCOPE_SEPARATOR = '#';
-
-    @DynamoDBHashKey(attributeName = "storeId")
-    private String storeId;
-
-    @DynamoDBRangeKey(attributeName = "filterKey")
-    private String filterKey;
+    @DynamoDBAttribute(attributeName = "id")
+    private String id;
 
     @DynamoDBAttribute(attributeName = "label")
     private String label;
@@ -33,54 +22,21 @@ public class OrderFilter {
     @DynamoDBAttribute(attributeName = "conditions")
     private List<String> conditions = new LinkedList<>();
 
-    @DynamoDBVersionAttribute
-    private Long version;
-
     public OrderFilter() {
     }
 
-    private OrderFilter(String storeId, String scope, String label, OrderFilterConditions conditions) {
-        if (label == null || label.isBlank()) {
-            throw new OrderFilterInvalidException("A filter needs a label");
-        }
-        this.storeId = storeId;
-        this.filterKey = scope + SCOPE_SEPARATOR + conditions.fingerprint();
-        this.label = label.trim();
+    public static OrderFilter of(String label, OrderFilterConditions conditions) {
+        OrderFilter filter = new OrderFilter();
+        filter.id = UUID.randomUUID().toString();
+        filter.label = requireLabel(label);
+        filter.conditions = new LinkedList<>(conditions.entries());
+        return filter;
+    }
+
+    @DynamoDBIgnore
+    public void changeTo(String label, OrderFilterConditions conditions) {
+        this.label = requireLabel(label);
         this.conditions = new LinkedList<>(conditions.entries());
-    }
-
-    public static OrderFilter sharedWithStore(String storeId, String label, OrderFilterConditions conditions) {
-        return new OrderFilter(storeId, STORE_SCOPE, label, conditions);
-    }
-
-    public static OrderFilter ownedBy(String storeId, String userId, String label, OrderFilterConditions conditions) {
-        return new OrderFilter(storeId, userId, label, conditions);
-    }
-
-    @DynamoDBIgnore
-    public String getScope() {
-        int separator = filterKey == null ? -1 : filterKey.indexOf(SCOPE_SEPARATOR);
-        return separator < 0 ? "" : filterKey.substring(0, separator);
-    }
-
-    @DynamoDBIgnore
-    public boolean isSharedWithStore() {
-        return STORE_SCOPE.equals(getScope());
-    }
-
-    @DynamoDBIgnore
-    public void requireWritableBy(FilterActor actor) {
-        if (isSharedWithStore() && !actor.administrator()) {
-            throw new OrderFilterAccessDeniedException("Only an administrator can change a filter shared with the store");
-        }
-        if (!isSharedWithStore() && !getScope().equals(actor.userId())) {
-            throw new OrderFilterAccessDeniedException("A private filter can be changed only by its owner");
-        }
-    }
-
-    @DynamoDBIgnore
-    public boolean isVisibleTo(String userId) {
-        return isSharedWithStore() || (userId != null && userId.equals(getScope()));
     }
 
     @DynamoDBIgnore
@@ -88,25 +44,19 @@ public class OrderFilter {
         return OrderFilterConditions.stored(conditions);
     }
 
-    @DynamoDBIgnore
-    public OrderFilter withConditions(String label, OrderFilterConditions conditions) {
-        return new OrderFilter(storeId, getScope(), label, conditions);
+    private static String requireLabel(String label) {
+        if (label == null || label.isBlank()) {
+            throw new OrderFilterInvalidException("A filter needs a label");
+        }
+        return label.trim();
     }
 
-    public String getStoreId() {
-        return storeId;
+    public String getId() {
+        return id;
     }
 
-    public void setStoreId(String storeId) {
-        this.storeId = storeId;
-    }
-
-    public String getFilterKey() {
-        return filterKey;
-    }
-
-    public void setFilterKey(String filterKey) {
-        this.filterKey = filterKey;
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getLabel() {
@@ -123,13 +73,5 @@ public class OrderFilter {
 
     public void setConditions(List<String> conditions) {
         this.conditions = conditions;
-    }
-
-    public Long getVersion() {
-        return version;
-    }
-
-    public void setVersion(Long version) {
-        this.version = version;
     }
 }

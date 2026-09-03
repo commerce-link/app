@@ -4,12 +4,15 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
-public record VisibleOrderFilters(List<OrderFilter> all) {
+public record VisibleOrderFilters(List<OrderFilter> sharedWithStore, List<OrderFilter> own) {
 
-    public Optional<OrderFilter> byKey(String filterKey) {
-        return filterKey == null || filterKey.isBlank()
+    public Optional<OrderFilter> byId(String filterId) {
+        return filterId == null || filterId.isBlank()
                 ? Optional.empty()
-                : all.stream().filter(filter -> filter.getFilterKey().equals(filterKey)).findFirst();
+                : Stream.concat(sharedWithStore.stream(), own.stream())
+                        .filter(filter -> filter.getId().equals(filterId))
+                        .findFirst();
     }
 }

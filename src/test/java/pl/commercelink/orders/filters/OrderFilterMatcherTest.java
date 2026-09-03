@@ -41,7 +41,7 @@ class OrderFilterMatcherTest {
                     return OrderFilterCondition.of(OrderFilterField.parse(parts[0]).orElseThrow(), parts[1]).orElseThrow();
                 })
                 .toList();
-        return OrderFilter.sharedWithStore("store-1", "test", OrderFilterConditions.of(parsed));
+        return OrderFilter.of("test", OrderFilterConditions.of(parsed));
     }
 
     @Test
@@ -134,7 +134,7 @@ class OrderFilterMatcherTest {
     @DisplayName("a filter whose stored conditions cannot be read matches nothing")
     void unreadableFilterMatchesNothing() {
         OrderFilter broken = new OrderFilter();
-        broken.setFilterKey("STORE#whatever");
+        broken.setId("broken");
         broken.setConditions(List.of("RemovedField=WHATEVER"));
 
         assertThat(matcher.matches(order(), broken)).isFalse();

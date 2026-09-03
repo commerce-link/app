@@ -24,8 +24,7 @@ class OrderFilterConditionsTest {
                 condition(OrderFilterField.ShippingDue, "DueToday"),
                 condition(OrderFilterField.ShipmentType, "Courier")));
 
-        assertThat(first.canonicalForm()).isEqualTo(second.canonicalForm());
-        assertThat(first.fingerprint()).isEqualTo(second.fingerprint());
+        assertThat(first.entries()).isEqualTo(second.entries());
     }
 
     @Test
@@ -34,7 +33,7 @@ class OrderFilterConditionsTest {
         OrderFilterConditions upper = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, "COURIER")));
         OrderFilterConditions lower = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, " courier ")));
 
-        assertThat(upper.fingerprint()).isEqualTo(lower.fingerprint());
+        assertThat(upper.entries()).isEqualTo(lower.entries());
     }
 
     @Test
@@ -43,7 +42,7 @@ class OrderFilterConditionsTest {
         OrderFilterConditions dashed = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShippingPostalCode, "00-9")));
         OrderFilterConditions plain = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShippingPostalCode, "009")));
 
-        assertThat(dashed.fingerprint()).isEqualTo(plain.fingerprint());
+        assertThat(dashed.entries()).isEqualTo(plain.entries());
     }
 
     @Test
@@ -54,15 +53,6 @@ class OrderFilterConditionsTest {
                 condition(OrderFilterField.ShipmentType, "Courier")));
 
         assertThat(conditions.entries()).containsExactly("ShipmentType=COURIER");
-    }
-
-    @Test
-    @DisplayName("different conditions produce different fingerprints")
-    void differentConditionsDiffer() {
-        OrderFilterConditions courier = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, "Courier")));
-        OrderFilterConditions pickupPoint = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, "PickupPoint")));
-
-        assertThat(courier.fingerprint()).isNotEqualTo(pickupPoint.fingerprint());
     }
 
     @Test

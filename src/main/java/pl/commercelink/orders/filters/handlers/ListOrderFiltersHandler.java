@@ -2,11 +2,11 @@ package pl.commercelink.orders.filters.handlers;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
 import pl.commercelink.orders.filters.VisibleOrderFilters;
+import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -19,12 +19,14 @@ public class ListOrderFiltersHandler {
     }
 
     public VisibleOrderFilters handle(FilterActor actor) {
-        List<OrderFilter> visible = orderFiltersRepository.findAllByStoreId(actor.storeId()).stream()
-                .filter(filter -> filter.isVisibleTo(actor.userId()))
-                .sorted(Comparator.comparing(OrderFilter::isSharedWithStore).reversed()
-                        .thenComparing(filter -> filter.getLabel() == null ? "" : filter.getLabel(),
-                                String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        return new VisibleOrderFilters(visible);
+        return new VisibleOrderFilters(
+                filtersOf(actor.storeId(), OwnedOrderFilters.WHOLE_STORE),
+                filtersOf(actor.storeId(), actor.userId()));
+    }
+
+    private List<OrderFilter> filtersOf(String storeId, String userId) {
+        return orderFiltersRepository.findByOwner(storeId, userId)
+                .map(OwnedOrderFilters::getFilters)
+                .orElseGet(List::of);
     }
 }

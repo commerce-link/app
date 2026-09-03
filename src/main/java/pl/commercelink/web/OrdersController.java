@@ -67,6 +67,7 @@ import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Controller
@@ -153,10 +154,10 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam(required = false) List<String> statuses,
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                        @RequestParam(required = false) String filterKey,
+                        @RequestParam(required = false) String filterId,
                         Model model) {
         VisibleOrderFilters savedFilters = listOrderFilters.handle(actor());
-        OrderFilter selectedFilter = savedFilters.byKey(filterKey).orElse(null);
+        OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
 
         List<Order> openOrders = listOpenOrders.handle(getStoreId(), selectedFilter);
 
@@ -175,8 +176,11 @@ public class OrdersController extends BaseController {
                 .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
                 .toList());
         model.addAttribute("selectedStatuses", statusSelection.selected());
-        model.addAttribute("savedFilters", savedFilters.all().stream().map(SavedOrderFilterView::of).toList());
-        model.addAttribute("selectedFilterKey", selectedFilter == null ? null : selectedFilter.getFilterKey());
+        model.addAttribute("savedFilters", Stream.concat(
+                        savedFilters.sharedWithStore().stream().map(f -> SavedOrderFilterView.of(f, true)),
+                        savedFilters.own().stream().map(f -> SavedOrderFilterView.of(f, false)))
+                .toList());
+        model.addAttribute("selectedFilterId", selectedFilter == null ? null : selectedFilter.getId());
         model.addAttribute("canManageStoreFilters", isAdmin());
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
@@ -189,23 +193,23 @@ public class OrdersController extends BaseController {
     public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes) {
         OrderFilter created = createOrderFilter.handle(
                 actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
-        redirectAttributes.addAttribute("filterKey", created.getFilterKey());
+        redirectAttributes.addAttribute("filterId", created.getId());
         return "redirect:/dashboard/orders";
     }
 
     @PostMapping("/dashboard/orders/filters/update")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateOrderFilter(@RequestParam String filterKey, OrderFilterForm form,
+    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
                                     RedirectAttributes redirectAttributes) {
-        OrderFilter updated = updateOrderFilter.handle(actor(), filterKey, form.getLabel(), form.toConditions());
-        redirectAttributes.addAttribute("filterKey", updated.getFilterKey());
+        OrderFilter updated = updateOrderFilter.handle(actor(), filterId, form.getLabel(), form.toConditions());
+        redirectAttributes.addAttribute("filterId", updated.getId());
         return "redirect:/dashboard/orders";
     }
 
     @PostMapping("/dashboard/orders/filters/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String deleteOrderFilter(@RequestParam String filterKey) {
-        deleteOrderFilter.handle(actor(), filterKey);
+    public String deleteOrderFilter(@RequestParam String filterId) {
+        deleteOrderFilter.handle(actor(), filterId);
         return "redirect:/dashboard/orders";
     }
 

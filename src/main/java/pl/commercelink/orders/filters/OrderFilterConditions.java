@@ -1,16 +1,10 @@
 package pl.commercelink.orders.filters;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 
 public final class OrderFilterConditions {
-
-    private static final String ENTRY_SEPARATOR = "|";
 
     private final List<String> entries;
 
@@ -52,19 +46,5 @@ public final class OrderFilterConditions {
 
     public boolean isReadable() {
         return !entries.isEmpty() && conditions().size() == entries.size();
-    }
-
-    public String canonicalForm() {
-        return String.join(ENTRY_SEPARATOR, entries);
-    }
-
-    public String fingerprint() {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(canonicalForm().getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
     }
 }

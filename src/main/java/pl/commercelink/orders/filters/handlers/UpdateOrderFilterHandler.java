@@ -2,11 +2,12 @@ package pl.commercelink.orders.filters.handlers;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterConditions;
 import pl.commercelink.orders.filters.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
+import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 
 import java.util.List;
 
@@ -14,31 +15,22 @@ import java.util.List;
 public class UpdateOrderFilterHandler {
 
     private final OrderFiltersRepository orderFiltersRepository;
+    private final OrderFilterOwnerAccess ownerAccess;
 
-    public UpdateOrderFilterHandler(OrderFiltersRepository orderFiltersRepository) {
+    public UpdateOrderFilterHandler(OrderFiltersRepository orderFiltersRepository, OrderFilterOwnerAccess ownerAccess) {
         this.orderFiltersRepository = orderFiltersRepository;
+        this.ownerAccess = ownerAccess;
     }
 
-    public OrderFilter handle(FilterActor actor, String filterKey, String label,
+    public OrderFilter handle(FilterActor actor, String filterId, String label,
                               List<OrderFilterCondition> conditions) {
-        OrderFilter existing = orderFiltersRepository.findById(actor.storeId(), filterKey)
+        OwnedOrderFilters owned = ownerAccess.openContaining(actor, filterId);
+        OrderFilter filter = owned.byId(filterId)
                 .orElseThrow(() -> new OrderFilterInvalidException("The filter no longer exists"));
-        existing.requireWritableBy(actor);
 
-        OrderFilter replacement = existing.withConditions(label, OrderFilterConditions.of(conditions));
+        filter.changeTo(label, OrderFilterConditions.of(conditions));
 
-        if (replacement.getFilterKey().equals(existing.getFilterKey())) {
-            existing.setLabel(replacement.getLabel());
-            orderFiltersRepository.save(existing);
-            return existing;
-        }
-
-        orderFiltersRepository.findById(actor.storeId(), replacement.getFilterKey()).ifPresent(clash -> {
-            throw new OrderFilterInvalidException("The same filter already exists under the label " + clash.getLabel());
-        });
-
-        orderFiltersRepository.save(replacement);
-        orderFiltersRepository.delete(existing);
-        return replacement;
+        orderFiltersRepository.save(owned);
+        return filter;
     }
 }
