@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.orders.Order;
@@ -60,6 +61,7 @@ class MarketplaceOrderLifecycleFlowTest {
     @Mock private DeliveriesRepository deliveriesRepository;
     @Mock private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
+    @Mock private DropshipItemLookup dropshipItemLookup;
     @Mock private MarketplaceProviderFactory providerFactory;
 
     @Mock private Store store;

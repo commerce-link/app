@@ -4,8 +4,10 @@ import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Component
 public class OrderLifecycle {
@@ -39,6 +42,8 @@ public class OrderLifecycle {
     private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Autowired
     private GoodsOutEventPublisher goodsOutEventPublisher;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     public void update(Order order) {
         update(order, null);
@@ -54,6 +59,12 @@ public class OrderLifecycle {
 
         Store store = storesRepository.findById(order.getStoreId());
         boolean documentsGenerationEnabled = store != null && store.hasDocumentsGenerationEnabled();
+        // The item fetch + dropship lookup below is only relevant once the order can possibly be Delivered
+        // (either already is, or has just reached that point earlier in this same update). Every other status
+        // short-circuits before paying for it, keeping this out of the hot path for New/Assembly/Shipping etc.
+        boolean warehouseDocumentsRequired = documentsGenerationEnabled
+                && (order.getStatus() == OrderStatus.Delivered || order.isDelivered())
+                && warehouseDocumentsRequired(order, orderItems);
 
         if (order.getStatus() == OrderStatus.New || order.getStatus() == OrderStatus.Assembly) {
             orderItems = getOrFetchOrderItems(order.getOrderId(), orderItems);
@@ -103,7 +114,7 @@ public class OrderLifecycle {
                         }
                     });
 
-            if (order.isAwaitingInvoiceGeneration() || order.isAwaitingDocumentsGeneration(documentsGenerationEnabled)) {
+            if (order.isAwaitingInvoiceGeneration() || order.isAwaitingDocumentsGeneration(warehouseDocumentsRequired)) {
                 String createdBy = CustomSecurityContext.getLoggedInUser()
                         .map(CustomUser::getName)
                         .orElse("System");
@@ -120,7 +131,7 @@ public class OrderLifecycle {
             }
         }
 
-        if (order.isSettled(documentsGenerationEnabled)) {
+        if (order.isSettled(warehouseDocumentsRequired)) {
             order.setStatus(OrderStatus.Completed);
         }
 
@@ -168,5 +179,24 @@ public class OrderLifecycle {
             return orderItemsRepository.findByOrderId(orderId);
         }
         return orderItems;
+    }
+
+    // Dropship goods never reach the warehouse, so they can never produce a goods issue note. Demanding one
+    // would keep such an order open forever. The item fetch is lazy: it only runs when the answer is not
+    // already settled by an existing document. Callers only reach here once the cheaper preconditions
+    // (store flag on, order delivered) already hold.
+    private boolean warehouseDocumentsRequired(Order order, List<OrderItem> orderItems) {
+        if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
+            return true;
+        }
+        return hasWarehouseFulfilledProductItems(order, orderItems);
+    }
+
+    private boolean hasWarehouseFulfilledProductItems(Order order, List<OrderItem> orderItems) {
+        List<OrderItem> items = getOrFetchOrderItems(order.getOrderId(), orderItems);
+        Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), items);
+        return items.stream()
+                .filter(OrderItem::isProduct)
+                .anyMatch(item -> !dropshipItemIds.contains(item.getItemId()));
     }
 }

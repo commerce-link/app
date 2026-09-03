@@ -4,11 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DeliveryTest {
 
@@ -141,5 +146,85 @@ class DeliveryTest {
                 .getValue(context, String.class));
         assertNull(parser.parseExpression("trackingView.lastCheckedAt").getValue(context));
         assertNull(delivery.getTracking());
+    }
+
+    @Test
+    void orderOutcomeIsUnknownWhenDispatchedWithAnErrorMessage() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setOrderErrorMessage("Supplier did not return an order number");
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isTrue();
+    }
+
+    @Test
+    void orderOutcomeIsNotUnknownWhileTheOrderIsStillBeingPlaced() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isFalse();
+    }
+
+    @Test
+    void orderOutcomeIsNotUnknownForAFailedDeliveryWithAnErrorMessage() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage("Supplier rejected the order");
+
+        // when / then
+        assertThat(delivery.isOrderOutcomeUnknown()).isFalse();
+    }
+
+    @Test
+    void aWarehouseDeliveryKnowsItCarriesGoodsMeantForTheCustomer() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Elko");
+        delivery.setType(DeliveryType.WAREHOUSE);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(true);
+        delivery.setAllocations(List.of(allocation));
+
+        // when / then
+        assertThat(delivery.hasDirectToConsumerAllocations()).isTrue();
+    }
+
+    @Test
+    void anOrdinaryWarehouseDeliveryCarriesNothingForTheCustomer() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Elko");
+        delivery.setType(DeliveryType.WAREHOUSE);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(false);
+        delivery.setAllocations(List.of(allocation));
+
+        // when / then
+        assertThat(delivery.hasDirectToConsumerAllocations()).isFalse();
+    }
+
+    @Test
+    void aDeliveryWithoutAllocationsCarriesNothingForTheCustomer() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Elko");
+
+        // when / then
+        assertThat(delivery.hasDirectToConsumerAllocations()).isFalse();
+    }
+
+    @Test
+    void aDropshipDeliveryDoesNotCarryGoodsForTheWarehouseToForward() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Elko");
+        delivery.setType(DeliveryType.DROPSHIP);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(true);
+        delivery.setAllocations(List.of(allocation));
+
+        // when / then
+        assertThat(delivery.hasDirectToConsumerAllocations()).isFalse();
     }
 }

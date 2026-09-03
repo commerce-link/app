@@ -345,6 +345,11 @@
                     <artifactId>pim-dev</artifactId>
                     <version>0.1.1</version>
                 </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>invoicing-dev</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
             </dependencies>
         </profile>
     </profiles>

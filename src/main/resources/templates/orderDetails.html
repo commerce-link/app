@@ -1186,7 +1186,7 @@
                         <div class="dropdown is-hoverable">
                             <div class="dropdown-trigger">
                                 <button class="button is-link is-small" type="button"
-                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !(hasWarehouseDocumentsEnabled and !hasWarehouseDocument))}"
+                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}"
                                         aria-haspopup="true" aria-controls="createDocumentMenu">
                                     <span th:text="#{order.action.create.document}"></span>
                                     <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
@@ -1194,7 +1194,7 @@
                             </div>
                             <div class="dropdown-menu" id="createDocumentMenu" role="menu">
                                 <div class="dropdown-content">
-                                    <form th:if="${hasWarehouseDocumentsEnabled and !hasWarehouseDocument}"
+                                    <form th:if="${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}"
                                           th:action="@{/dashboard/orders/{orderId}/goods-out(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
                                         <button type="submit" class="dropdown-item button is-ghost is-shadowless has-text-left"
                                                 th:disabled="${isCompletedOrder}"

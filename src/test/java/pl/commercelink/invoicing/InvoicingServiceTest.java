@@ -11,6 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import pl.commercelink.baskets.Basket;
+import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.invoicing.api.Invoice;
 import pl.commercelink.invoicing.api.InvoiceRequest;
@@ -21,6 +23,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
@@ -30,6 +33,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Collections;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -152,6 +156,86 @@ class InvoicingServiceTest {
         verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
     }
 
+    @Test
+    @DisplayName("createProforma returns provider-not-configured error and does not throw when the store has no invoicing provider")
+    void createProformaReturnsErrorWhenInvoicingProviderIsNotConfigured() {
+        // given
+        Basket basket = basketWithFilledBillingDetails();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        InvoicingService.OperationResult result = invoicingService.createProforma(basket, Locale.ENGLISH, false);
+
+        // then
+        assertThat(result.hasError()).isTrue();
+        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
+    }
+
+    @Test
+    @DisplayName("createInvoice (standard document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
+    void createInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
+        // given
+        Order order = orderWithFilledBillingDetails();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceVat, false);
+
+        // then
+        assertThat(result.hasError()).isTrue();
+        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
+        verify(ordersRepository, never()).save(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
+    }
+
+    @Test
+    @DisplayName("createInvoice (advance document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
+    void createAdvanceInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
+        // given
+        Order order = orderWithFilledBillingDetails();
+        order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan Kowalski", 100));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceAdvance, false);
+
+        // then
+        assertThat(result.hasError()).isTrue();
+        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
+        verify(ordersRepository, never()).save(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
+    }
+
+    @Test
+    @DisplayName("createInvoice (final document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
+    void createFinalInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
+        // given
+        Order order = orderWithFilledBillingDetails();
+        order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
+        order.addDocument(new Document("adv-1", "ZAL/1/2026", null, DocumentType.InvoiceAdvance));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceFinal, false);
+
+        // then
+        assertThat(result.hasError()).isTrue();
+        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
+        verify(ordersRepository, never()).save(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
+    }
+
     private Order orderBase() {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -170,5 +254,21 @@ class InvoicingServiceTest {
         billing.setPhone("+48123456789");
         order.setBillingDetails(billing);
         return order;
+    }
+
+    private Basket basketWithFilledBillingDetails() {
+        Basket basket = new Basket();
+        basket.setStoreId(STORE_ID);
+        basket.setBasketId("basket-1");
+        BillingDetails billing = new BillingDetails();
+        billing.setName("Jan Kowalski");
+        billing.setStreetAndNumber("Marszalkowska 1");
+        billing.setPostalCode("00-001");
+        billing.setCity("Warszawa");
+        billing.setCountry("PL");
+        billing.setEmail("jan@example.com");
+        billing.setPhone("+48123456789");
+        basket.setBillingDetails(billing);
+        return basket;
     }
 }

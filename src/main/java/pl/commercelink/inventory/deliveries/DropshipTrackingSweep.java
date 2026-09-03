@@ -2,7 +2,6 @@ package pl.commercelink.inventory.deliveries;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -35,7 +34,6 @@ public class DropshipTrackingSweep {
         this.clock = clock;
     }
 
-    @Scheduled(cron = "${dropship.tracking.sweep-cron:0 7 * * * ?}")
     public void sweep() {
         LocalDateTime now = LocalDateTime.now(clock);
         int published = 0;

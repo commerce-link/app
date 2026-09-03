@@ -12,12 +12,15 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.BillingParty;
 import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.util.OperationResult;
@@ -30,12 +33,18 @@ import pl.commercelink.warehouse.api.GoodsOutRequest;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +77,10 @@ class GoodsOutServiceTest {
     private BillingParty issuer;
     @Mock
     private GoodsOutHandler goodsOutHandler;
+    @Mock
+    private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private OrderLifecycle orderLifecycle;
 
     @InjectMocks
     private GoodsOutService goodsOutService;
@@ -101,6 +114,8 @@ class GoodsOutServiceTest {
     void issueGoodsOutFailsWhenWarehouseConfigurationIsMissing() {
         // given
         Order order = orderWithoutDocuments();
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
         when(warehouseConfiguration.isComplete()).thenReturn(false);
@@ -120,6 +135,8 @@ class GoodsOutServiceTest {
     void issueGoodsOutSucceedsWithoutPayloadWhenDocumentsGenerationDisabled() {
         // given
         Order order = orderWithoutDocuments();
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
         when(warehouseConfiguration.isComplete()).thenReturn(true);
@@ -151,7 +168,8 @@ class GoodsOutServiceTest {
         when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
         when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
         when(issuer.hasCompanyDetails()).thenReturn(true);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
         when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
         when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
                 .thenReturn(OperationResult.success(warehouseDocument));
@@ -167,6 +185,193 @@ class GoodsOutServiceTest {
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getDocuments()).contains(warehouseDocument);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut creates no document when every product item sits in a dropship delivery")
+    void issueGoodsOutCreatesNoDocumentWhenEveryProductItemIsDropship() {
+        // given
+        Order order = orderWithoutDocuments();
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then: the store is never even looked up, so an incomplete warehouse setup cannot fail the order
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.hasPayload()).isFalse();
+        verify(storesRepository, never()).findById(any());
+        verify(warehouse, never()).goodsOutHandler(any());
+        verifyNoInteractions(invoicingProviderFactory);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut creates no document for an order with no product items at all")
+    void issueGoodsOutCreatesNoDocumentForAnOrderWithoutProductItems() {
+        // given
+        Order order = orderWithoutDocuments();
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.hasPayload()).isFalse();
+        verify(warehouse, never()).goodsOutHandler(any());
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut builds the goods-out request from warehouse items only")
+    void issueGoodsOutBuildsTheDocumentFromWarehouseItemsOnly() {
+        // given
+        Order order = orderWithoutDocuments();
+        Document warehouseDocument = new Document("doc-3", "WZ/3/2026", "https://example.com/wz/3", DocumentType.GoodsIssue);
+        OrderItem dropshipItem = productItem("item-1");
+        OrderItem warehouseItem = productItem("item-2");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipItem, warehouseItem));
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        ArgumentCaptor<GoodsOutRequest> request = ArgumentCaptor.forClass(GoodsOutRequest.class);
+        verify(goodsOutHandler).issue(request.capture(), anyBoolean());
+        assertThat(request.getValue().getItems()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut re-evaluates the order lifecycle after attaching a new goods issue note")
+    void issueGoodsOutReEvaluatesTheOrderLifecycleAfterAttachingANewDocument() {
+        // given
+        Order order = orderWithoutDocuments();
+        Document warehouseDocument = new Document("doc-4", "WZ/4/2026", "https://example.com/wz/4", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        verify(orderLifecycle).update(any(Order.class));
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut does not re-evaluate the lifecycle when the goods issue note already exists")
+    void issueGoodsOutDoesNotReEvaluateTheLifecycleWhenTheDocumentAlreadyExists() {
+        // given
+        Document existing = new Document("doc-5", "WZ/5/2026", "https://example.com/wz/5", DocumentType.GoodsIssue);
+        Order order = orderWithDocument(existing);
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        verifyNoInteractions(orderLifecycle);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut does not re-evaluate the lifecycle when a concurrent call already attached the document")
+    void issueGoodsOutDoesNotReEvaluateTheLifecycleWhenAConcurrentCallAlreadyAttachedTheDocument() {
+        // given: the order passed in has no GoodsIssue document yet, so the top-of-method check passes and the
+        // handler runs, but by the time the mutator re-reads the order a concurrent call has already attached one.
+        Order order = orderWithoutDocuments();
+        Document existing = new Document("doc-6", "WZ/6/2026", "https://example.com/wz/6", DocumentType.GoodsIssue);
+        Order concurrentlyUpdatedOrder = orderWithDocument(existing);
+        Document warehouseDocument = new Document("doc-7", "WZ/7/2026", "https://example.com/wz/7", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(concurrentlyUpdatedOrder);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        verifyNoInteractions(orderLifecycle);
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut reads the order only once, reusing the entity modifyAndSave saved instead of re-reading it")
+    void issueGoodsOutReadsTheOrderOnlyOnceWhenAttachingANewDocument() {
+        // given
+        Order order = orderWithoutDocuments();
+        Document warehouseDocument = new Document("doc-8", "WZ/8/2026", "https://example.com/wz/8", DocumentType.GoodsIssue);
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(true);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
+        when(warehouseConfiguration.getWarehouseId()).thenReturn("wh-main");
+        when(warehouseConfiguration.getCostCenterId()).thenReturn("cc-1");
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.fetchCostCenterById("cc-1")).thenReturn(issuer);
+        when(issuer.hasCompanyDetails()).thenReturn(true);
+        when(warehouse.goodsOutHandler(STORE_ID)).thenReturn(goodsOutHandler);
+        when(goodsOutHandler.issue(any(GoodsOutRequest.class), anyBoolean()))
+                .thenReturn(OperationResult.success(warehouseDocument));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then: the only read of the order is the loader inside modifyAndSave; the lifecycle is
+        // re-evaluated using the entity that call saved, not a second eventually-consistent read
+        verify(ordersRepository, times(1)).findById(STORE_ID, ORDER_ID);
+        verify(orderLifecycle).update(order);
+    }
+
+    private OrderItem productItem(String itemId) {
+        OrderItem item = mock(OrderItem.class);
+        when(item.isProduct()).thenReturn(true);
+        when(item.getItemId()).thenReturn(itemId);
+        return item;
     }
 
     private Order orderWithoutDocuments() {
