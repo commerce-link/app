@@ -4,7 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.orders.filters.OrderFilterConditions;
-import pl.commercelink.orders.filters.OrderFilterInvalidException;
+import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -28,14 +28,14 @@ public class OrderFilter {
     public static OrderFilter of(String label, OrderFilterConditions conditions) {
         OrderFilter filter = new OrderFilter();
         filter.id = UUID.randomUUID().toString();
-        filter.label = requireLabel(label);
+        filter.label = validLabel(label);
         filter.conditions = new LinkedList<>(conditions.entries());
         return filter;
     }
 
     @DynamoDBIgnore
     public void changeTo(String label, OrderFilterConditions conditions) {
-        this.label = requireLabel(label);
+        this.label = validLabel(label);
         this.conditions = new LinkedList<>(conditions.entries());
     }
 
@@ -44,7 +44,7 @@ public class OrderFilter {
         return OrderFilterConditions.stored(conditions);
     }
 
-    private static String requireLabel(String label) {
+    private static String validLabel(String label) {
         if (label == null || label.isBlank()) {
             throw new OrderFilterInvalidException("A filter needs a label");
         }

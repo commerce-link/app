@@ -6,7 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
-import pl.commercelink.orders.filters.OrderFilterInvalidException;
+import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -15,9 +15,9 @@ import java.util.Optional;
 @DynamoDBTable(tableName = "OrderFilters")
 public class OwnedOrderFilters {
 
-    public static final String WHOLE_STORE = "default";
+    public static final String STORE_FILTER = "default";
 
-    public static final int LIMIT = 20;
+    public static final int LIMIT_PER_DOCUMENT = 20;
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -42,8 +42,8 @@ public class OwnedOrderFilters {
     }
 
     @DynamoDBIgnore
-    public boolean isWholeStore() {
-        return WHOLE_STORE.equals(userId);
+    public boolean isFiltersForStore() {
+        return STORE_FILTER.equals(userId);
     }
 
     @DynamoDBIgnore
@@ -53,8 +53,8 @@ public class OwnedOrderFilters {
 
     @DynamoDBIgnore
     public void add(OrderFilter filter) {
-        if (filters.size() >= LIMIT) {
-            throw new OrderFilterInvalidException("A filter list cannot hold more than " + LIMIT + " filters");
+        if (filters.size() >= LIMIT_PER_DOCUMENT) {
+            throw new OrderFilterInvalidException("A filter list cannot hold more than " + LIMIT_PER_DOCUMENT + " filters");
         }
         filters.add(filter);
     }

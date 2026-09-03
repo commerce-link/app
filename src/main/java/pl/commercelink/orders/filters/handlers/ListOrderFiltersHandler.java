@@ -20,7 +20,7 @@ public class ListOrderFiltersHandler {
 
     public VisibleOrderFilters handle(FilterActor actor) {
         return new VisibleOrderFilters(
-                filtersOf(actor.storeId(), OwnedOrderFilters.WHOLE_STORE),
+                filtersOf(actor.storeId(), OwnedOrderFilters.STORE_FILTER),
                 filtersOf(actor.storeId(), actor.userId()));
     }
 

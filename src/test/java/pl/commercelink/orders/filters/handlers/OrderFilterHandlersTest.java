@@ -7,11 +7,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.OrderFilterAccessDeniedException;
+import pl.commercelink.orders.filters.exceptions.OrderFilterAccessDeniedException;
 import pl.commercelink.orders.filters.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterConditions;
 import pl.commercelink.orders.filters.OrderFilterField;
-import pl.commercelink.orders.filters.OrderFilterInvalidException;
+import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
+import pl.commercelink.orders.filters.OrderFilterWriteAccess;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
 import pl.commercelink.orders.filters.VisibleOrderFilters;
 import pl.commercelink.orders.filters.model.OrderFilter;
@@ -59,8 +60,8 @@ class OrderFilterHandlersTest {
         return owned;
     }
 
-    private OrderFilterOwnerAccess ownerAccess() {
-        return new OrderFilterOwnerAccess(repository);
+    private OrderFilterWriteAccess writeAccess() {
+        return new OrderFilterWriteAccess(repository);
     }
 
     @Nested
@@ -71,8 +72,8 @@ class OrderFilterHandlersTest {
         void readsBothRows() {
             OrderFilter shared = filter("Courier");
             OrderFilter mine = filter("Mine");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE))
-                    .thenReturn(Optional.of(rowOf(OwnedOrderFilters.WHOLE_STORE, shared)));
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER))
+                    .thenReturn(Optional.of(rowOf(OwnedOrderFilters.STORE_FILTER, shared)));
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(rowOf("user-1", mine)));
 
             VisibleOrderFilters visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
@@ -87,7 +88,7 @@ class OrderFilterHandlersTest {
         @Test
         @DisplayName("an owner without a row simply has no filters")
         void missingRowMeansNoFilters() {
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
 
             VisibleOrderFilters visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
@@ -105,7 +106,7 @@ class OrderFilterHandlersTest {
         void regularUserAppendsToOwnRow() {
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
 
-            OrderFilter created = new CreateOrderFilterHandler(repository, ownerAccess())
+            OrderFilter created = new CreateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), false, "Mine", COURIER);
 
             assertThat(created.getId()).isNotBlank();
@@ -115,7 +116,7 @@ class OrderFilterHandlersTest {
         @Test
         @DisplayName("only an administrator writes to the store row")
         void onlyAdministratorWritesToStoreRow() {
-            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), true, "Courier", COURIER))
                     .isInstanceOf(OrderFilterAccessDeniedException.class);
 
@@ -128,7 +129,7 @@ class OrderFilterHandlersTest {
             OwnedOrderFilters own = rowOf("user-1", filter("Courier"));
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
 
-            new CreateOrderFilterHandler(repository, ownerAccess()).handle(user("user-1"), false, "Courier", COURIER);
+            new CreateOrderFilterHandler(repository, writeAccess()).handle(user("user-1"), false, "Courier", COURIER);
 
             assertThat(own.getFilters()).hasSize(2);
         }
@@ -137,17 +138,17 @@ class OrderFilterHandlersTest {
         @DisplayName("an owner cannot keep more than twenty filters")
         void anOwnerCannotKeepMoreThanTwentyFilters() {
             OwnedOrderFilters own = rowOf("user-1");
-            for (int i = 0; i < OwnedOrderFilters.LIMIT; i++) {
+            for (int i = 0; i < OwnedOrderFilters.LIMIT_PER_DOCUMENT; i++) {
                 own.add(filter("Filter " + i));
             }
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
 
-            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), false, "One too many", COURIER))
                     .isInstanceOf(OrderFilterInvalidException.class)
                     .hasMessageContaining("20");
 
-            assertThat(own.getFilters()).hasSize(OwnedOrderFilters.LIMIT);
+            assertThat(own.getFilters()).hasSize(OwnedOrderFilters.LIMIT_PER_DOCUMENT);
             verify(repository, never()).save(any());
         }
 
@@ -156,7 +157,7 @@ class OrderFilterHandlersTest {
         void filterNeedsALabel() {
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new CreateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), false, "  ", COURIER))
                     .isInstanceOf(OrderFilterInvalidException.class);
         }
@@ -170,10 +171,10 @@ class OrderFilterHandlersTest {
         void filterIsChangedInPlace() {
             OrderFilter mine = filter("Courier");
             OwnedOrderFilters own = rowOf("user-1", mine);
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
 
-            OrderFilter updated = new UpdateOrderFilterHandler(repository, ownerAccess())
+            OrderFilter updated = new UpdateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), mine.getId(), false, "Paczkomaty", PICKUP_POINT);
 
             assertThat(updated.getId()).isEqualTo(mine.getId());
@@ -187,10 +188,10 @@ class OrderFilterHandlersTest {
         @DisplayName("a filter shared with the store is changed only by an administrator")
         void sharedFilterIsChangedOnlyByAdministrator() {
             OrderFilter shared = filter("Courier");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE))
-                    .thenReturn(Optional.of(rowOf(OwnedOrderFilters.WHOLE_STORE, shared)));
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER))
+                    .thenReturn(Optional.of(rowOf(OwnedOrderFilters.STORE_FILTER, shared)));
 
-            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), shared.getId(), true, "Kurier", COURIER))
                     .isInstanceOf(OrderFilterAccessDeniedException.class);
 
@@ -202,11 +203,11 @@ class OrderFilterHandlersTest {
         void tickingSharedMovesTheFilter() {
             OrderFilter mine = filter("Courier");
             OwnedOrderFilters own = rowOf("user-1", mine);
-            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.WHOLE_STORE);
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.of(storeRow));
+            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.STORE_FILTER);
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.of(storeRow));
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
 
-            OrderFilter moved = new UpdateOrderFilterHandler(repository, ownerAccess())
+            OrderFilter moved = new UpdateOrderFilterHandler(repository, writeAccess())
                     .handle(admin("user-1"), mine.getId(), true, "Courier", COURIER);
 
             assertThat(moved.getId()).isEqualTo(mine.getId());
@@ -220,10 +221,10 @@ class OrderFilterHandlersTest {
         @DisplayName("a regular user cannot share a filter with the store by updating it")
         void regularUserCannotShareByUpdating() {
             OrderFilter mine = filter("Courier");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(rowOf("user-1", mine)));
 
-            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), mine.getId(), true, "Courier", COURIER))
                     .isInstanceOf(OrderFilterAccessDeniedException.class);
         }
@@ -232,10 +233,10 @@ class OrderFilterHandlersTest {
         @DisplayName("a filter of another user is not reachable")
         void filterOfAnotherUserIsNotReachable() {
             OrderFilter theirs = filter("Theirs");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(rowOf("user-1")));
 
-            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new UpdateOrderFilterHandler(repository, writeAccess())
                     .handle(admin("user-1"), theirs.getId(), false, "Mine now", COURIER))
                     .isInstanceOf(OrderFilterInvalidException.class);
         }
@@ -250,10 +251,10 @@ class OrderFilterHandlersTest {
             OrderFilter first = filter("First");
             OrderFilter second = filter("Second");
             OwnedOrderFilters own = rowOf("user-1", first, second);
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
 
-            new DeleteOrderFilterHandler(repository, ownerAccess()).handle(user("user-1"), first.getId());
+            new DeleteOrderFilterHandler(repository, writeAccess()).handle(user("user-1"), first.getId());
 
             assertThat(own.getFilters()).containsExactly(second);
             verify(repository).save(own);
@@ -263,14 +264,14 @@ class OrderFilterHandlersTest {
         @DisplayName("only an administrator removes a filter shared with the store")
         void onlyAdministratorRemovesSharedFilter() {
             OrderFilter shared = filter("Courier");
-            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.WHOLE_STORE, shared);
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.WHOLE_STORE)).thenReturn(Optional.of(storeRow));
+            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.STORE_FILTER, shared);
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.of(storeRow));
 
-            assertThatThrownBy(() -> new DeleteOrderFilterHandler(repository, ownerAccess())
+            assertThatThrownBy(() -> new DeleteOrderFilterHandler(repository, writeAccess())
                     .handle(user("user-1"), shared.getId()))
                     .isInstanceOf(OrderFilterAccessDeniedException.class);
 
-            new DeleteOrderFilterHandler(repository, ownerAccess()).handle(admin("user-9"), shared.getId());
+            new DeleteOrderFilterHandler(repository, writeAccess()).handle(admin("user-9"), shared.getId());
 
             assertThat(storeRow.getFilters()).isEmpty();
             verify(repository).save(storeRow);

@@ -1,5 +1,6 @@
 package pl.commercelink.orders.filters;
 
+import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

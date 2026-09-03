@@ -1,4 +1,4 @@
-package pl.commercelink.orders.filters;
+package pl.commercelink.orders.filters.exceptions;
 
 public class OrderFilterInvalidException extends RuntimeException {
 
