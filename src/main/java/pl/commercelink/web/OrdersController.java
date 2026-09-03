@@ -35,7 +35,7 @@ import pl.commercelink.orders.filters.handlers.ListOrderFiltersHandler;
 
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.handlers.UpdateOrderFilterHandler;
-import pl.commercelink.orders.filters.ListOrderFiltersView;
+import pl.commercelink.orders.filters.handlers.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;

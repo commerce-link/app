@@ -14,7 +14,7 @@ import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFilterWriteAccess;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
-import pl.commercelink.orders.filters.ListOrderFiltersView;
+import pl.commercelink.orders.filters.handlers.ListOrderFiltersView;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 

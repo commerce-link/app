@@ -3,7 +3,6 @@ package pl.commercelink.orders.filters.handlers;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
-import pl.commercelink.orders.filters.ListOrderFiltersView;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 
