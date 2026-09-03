@@ -26,8 +26,8 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterAccessDeniedException;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
-import pl.commercelink.orders.ListOpenOrdersHandler;
-import pl.commercelink.orders.OrderStatusSelection;
+import pl.commercelink.orders.handlers.ListOpenOrdersHandler;
+
 import pl.commercelink.orders.filters.handlers.CreateOrderFilterHandler;
 import pl.commercelink.orders.filters.handlers.DeleteOrderFilterHandler;
 import pl.commercelink.orders.filters.FilterActor;
@@ -35,7 +35,7 @@ import pl.commercelink.orders.filters.handlers.ListOrderFiltersHandler;
 
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.handlers.UpdateOrderFilterHandler;
-import pl.commercelink.orders.filters.VisibleOrderFilters;
+import pl.commercelink.orders.filters.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -59,6 +59,7 @@ import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.Marketplace;
 import pl.commercelink.web.dtos.OrderFilterForm;
+import pl.commercelink.web.dtos.OrderStatusSelection;
 import pl.commercelink.web.dtos.SavedOrderFilterView;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
@@ -158,7 +159,7 @@ public class OrdersController extends BaseController {
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
                         @RequestParam(required = false) String filterId,
                         Model model) {
-        VisibleOrderFilters savedFilters = listOrderFilters.handle(actor());
+        ListOrderFiltersView savedFilters = listOrderFilters.handle(actor());
         OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
 
         List<Order> openOrders = listOpenOrders.handle(getStoreId(), selectedFilter);

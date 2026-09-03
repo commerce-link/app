@@ -14,7 +14,7 @@ import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFilterWriteAccess;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
-import pl.commercelink.orders.filters.VisibleOrderFilters;
+import pl.commercelink.orders.filters.ListOrderFiltersView;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 
@@ -80,7 +80,7 @@ class OrderFilterHandlersTest {
                     .thenReturn(Optional.of(rowOf(OwnedOrderFilters.STORE_FILTER, shared)));
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(rowOf("user-1", mine)));
 
-            VisibleOrderFilters visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
+            ListOrderFiltersView visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
 
             assertThat(visible.sharedWithStore()).containsExactly(shared);
             assertThat(visible.own()).containsExactly(mine);
@@ -95,7 +95,7 @@ class OrderFilterHandlersTest {
             when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
             when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
 
-            VisibleOrderFilters visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
+            ListOrderFiltersView visible = new ListOrderFiltersHandler(repository).handle(user("user-1"));
 
             assertThat(visible.sharedWithStore()).isEmpty();
             assertThat(visible.own()).isEmpty();

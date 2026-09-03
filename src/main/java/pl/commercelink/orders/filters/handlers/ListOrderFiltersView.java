@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-public record VisibleOrderFilters(List<OrderFilter> sharedWithStore, List<OrderFilter> own) {
+public record ListOrderFiltersView(List<OrderFilter> sharedWithStore, List<OrderFilter> own) {
 
     public Optional<OrderFilter> byId(String filterId) {
         return filterId == null || filterId.isBlank()

@@ -1,4 +1,7 @@
-package pl.commercelink.orders;
+package pl.commercelink.web.dtos;
+
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 
 import java.util.List;
 

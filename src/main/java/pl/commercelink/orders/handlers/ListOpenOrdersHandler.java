@@ -1,6 +1,9 @@
-package pl.commercelink.orders;
+package pl.commercelink.orders.handlers;
 
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.OrderFilterMatcher;
 
