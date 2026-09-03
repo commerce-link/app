@@ -103,7 +103,7 @@
                                 <td th:text="${enumI18n.localize(shipment.type)}"></td>
                                 <td th:text="${shipment.trackingNo}"></td>
                                 <td th:text="${shipment.carrier}"></td>
-                                <td th:text="${shipment.shippedAt}"></td>
+                                <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
                             </tr>
                             </tbody>
                         </table>
