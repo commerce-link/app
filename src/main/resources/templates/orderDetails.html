@@ -997,6 +997,7 @@
                         <th th:text="#{order.shipment.carrier}"></th>
                         <th th:text="#{order.shipment.shipped.at}"></th>
                         <th th:text="#{order.shipment.delivered.at}"></th>
+                        <th th:text="#{order.shipment.tracking.status}"></th>
                     </tr>
                     </thead>
 
@@ -1008,6 +1009,13 @@
                             <td th:text="${shipment.carrier}"></td>
                             <td th:text="${shipment.shippedAt}"></td>
                             <td th:text="${shipment.deliveredAt}"></td>
+                            <td>
+                                <span th:if="${shipment.trackingSubscriptionStatus != null}"
+                                      class="tag"
+                                      th:classappend="${shipment.trackingSubscriptionStatus.name() == 'ACTIVE'} ? 'is-success is-light' : (${shipment.trackingSubscriptionStatus.name() == 'FAILED'} ? 'is-danger is-light' : 'is-light')"
+                                      th:title="${shipment.trackingSubscriptionError}"
+                                      th:text="#{'order.shipment.tracking.status.' + ${shipment.trackingSubscriptionStatus.name()}}"></span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

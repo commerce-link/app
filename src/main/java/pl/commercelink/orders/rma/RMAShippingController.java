@@ -14,6 +14,7 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.stores.RMAConfiguration;
 
 import java.util.Collections;
@@ -41,6 +42,9 @@ public class RMAShippingController extends AbstractShippingController {
 
     @Autowired
     private RMALifecycle rmaLifecycle;
+
+    @Autowired
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @PostMapping("/shipItemsToDistributor")
     public String initiateShippingToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, Model model, RedirectAttributes redirectAttributes, Locale locale) {
@@ -127,6 +131,7 @@ public class RMAShippingController extends AbstractShippingController {
         rmaItemsRepository.batchSave(selectedItems);
 
         rma.setShipments(shipments);
+        shipmentTrackingSubscriber.subscribe(getStoreId(), rma);
         rmaLifecycle.update(rma, selectedItems);
     }
 

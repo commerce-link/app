@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import pl.commercelink.orders.*;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +29,9 @@ public class OrdersShippingController extends AbstractShippingController {
 
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+
+    @Autowired
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @GetMapping("")
     public String initiate(@PathVariable("orderId") String orderId, Model model) {
@@ -66,6 +70,7 @@ public class OrdersShippingController extends AbstractShippingController {
         Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
 
         order.replaceShipments(shipments);
+        shipmentTrackingSubscriber.subscribe(getStoreId(), order);
 
         orderLifecycle.update(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);

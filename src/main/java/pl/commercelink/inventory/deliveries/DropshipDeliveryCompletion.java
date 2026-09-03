@@ -14,6 +14,7 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.util.OperationResult;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,7 @@ public class DropshipDeliveryCompletion {
     private final OrderItemsRepository orderItemsRepository;
     private final OrderLifecycle orderLifecycle;
     private final OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    private final ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     public OperationResult<DropshipShipmentResult> confirmShipped(String storeId, Delivery delivery,
                                                                   List<Allocation> selectedOrderAllocations,
@@ -105,6 +107,7 @@ public class DropshipDeliveryCompletion {
         Shipment target = shipmentToFill(order);
         boolean firstTrackedParcel = order.getShipments().stream().noneMatch(Shipment::hasShippingData);
         shipment.applyTo(target);
+        shipmentTrackingSubscriber.subscribe(order.getStoreId(), order);
         orderLifecycle.update(order, orderItems);
         if (firstTrackedParcel) {
             orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
