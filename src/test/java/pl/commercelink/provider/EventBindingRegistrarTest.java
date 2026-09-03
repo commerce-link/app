@@ -184,6 +184,34 @@ class EventBindingRegistrarTest {
     }
 
     @Test
+    void webhookOutcomeWithRejectedStatusIsNeverDispatchedEvenWithAResult() throws Exception {
+        // given: convention says an executor sets result only alongside a non-rejected status,
+        // but the registrar must not dispatch a rejected outcome regardless
+        WebhookStatusResponse rejected = new WebhookStatusResponse(EventBindingRegistrar.REJECTED_STATUS);
+        AtomicReference<Object> capturedResult = new AtomicReference<>("not-called");
+        TestDescriptor descriptor = new TestDescriptor("furgonetka",
+                List.of(new WebhookBinding<>("furgonetka", (event, ctx) -> WebhookOutcome.of("some-result", rejected))));
+
+        RouterFunction<ServerResponse> routes = EventBindingRegistrar
+                .forDescriptors(List.of(descriptor))
+                .withWebhooks("/Store/{storeId}/Webhooks/Shipping/",
+                        (d, storeId) -> Map.of(),
+                        (d, storeId, result) -> capturedResult.set(result))
+                .register();
+
+        MockHttpServletRequest http = new MockHttpServletRequest("POST", "/Store/s1/Webhooks/Shipping/furgonetka");
+        http.setContent("{}".getBytes());
+        ServerRequest req = ServerRequest.create(http, messageConverters);
+
+        // when
+        ServerResponse response = routes.route(req).orElseThrow().handle(req);
+
+        // then
+        assertThat(response.statusCode().value()).isEqualTo(401);
+        assertThat(capturedResult.get()).isEqualTo("not-called");
+    }
+
+    @Test
     void webhookOutcomeWithOkStatusAnswers200() throws Exception {
         // given
         TestDescriptor descriptor = new TestDescriptor("furgonetka",

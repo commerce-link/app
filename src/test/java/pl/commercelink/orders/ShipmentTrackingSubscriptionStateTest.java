@@ -106,4 +106,15 @@ class ShipmentTrackingSubscriptionStateTest {
         assertThat(Shipment.normalizeTrackingNo(null)).isNull();
         assertThat(Shipment.normalizeTrackingNo(" pkg-1 ")).isEqualTo("PKG-1");
     }
+
+    @Test
+    void whitespaceOnlyTrackingNumberIsNotShippingData() {
+        // a blank number would normalize to an empty index key, which DynamoDB rejects
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("   ");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 3, 10, 0));
+
+        assertThat(shipment.hasShippingData()).isFalse();
+    }
 }

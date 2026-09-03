@@ -32,6 +32,7 @@ public final class EventBindingRegistrar {
     /**
      * Status body a provider's {@code WebhookExecutor} returns to have the webhook answered with HTTP 401
      * (bad signature/checksum) instead of 200 — see {@code FurgonetkaWebhookExecutor.STATUS_REJECTED}.
+     * A rejected outcome is answered with 401 and never dispatched.
      */
     public static final String REJECTED_STATUS = "REJECTED";
 
@@ -158,12 +159,13 @@ public final class EventBindingRegistrar {
             }
             WebhookContext ctx = new WebhookContext(extractHeaders(request), providerConfig);
             WebhookOutcome<R> outcome = binding.executor().execute(body, ctx);
-            if (outcome.result() != null) {
-                dispatchResult(descriptor, storeId, outcome.result());
-            }
             if (outcome.responseBody() instanceof WebhookStatusResponse status
                     && REJECTED_STATUS.equals(status.status())) {
+                // never dispatch a rejected outcome, even if an executor set a result against convention
                 return ServerResponse.status(HttpStatus.UNAUTHORIZED).body(outcome.responseBody());
+            }
+            if (outcome.result() != null) {
+                dispatchResult(descriptor, storeId, outcome.result());
             }
             if (outcome.responseBody() != null) {
                 return ServerResponse.ok().body(outcome.responseBody());

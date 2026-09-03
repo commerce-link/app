@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.Locale;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
 public class Shipment {
@@ -138,12 +138,13 @@ public class Shipment {
 
     @DynamoDBIgnore
     public boolean isDeliveredToCollectionPoint() {
-        return isNotEmpty(collectionPointCode);
+        return isNotBlank(collectionPointCode);
     }
 
     @DynamoDBIgnore
     public boolean hasShippingData() {
-        return isCarrierShipment() && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+        // a blank tracking number normalizes to an empty string, which is not a valid DynamoDB index key
+        return isCarrierShipment() && isNotBlank(carrier) && isNotBlank(trackingNo) && shippedAt != null;
     }
 
     private boolean isCarrierShipment() {

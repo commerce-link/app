@@ -112,6 +112,22 @@ class ShipmentTrackingSubscriberTest {
     }
 
     @Test
+    void blankTrackingNumberIsSkipped() {
+        // given
+        providerAvailable();
+        Shipment shipment = courier("   ");
+        Order order = orderWith(shipment);
+
+        // when
+        subscriber.subscribe(STORE_ID, order);
+
+        // then
+        verifyNoInteractions(shipmentTrackingsRepository);
+        verify(provider, never()).trackParcel(any());
+        assertThat(shipment.getTrackingSubscriptionStatus()).isNull();
+    }
+
+    @Test
     void doesNothingWhenStoreHasNoTrackingCapableProvider() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
