@@ -12,8 +12,6 @@
             <h1 class="title" th:text="#{store.categories.page.title}"></h1>
             <p class="subtitle is-6" th:text="#{store.categories.page.description}"></p>
 
-            <div class="notification is-success" th:if="${successMessage}" th:text="${successMessage}"></div>
-            <div class="notification is-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 
             <div class="box" th:if="${#lists.isEmpty(categoryNames)}">
                 <p th:text="#{store.enabled.categories.unavailable}"></p>

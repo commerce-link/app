@@ -25,9 +25,23 @@ class BuiltInReservationService implements ReservationService {
 
     @Override
     public Reservation create(Reservation reservation) {
+        reserveRequestedItems(reservation);
         reserveAvailableStock(reservation);
         reserveIncomingStock(reservation);
         return reservation;
+    }
+
+    private void reserveRequestedItems(Reservation reservation) {
+        for (ReservationItem item : reservation.getUnfulfilledItems()) {
+            if (!item.hasWarehouseItemId()) {
+                continue;
+            }
+            WarehouseItem warehouseItem = warehouseRepository.findById(reservation.getStoreId(), item.getWarehouseItemId());
+            if (warehouseItem == null || !warehouseItem.isAvailable()) {
+                continue;
+            }
+            item.add(reserve(warehouseItem, item.getRemainingQty(), warehouseItem.isDelivered()));
+        }
     }
 
     private void reserveAvailableStock(Reservation reservation) {
@@ -57,8 +71,7 @@ class BuiltInReservationService implements ReservationService {
 
                 if (optional.isPresent()) {
                     WarehouseItem warehouseItem = optional.get();
-                    warehouseItem.setQty(warehouseItem.getQty() + removalItem.getQty());
-                    warehouseItem.appendComment(removalItem.getComment());
+                    warehouseItem.absorb(removalItem);
                     warehouseRepository.save(warehouseItem);
                 } else {
                     warehouseRepository.save(warehouseItemFactory.create(reservation.getStoreId(), removalItem));
@@ -69,9 +82,13 @@ class BuiltInReservationService implements ReservationService {
 
     private void reserveStock(Reservation reservation, FulfilmentStatus fulfilmentStatus) {
         for (ReservationItem item : reservation.getUnfulfilledItems()) {
+            if (item.hasWarehouseItemId()) {
+                continue;
+            }
             List<WarehouseItem> inStockItems = warehouseRepository.findAllByMfnAndStatus(
                             reservation.getStoreId(), item.getMfn(), fulfilmentStatus
                     ).stream()
+                    .filter(WarehouseItem::isSealed)
                     .sorted(fifoSortOrder(reservation.getStoreId()))
                     .toList();
 
@@ -102,7 +119,8 @@ class BuiltInReservationService implements ReservationService {
                 Price.fromNet(warehouseItem.getCost(), warehouseItem.getTax()),
                 qtyFromThisItem,
                 inStock,
-                warehouseItem.getComment()
+                warehouseItem.getComment(),
+                warehouseItem.getCondition()
         );
     }
 

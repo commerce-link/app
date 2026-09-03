@@ -8,7 +8,9 @@ import pl.commercelink.invoicing.api.Price;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -29,6 +31,7 @@ public class DeliveryCreationForm {
     private int paymentTerms;
     private boolean removeUnselected;
     private String deliveryAddressId;
+    private Map<String, String> supplierOrderChoices = new LinkedHashMap<>();
 
     private List<DeliveryItem> items = new ArrayList<>();
     private List<SuggestedDeliveryItem> suggestedItems = new ArrayList<>();
@@ -57,6 +60,14 @@ public class DeliveryCreationForm {
 
     public void setDeliveryAddressId(String deliveryAddressId) {
         this.deliveryAddressId = deliveryAddressId;
+    }
+
+    public Map<String, String> getSupplierOrderChoices() {
+        return supplierOrderChoices;
+    }
+
+    public void setSupplierOrderChoices(Map<String, String> supplierOrderChoices) {
+        this.supplierOrderChoices = supplierOrderChoices == null ? new LinkedHashMap<>() : supplierOrderChoices;
     }
 
     public String getExternalDeliveryId() {
@@ -137,6 +148,10 @@ public class DeliveryCreationForm {
 
     public void setSuggestedItems(List<SuggestedDeliveryItem> suggestedItems) {
         this.suggestedItems = suggestedItems;
+    }
+
+    public boolean hasRequestedItems() {
+        return items.stream().anyMatch(item -> item.getRequestedQty() > 0);
     }
 
     public boolean hasDeliveryDetails() {

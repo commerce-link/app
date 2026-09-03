@@ -19,6 +19,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentProviderDescriptor;
+import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.PaymentIntegration;
@@ -90,6 +91,7 @@ public class ClientOfferController {
         model.addAttribute("form", form);
         model.addAttribute("submitted",  existingOffer.getBillingDetails() != null && existingOffer.getShippingDetails() != null);
         model.addAttribute("isSplitPaymentRequired", isSplitPaymentRequired);
+        model.addAttribute("canEdit", storeId.equals(CustomSecurityContext.getStoreId()));
         List<PaymentOptionView> paymentOptions = buildPaymentOptions(store);
         model.addAttribute("paymentOptions", paymentOptions);
         model.addAttribute("defaultPaymentOption", resolveDefaultPaymentOption(paymentOptions));

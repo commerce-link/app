@@ -14,6 +14,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -97,11 +98,14 @@ public class DeliveriesManager {
                 source.getTax()
         );
         target.setConnectionMode(source.getConnectionMode());
-        if (source.isAwaitingApproval() || source.isOrderFailed()) {
+        target.setType(DeliveryType.WAREHOUSE);
+        if (source.isAwaitingApproval() || source.isOrderFailed() || source.isOrderDispatched()) {
             target.setOrderStatus(source.getOrderStatus());
             target.setPurchaseRef(UUID.randomUUID().toString());
             target.setDeliveryAddressId(source.getDeliveryAddressId());
             target.setOrderErrorMessage(source.getOrderErrorMessage());
+            target.setSupplierOrderChoices(new HashMap<>(source.getSupplierOrderChoices()));
+            target.setSupplierOrderChoicesLabel(source.getSupplierOrderChoicesLabel());
         }
 
         transferCostAndAllocations(storeId, source, target, orderAllocations, warehouseAllocations);

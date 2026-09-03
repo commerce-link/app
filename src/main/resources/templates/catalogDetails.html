@@ -105,6 +105,9 @@
                                                     <a class="dropdown-item"
                                                        th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=SuggestedRetailPrice(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
                                                        th:text="#{catalog.category.product.show.suggested.retail.price}"></a>
+                                                    <a class="dropdown-item"
+                                                       th:href="@{/dashboard/catalogs/{catalogId}/category/{categoryId}/products?status=MaxRetailPrice(catalogId=${productCatalog.catalogId}, categoryId=${category.categoryId})}"
+                                                       th:text="#{catalog.category.product.show.max.retail.price}"></a>
                                                 </div>
 
                                                 <div th:if="${category.type == T(pl.commercelink.products.CategoryDefinitionType).Dynamic}">

@@ -10,8 +10,81 @@
         <div class="container">
             <h1 th:text="#{deliveries.preview.title}">Pending Deliveries</h1>
 
-            <div th:if="${deliveries.isEmpty()}" class="notification is-info">
+            <div th:if="${deliveries.isEmpty() and dropshipCandidates.isEmpty()}" class="notification is-info">
                 <span th:text="#{deliveries.preview.empty}">No pending deliveries. All items have been allocated to deliveries.</span>
+            </div>
+
+            <div th:each="candidate : ${dropshipCandidates}" class="box mb-5">
+                <div class="level">
+                    <div class="level-left">
+                        <div class="level-item">
+                            <h2 class="title is-4 mb-0" th:text="${candidate.provider}"></h2>
+                        </div>
+                        <div class="level-item">
+                            <span class="has-text-grey" th:text="${candidate.orderId}"></span>
+                        </div>
+                        <div class="level-item">
+                            <span class="tag is-info" th:text="#{deliveries.dropship.badge}">Dropshipping</span>
+                        </div>
+                    </div>
+                    <div class="level-right">
+                        <div class="level-item">
+                            <a th:href="${isSuperAdmin}
+                                    ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship(storeId=${storeId}, orderId=${candidate.orderId}, provider=${candidate.provider})}
+                                    : @{/dashboard/orders/{orderId}/dropship(orderId=${candidate.orderId}, provider=${candidate.provider})}"
+                               class="button is-primary" th:text="#{deliveries.preview.create}">Create Delivery</a>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="table is-fullwidth is-narrow">
+                    <thead>
+                    <tr>
+                        <th th:text="#{general.name}">Name</th>
+                        <th th:text="#{deliveries.orderedQty}">Qty</th>
+                        <th th:text="#{general.ean}">EAN</th>
+                        <th th:text="#{general.manufacturer.code}">MFN</th>
+                        <th th:text="#{general.net.cost}">Unit Cost</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${candidate.items}">
+                        <td th:text="${item.name}"></td>
+                        <td th:text="${item.orderedQty}"></td>
+                        <td th:text="${item.ean}"></td>
+                        <td th:text="${item.mfn}"></td>
+                        <td th:text="${#numbers.formatDecimal(item.unitCost, 1, 2)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <details class="mt-3">
+                    <summary class="has-text-weight-semibold" th:text="#{deliveries.allocations}">Allocations</summary>
+                    <div class="mt-2">
+                        <table class="table is-fullwidth is-narrow">
+                            <thead>
+                            <tr>
+                                <th th:text="#{deliveries.source}">Source</th>
+                                <th th:text="#{general.name}">Name</th>
+                                <th th:text="#{general.quantity}">Qty</th>
+                                <th th:text="#{general.ean}">EAN</th>
+                                <th th:text="#{general.manufacturer.code}">MFN</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="allocation : ${candidate.allocations}">
+                                <td>
+                                    <a th:href="@{${allocation.key.url}}" th:text="${allocation.key.name}" target="_blank"></a>
+                                </td>
+                                <td th:text="${allocation.name}"></td>
+                                <td th:text="${allocation.qty}"></td>
+                                <td th:text="${allocation.ean}"></td>
+                                <td th:text="${allocation.mfn}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
             </div>
 
             <div th:each="delivery, deliveryStat : ${deliveries}" class="box mb-5">
@@ -19,6 +92,10 @@
                     <div class="level-left">
                         <div class="level-item">
                             <h2 class="title is-4" th:text="${delivery.provider}"></h2>
+                        </div>
+                        <div class="level-item">
+                            <span class="tag is-warning" th:if="${delivery.hasDirectToConsumerAllocations()}"
+                                  th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span>
                         </div>
                     </div>
                     <div class="level-right">
@@ -30,6 +107,9 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="notification is-warning is-light" th:if="${delivery.hasDirectToConsumerAllocations()}"
+                     th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></div>
 
                 <h4 class="title is-5" th:text="#{deliveries.items}">Items</h4>
                 <table class="table is-fullwidth is-narrow">

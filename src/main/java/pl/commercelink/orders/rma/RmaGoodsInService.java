@@ -10,6 +10,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.RmaGoodsInRequest;
@@ -40,53 +41,50 @@ public class RmaGoodsInService {
             RMA rma,
             List<RMAItem> rmaItems,
             BillingDetails customerBillingDetails,
-            boolean itemsRequireRepair
+            boolean itemsRequireRepair,
+            ItemCondition condition
     ) {
         Store store = storesRepository.findById(storeId);
         WarehouseConfiguration config = store.getWarehouseConfiguration();
-
-        if (config == null || !config.isComplete()) {
-            return OperationResult.failure("Warehouse configuration is missing for store: " + storeId);
-        }
-
-        RmaGoodsInRequest request = buildFullRequest(
-                store, config, rma, rmaItems, customerBillingDetails, itemsRequireRepair
-        );
-
-        return warehouse.rmaGoodsInHandler(storeId)
-                .receive(request, config.isDocumentsGenerationEnabled());
-    }
-
-    private RmaGoodsInRequest buildFullRequest(
-            Store store,
-            WarehouseConfiguration config,
-            RMA rma,
-            List<RMAItem> rmaItems,
-            BillingDetails customerBillingDetails,
-            boolean itemsRequireRepair
-    ) {
-        List<GoodsReceiptItem> items = rmaItems
-                .stream()
-                .map(GoodsReceiptItem::from)
-                .collect(Collectors.toList());
+        boolean documentsGenerationEnabled = config != null && config.isDocumentsGenerationEnabled();
 
         RmaGoodsInRequest.Builder builder = RmaGoodsInRequest.builder()
                 .storeId(store.getStoreId())
-                .warehouseId(config.getWarehouseId())
                 .rmaId(rma.getRmaId())
                 .orderId(rma.getOrderId())
-                .items(items)
+                .items(toGoodsReceiptItems(rmaItems, condition))
                 .itemsRequireRepair(itemsRequireRepair)
                 .createdBy(CustomSecurityContext.getLoggedInUserName());
 
-        builder.issuer(fetchIssuer(store, config));
-        builder.counterparty(customerBillingDetails.toBillingParty());
+        if (documentsGenerationEnabled) {
+            if (!config.isComplete()) {
+                return OperationResult.failure("Warehouse configuration is missing for store: " + storeId);
+            }
+            BillingParty issuer = fetchIssuer(store, config);
+            if (issuer == null) {
+                return OperationResult.failure("Failed to fetch cost center with id: " + config.getCostCenterId());
+            }
+            builder.warehouseId(config.getWarehouseId())
+                    .issuer(issuer)
+                    .counterparty(customerBillingDetails.toBillingParty());
+        }
 
-        return builder.build();
+        return warehouse.rmaGoodsInHandler(storeId)
+                .receive(builder.build(), documentsGenerationEnabled);
+    }
+
+    private List<GoodsReceiptItem> toGoodsReceiptItems(List<RMAItem> rmaItems, ItemCondition condition) {
+        return rmaItems
+                .stream()
+                .map(rmaItem -> GoodsReceiptItem.from(rmaItem, condition))
+                .collect(Collectors.toList());
     }
 
     private BillingParty fetchIssuer(Store store, WarehouseConfiguration config) {
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return null;
+        }
         return invoicingProvider.fetchCostCenterById(config.getCostCenterId());
     }
 }

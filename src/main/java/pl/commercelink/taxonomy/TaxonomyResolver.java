@@ -15,7 +15,7 @@ public class TaxonomyResolver {
         Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
 
         if (taxonomy == null) {
-            return new ResolvedProduct(mfn, fallbackName, fallbackCategory);
+            return new ResolvedProduct(mfn, fallbackName, fallbackCategory, null);
         }
 
         String name = taxonomy.name() != null && !taxonomy.name().isEmpty()
@@ -27,8 +27,8 @@ public class TaxonomyResolver {
                 ? categoryKey
                 : fallbackCategory;
 
-        return new ResolvedProduct(mfn, name, category);
+        return new ResolvedProduct(mfn, name, category, taxonomy.categoryId());
     }
 
-    public record ResolvedProduct(String mfn, String name, String category) {}
+    public record ResolvedProduct(String mfn, String name, String category, String categoryId) {}
 }

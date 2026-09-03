@@ -1,23 +1,26 @@
 package pl.commercelink.inventory.deliveries;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.SupplierSkuResolver;
-import pl.commercelink.inventory.supplier.GlobalSupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
-import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
-import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOutcomeUnknownException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.util.OperationResult;
@@ -38,15 +41,18 @@ import java.util.stream.IntStream;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SupplierPurchaseService {
 
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
-    private static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
+    static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
+    private static final String ORDER_RECONCILED_EVENT = "DELIVERY_ORDER_RECONCILED";
+    static final int MAX_SQS_ATTEMPTS = 3;
+    private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
 
-    private final SupplierProviderFactory supplierProviderFactory;
-    private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
+    private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
     private final DeliveryCreationService deliveryCreationService;
     private final DeliveriesRepository deliveriesRepository;
@@ -54,9 +60,13 @@ public class SupplierPurchaseService {
     private final SupplierRegistry supplierRegistry;
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
+    private final DropshipPurchaseService dropshipPurchaseService;
+    private final DropshipOrderLocator dropshipOrderLocator;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -78,6 +88,11 @@ public class SupplierPurchaseService {
             return List.of();
         }
         return supplierProvider.deliveryAddresses();
+    }
+
+    public List<SupplierOrderOption> orderOptions(String storeId, String provider, SupplierOrderOptionsContext context) {
+        SupplierProvider supplierProvider = getProvider(storeId, provider);
+        return supplierProvider == null ? List.of() : supplierProvider.orderOptions(context);
     }
 
     public void mergeSuggestedItems(DeliveryCreationForm form) {
@@ -153,42 +168,114 @@ public class SupplierPurchaseService {
         return new LiveCostConversion(ExchangeRates.LOCAL_CURRENCY, sellRate);
     }
 
-    public void processPending(String storeId, String deliveryId) {
+    public void processPending(String storeId, String deliveryId, String orderId, int attempt) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (delivery == null) {
             throw new IllegalStateException("Delivery " + deliveryId + " not found for pending purchase");
         }
         if (!delivery.isOrderPending()) {
+            // Covers SQS redelivery after a crash mid-placement: an ORDER_DISPATCHED
+            // delivery must never trigger a second placement.
             return;
         }
 
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
-        delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
+        if (!delivery.isDropship()) {
+            delivery.setDeliveryAddress(resolveDeliveryAddressLabel(storeId, form));
+        }
+
+        String dropshipOrderId = null;
+        if (delivery.isDropship()) {
+            dropshipOrderId = resolveDropshipOrderId(delivery, orderId, attempt);
+            if (dropshipOrderId == null) {
+                return;
+            }
+        }
+
+        PurchaseValidation validation;
+        List<SupplierOrderLine> lines;
         try {
-            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
-            List<SupplierOrderLine> lines = validation.lines().stream()
+            validation = validate(storeId, form, delivery.getPurchaseRef());
+            lines = validation.lines().stream()
                     .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
                     .toList();
             if (lines.isEmpty()) {
                 throw new SupplierOrderException("No orderable lines in pending purchase");
             }
+        } catch (SupplierOrderException e) {
+            failDelivery(delivery, e.getMessage());
+            log.error("Supplier purchase validation failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), e);
+            return;
+        }
 
-            SupplierOrderResult orderResult = getProvider(storeId, form.getProvider())
-                    .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
-                            form.getDeliveryAddressId()));
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        deliveriesRepository.save(delivery);
+
+        try {
+            SupplierOrderResult orderResult = delivery.isDropship()
+                    ? dropshipPurchaseService.placeDropshipOrder(storeId, delivery, lines, dropshipOrderId)
+                    : getProvider(storeId, form.getProvider())
+                            .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
+                                    form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
             if (StringUtils.isBlank(orderResult.externalOrderId())) {
-                throw new SupplierOrderException(
+                throw new SupplierOrderOutcomeUnknownException(
                         "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
             }
-
             applyOrderResult(form, validation, orderResult);
+            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-            deliveryCreationService.completePending(storeId, delivery, form);
-        } catch (SupplierOrderException e) {
-            delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+            if (delivery.isDropship()) {
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
+            } else {
+                deliveryCreationService.completePending(storeId, delivery, form);
+            }
+            log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
+                    orderResult.externalOrderId());
+            if (orderResult.provisional()) {
+                orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                        storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
+            }
+        } catch (SupplierOrderOutcomeUnknownException e) {
             delivery.setOrderErrorMessage(e.getMessage());
-            deliveriesRepository.save(delivery);
+            deliveriesRepository.save(delivery); // stays ORDER_DISPATCHED
+            log.error("Supplier purchase outcome UNKNOWN - order may exist at the supplier: "
+                            + "store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
+        } catch (SupplierOrderException e) {
+            failDelivery(delivery, e.getMessage());
+            log.error("Supplier purchase failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
         }
+    }
+
+    private String resolveDropshipOrderId(Delivery delivery, String payloadOrderId, int attempt) {
+        if (StringUtils.isNotBlank(payloadOrderId)) {
+            return payloadOrderId;
+        }
+        Optional<String> located;
+        try {
+            located = dropshipOrderLocator.locate(delivery.getDeliveryId());
+        } catch (IllegalStateException e) {
+            failDelivery(delivery, e.getMessage());
+            return null;
+        }
+        if (located.isPresent()) {
+            return located.get();
+        }
+        if (attempt >= MAX_SQS_ATTEMPTS) {
+            failDelivery(delivery, "Dropship order could not be resolved for delivery "
+                    + delivery.getDeliveryId());
+            return null;
+        }
+        throw new DropshipOrderPendingException(delivery.getDeliveryId(), attempt);
+    }
+
+    private void failDelivery(Delivery delivery, String message) {
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setOrderErrorMessage(message);
+        deliveriesRepository.save(delivery);
     }
 
     private String resolveDeliveryAddressLabel(String storeId, DeliveryCreationForm form) {
@@ -215,6 +302,11 @@ public class SupplierPurchaseService {
     }
 
     public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId) {
+        return approve(storeId, deliveryId, deliveryAddressId, Map.of());
+    }
+
+    public OperationResult<String> approve(String storeId, String deliveryId, String deliveryAddressId,
+                                           Map<String, String> supplierOrderChoices) {
         Delivery delivery = findAwaitingApproval(storeId, deliveryId);
         if (delivery == null) {
             return OperationResult.failure("deliveries.approval.error.state");
@@ -230,21 +322,47 @@ public class SupplierPurchaseService {
         if (supplierProvider == null) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
-        if (supplierProvider.requiresDeliveryAddress() && StringUtils.isBlank(deliveryAddressId)) {
+        if (!delivery.isDropship() && supplierProvider.requiresDeliveryAddress()
+                && StringUtils.isBlank(deliveryAddressId)) {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
-        form.setDeliveryAddressId(deliveryAddressId);
-        delivery.setDeliveryAddressId(deliveryAddressId);
+        if (!delivery.isDropship()) {
+            form.setDeliveryAddressId(deliveryAddressId);
+            delivery.setDeliveryAddressId(deliveryAddressId);
+        }
+
+        List<SupplierOrderOption> options;
+        try {
+            Optional<Order> dropshipOrder = delivery.isDropship()
+                    ? dropshipPurchaseService.orderOf(storeId, delivery)
+                    : Optional.empty();
+            if (delivery.isDropship() && dropshipOrder.isEmpty()) {
+                // Without the order we cannot tell a pickup-point delivery from a courier one, and
+                // courier options offered for a pickup-point order would let the operator approve
+                // on a false premise - fail closed instead of guessing the context.
+                log.error("Dropship order not found for delivery: store={} delivery={}", storeId, deliveryId);
+                return OperationResult.failure("deliveries.options.error");
+            }
+            SupplierOrderOptionsContext optionsContext = delivery.isDropship()
+                    ? DropshipPurchaseService.optionsContext(dropshipOrder.get())
+                    : SupplierOrderOptionsContext.warehouse();
+            options = supplierProvider.orderOptions(optionsContext);
+        } catch (Exception e) {
+            log.error("Supplier order options lookup failed: store={} delivery={}", storeId, deliveryId, e);
+            return OperationResult.failure("deliveries.options.error");
+        }
+        if (!SupplierOrderChoices.missingRequiredOptions(options, supplierOrderChoices).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
+        }
+        SupplierOrderChoices.applySupplierOrderChoices(delivery, options, supplierOrderChoices);
 
         PurchaseValidation validation;
         try {
             validation = validate(storeId, form, delivery.getPurchaseRef());
         } catch (Exception e) {
-            System.err.println("[SupplierPurchase] availability re-check failed for store " + storeId
-                    + ", delivery " + deliveryId + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("Supplier availability re-check failed: store={} delivery={}", storeId, deliveryId, e);
             return OperationResult.failure("deliveries.purchase.error.availability");
         }
         if (!validation.fullyAvailable()) {
@@ -255,25 +373,149 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, PURCHASE_APPROVED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
 
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        publishPurchase(delivery);
 
         return OperationResult.success(delivery.getDeliveryId());
     }
 
+    private void publishPurchase(Delivery delivery) {
+        delivery.setPurchaseAttempts(delivery.getPurchaseAttempts() + 1);
+        deliveriesRepository.save(delivery);
+        SupplierPurchaseEventRequest request = new SupplierPurchaseEventRequest(
+                delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(),
+                delivery.getPurchaseRef(), null, delivery.getPurchaseAttempts());
+        supplierPurchaseEventPublisher.publish(request,
+                delivery.getPurchaseRef() + ":" + delivery.getPurchaseAttempts());
+    }
+
     public OperationResult<String> retry(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
-        if (delivery == null || !delivery.isOrderFailed()
-                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+        if (!canRecoverFailedPurchase(delivery)) {
             return OperationResult.failure("deliveries.purchase.retry.error.state");
         }
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setOrderErrorMessage(null);
         delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
-        supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+        publishPurchase(delivery);
         return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> reconcile(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderDispatched()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.reconcile.error.state");
+        }
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        try {
+            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
+            List<SupplierOrderLine> lines = validation.lines().stream()
+                    .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
+                    .toList();
+            Optional<SupplierOrderResult> placed = getProvider(storeId, delivery.getProvider())
+                    .findPlacedOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
+                            form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
+            if (placed.isEmpty()) {
+                log.info("Reconcile found no supplier order: store={} delivery={} provider={} ref={}",
+                        storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef());
+                return OperationResult.failure("deliveries.purchase.reconcile.notFound");
+            }
+            SupplierOrderResult orderResult = placed.get();
+            applyOrderResult(form, validation, orderResult);
+            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
+            delivery.setOrderErrorMessage(null);
+            delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
+            if (delivery.isDropship()) {
+                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
+            } else {
+                deliveryCreationService.completePending(storeId, delivery, form);
+            }
+            if (orderResult.provisional()) {
+                try {
+                    orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                            storeId, delivery.getDeliveryId(), delivery.getProvider(), delivery.getPurchaseRef()));
+                } catch (RuntimeException e) {
+                    log.error("Order id refresh publish failed after reconcile: store={} delivery={}",
+                            storeId, deliveryId, e);
+                }
+            }
+            log.info("Reconcile confirmed supplier order: store={} delivery={} provider={} ref={} externalOrderId={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(),
+                    orderResult.externalOrderId());
+            return OperationResult.success(delivery.getDeliveryId());
+        } catch (Exception e) {
+            log.error("Reconcile failed: store={} delivery={} provider={} ref={}",
+                    storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), e);
+            return OperationResult.failure("deliveries.purchase.reconcile.error.failed");
+        }
+    }
+
+    public OperationResult<String> forceRetry(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || !delivery.isOrderDispatched()
+                || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.retry.error.state");
+        }
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        delivery.setOrderErrorMessage(null);
+        delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
+        publishPurchase(delivery);
+        log.info("Force retry of unconfirmed purchase: store={} delivery={} provider={} ref={} attempt={}",
+                storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(),
+                delivery.getPurchaseAttempts());
+        return OperationResult.success(delivery.getDeliveryId());
+    }
+
+    public OperationResult<String> completeManually(String storeId, String deliveryId, String externalOrderId,
+                                                    LocalDate estimatedDeliveryAt) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (!canCompleteManually(delivery)) {
+            return OperationResult.failure("deliveries.purchase.complete.error.state");
+        }
+        if (StringUtils.isBlank(externalOrderId)) {
+            return OperationResult.failure("deliveries.purchase.complete.error.number");
+        }
+        if (estimatedDeliveryAt == null) {
+            return OperationResult.failure("deliveries.purchase.complete.error.date");
+        }
+
+        delivery.setExternalDeliveryId(externalOrderId.trim());
+        delivery.setEstimatedDeliveryAt(estimatedDeliveryAt);
+        delivery.setOrderStatus(null);
+        delivery.setOrderErrorMessage(null);
+        delivery.setExternalDeliveryIdProvisional(false);
+        delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        withAllocations.getItems().forEach(item -> item.getAllocations().stream()
+                .filter(allocation -> allocation.getType() == AllocationType.Order)
+                .forEach(allocation -> allocation.setSelected(true)));
+        orderAllocationsManager.commit(storeId, deliveryId, estimatedDeliveryAt, withAllocations.getItems());
+
+        log.info("Supplier order completed manually: store={} delivery={} provider={} ref={} externalOrderId={}",
+                storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());
+
+        return OperationResult.success(deliveryId);
+    }
+
+    public LocalDate suggestEstimatedDeliveryAt(Delivery delivery) {
+        if (delivery.getEstimatedDeliveryAt() != null) {
+            return delivery.getEstimatedDeliveryAt();
+        }
+        ShippingTerms terms = supplierRegistry.get(delivery.getProvider()).shippingTermsFor("PL");
+        return LocalDate.now().plusDays(terms.arrivalDays());
+    }
+
+    private boolean canRecoverFailedPurchase(Delivery delivery) {
+        return delivery != null && delivery.isOrderFailed()
+                && !delivery.hasBeenReceived() && delivery.getDocuments().isEmpty();
+    }
+
+    private boolean canCompleteManually(Delivery delivery) {
+        return delivery != null && (delivery.isOrderFailed() || delivery.isOrderDispatched())
+                && !delivery.hasBeenReceived() && delivery.getDocuments().isEmpty();
     }
 
     public OperationResult<String> reject(String storeId, String deliveryId, String reason) {
@@ -302,6 +544,7 @@ public class SupplierPurchaseService {
         form.setStoreId(storeId);
         form.setProvider(delivery.getProvider());
         form.setDeliveryAddressId(delivery.getDeliveryAddressId());
+        form.getSupplierOrderChoices().putAll(delivery.getSupplierOrderChoices());
         form.getItems().addAll(withAllocations.getItems());
         return form;
     }
@@ -331,6 +574,22 @@ public class SupplierPurchaseService {
             return OperationResult.failure("deliveries.purchase.error.address");
         }
 
+        List<SupplierOrderOption> options = null;
+        try {
+            options = orderOptions(storeId, form.getProvider(), SupplierOrderOptionsContext.warehouse());
+        } catch (Exception e) {
+            if (requiresApproval) {
+                log.error("Supplier order options lookup failed for a global submission: store={} provider={}",
+                        storeId, form.getProvider(), e);
+            } else {
+                log.error("Supplier order options lookup failed: store={} provider={}", storeId, form.getProvider(), e);
+                return OperationResult.failure("deliveries.options.error");
+            }
+        }
+        if (!requiresApproval && !SupplierOrderChoices.missingRequiredOptions(options, form.getSupplierOrderChoices()).isEmpty()) {
+            return OperationResult.failure("deliveries.purchase.error.options");
+        }
+
         Optional<Delivery> existing = deliveriesRepository.findByPurchaseRef(storeId, purchaseRef);
         if (existing.isPresent()) {
             return OperationResult.success(
@@ -339,19 +598,26 @@ public class SupplierPurchaseService {
 
         Delivery delivery = new Delivery(storeId, null, form.getProvider());
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(store, form.getProvider()));
+        delivery.setType(DeliveryType.WAREHOUSE);
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
                 : DeliveryOrderStatus.ORDER_PENDING);
         delivery.setPurchaseRef(purchaseRef);
         delivery.setDeliveryAddressId(form.getDeliveryAddressId());
+        if (options != null) {
+            SupplierOrderChoices.applySupplierOrderChoices(delivery, options, form.getSupplierOrderChoices());
+        } else {
+            // The dictionary lookup failed for this global submission - keep the posted values
+            // (minus blank answers; no declared options to validate/label against) rather than losing them.
+            delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
+        }
         deliveryCreationService.claimAllocations(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
 
         if (!requiresApproval) {
-            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef));
+            publishPurchase(delivery);
         }
 
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
@@ -384,8 +650,7 @@ public class SupplierPurchaseService {
             }
         });
 
-        SupplierInfo supplierInfo = supplierRegistry.get(form.getProvider());
-        ShippingTerms terms = supplierInfo.shippingTermsFor("PL");
+        ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
         double totalNetForShipping = orderResult.totalNet() > 0
                 ? orderResult.totalNet() * conversion.sellRate()
@@ -408,16 +673,6 @@ public class SupplierPurchaseService {
     }
 
     private SupplierProvider getProvider(String storeId, String provider) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            return null;
-        }
-        if (store.isOwnSupplier(provider)) {
-            return supplierProviderFactory.get(store, provider);
-        }
-        if (store.isGlobalSupplier(provider)) {
-            return globalSupplierProviderFactory.get(provider).orElse(null);
-        }
-        return null;
+        return supplierProviderResolver.resolve(storeId, provider);
     }
 }

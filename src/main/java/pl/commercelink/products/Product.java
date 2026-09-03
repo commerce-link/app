@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbMetadataConverter;
 import pl.commercelink.starter.dynamodb.Metadata;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -52,6 +53,10 @@ public class Product {
     private String productPage;
     @DynamoDBAttribute(attributeName = "suggestedRetailPrice")
     private int suggestedRetailPrice;
+    @DynamoDBAttribute(attributeName = "maxRetailPrice")
+    private int maxRetailPrice;
+    @DynamoDBAttribute(attributeName = "maxRetailPriceSuppliers")
+    private String maxRetailPriceSuppliers;
     @DynamoDBAttribute(attributeName = "availabilityType")
     @DynamoDBTypeConvertedEnum
     private ProductAvailabilityType availabilityType;
@@ -102,6 +107,17 @@ public class Product {
     @DynamoDBIgnore
     public boolean hasAvailabilityType(ProductAvailabilityType other) {
         return availabilityType == other;
+    }
+
+    @DynamoDBIgnore
+    public List<String> getMaxRetailPriceSupplierNames() {
+        if (maxRetailPriceSuppliers == null || maxRetailPriceSuppliers.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(maxRetailPriceSuppliers.split(","))
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .toList();
     }
 
     // required by DynamoDB
@@ -216,6 +232,22 @@ public class Product {
 
     public void setSuggestedRetailPrice(int suggestedRetailPrice) {
         this.suggestedRetailPrice = suggestedRetailPrice;
+    }
+
+    public int getMaxRetailPrice() {
+        return maxRetailPrice;
+    }
+
+    public void setMaxRetailPrice(int maxRetailPrice) {
+        this.maxRetailPrice = maxRetailPrice;
+    }
+
+    public String getMaxRetailPriceSuppliers() {
+        return maxRetailPriceSuppliers;
+    }
+
+    public void setMaxRetailPriceSuppliers(String maxRetailPriceSuppliers) {
+        this.maxRetailPriceSuppliers = maxRetailPriceSuppliers;
     }
 
     public ProductAvailabilityType getAvailabilityType() {

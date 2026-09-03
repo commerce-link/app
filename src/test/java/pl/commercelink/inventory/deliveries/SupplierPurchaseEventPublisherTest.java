@@ -47,4 +47,24 @@ class SupplierPurchaseEventPublisherTest {
         verify(options).messageGroupId("store-1:Acme");
         verify(options).messageDeduplicationId("ref-1");
     }
+
+    @Test
+    void publishWithExplicitDeduplicationIdUsesIt() {
+        // given
+        SupplierPurchaseEventRequest request =
+                new SupplierPurchaseEventRequest("store-1", "delivery-1", "Acme", "ref-1", null, 3);
+
+        // when
+        publisher.publish(request, "ref-1:3");
+
+        // then
+        ArgumentCaptor<Consumer<SqsSendOptions<SupplierPurchaseEventRequest>>> captor =
+                ArgumentCaptor.forClass(Consumer.class);
+        verify(sqsTemplate).send(captor.capture());
+
+        SqsSendOptions<SupplierPurchaseEventRequest> options = mock(SqsSendOptions.class, RETURNS_SELF);
+        captor.getValue().accept(options);
+
+        verify(options).messageDeduplicationId("ref-1:3");
+    }
 }

@@ -167,7 +167,10 @@
         <fieldset class="box">
             <legend class="label" th:text="#{product.pricing.availability}"></legend>
             <div class="field">
-                <label class="label" for="availabilityType" th:text="#{product.availability.type}"></label>
+                <label class="label" for="availabilityType">
+                    <span th:text="#{product.availability.type}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.availability.type.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <div class="select">
                         <select id="availabilityType" th:field="*{availabilityType}">
@@ -177,37 +180,73 @@
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="suggestedRetailPrice" th:text="#{product.srp}"></label>
+                <label class="label" for="suggestedRetailPrice">
+                    <span th:text="#{product.srp}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.srp.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <input class="input" type="number" id="suggestedRetailPrice" th:field="*{suggestedRetailPrice}" />
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="stockExpectedQty" th:text="#{product.stock.expected}"></label>
+                <label class="label" for="maxRetailPrice">
+                    <span th:text="#{product.max.retail.price}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.max.retail.price.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
+                <div class="control">
+                    <input class="input" type="number" id="maxRetailPrice" th:field="*{maxRetailPrice}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="maxRetailPriceSuppliers">
+                    <span th:text="#{product.max.retail.price.suppliers}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.max.retail.price.suppliers.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
+                <div class="control">
+                    <input class="input" type="text" id="maxRetailPriceSuppliers" th:field="*{maxRetailPriceSuppliers}" th:placeholder="#{product.max.retail.price.suppliers.placeholder}" />
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="stockExpectedQty">
+                    <span th:text="#{product.stock.expected}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.stock.expected.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <input class="input" type="number" id="stockExpectedQty" th:field="*{stockExpectedQty}" />
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="restockPricePromo" th:text="#{product.restock.price.promo}"></label>
+                <label class="label" for="restockPricePromo">
+                    <span th:text="#{product.restock.price.promo}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.restock.price.promo.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <input class="input" type="number" id="restockPricePromo" th:field="*{restockPricePromo}" />
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="restockPriceStandard" th:text="#{product.restock.price.standard}"></label>
+                <label class="label" for="restockPriceStandard">
+                    <span th:text="#{product.restock.price.standard}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.restock.price.standard.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <input class="input" type="number" id="restockPriceStandard" th:field="*{restockPriceStandard}" />
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="estimatedDeliveryDays" th:text="#{product.estimated.delivery.days}"></label>
+                <label class="label" for="estimatedDeliveryDays">
+                    <span th:text="#{product.estimated.delivery.days}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.estimated.delivery.days.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <input class="input" type="number" id="estimatedDeliveryDays" th:field="*{estimatedDeliveryDays}" />
                 </div>
             </div>
             <div class="field">
-                <label class="label" for="pricingGroup" th:text="#{product.pricing.group}"></label>
+                <label class="label" for="pricingGroup">
+                    <span th:text="#{product.pricing.group}"></span>
+                    <span class="icon is-small has-text-grey ml-1 cl-tooltip" th:attr="data-tooltip=#{product.pricing.group.help}"><i class="fas fa-info-circle"></i></span>
+                </label>
                 <div class="control">
                     <div class="select">
                         <select id="pricingGroup" th:field="*{pricingGroup}">

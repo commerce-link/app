@@ -161,13 +161,14 @@ Products are matched across suppliers by EAN and manufacturer code via `Inventor
 
 ### Event-Driven Processing
 
-Async work is driven through 17 `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
+Async work is driven through `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
 
 **Scheduled tasks** (`@Scheduled`):
 - Every 5 min: `FeedReloaderScheduler` — reload global inventory feeds
 - Every 5 min: `TaxonomyCategoryMatchScheduler` — taxonomy category match sweep
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
 - Hourly: `DemoStoreCleanupJob` — clean up demo stores
+- Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
 
 ### Security
 
@@ -183,7 +184,7 @@ Async work is driven through 17 `@SqsListener` methods. Queue names follow `{dom
 |---------|-------|
 | DynamoDB | Primary database |
 | S3 | Feed storage, pricelists, images, stores |
-| SQS | Async job queues (17 listeners) |
+| SQS | Async job queues |
 | EventBridge Scheduler | Per-store daily feed imports, recurring generation jobs |
 | SES v2 | Email delivery |
 | Secrets Manager | External API credentials |

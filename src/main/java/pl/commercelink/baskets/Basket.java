@@ -7,11 +7,14 @@ import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
+import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -75,7 +78,7 @@ public class Basket {
         this.storeId = storeId;
         this.basketId = UUID.randomUUID().toString();
         this.createdAt = LocalDateTime.now();
-        this.expiresAt = LocalDateTime.now().plusDays(3);
+        this.expiresAt = LocalDateTime.now().plusDays(3).with(LocalTime.of(23, 59));
     }
 
     public String getStoreId() {
@@ -294,6 +297,19 @@ public class Basket {
     }
 
     @DynamoDBIgnore
+    public long getHoursToExpiry() {
+        if (expiresAt == null) {
+            return 0;
+        }
+        return Math.max(0, Duration.between(LocalDateTime.now(), expiresAt).toHours());
+    }
+
+    @DynamoDBIgnore
+    public long getDaysToExpiry() {
+        return getHoursToExpiry() / 24;
+    }
+
+    @DynamoDBIgnore
     public double getTotalPrice() {
         return basketItems.stream()
                 .mapToDouble(BasketItem::getTotalPrice)
@@ -303,6 +319,11 @@ public class Basket {
     @DynamoDBIgnore
     public String createOfferUrl(String domain) {
         return domain + "/store/" + this.storeId + "/individual/offer/" + this.basketId;
+    }
+
+    @DynamoDBIgnore
+    public String getShortenedBasketId() {
+        return ConversionUtil.getShortenedId(basketId);
     }
 
     @DynamoDBIgnore

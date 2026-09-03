@@ -14,7 +14,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.marketplace.api.MarketplaceExportReport;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
@@ -36,6 +35,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -128,6 +128,29 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(publishedOffers).hasSize(1);
         assertThat(publishedOffers.get(0).quantity()).isEqualTo(0L);
         assertThat(publishedOffers.get(0).price()).isEqualTo(100L);
+    }
+
+    @Test
+    void evaluatesCriteriaOnInventoryNarrowedToPricelistPriceWithoutMarkup() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        MarketplaceDefinition marketplaceDefinition = warehouseDefinition(5);
+        marketplaceDefinition.setMarkup(1.1);
+        MatchedInventory fullInventory = mock(MatchedInventory.class);
+        MatchedInventory inventoryAtPrice = mockMatchedInventoryWithWarehouseQuantity(10);
+        when(fullInventory.atPricePoint(100L)).thenReturn(inventoryAtPrice);
+        configureCategoryWith(marketplaceDefinition, product, fullInventory);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).hasSize(1);
+        assertThat(published.get(0).price()).isEqualTo(110L);
+        assertThat(published.get(0).quantity()).isEqualTo(10L);
+        verify(fullInventory, never()).getTotalAvailableQtyFromSupplier(any());
     }
 
     @Test
@@ -387,7 +410,7 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private MarketplaceDefinition warehouseDefinition(int minWarehouseQuantity) {
-        MarketplaceDefinition marketplaceDefinition = new MarketplaceDefinition(MARKETPLACE, 1.0, 0, 0, 0, minWarehouseQuantity);
+        MarketplaceDefinition marketplaceDefinition = new MarketplaceDefinition(MARKETPLACE, 1.0, 0, 0, 0, 0, minWarehouseQuantity);
         marketplaceDefinition.setEnabled(true);
         return marketplaceDefinition;
     }
@@ -410,18 +433,23 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, int warehouseQuantity, String categoryName, String definitionName) {
+        configureCategoryWith(marketplaceDefinition, product, mockMatchedInventoryWithWarehouseQuantity(warehouseQuantity), categoryName, definitionName);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, MatchedInventory matchedInventory) {
+        configureCategoryWith(marketplaceDefinition, product, matchedInventory, "Laptops", null);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, MatchedInventory matchedInventory, String categoryName, String definitionName) {
         when(catalog.getCategories()).thenReturn(List.of(category(categoryName, definitionName, List.of(marketplaceDefinition))));
         when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(product));
-
-        MatchedInventory matchedInventory = mockMatchedInventoryWithWarehouseQuantity(warehouseQuantity);
         when(inventoryView.findByProduct(product)).thenReturn(matchedInventory);
     }
 
     private MatchedInventory mockMatchedInventoryWithWarehouseQuantity(int warehouseQuantity) {
         MatchedInventory matchedInventory = mock(MatchedInventory.class);
-        InventoryItem inventoryItem = mock(InventoryItem.class);
-        when(inventoryItem.qty()).thenReturn(warehouseQuantity);
-        when(matchedInventory.getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(List.of(inventoryItem));
+        when(matchedInventory.atPricePoint(anyLong())).thenReturn(matchedInventory);
+        when(matchedInventory.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn((long) warehouseQuantity);
         return matchedInventory;
     }
 

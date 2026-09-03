@@ -1,5 +1,8 @@
 package pl.commercelink.warehouse.builtin;
 
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.warehouse.api.ItemCondition;
+
 public record AvailableWarehouseItemDto(
         String itemId,
         String category,
@@ -8,7 +11,8 @@ public record AvailableWarehouseItemDto(
         String ean,
         String serialNo,
         int qty,
-        String status
+        FulfilmentStatus status,
+        ItemCondition condition
 ) {
 
     static AvailableWarehouseItemDto from(WarehouseItem item) {
@@ -20,7 +24,8 @@ public record AvailableWarehouseItemDto(
                 item.getEan(),
                 item.getSerialNo(),
                 item.getQty(),
-                item.getStatus().name()
+                item.getStatus(),
+                item.getCondition()
         );
     }
 }

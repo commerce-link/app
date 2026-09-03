@@ -29,6 +29,15 @@ awslocal sqs create-queue --queue-name order-goods-out-queue.fifo \
 awslocal sqs create-queue --queue-name supplier-purchase-queue.fifo \
   --attributes FifoQueue=true,ContentBasedDeduplication=false
 
+## Invoicing queue with a DLQ + redrive mirroring prod (terraform: order-invoicing-dlq.fifo,
+## maxReceiveCount 1). The listener rethrows on every OperationResult error, so without a redrive
+## a message that can never succeed - no invoicing provider on the store, missing billing details -
+## is redelivered forever and blocks its whole FIFO message group, which is the store id.
+awslocal sqs create-queue --queue-name order-invoicing-dlq.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false,MessageRetentionPeriod=604800
+awslocal sqs create-queue --queue-name order-invoicing-queue.fifo \
+  --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"30","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-invoicing-dlq.fifo\",\"maxReceiveCount\":\"1\"}"}'
+
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
@@ -36,6 +45,16 @@ awslocal sqs create-queue --queue-name pim-fetch-queue
 awslocal sqs create-queue --queue-name pim-category-match-queue
 awslocal sqs create-queue --queue-name pim-category-matched-queue
 awslocal sqs create-queue --queue-name supplier-taxonomy-queue
+
+## Refresh queue with a DLQ + redrive so local retries mirror prod (short visibility for fast E2E)
+awslocal sqs create-queue --queue-name supplier-order-refresh-queue-dlq
+awslocal sqs create-queue --queue-name supplier-order-refresh-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-refresh-queue-dlq\",\"maxReceiveCount\":\"6\"}"}'
+
+## Tracking queue with a DLQ + redrive mirroring prod (visibility short for local E2E)
+awslocal sqs create-queue --queue-name supplier-order-tracking-queue-dlq
+awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-tracking-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
 
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,

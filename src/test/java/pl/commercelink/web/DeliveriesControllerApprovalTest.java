@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -23,8 +24,17 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
+import pl.commercelink.inventory.deliveries.DeliveryType;
+import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
+import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -36,18 +46,23 @@ import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,6 +70,7 @@ class DeliveriesControllerApprovalTest {
 
     private static final String STORE_ID = "store-1";
     private static final String DELIVERY_ID = "delivery-1";
+    private static final LocalDate ESTIMATED_DELIVERY_AT = LocalDate.of(2026, 9, 1);
     private static final String PROVIDER = "Action";
 
     @Mock
@@ -93,35 +109,41 @@ class DeliveriesControllerApprovalTest {
     @Mock
     private DeliveryTaxResolver deliveryTaxResolver;
 
+    @Mock
+    private OrdersRepository ordersRepository;
+
+    @Mock
+    private DropshipOrderLocator dropshipOrderLocator;
+
     @InjectMocks
     private DeliveriesController deliveriesController;
 
     @Test
     void approvingRedirectsBackToTheStoreScopedDeliveryDetails() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617"))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of()))
                 .thenReturn(OperationResult.success(DELIVERY_ID));
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617",
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617", Map.of(),
                 redirectAttributes, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"));
+        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"), eq(Map.of()));
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
 
     @Test
     void approvalFailureAddsFlashErrorMessageAndRedirectsToTheRealisationScreen() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, null))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, null, Map.of()))
                 .thenReturn(OperationResult.failure("deliveries.approval.error.state"));
         when(messageSource.getMessage(eq("deliveries.approval.error.state"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("Delivery is no longer awaiting approval");
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, null,
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, null, Map.of(),
                 redirectAttributes, Locale.ENGLISH);
 
         // then
@@ -215,6 +237,57 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void purchaseConfirmationExposesOrderOptionsWithDefaultsPreselected() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        Model model = new ConcurrentModel();
+        SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
+                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true);
+        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
+                .thenReturn(List.of(laneOption));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
+
+            // then
+            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
+            assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
+            assertThat(model.getAttribute("selectedOptions")).isEqualTo(Map.of("lane", "fast"));
+            assertThat(model.containsAttribute("orderOptionsError")).isFalse();
+        }
+    }
+
+    @Test
+    void purchaseConfirmationBlocksWhenOptionsCannotBeFetched() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        Model model = new ConcurrentModel();
+        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
+                .thenThrow(new RuntimeException("supplier unavailable"));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
+
+            // then
+            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
+            assertThat(model.getAttribute("orderOptionsError")).isEqualTo("supplier unavailable");
+            assertThat((List<?>) model.getAttribute("orderOptions")).isEmpty();
+        }
+    }
+
+    @Test
     void deliveryDetailsNoLongerExposesApprovalAddressesForSuperAdmin() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
@@ -257,6 +330,90 @@ class DeliveriesControllerApprovalTest {
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
             assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsResolveTheContactThroughTheLocator() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order();
+        order.setOrderId("order-1");
+        ShippingDetails shippingDetails = new ShippingDetails();
+        shippingDetails.setName("Jan");
+        order.setShippingDetails(shippingDetails);
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isEqualTo(shippingDetails);
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorHasNoAnswerYet() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
+        }
+    }
+
+    @Test
+    void dropshipDeliveryDetailsRenderWithoutContactWhenTheLocatorInvariantIsViolated() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenThrow(
+                new IllegalStateException("Dropship delivery " + DELIVERY_ID + " is claimed by orders [a, b]"));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(model.getAttribute("dropshipContact")).isNull();
+            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            verifyNoInteractions(ordersRepository);
         }
     }
 
@@ -306,7 +463,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("1", "ul. Testowa 1", "Kraków", "31-140", "PL")));
         Model model = new ConcurrentModel();
@@ -321,13 +478,36 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void approvalScreenWarnsWhenWarehouseGoodsAreBoundForTheCustomer() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        Allocation allocation = mock(Allocation.class);
+        when(allocation.isDirectToConsumer()).thenReturn(true);
+        delivery.setAllocations(List.of(allocation));
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(((Delivery) model.getAttribute("delivery")).hasDirectToConsumerAllocations()).isTrue();
+    }
+
+    @Test
     void approvalScreenRedirectsToDetailsWhenTheDeliveryIsNotAwaitingApproval() {
         // given
         Delivery delivery = new Delivery();
         delivery.setStoreId(STORE_ID);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         Model model = new ConcurrentModel();
 
         // when
@@ -346,7 +526,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setStoreId(STORE_ID);
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         Model model = new ConcurrentModel();
         model.addAttribute("errorMessage", "Delivery is no longer awaiting approval");
 
@@ -362,15 +542,32 @@ class DeliveriesControllerApprovalTest {
     @Test
     void failedApprovalReturnsToTheRealisationScreen() {
         // given
-        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "1"))
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "1", Map.of()))
                 .thenReturn(OperationResult.failure("deliveries.purchase.error.availability"));
 
         // when
-        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "1", redirectAttributes, Locale.ENGLISH);
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "1", Map.of(),
+                redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo(
                 "redirect:/dashboard/store/" + STORE_ID + "/deliveries/" + DELIVERY_ID + "/approval");
+    }
+
+    @Test
+    void approveEndpointPassesSupplierOrderChoicesToTheService() {
+        // given
+        when(supplierPurchaseService.approve(STORE_ID, DELIVERY_ID, "17200617", Map.of("lane", "fast")))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.approvePurchase(STORE_ID, DELIVERY_ID, "17200617",
+                Map.of("supplierOrderChoices[lane]", "fast", "deliveryAddressId", "17200617"),
+                redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).approve(eq(STORE_ID), eq(DELIVERY_ID), eq("17200617"), eq(Map.of("lane", "fast")));
     }
 
     @Test
@@ -381,7 +578,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
 
@@ -499,6 +696,322 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+    }
+
+    @Test
+    void reconcilePurchaseAddsFlashSuccessMessageOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.found"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawca potwierdzil zamowienie.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void completePurchaseRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawa oznaczona jako zamowiona.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
+            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void reconcilePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).reconcile(any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void completePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze ukonczyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).completeManually(any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze ukonczyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void reconcilePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.reconcile.notFound"));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.notFound"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The supplier does not see an order with this reference number.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.reconcilePurchase(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "The supplier does not see an order with this reference number.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+        }
+    }
+
+    @Test
+    void completePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
+                .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot complete - the delivery is not in a failed order state.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.completePurchase(DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
+                    redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Cannot complete - the delivery is not in a failed order state.");
+            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+        }
+    }
+
+    @Test
+    void reconcilePurchaseForSuperAdminAddsFlashSuccessMessageOnSuccess() {
+        // given
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.found"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawca potwierdzil zamowienie.");
+
+        // when
+        String view = deliveriesController.reconcilePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
+        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+    }
+
+    @Test
+    void reconcilePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.reconcile(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.reconcile.error.failed"));
+        when(messageSource.getMessage(eq("deliveries.purchase.reconcile.error.failed"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Failed to check the order with the supplier.");
+
+        // when
+        String view = deliveriesController.reconcilePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Failed to check the order with the supplier.");
+    }
+
+    @Test
+    void forcePurchaseRedirectsBackToDeliveryDetailsOnSuccess() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService).forceRetry(STORE_ID, DELIVERY_ID);
+            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        }
+    }
+
+    @Test
+    void forcePurchaseRefusesGlobalDeliveriesForStoreAdmin() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.GLOBAL);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.global"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawe globalna moze powtorzyc tylko administrator platformy.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(supplierPurchaseService, never()).forceRetry(any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "Dostawe globalna moze powtorzyc tylko administrator platformy.");
+        }
+    }
+
+    @Test
+    void forcePurchaseFailureAddsFlashErrorMessage() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setConnectionMode(ConnectionMode.OWN);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.forcePurchase(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+        }
+    }
+
+    @Test
+    void forcePurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID)).thenReturn(OperationResult.success(DELIVERY_ID));
+
+        // when
+        String view = deliveriesController.forcePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).forceRetry(STORE_ID, DELIVERY_ID);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void forcePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.forceRetry(STORE_ID, DELIVERY_ID))
+                .thenReturn(OperationResult.failure("deliveries.purchase.retry.error.state"));
+        when(messageSource.getMessage(eq("deliveries.purchase.retry.error.state"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("This delivery cannot be retried.");
+
+        // when
+        String view = deliveriesController.forcePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "This delivery cannot be retried.");
+    }
+
+    @Test
+    void completePurchaseForSuperAdminRedirectsToStoreScopedDeliveryDetailsOnSuccess() {
+        // given
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
+                .thenReturn(OperationResult.success(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.success"), eq(null), eq(Locale.forLanguageTag("pl"))))
+                .thenReturn("Dostawa oznaczona jako zamowiona.");
+
+        // when
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
+                redirectAttributes, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
+        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+    }
+
+    @Test
+    void completePurchaseForSuperAdminFailureAddsFlashErrorMessage() {
+        // given
+        when(supplierPurchaseService.completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT))
+                .thenReturn(OperationResult.failure("deliveries.purchase.complete.error.number"));
+        when(messageSource.getMessage(eq("deliveries.purchase.complete.error.number"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Enter the supplier order number.");
+
+        // when
+        String view = deliveriesController.completePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT,
+                redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the supplier order number.");
     }
 
     @Test
@@ -741,6 +1254,65 @@ class DeliveriesControllerApprovalTest {
             assertThat(view).isEqualTo(
                     "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(deliveriesManager).reassignAllocations(eq(STORE_ID), eq(DELIVERY_ID), eq("delivery-2"), any(), any());
+        }
+    }
+
+    @Test
+    void mergeIsRefusedWhenEitherDeliveryIsDropship() {
+        // given
+        Delivery source = new Delivery(STORE_ID, null, PROVIDER);
+        source.setDeliveryId(DELIVERY_ID);
+        source.setType(DeliveryType.DROPSHIP);
+        Delivery target = new Delivery(STORE_ID, null, PROVIDER);
+        target.setDeliveryId("delivery-2");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(target);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
+        }
+    }
+
+    @Test
+    void splitIsRefusedForADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.merge.error.dropship"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Dropshipping deliveries cannot be merged or split.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "Dropshipping deliveries cannot be merged or split.");
         }
     }
 
@@ -1009,6 +1581,136 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void splitIsBlockedForStoreAdminWhileOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetExternalDeliveryId("EXT-1");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.splitSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).splitAllocations(any(), any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminIsBlockedWhileTheOrderIsStillBeingPlaced() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).deleteAllocations(any(), any(), any());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForSuperAdminIsAllowedWhenTheOrderOutcomeIsUnknown() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID))
+                .thenReturn(dispatchedDeliveryWithUnknownOutcome(DELIVERY_ID));
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).deleteAllocations(STORE_ID, DELIVERY_ID, List.of());
+        }
+    }
+
+    @Test
+    void deleteSelectedAllocationsForStoreAdminIsAllowedWhenTheOrderOutcomeIsUnknown() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID))
+                .thenReturn(dispatchedDeliveryWithUnknownOutcome(DELIVERY_ID));
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteSelectedAllocations(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager).deleteAllocations(STORE_ID, DELIVERY_ID, List.of());
+        }
+    }
+
+    @Test
+    void mergeIsBlockedWhenSourceAndTargetAreBothOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(deliveriesRepository.findById(STORE_ID, "delivery-2")).thenReturn(dispatchedDelivery("delivery-2"));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
+        form.setTargetDeliveryId("delivery-2");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.mergeSelectedAllocationsForSuperAdmin(
+                    STORE_ID, form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo(
+                    "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesManager, never()).reassignAllocations(any(), any(), any(), any(), any());
+            verify(redirectAttributes).addFlashAttribute("errorMessage",
+                    "The delivery has a supplier order in progress and cannot be edited.");
+        }
+    }
+
+    @Test
+    void deleteDeliveryIsBlockedWhileOrderDispatched() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dispatchedDelivery(DELIVERY_ID));
+        when(messageSource.getMessage(eq("deliveries.edit.locked.orderPending"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("The delivery has a supplier order in progress and cannot be edited.");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+            verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        }
+    }
+
+    @Test
     void mergeTargetsExcludeDeliveriesWithADifferentOrderStatus() {
         // given
         Delivery delivery = failedDelivery(DELIVERY_ID);
@@ -1046,6 +1748,21 @@ class DeliveriesControllerApprovalTest {
         return delivery;
     }
 
+    private Delivery dispatchedDelivery(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        return delivery;
+    }
+
+    private Delivery dispatchedDeliveryWithUnknownOutcome(String deliveryId) {
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setDeliveryId(deliveryId);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setOrderErrorMessage("Supplier did not confirm the order");
+        return delivery;
+    }
+
     private Delivery failedDelivery(String deliveryId) {
         Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
         delivery.setDeliveryId(deliveryId);
@@ -1061,7 +1778,7 @@ class DeliveriesControllerApprovalTest {
         delivery.setDeliveryId(DELIVERY_ID);
         delivery.setProvider(PROVIDER);
         delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID))
                 .thenReturn(List.of(new SupplierDeliveryAddress("17200617", "ul. Łobzowska 22/1", "Kraków", "31-140", "PL")));
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
@@ -1074,5 +1791,135 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(model.getAttribute("suggestedAddressId")).isNull();
         assertThat(model.getAttribute("suggestedAddress")).isNull();
+    }
+
+    @Test
+    void deliveryDetailsSuggestsEstimatedDeliveryDateForFailedPurchase() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.suggestEstimatedDeliveryAt(delivery)).thenReturn(ESTIMATED_DELIVERY_AT);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+        }
+    }
+
+    @Test
+    void deliveryDetailsSuggestsEstimatedDeliveryDateForDispatchedPurchase() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.suggestEstimatedDeliveryAt(delivery)).thenReturn(ESTIMATED_DELIVERY_AT);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+        }
+    }
+
+    @Test
+    void deliveryDetailsDoesNotSuggestEstimatedDeliveryDateForNonFailedDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
+        Model model = new ConcurrentModel();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(model.containsAttribute("suggestedEstimatedDeliveryAt")).isFalse();
+            verify(supplierPurchaseService, never()).suggestEstimatedDeliveryAt(any());
+        }
+    }
+
+    @Test
+    void approvalScreenExposesTheConsigneeOfADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        ShippingDetails consignee = new ShippingDetails();
+        consignee.setName("Jan");
+        consignee.setSurname("Kowalski");
+        order.setShippingDetails(consignee);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(model.getAttribute("consignee")).isSameAs(consignee);
+        verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
+    }
+
+    @Test
+    void approvalScreenExposesOrderOptionsForDropshipDeliveries() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(PROVIDER);
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of("order-1"));
+        Order order = new Order(STORE_ID);
+        order.setOrderId("order-1");
+        Shipment pickupShipment = new Shipment(ShipmentType.PickupPoint);
+        pickupShipment.setCarrier("InPost");
+        pickupShipment.setCollectionPointCode("WAW04A");
+        order.setShipments(List.of(pickupShipment));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
+                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), null, true);
+        ArgumentCaptor<SupplierOrderOptionsContext> context =
+                ArgumentCaptor.forClass(SupplierOrderOptionsContext.class);
+        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), context.capture()))
+                .thenReturn(List.of(laneOption));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then — the render path must resolve the order and pass its pickup point through, not
+        // just any dropship context.
+        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
+        assertThat(context.getValue().dropship()).isTrue();
+        assertThat(context.getValue().pickupPoint()).isNotNull();
+        assertThat(context.getValue().pickupPoint().carrier()).isEqualTo("InPost");
+        assertThat(context.getValue().pickupPoint().code()).isEqualTo("WAW04A");
     }
 }

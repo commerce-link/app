@@ -1,7 +1,7 @@
 package pl.commercelink.web;
 
 import org.apache.commons.lang3.StringUtils;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.orders.ShipmentCarrierOptions;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -50,15 +50,16 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+
 import java.util.*;
 import java.util.stream.Collectors;
-import pl.commercelink.stores.IntegrationType;
 
 @Controller
 public class OrdersController extends BaseController {
 
     @Autowired
-    private CarrierDictionary carrierDictionary;
+    private ShipmentCarrierOptions shipmentCarrierOptions;
 
     @Autowired
     private Inventory inventory;
@@ -116,6 +117,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -340,7 +343,7 @@ public class OrdersController extends BaseController {
                 .findFirst()
                 .orElse(null));
         model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("carrierOptions", carrierOptions(order, store));
+        model.addAttribute("carrierOptions", shipmentCarrierOptions.forOrder(order, store));
         model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("isCompletedOrder", order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || isSuperAdmin());
@@ -349,7 +352,13 @@ public class OrdersController extends BaseController {
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
         model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
+        model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
+        Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems);
+        model.addAttribute("hasDropshipItems", !dropshipItemIds.isEmpty());
+        model.addAttribute("hasWarehouseItems", orderItems.stream()
+                .filter(OrderItem::isProduct)
+                .anyMatch(item -> !dropshipItemIds.contains(item.getItemId())));
         model.addAttribute("hasWarehouseDocumentsEnabled", store.hasDocumentsGenerationEnabled());
         model.addAttribute("isInvoiced", order.isInvoiced());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
@@ -466,6 +475,15 @@ public class OrdersController extends BaseController {
             return "redirect:/dashboard/orders/" + orderId;
         }
 
+        FulfilmentType requestedFulfilmentType = updatedOrder.getFulfilmentType();
+        boolean fulfilmentTypeChanged = requestedFulfilmentType != null
+                && requestedFulfilmentType != existingOrder.getFulfilmentType();
+        if (fulfilmentTypeChanged
+                && !existingOrder.canChangeFulfilmentType(orderItemsRepository.findByOrderId(orderId))) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.fulfilment.type.locked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
         existingOrder.setStatus(updatedOrder.getStatus());
         existingOrder.setEmailNotificationsEnabled(updatedOrder.isEmailNotificationsEnabled());
         existingOrder.setEstimatedAssemblyAt(updatedOrder.getEstimatedAssemblyAt());
@@ -473,7 +491,9 @@ public class OrdersController extends BaseController {
         existingOrder.setAffiliateId(updatedOrder.getAffiliateId());
         existingOrder.setGclid(updatedOrder.getGclid());
         existingOrder.setComment(updatedOrder.getComment());
-        existingOrder.setFulfilmentType(updatedOrder.getFulfilmentType());
+        if (fulfilmentTypeChanged) {
+            existingOrder.setFulfilmentType(requestedFulfilmentType);
+        }
         return save(existingOrder);
     }
 
@@ -541,9 +561,16 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSupplier(@PathVariable String orderId, @RequestParam String itemId,
                                  @RequestParam String manufacturerCode, @RequestParam double cost,
-                                 @RequestParam String supplier, Model model, Locale locale) {
+                                 @RequestParam String supplier, Model model,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
 
         orderItem.setManufacturerCode(manufacturerCode);
         orderItem.setCost(cost);
@@ -566,8 +593,14 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/clear-supplier")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId) {
+    public String clearSupplier(@PathVariable String orderId, @RequestParam String itemId,
+                                RedirectAttributes redirectAttributes, Locale locale) {
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        if (!orderItem.isReleasable()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.clear.assign.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         orderItem.removeFulfilment();
         orderItemsRepository.save(orderItem);
         return "redirect:/dashboard/orders/" + orderId;
@@ -584,8 +617,15 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String mfn) {
-        ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, mfn);
+    public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId,
+                                      @RequestParam String warehouseItemId,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, warehouseItemId);
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+        }
         return "redirect:/dashboard/orders/" + orderId;
     }
 
@@ -658,15 +698,26 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouse")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
-        ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
+    public String moveSelectedItemsToTheWarehouse(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                                  RedirectAttributes redirectAttributes, Locale locale) {
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouse(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        flashSkippedDropshipItems(result, redirectAttributes, locale);
         return "redirect:/dashboard/orders/" + orderId;
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToTheWarehouseForRMA")
-    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
-        ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
+    public String moveSelectedItemsToTheWarehouseForRMA(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                                        RedirectAttributes redirectAttributes, Locale locale) {
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, form.getSelectedOrderItemIds());
+        flashSkippedDropshipItems(result, redirectAttributes, locale);
         return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    private void flashSkippedDropshipItems(OrdersManager.Result result, RedirectAttributes redirectAttributes, Locale locale) {
+        if (result.getSkippedDropshipItems() > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.items.action.move.warehouse.dropship.error", null, locale));
+        }
     }
 
     @PostMapping("/dashboard/orders/{orderId}/splitOrder")
@@ -832,19 +883,6 @@ public class OrdersController extends BaseController {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
         return view;
-    }
-
-    private List<String> carrierOptions(Order order, Store store) {
-        Set<String> options = new LinkedHashSet<>(
-                carrierDictionary.namesUsedBy(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)));
-        if (options.isEmpty()) {
-            return List.of();
-        }
-        order.getShipments().stream()
-                .map(Shipment::getCarrier)
-                .filter(StringUtils::isNotBlank)
-                .forEach(options::add);
-        return List.copyOf(options);
     }
 
     private List<String> shipmentDataSnapshot(Order order) {

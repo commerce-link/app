@@ -21,6 +21,16 @@ class BuiltInStockQueryService implements StockQueryService {
     public List<WarehouseItemView> searchAvailableByMfns(String storeId, Collection<String> mfns) {
         return warehouseRepository.findAllAvailableByMfns(storeId, mfns)
                 .stream()
+                .filter(WarehouseItem::isSealed)
+                .map(this::fromInternal)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WarehouseItemView> searchNotSealedAvailableByMfns(String storeId, Collection<String> mfns) {
+        return warehouseRepository.findAllAvailableByMfns(storeId, mfns)
+                .stream()
+                .filter(item -> !item.isSealed())
                 .map(this::fromInternal)
                 .collect(Collectors.toList());
     }
@@ -29,6 +39,7 @@ class BuiltInStockQueryService implements StockQueryService {
     public List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns) {
         return warehouseRepository.findAllByMfns(storeId, mfns)
                 .stream()
+                .filter(WarehouseItem::isSealed)
                 .filter(e -> !e.hasOneOfTheStatuses(
                         FulfilmentStatus.InRMA,
                         FulfilmentStatus.InExternalService,
@@ -49,15 +60,25 @@ class BuiltInStockQueryService implements StockQueryService {
         return fromInternal(warehouseItem);
     }
 
+    @Override
+    public WarehouseItemView findById(String storeId, String itemId) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        if (warehouseItem == null) {
+            return null;
+        }
+        return fromInternal(warehouseItem);
+    }
+
     private WarehouseItemView fromInternal(WarehouseItem warehouseItem) {
         return new WarehouseItemView(
                 warehouseItem.getStoreId(),
                 warehouseItem.getItemId(),
                 warehouseItem.getEan(),
                 warehouseItem.getManufacturerCode(),
-                Price.fromNet(warehouseItem.getCost(), warehouseItem.getTax()),
+                Price.fromNet(warehouseItem.getEffectiveUnitSystemCost(), warehouseItem.getTax()),
                 warehouseItem.getQty(),
-                warehouseItem.getStatus()
+                warehouseItem.getStatus(),
+                warehouseItem.getCondition()
         );
     }
 }

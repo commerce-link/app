@@ -10,6 +10,7 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
@@ -46,8 +47,13 @@ public abstract class Item implements Delivered {
     private double tax = DEFAULT_VAT_RATE;
     @DynamoDBAttribute(attributeName = "deliveryId")
     private String deliveryId;
+    @DynamoDBAttribute(attributeName = "claimedDeliveryId")
+    private String claimedDeliveryId;
     @DynamoDBAttribute(attributeName = "serialNo")
     private String serialNo;
+    @DynamoDBAttribute(attributeName = "condition")
+    @DynamoDBTypeConvertedEnum
+    private ItemCondition condition = ItemCondition.Sealed;
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum
     private FulfilmentStatus  status = FulfilmentStatus.New;
@@ -87,12 +93,33 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public void removeFulfilment() {
+        boolean wasDelivered = isDelivered();
         this.ean = null;
         this.manufacturerCode = null;
         this.cost = 0;
         this.deliveryId = null;
         this.serialNo = null;
+        this.condition = ItemCondition.Sealed;
         this.status = FulfilmentStatus.New;
+        if (!wasDelivered) {
+            this.claimedDeliveryId = null;
+        }
+    }
+
+    @DynamoDBIgnore
+    public boolean isSealed() {
+        return condition == ItemCondition.Sealed;
+    }
+
+    public void appendSerialNumbers(String sns) {
+        if (StringUtils.isBlank(sns)) {
+            return;
+        }
+        if (StringUtils.isBlank(serialNo)) {
+            serialNo = sns;
+            return;
+        }
+        serialNo = serialNo + "," + sns;
     }
 
     public void removeSerialNumbers(String sns) {
@@ -142,6 +169,11 @@ public abstract class Item implements Delivered {
     @DynamoDBIgnore
     public boolean isNew() {
         return status == FulfilmentStatus.New;
+    }
+
+    @DynamoDBIgnore
+    public boolean isReleasable() {
+        return isNew() || hasOneOfTheStatuses(FulfilmentStatus.Allocation);
     }
 
     @DynamoDBIgnore
@@ -200,14 +232,16 @@ public abstract class Item implements Delivered {
     public boolean hasSameFulfilmentAs(GoodsReceiptItem goodsReceiptItem) {
         return this.deliveryId.equalsIgnoreCase(goodsReceiptItem.getDeliveryId())
                 && areEansEq(this.ean, goodsReceiptItem.getEan())
-                && areMfnsEq(this.manufacturerCode, goodsReceiptItem.getMfn());
+                && areMfnsEq(this.manufacturerCode, goodsReceiptItem.getMfn())
+                && this.condition == goodsReceiptItem.getCondition();
     }
 
     @DynamoDBIgnore
     public boolean hasSameFulfilmentAs(ReservationRemovalItem removalItem) {
         return this.deliveryId.equalsIgnoreCase(removalItem.getDeliveryId())
                 && areEansEq(this.ean, removalItem.getEan())
-                && areMfnsEq(this.manufacturerCode, removalItem.getMfn());
+                && areMfnsEq(this.manufacturerCode, removalItem.getMfn())
+                && this.condition == removalItem.getCondition();
     }
 
     @DynamoDBIgnore
@@ -224,6 +258,7 @@ public abstract class Item implements Delivered {
     public void markAsOrdered(String deliveryId, double cost) {
         this.cost = cost;
         this.deliveryId = deliveryId;
+        this.claimedDeliveryId = deliveryId;
         this.status = FulfilmentStatus.Ordered;
     }
 
@@ -252,6 +287,7 @@ public abstract class Item implements Delivered {
     @DynamoDBIgnore
     public void markAsInAllocation() {
         this.setStatus(FulfilmentStatus.Allocation);
+        this.claimedDeliveryId = null;
     }
 
     @DynamoDBIgnore
@@ -355,6 +391,14 @@ public abstract class Item implements Delivered {
         this.deliveryId = deliveryId;
     }
 
+    public String getClaimedDeliveryId() {
+        return claimedDeliveryId;
+    }
+
+    public void setClaimedDeliveryId(String claimedDeliveryId) {
+        this.claimedDeliveryId = claimedDeliveryId;
+    }
+
     @DynamoDBIgnore
     public String getShortenedDeliveryId() {
         return ConversionUtil.getShortenedId(deliveryId);
@@ -366,6 +410,14 @@ public abstract class Item implements Delivered {
 
     public void setSerialNo(String serialNo) {
         this.serialNo = serialNo;
+    }
+
+    public ItemCondition getCondition() {
+        return condition;
+    }
+
+    public void setCondition(ItemCondition condition) {
+        this.condition = condition;
     }
 
     public FulfilmentStatus getStatus() {

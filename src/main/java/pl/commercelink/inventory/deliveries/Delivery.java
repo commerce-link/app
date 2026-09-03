@@ -20,8 +20,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -65,10 +67,18 @@ public class Delivery {
     private String deliveryAddress;
     @DynamoDBAttribute(attributeName = "deliveryAddressId")
     private String deliveryAddressId;
+    @DynamoDBAttribute(attributeName = "supplierOrderChoices")
+    private Map<String, String> supplierOrderChoices = new HashMap<>();
+    @DynamoDBAttribute(attributeName = "supplierOrderChoicesLabel")
+    private String supplierOrderChoicesLabel;
 
     @DynamoDBAttribute(attributeName = "connectionMode")
     @DynamoDBTypeConvertedEnum
     private ConnectionMode connectionMode;
+
+    @DynamoDBAttribute(attributeName = "type")
+    @DynamoDBTypeConvertedEnum
+    private DeliveryType type;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -98,6 +108,14 @@ public class Delivery {
     private boolean synced;
     @DynamoDBAttribute(attributeName = "paid")
     private boolean paid;
+    @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
+    private boolean externalDeliveryIdProvisional;
+
+    @DynamoDBAttribute(attributeName = "tracking")
+    private DeliveryTracking tracking;
+
+    @DynamoDBAttribute(attributeName = "purchaseAttempts")
+    private int purchaseAttempts;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -367,6 +385,36 @@ public class Delivery {
         this.externalDeliveryId = externalDeliveryId;
     }
 
+    /**
+     * Stays nullable on purpose: a getter creating the document on the fly would make every saved delivery carry an
+     * empty tracking map and defeat the cron filter that looks for deliveries without one.
+     */
+    public DeliveryTracking getTracking() {
+        return tracking;
+    }
+
+    public void setTracking(DeliveryTracking tracking) {
+        this.tracking = tracking;
+    }
+
+    /**
+     * The tracking document to mutate, created and attached on first use.
+     */
+    public DeliveryTracking tracking() {
+        if (tracking == null) {
+            tracking = new DeliveryTracking();
+        }
+        return tracking;
+    }
+
+    /**
+     * Read-only view for templates and queries: never null, never attached to the delivery.
+     */
+    @DynamoDBIgnore
+    public DeliveryTracking getTrackingView() {
+        return tracking == null ? new DeliveryTracking() : tracking;
+    }
+
     public String getComment() {
         return comment;
     }
@@ -447,6 +495,22 @@ public class Delivery {
         this.deliveryAddressId = deliveryAddressId;
     }
 
+    public Map<String, String> getSupplierOrderChoices() {
+        return supplierOrderChoices;
+    }
+
+    public void setSupplierOrderChoices(Map<String, String> supplierOrderChoices) {
+        this.supplierOrderChoices = supplierOrderChoices == null ? new HashMap<>() : supplierOrderChoices;
+    }
+
+    public String getSupplierOrderChoicesLabel() {
+        return supplierOrderChoicesLabel;
+    }
+
+    public void setSupplierOrderChoicesLabel(String supplierOrderChoicesLabel) {
+        this.supplierOrderChoicesLabel = supplierOrderChoicesLabel;
+    }
+
     public ConnectionMode getConnectionMode() {
         return connectionMode;
     }
@@ -455,9 +519,27 @@ public class Delivery {
         this.connectionMode = connectionMode;
     }
 
+    public DeliveryType getType() {
+        return type == null ? DeliveryType.WAREHOUSE : type;
+    }
+
+    public void setType(DeliveryType type) {
+        this.type = type;
+    }
+
     @DynamoDBIgnore
     public boolean isOrderPending() {
         return orderStatus == DeliveryOrderStatus.ORDER_PENDING;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOrderDispatched() {
+        return orderStatus == DeliveryOrderStatus.ORDER_DISPATCHED;
+    }
+
+    @DynamoDBIgnore
+    public boolean isOrderOutcomeUnknown() {
+        return orderStatus == DeliveryOrderStatus.ORDER_DISPATCHED && orderErrorMessage != null;
     }
 
     @DynamoDBIgnore
@@ -470,12 +552,52 @@ public class Delivery {
         return orderStatus == DeliveryOrderStatus.AWAITING_APPROVAL;
     }
 
+    @DynamoDBIgnore
+    public boolean isDropship() {
+        return getType() == DeliveryType.DROPSHIP;
+    }
+
+    // A warehouse delivery can still carry goods bought for a direct-to-consumer order: the supplier simply
+    // cannot ship them to the customer. They arrive at the warehouse and have to be forwarded by hand.
+    // A dropship delivery serves such an order by construction and does not go through the warehouse at all,
+    // so it is excluded here even though its allocations also carry the direct-to-consumer flag.
+    @DynamoDBIgnore
+    public boolean hasDirectToConsumerAllocations() {
+        return !isDropship() && getAllocations() != null && getAllocations().stream().anyMatch(Allocation::isDirectToConsumer);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackable() {
+        return isDropship() && orderStatus == null && !hasBeenReceived() && StringUtils.isNotBlank(externalDeliveryId);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackingPending() {
+        return tracking == null || tracking.isPending();
+    }
+
     public boolean isPaid() {
         return paid;
     }
 
     public void setPaid(boolean paid) {
         this.paid = paid;
+    }
+
+    public boolean isExternalDeliveryIdProvisional() {
+        return externalDeliveryIdProvisional;
+    }
+
+    public void setExternalDeliveryIdProvisional(boolean externalDeliveryIdProvisional) {
+        this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
+    }
+
+    public int getPurchaseAttempts() {
+        return purchaseAttempts;
+    }
+
+    public void setPurchaseAttempts(int purchaseAttempts) {
+        this.purchaseAttempts = purchaseAttempts;
     }
 
     public List<Shipment> getShipments() {

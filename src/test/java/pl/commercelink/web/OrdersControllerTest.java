@@ -25,6 +25,7 @@ import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
@@ -539,6 +540,196 @@ class OrdersControllerTest {
         verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
     }
 
+    @Test
+    void clearSupplierReleasesAnAllocatedItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("Acme");
+        item.setStatus(FulfilmentStatus.Allocation);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+
+        // when
+        String view = ordersController.clearSupplier(ORDER_ID, item.getItemId(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(item.getDeliveryId()).isNull();
+        assertThat(item.getClaimedDeliveryId()).isNull();
+        verify(orderItemsRepository).save(item);
+        verifyNoInteractions(redirectAttributes);
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void clearSupplierKeepsWorkingForNewItems() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setDeliveryId("Acme");
+        item.setStatus(FulfilmentStatus.New);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+
+        // when
+        String view = ordersController.clearSupplier(ORDER_ID, item.getItemId(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(item.getDeliveryId()).isNull();
+        verify(orderItemsRepository).save(item);
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void clearSupplierRefusesAnOrderedItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("d-1");
+        item.setClaimedDeliveryId("d-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(messageSource.getMessage(eq("order.item.clear.assign.blocked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("blocked");
+
+        // when
+        String view = ordersController.clearSupplier(ORDER_ID, item.getItemId(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getDeliveryId()).isEqualTo("d-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void clearSupplierRefusesADeliveredItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("d-1");
+        item.setClaimedDeliveryId("d-1");
+        item.setStatus(FulfilmentStatus.Delivered);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(messageSource.getMessage(eq("order.item.clear.assign.blocked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("blocked");
+
+        // when
+        String view = ordersController.clearSupplier(ORDER_ID, item.getItemId(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(item.getDeliveryId()).isEqualTo("d-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void assignSupplierRefusesAnOrderedItem() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("d-1");
+        item.setClaimedDeliveryId("d-1");
+        item.setStatus(FulfilmentStatus.Ordered);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(messageSource.getMessage(eq("order.item.assign.supplier.blocked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("blocked");
+
+        // when
+        String view = ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-2", 50.0, "d-2",
+                new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getManufacturerCode()).isEqualTo("MFN-1");
+        assertThat(item.getDeliveryId()).isEqualTo("d-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo rejects a fulfilment type change once a product item is allocated")
+    void updateOrderInfoRejectsFulfilmentTypeChangeWhenAnItemIsAllocated() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+        OrderItem allocated = new OrderItem();
+        allocated.setStatus(FulfilmentStatus.Allocation);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocated));
+        when(messageSource.getMessage(eq("order.fulfilment.type.locked"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Locked");
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+
+        // when
+        String view = ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Locked");
+        verify(orderLifecycle, never()).update(any());
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo applies a fulfilment type change while every product item is New")
+    void updateOrderInfoAppliesFulfilmentTypeChangeWhenAllProductsAreNew() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.WarehouseFulfilment);
+        OrderItem fresh = new OrderItem();
+        fresh.setStatus(FulfilmentStatus.New);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(fresh));
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+
+        // when
+        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        verify(orderLifecycle).update(existingOrder);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo keeps the fulfilment type when the disabled field is absent from the form")
+    void updateOrderInfoKeepsFulfilmentTypeWhenTheFieldIsAbsent() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setStatus(OrderStatus.New);
+        existingOrder.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.New);
+        payload.setFulfilmentType(null);
+
+        // when
+        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getFulfilmentType())
+                .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        verifyNoInteractions(orderItemsRepository);
+    }
+
     private OrderItem existingOrderItem(String category, boolean service) {
         OrderItem item = new OrderItem(ORDER_ID, category, "pozycja", 1, 100.0, null, false);
         item.setService(service);
@@ -567,5 +758,26 @@ class OrdersControllerTest {
                 "fv-1", "FV/1/2026", "https://example.com/fv/1",
                 pl.commercelink.documents.DocumentType.InvoiceVat));
         return order;
+    }
+
+    @Test
+    void movingDropshipItemsToTheWarehouseIsReportedAsSkipped() {
+        // given
+        OrderItem selected = new OrderItem();
+        selected.setItemId("item-1");
+        selected.setSelected(true);
+        OrderItemsForm form = new OrderItemsForm(List.of(selected));
+        when(ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID, List.of("item-1")))
+                .thenReturn(new OrdersManager.Result(new Order(STORE_ID), List.of(), 1));
+        when(messageSource.getMessage(eq("order.items.action.move.warehouse.dropship.error"), any(), any()))
+                .thenReturn("skipped");
+
+        // when
+        String view = ordersController.moveSelectedItemsToTheWarehouse(ORDER_ID, form, redirectAttributes,
+                Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "skipped");
     }
 }

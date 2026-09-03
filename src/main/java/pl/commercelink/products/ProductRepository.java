@@ -202,7 +202,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return dynamoDBMapper.scan(Product.class, scanExpression);
     }
 
-    public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, int page, int pageSize) {
+    public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, Integer minMaxRetailPrice, int page, int pageSize) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":categoryId", new AttributeValue().withS(categoryId));
 
@@ -269,6 +269,12 @@ public class ProductRepository extends DynamoDbRepository<Product> {
             if (filterExpression.length() > 0) filterExpression.append(" AND ");
             filterExpression.append("suggestedRetailPrice >= :minSuggestedRetailPrice");
             eav.put(":minSuggestedRetailPrice", new AttributeValue().withN(String.valueOf(minSuggestedRetailPrice)));
+        }
+
+        if (minMaxRetailPrice != null) {
+            if (filterExpression.length() > 0) filterExpression.append(" AND ");
+            filterExpression.append("maxRetailPrice >= :minMaxRetailPrice");
+            eav.put(":minMaxRetailPrice", new AttributeValue().withN(String.valueOf(minMaxRetailPrice)));
         }
 
         DynamoDBQueryExpression<Product> queryExpression = new DynamoDBQueryExpression<Product>()

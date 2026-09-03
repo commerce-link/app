@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -140,6 +141,8 @@ class AvailabilityAndPriceListTest {
         when(categoryDefinition.getName()).thenReturn("Obudowa");
         when(categoryDefinition.hasGrouping()).thenReturn(false);
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
-        when(matchedInventory.getTotalAvailableQty(1000)).thenReturn(5L);
+        MatchedInventory inventoryAtPricePoint = mock(MatchedInventory.class);
+        when(inventoryAtPricePoint.getTotalAvailableQty()).thenReturn(5L);
+        when(matchedInventory.atPricePoint(1000)).thenReturn(inventoryAtPricePoint);
     }
 }

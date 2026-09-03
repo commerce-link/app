@@ -104,6 +104,24 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("reassign stamps the claimed delivery id of moved items with the target delivery")
+    void reassignStampsClaimedDeliveryIdWithTargetDelivery() {
+        // given
+        WarehouseItem warehouseItem = warehouseItemInStatus(FulfilmentStatus.Ordered);
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(warehouseItem);
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, ITEM_ID, "Warehouse"));
+
+        // when
+        warehouseAllocationsManager.reassign(STORE_ID, "delivery-target", List.of(allocation));
+
+        // then
+        verify(warehouseRepository).save(warehouseItem);
+        assertThat(warehouseItem.getDeliveryId()).isEqualTo("delivery-target");
+        assertThat(warehouseItem.getClaimedDeliveryId()).isEqualTo("delivery-target");
+    }
+
+    @Test
     @DisplayName("release returns an Ordered item with no purchase claim to the allocation pool unchanged")
     void releaseReturnsAllDeliveryWarehouseItemsToAllocationPool() {
         // given

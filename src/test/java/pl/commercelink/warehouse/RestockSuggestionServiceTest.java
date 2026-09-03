@@ -68,7 +68,7 @@ class RestockSuggestionServiceTest {
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
         when(catalog.getCatalogId()).thenReturn("cat");
-        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(gpu, cpuAmd, cpuIntel));
         when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
@@ -103,7 +103,7 @@ class RestockSuggestionServiceTest {
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
         when(catalog.getCatalogId()).thenReturn("cat");
-        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(goodDeal, hotDeal));
         when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
@@ -132,7 +132,7 @@ class RestockSuggestionServiceTest {
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
         when(catalog.getCatalogId()).thenReturn("cat");
-        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(level));
         when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
@@ -154,7 +154,7 @@ class RestockSuggestionServiceTest {
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
-        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
                 .thenReturn(List.of(affordable, tooExpensive));
         when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
@@ -173,7 +173,7 @@ class RestockSuggestionServiceTest {
         StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 0, 0, 3);
 
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
-        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false))
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
                 .thenReturn(List.of(level));
         when(enabledInventory.findByProductCode(anyString())).thenReturn(null);
 

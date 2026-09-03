@@ -124,8 +124,8 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isSettled(boolean documentsGenerationEnabled) {
-        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(documentsGenerationEnabled) && !isAwaitingReview();
+    public boolean isSettled(boolean warehouseDocumentsRequired) {
+        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(warehouseDocumentsRequired) && !isAwaitingReview();
     }
 
     @DynamoDBIgnore
@@ -141,8 +141,8 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isAwaitingDocumentsGeneration(boolean documentsGenerationEnabled) {
-        return documentsGenerationEnabled && !getDocumentByType(DocumentType.GoodsIssue).isPresent();
+    public boolean isAwaitingDocumentsGeneration(boolean warehouseDocumentsRequired) {
+        return warehouseDocumentsRequired && !getDocumentByType(DocumentType.GoodsIssue).isPresent();
     }
 
     @DynamoDBIgnore
@@ -332,6 +332,13 @@ public class Order {
                 && getPaidAmount() == 0
                 && !getDocumentByType(DocumentType.GoodsIssue).isPresent()
                 && !isInvoiced();
+    }
+
+    @DynamoDBIgnore
+    public boolean canChangeFulfilmentType(List<OrderItem> orderItems) {
+        return orderItems.stream()
+                .filter(OrderItem::isProduct)
+                .allMatch(OrderItem::isNew);
     }
 
     @DynamoDBIgnore
@@ -750,6 +757,13 @@ public class Order {
 
         public Builder withCollectionPointCode(String collectionPointCode) {
             shipment.setCollectionPointCode(collectionPointCode);
+            return this;
+        }
+
+        public Builder withEstimatedShippingAt(LocalDate estimatedShippingAt) {
+            if (estimatedShippingAt != null) {
+                order.setEstimatedShippingAt(estimatedShippingAt);
+            }
             return this;
         }
 

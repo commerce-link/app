@@ -115,6 +115,7 @@ public class StoreCopyService {
                 newCategory.setPimCategoryIds(new LinkedList<>(sourceCategory.getPimCategoryIds()));
                 newCategory.setType(sourceCategory.getType());
                 newCategory.setRequiredDuringOrder(sourceCategory.isRequiredDuringOrder());
+                newCategory.setIncludedInDeliverySuggestions(sourceCategory.isIncludedInDeliverySuggestions());
                 newCategory.setSequenceNumber(sourceCategory.getSequenceNumber());
                 newCategory.setGroupingOrder(sourceCategory.getGroupingOrder());
                 newCategory.setMaxQty(sourceCategory.getMaxQty());
@@ -164,6 +165,8 @@ public class StoreCopyService {
                 target.setQuickFilters(copyList(source.getQuickFilters()));
                 target.setProductPage(source.getProductPage());
                 target.setSuggestedRetailPrice(source.getSuggestedRetailPrice());
+                target.setMaxRetailPrice(source.getMaxRetailPrice());
+                target.setMaxRetailPriceSuppliers(source.getMaxRetailPriceSuppliers());
                 target.setAvailabilityType(source.getAvailabilityType());
                 target.setStockExpectedQty(source.getStockExpectedQty());
                 target.setRestockPricePromo(source.getRestockPricePromo());

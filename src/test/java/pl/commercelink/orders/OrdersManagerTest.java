@@ -16,19 +16,26 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
+import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
+import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationService;
+import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
+import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -63,6 +70,12 @@ class OrdersManagerTest {
     private MatchedInventory matchedInventory;
     @Mock
     private ReservationService reservationService;
+    @Mock
+    private StockQueryService stockQueryService;
+    @Mock
+    private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
+    @Mock
+    private DropshipItemLookup dropshipItemLookup;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -453,6 +466,52 @@ class OrdersManagerTest {
     }
 
     @Test
+    void moveToWarehouseLeavesItemsOfADropshipDeliveryAlone() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem dropshipped = allocatedProduct("item-1");
+        dropshipped.setStatus(FulfilmentStatus.Ordered);
+        dropshipped.setDeliveryId("dropship-delivery");
+        OrderItem fromWarehouse = allocatedProduct("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipped, fromWarehouse));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
+        // when
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID,
+                List.of("item-1", "item-2"));
+
+        // then
+        verify(reservationService, times(1)).remove(any(Reservation.class));
+        verify(orderItemsRepository, never()).save(dropshipped);
+        assertThat(dropshipped.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(dropshipped.getDeliveryId()).isEqualTo("dropship-delivery");
+        assertThat(fromWarehouse.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(result.getSkippedDropshipItems()).isEqualTo(1);
+    }
+
+    @Test
+    void moveToWarehouseForRmaLeavesItemsOfADropshipDeliveryAlone() {
+        // given
+        Order order = orderWithTotalPrice(150.0);
+        OrderItem dropshipped = allocatedProduct("item-1");
+        dropshipped.setDeliveryId("dropship-delivery");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipped));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
+        // when
+        OrdersManager.Result result = ordersManager.moveOrderItemsToTheWarehouseForRMA(STORE_ID, ORDER_ID, List.of("item-1"));
+
+        // then
+        verify(reservationService, never()).remove(any(Reservation.class));
+        assertThat(dropshipped.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(result.getSkippedDropshipItems()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("moveOrderItemsToTheWarehouse skips service items entirely")
     void moveToWarehouseSkipsServiceItems() {
         // given
@@ -522,6 +581,164 @@ class OrdersManagerTest {
         assertThat(item.getDeliveryId()).isEqualTo("Acme");
         assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("splitOrder moves a pre-claim Allocation item to the new order with its allocation intact")
+    void splitOrderMovesAnAllocatedItemWithItsAllocation() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
+        // when
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+
+        // then
+        assertThat(newOrder).isNotNull();
+        assertThat(newOrder.getOrderId()).isNotEqualTo(ORDER_ID);
+        verify(ordersRepository, times(2)).save(newOrder);
+        verify(ordersRepository).save(original);
+
+        ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(movedCaptor.capture());
+        OrderItem moved = movedCaptor.getValue();
+        assertThat(moved.getOrderId()).isEqualTo(newOrder.getOrderId());
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(moved.getDeliveryId()).isEqualTo("AcmeB");
+        assertThat(moved.getCost()).isEqualTo(200.0);
+        assertThat(moved.getEan()).isEqualTo(itemB.getEan());
+        assertThat(moved.getManufacturerCode()).isEqualTo(itemB.getManufacturerCode());
+
+        verify(orderItemsRepository).delete(itemB);
+        verify(orderItemsRepository, never()).delete(itemA);
+
+        assertThat(newOrder.getTotalPrice()).isEqualTo(itemB.getTotalPrice());
+        assertThat(original.getTotalPrice()).isEqualTo(300.0 - itemB.getTotalPrice());
+    }
+
+    @Test
+    @DisplayName("splitOrder still moves brand-new items with no fulfilment")
+    void splitOrderStillMovesNewItems() {
+        // given
+        Order original = splittableOrder(150.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = new OrderItem(ORDER_ID, "Accessories", "Mouse", 1, 50.0, "SKU-C", false);
+        itemB.setItemId("item-b");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
+        // when
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+
+        // then
+        ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(movedCaptor.capture());
+        OrderItem moved = movedCaptor.getValue();
+        assertThat(moved.getOrderId()).isEqualTo(newOrder.getOrderId());
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(newOrder.getTotalPrice()).isEqualTo(50.0);
+        assertThat(original.getTotalPrice()).isEqualTo(100.0);
+    }
+
+    @Test
+    @DisplayName("splitOrder refuses to move an item already Ordered from a supplier")
+    void splitOrderRefusesItemsAlreadyOrderedFromASupplier() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsOrdered("d-1", 200.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("split.order.items.have.fulfilment");
+        verify(ordersRepository, never()).save(any());
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("splitOrder refuses to move a Delivered item")
+    void splitOrderRefusesDeliveredItems() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsOrdered("d-1", 200.0);
+        itemB.setStatus(FulfilmentStatus.Delivered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("split.order.items.have.fulfilment");
+        verify(ordersRepository, never()).save(any());
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+    }
+
+    private Order splittableOrder(double totalPrice) {
+        Order order = orderWithTotalPrice(totalPrice);
+        order.setBillingDetails(new BillingDetails());
+        order.setShippingDetails(new ShippingDetails());
+        return order;
+    }
+
+    private OrderItem allocatedItem(String itemId, String name, String deliveryId, String ean, String mfn, double price) {
+        OrderItem item = new OrderItem(ORDER_ID, "CPU", name, 1, price, mfn, false);
+        item.setItemId(itemId);
+        item.setEan(ean);
+        item.setManufacturerCode(mfn);
+        item.setCost(price);
+        item.setDeliveryId(deliveryId);
+        item.markAsInAllocation();
+        return item;
+    }
+
+    @Test
+    @DisplayName("assignFromWarehouse assigns the exact warehouse item picked by the user")
+    void assignFromWarehouseAssignsTheExactWarehouseItem() {
+        // given
+        OrderItem orderItem = orderItem("item-1", 100.0);
+        WarehouseItemView warehouseItem = new WarehouseItemView(
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
+        );
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(warehouseItem);
+
+        // when
+        ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1");
+
+        // then
+        assertThat(orderItem.getSku()).isEqualTo("MFN-1");
+        verify(orderItemsRepository).save(orderItem);
+        verify(manualWarehouseItemFulfilment).run(STORE_ID, orderItem, warehouseItem);
+        verify(automatedOrderFulfilment, never()).run(any(), any());
+    }
+
+    @Test
+    @DisplayName("assignFromWarehouse rejects a warehouse item that is no longer available")
+    void assignFromWarehouseRejectsUnavailableWarehouseItem() {
+        // given
+        WarehouseItemView reserved = new WarehouseItemView(
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved, ItemCondition.Sealed
+        );
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(reserved);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("warehouse.item.not.available");
+        verify(manualWarehouseItemFulfilment, never()).run(any(), any(), any());
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

@@ -6,9 +6,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
 import pl.commercelink.taxonomy.Categories;
+import pl.commercelink.warehouse.api.GoodsReceiptItem;
+import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -30,6 +33,9 @@ public class WarehouseItem extends Item {
 
     @DynamoDBAttribute(attributeName = "purchaseClaimQty")
     private int purchaseClaimQty;
+
+    @DynamoDBAttribute(attributeName = "unitSystemCost")
+    private double unitSystemCost;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -62,9 +68,12 @@ public class WarehouseItem extends Item {
         this.setName(other.getName());
         this.setComment(other.getComment());
         this.setSerialNo(other.getSerialNo());
+        this.setUnitSystemCost(other.getUnitSystemCost());
+        this.setCondition(other.getCondition());
 
         if (hasOneOfTheStatuses(FulfilmentStatus.New)) {
             setDeliveryId(other.getDeliveryId());
+            setClaimedDeliveryId(other.getClaimedDeliveryId());
             setEan(other.getEan());
             setManufacturerCode(other.getManufacturerCode());
             setCost(other.getCost());
@@ -88,6 +97,7 @@ public class WarehouseItem extends Item {
     public void returnToAllocationPool(String provider) {
         this.setStatus(FulfilmentStatus.Allocation);
         this.setDeliveryId(provider);
+        this.setClaimedDeliveryId(null);
     }
 
     @DynamoDBIgnore
@@ -122,7 +132,44 @@ public class WarehouseItem extends Item {
         return Objects.equals(this.getEan(), other.getEan()) &&
                Objects.equals(this.getManufacturerCode(), other.getManufacturerCode()) &&
                Objects.equals(this.getCost(), other.getCost()) &&
-               Objects.equals(this.getDeliveryId(), other.getDeliveryId());
+               Objects.equals(this.getDeliveryId(), other.getDeliveryId()) &&
+               this.getCondition() == other.getCondition();
+    }
+
+    @DynamoDBIgnore
+    public void absorb(WarehouseItem other) {
+        absorb(other.getQty(), other.getSerialNo(), other.getComment());
+    }
+
+    @DynamoDBIgnore
+    public void absorb(ReservationRemovalItem other) {
+        absorb(other.getQty(), other.getSerialNo(), other.getComment());
+    }
+
+    @DynamoDBIgnore
+    public void absorb(GoodsReceiptItem other) {
+        absorb(other.getQty(), other.getSerialNo(), null);
+    }
+
+    private void absorb(int qty, String serialNo, String comment) {
+        setQty(getQty() + qty);
+        appendSerialNumbers(serialNo);
+        appendComment(comment);
+    }
+
+    @DynamoDBIgnore
+    public double getEffectiveUnitSystemCost() {
+        return unitSystemCost > 0 ? unitSystemCost : getCost();
+    }
+
+    @DynamoDBIgnore
+    public boolean hasUnitSystemCost() {
+        return unitSystemCost > 0;
+    }
+
+    @DynamoDBIgnore
+    public Price systemCost() {
+        return Price.fromNet(unitSystemCost, getTax());
     }
 
     @DynamoDBIgnore
@@ -141,9 +188,12 @@ public class WarehouseItem extends Item {
         splitItem.setEan(getEan());
         splitItem.setManufacturerCode(getManufacturerCode());
         splitItem.setCost(getCost());
+        splitItem.setUnitSystemCost(getUnitSystemCost());
         splitItem.setTax(getTax());
         splitItem.setDeliveryId(getDeliveryId());
+        splitItem.setClaimedDeliveryId(getClaimedDeliveryId());
         splitItem.setStatus(getStatus());
+        splitItem.setCondition(getCondition());
 
         this.setQty(getQty() - qtyToSplit);
 
@@ -180,5 +230,13 @@ public class WarehouseItem extends Item {
 
     public void setPurchaseClaimQty(int purchaseClaimQty) {
         this.purchaseClaimQty = purchaseClaimQty;
+    }
+
+    public double getUnitSystemCost() {
+        return unitSystemCost;
+    }
+
+    public void setUnitSystemCost(double unitSystemCost) {
+        this.unitSystemCost = unitSystemCost;
     }
 }

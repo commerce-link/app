@@ -2,14 +2,12 @@ package pl.commercelink.invoicing;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 
 @Component
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 public class InvoiceCreationEventListener {
 
     @Autowired

@@ -1,11 +1,11 @@
 pimId;ean;mfn;brand;label;name;category;priceGross;qty;estDeliveryDays;lowest30dPrice;supplier;inWarehouse;inCatalog;pimCategoryId
-local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;ClearEdge Pro X3D;AMD ClearEdge Pro X3D;CPU;2269;20;1;2409;Acme;true;true;989
-local-seed-0002;5900000000002;MFN-VALUE-01;NVIDIA;ValueKing RTX Ultra;NVIDIA ValueKing RTX Ultra;GPU;5519;10;1;5859;Acme,AcmeB;true;true;170
-local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch 32GB DDR5 Kit;G.Skill TwinMatch 32GB DDR5 Kit;Memory;649;50;1;689;Acme;true;true;911
-local-seed-0004;5900000000004;MFN-NECK-01;MSI;NeckAndNeck Z790;MSI NeckAndNeck Z790;Motherboard;1559;15;1;1659;Acme,AcmeB;true;true;164
-local-seed-0005;5900000000005;MFN-PHANT-01;Corsair;PhantomStock 850W Gold;Corsair PhantomStock 850W Gold;PSU;779;22;2;829;Acme;true;true;963
+local-seed-0001;5900000000001;MFN-CLEAR-01;AMD;ClearEdge Pro X3D;AMD ClearEdge Pro X3D;CPU;2269;20;1;2409;Acme;false;true;989
+local-seed-0002;5900000000002;MFN-VALUE-01;NVIDIA;ValueKing RTX Ultra;NVIDIA ValueKing RTX Ultra;GPU;5519;10;1;5859;Acme,AcmeB;false;true;170
+local-seed-0003;5900000000003;MFN-TWIN-01;G.Skill;TwinMatch 32GB DDR5 Kit;G.Skill TwinMatch 32GB DDR5 Kit;Memory;649;50;1;689;Acme;false;true;911
+local-seed-0004;5900000000004;MFN-NECK-01;MSI;NeckAndNeck Z790;MSI NeckAndNeck Z790;Motherboard;1559;15;1;1659;Acme,AcmeB;false;true;164
+local-seed-0005;5900000000005;MFN-PHANT-01;Corsair;PhantomStock 850W Gold;Corsair PhantomStock 850W Gold;PSU;779;22;2;829;Acme;false;true;963
 local-seed-0006;5900000000006;MFN-MIRAGE-01;Samsung;MirageDrive 2TB NVMe;Samsung MirageDrive 2TB NVMe;Storage;919;35;2;979;AcmeB;false;true;1563
-local-seed-0008;5900000000008;MFN-FINAL-01;NZXT;FinalUnit ATX Mid;NZXT FinalUnit ATX Mid;Case;819;30;1;869;AcmeB;true;true;237
+local-seed-0008;5900000000008;MFN-FINAL-01;NZXT;FinalUnit ATX Mid;NZXT FinalUnit ATX Mid;Case;819;30;1;869;AcmeB;false;true;237
 local-seed-0009;5900000000009;MFN-PENNY-01;Arctic;PennyWise 120mm PWM;Arctic PennyWise 120mm PWM;Fan;169;60;1;179;Acme,AcmeB;false;true;1571
 local-seed-0010;5900000000010;MFN-TIDE-01;LG;HighTide 27in 165Hz IPS;LG HighTide 27in 165Hz IPS;Displays;1979;12;1;2099;Acme,AcmeB;false;true;222
 local-seed-0011;5900000000011;MFN-FOREX-01;Logitech;ForeignExchange TKL;Logitech ForeignExchange TKL;Keyboards;709;25;1;759;Acme,AcmeB;true;true;194
@@ -15,7 +15,7 @@ local-seed-0014;5900000000014;B650-TOMAHAWK-WIFI;MSI;MAG B650 Tomahawk;MSI MAG B
 local-seed-0015;5900000000015;ROG-STRIX-Z790-E;ASUS;ROG Strix Z790-E;ASUS ROG Strix Z790-E Gaming WiFi;Motherboard;1899;9;2;1999;Acme;false;true;164
 local-seed-0016;5900000000016;B550M-DS3H;Gigabyte;B550M DS3H;Gigabyte B550M DS3H;Motherboard;399;35;1;419;AcmeB;false;true;164
 local-seed-0017;5900000000017;RM850E;Corsair;RM850e;Corsair RM850e 850W 80+ Gold;PSU;549;28;1;579;Acme,AcmeB;true;true;963
-local-seed-0018;5900000000018;RM650;Corsair;RM650;Corsair RM650 650W 80+ Gold;PSU;419;30;1;449;Acme;true;true;963
+local-seed-0018;5900000000018;RM650;Corsair;RM650;Corsair RM650 650W 80+ Gold;PSU;419;30;1;449;Acme;false;true;963
 local-seed-0019;5900000000019;SF750-PLAT;Corsair;SF750 Platinum;Corsair SF750 750W SFX 80+ Platinum;PSU;899;12;2;949;AcmeB;false;true;963
 local-seed-0020;5900000000020;980PRO-2TB;Samsung;980 Pro 2TB;Samsung 980 Pro 2TB NVMe Gen4;Storage;699;24;1;749;Acme,AcmeB;true;true;1563
 local-seed-0021;5900000000021;SN850X-1TB;WD;WD Black SN850X;WD Black SN850X 1TB NVMe Gen4;Storage;399;40;1;429;Acme;false;true;1563
@@ -33,7 +33,7 @@ local-seed-0032;5900000000032;VG271UP;Acer;Nitro VG271UP;Acer Nitro VG271UP 27 Q
 local-seed-0033;5900000000033;LG27GP850;LG;UltraGear 27GP850;LG UltraGear 27GP850-B 27 QHD 165Hz;Displays;1499;12;2;1599;Acme;false;true;222
 local-seed-0034;5900000000034;ODYSSEY-G5-32;Samsung;Odyssey G5 32 ;Samsung Odyssey G5 32 QHD Curved;Displays;1299;10;2;1399;AcmeB;false;true;222
 local-seed-0035;5900000000035;U2723QE;Dell;UltraSharp U2723QE;Dell UltraSharp U2723QE 27 4K USB-C;Displays;2799;6;3;2899;Acme;false;true;222
-local-seed-0036;5900000000036;G915-TKL;Logitech;G915 TKL;Logitech G915 TKL Wireless Keyboard;Keyboards;899;20;1;949;Acme,AcmeB;true;true;194
+local-seed-0036;5900000000036;G915-TKL;Logitech;G915 TKL;Logitech G915 TKL Wireless Keyboard;Keyboards;899;20;1;949;Acme,AcmeB;false;true;194
 local-seed-0037;5900000000037;K70-RGB-PRO;Corsair;K70 RGB Pro;Corsair K70 RGB Pro Mechanical Keyboard;Keyboards;699;22;1;729;AcmeB;false;true;194
 local-seed-0038;5900000000038;KEYCHRON-K8;Keychron;K8 Wireless;Keychron K8 Wireless Mechanical;Keyboards;449;30;2;469;Acme;false;true;194
 local-seed-0039;5900000000039;G-PRO-X-SUPERLIGHT;Logitech;G Pro X Superlight;Logitech G Pro X Superlight Wireless;Mice;649;25;1;679;Acme,AcmeB;true;true;195
@@ -55,7 +55,7 @@ local-seed-0054;5900000000054;LEGION-5-PRO;Lenovo;Legion 5 Pro;Lenovo Legion 5 P
 local-seed-0055;5900000000055;TUF-A15-FA507;ASUS;TUF Gaming A15;ASUS TUF Gaming A15 RTX 4050;Laptops;4299;10;3;4499;Acme,AcmeB;true;true;151
 local-seed-0056;5900000000056;MACBOOK-AIR-M3;Apple;MacBook Air M3;Apple MacBook Air 13 M3 256GB;Laptops;5499;6;3;5699;AcmeB;false;true;151
 local-seed-0057;5900000000057;THINKPAD-E14-G5;Lenovo;ThinkPad E14 Gen5;Lenovo ThinkPad E14 Gen 5 i5;Laptops;3799;12;3;3999;Acme;false;true;151
-local-seed-0058;5900000000058;PH16-71;Acer;Predator Helios 16;Acer Predator Helios 16 RTX 4070;Laptops;7999;6;3;8299;Acme;true;true;151
+local-seed-0058;5900000000058;PH16-71;Acer;Predator Helios 16;Acer Predator Helios 16 RTX 4070;Laptops;7999;6;3;8299;Acme;false;true;151
 local-seed-0059;5900000000059;OMEN-16-WF;HP;Omen 16;HP Omen 16 RTX 4060;Laptops;5799;8;3;5999;AcmeB;false;true;151
 local-seed-0060;5900000000060;XPS-15-9530;Dell;XPS 15;Dell XPS 15 9530 RTX 4050;Laptops;7499;5;3;7699;Acme;false;true;151
 local-seed-0061;5900000000061;KATANA-15-B13V;MSI;Katana 15;MSI Katana 15 RTX 4060;Laptops;4999;9;3;5199;AcmeB;false;true;151
@@ -66,38 +66,38 @@ local-seed-0065;5900000000065;GV-N406TWF2OC;Gigabyte;RTX 4060 Ti;Gigabyte GeForc
 local-seed-0066;5900000000066;TUF-RTX4080S-16G;ASUS;TUF RTX 4080 Super;ASUS TUF Gaming GeForce RTX 4080 Super 16GB;GPU;5299;6;2;5499;Acme;false;true;170
 local-seed-0067;5900000000067;RX7900XTX-24G;PowerColor;Red Devil RX 7900 XTX;PowerColor Red Devil Radeon RX 7900 XTX 24GB;GPU;4599;5;2;4799;AcmeB;false;true;170
 local-seed-0068;5900000000068;RTX4070TIS-16G;MSI;RTX 4070 Ti Super;MSI GeForce RTX 4070 Ti Super Ventus 16GB;GPU;3899;9;2;3999;Acme;false;true;170
-local-seed-0069;5900000000069;SKC3000D2TB;Kingston;KC3000 2TB;Kingston KC3000 2TB NVMe Gen4;Storage;799;22;1;849;Acme,AcmeB;true;true;1563
+local-seed-0069;5900000000069;SKC3000D2TB;Kingston;KC3000 2TB;Kingston KC3000 2TB NVMe Gen4;Storage;799;22;1;849;Acme,AcmeB;false;true;1563
 local-seed-0070;5900000000070;ST2000DM008;Seagate;Barracuda 2TB;Seagate Barracuda 2TB SATA HDD;Storage;249;40;1;269;Acme;false;true;1563
 local-seed-0071;5900000000071;CT1000P3PSSD8;Crucial;P3 Plus 1TB;Crucial P3 Plus 1TB NVMe Gen4;Storage;299;45;1;319;AcmeB;false;true;1563
 local-seed-0072;5900000000072;MU-PC1T0H;Samsung;T7 1TB;Samsung T7 1TB Portable SSD;Storage;399;30;1;429;Acme;false;true;1563
-local-seed-0073;5900000000073;KF560C36RSK2-32;Kingston;Fury Renegade 32GB;Kingston Fury Renegade 32GB DDR5-6000;Memory;629;24;1;669;Acme,AcmeB;true;true;911
+local-seed-0073;5900000000073;KF560C36RSK2-32;Kingston;Fury Renegade 32GB;Kingston Fury Renegade 32GB DDR5-6000;Memory;629;24;1;669;Acme,AcmeB;false;true;911
 local-seed-0074;5900000000074;CP32G60C36;Crucial;Pro 32GB DDR5;Crucial Pro 32GB DDR5-6000;Memory;549;28;1;579;AcmeB;false;true;911
 local-seed-0075;5900000000075;B650M-PRO-RS;ASRock;B650M Pro RS;ASRock B650M Pro RS;Motherboard;599;26;1;629;Acme;false;true;164
 local-seed-0076;5900000000076;PRO-Z790-A;MSI;PRO Z790-A WiFi;MSI PRO Z790-A WiFi DDR5;Motherboard;1099;14;2;1149;AcmeB;false;true;164
 local-seed-0077;5900000000077;X670-AORUS-ELITE;Gigabyte;X670 Aorus Elite;Gigabyte X670 Aorus Elite AX;Motherboard;1399;9;2;1449;Acme;false;true;164
-local-seed-0078;5900000000078;STRAIGHT-12-850W;be quiet!;Straight Power 12 850W;be quiet! Straight Power 12 850W 80+ Platinum;PSU;799;16;1;829;Acme,AcmeB;true;true;963
+local-seed-0078;5900000000078;STRAIGHT-12-850W;be quiet!;Straight Power 12 850W;be quiet! Straight Power 12 850W 80+ Platinum;PSU;799;16;1;829;Acme,AcmeB;false;true;963
 local-seed-0079;5900000000079;FOCUS-GX-750;Seasonic;Focus GX-750;Seasonic Focus GX-750 80+ Gold;PSU;479;24;1;499;AcmeB;false;true;963
 local-seed-0080;5900000000080;LF-III-360;Arctic;Liquid Freezer III 360;Arctic Liquid Freezer III 360 AIO;Cooler;649;18;2;689;Acme;false;true;921
 local-seed-0081;5900000000081;DARK-ROCK-PRO-5;be quiet!;Dark Rock Pro 5;be quiet! Dark Rock Pro 5;Cooler;499;20;1;519;AcmeB;false;true;921
 local-seed-0082;5900000000082;FD-NORTH-CHARCOAL;Fractal Design;North;Fractal Design North Charcoal;Case;579;16;2;599;Acme;false;true;237
 local-seed-0083;5900000000083;O11-DYNAMIC-EVO;Lian Li;O11 Dynamic Evo;Lian Li O11 Dynamic Evo;Case;749;12;2;779;AcmeB;false;true;237
-local-seed-0084;5900000000084;ARCTIC-P12-5PK;Arctic;P12 PWM 5-pack;Arctic P12 PWM PST 5-pack 120mm;Fan;129;60;1;139;Acme,AcmeB;true;true;1571
+local-seed-0084;5900000000084;ARCTIC-P12-5PK;Arctic;P12 PWM 5-pack;Arctic P12 PWM PST 5-pack 120mm;Fan;129;60;1;139;Acme,AcmeB;false;true;1571
 local-seed-0085;5900000000085;SILENT-WINGS-4;be quiet!;Silent Wings 4;be quiet! Silent Wings 4 120mm PWM;Fan;169;40;1;179;AcmeB;false;true;1571
-local-seed-0086;5900000000086;AOC-24G2U;AOC;24G2;AOC 24G2 24 inch 144Hz IPS;Displays;799;22;2;849;Acme,AcmeB;true;true;222
+local-seed-0086;5900000000086;AOC-24G2U;AOC;24G2;AOC 24G2 24 inch 144Hz IPS;Displays;799;22;2;849;Acme,AcmeB;false;true;222
 local-seed-0087;5900000000087;MAG-274QRF-QD;MSI;MAG 274QRF QD;MSI MAG 274QRF QD 27 inch QHD 170Hz;Displays;1399;14;2;1499;Acme;false;true;222
 local-seed-0088;5900000000088;GB-M27Q-P;Gigabyte;M27Q P;Gigabyte M27Q P 27 inch QHD 170Hz;Displays;1299;16;2;1349;AcmeB;false;true;222
 local-seed-0089;5900000000089;BLACKWIDOW-V4-PRO;Razer;BlackWidow V4 Pro;Razer BlackWidow V4 Pro Mechanical;Keyboards;999;16;1;1049;Acme;false;true;194
 local-seed-0090;5900000000090;APEX-PRO-TKL;SteelSeries;Apex Pro TKL;SteelSeries Apex Pro TKL Gen 3;Keyboards;899;18;2;929;AcmeB;false;true;194
-local-seed-0091;5900000000091;G502-X-PLUS;Logitech;G502 X Plus;Logitech G502 X Plus Wireless;Mice;749;20;1;779;Acme,AcmeB;true;true;195
+local-seed-0091;5900000000091;G502-X-PLUS;Logitech;G502 X Plus;Logitech G502 X Plus Wireless;Mice;749;20;1;779;Acme,AcmeB;false;true;195
 local-seed-0092;5900000000092;GLORIOUS-MODEL-O2;Glorious;Model O 2;Glorious Model O 2 Wireless;Mice;449;28;2;469;Acme;false;true;195
 local-seed-0093;5900000000093;HD-560S;Sennheiser;HD 560S;Sennheiser HD 560S Open-Back;Headphones;699;16;2;729;AcmeB;false;true;1637
 local-seed-0094;5900000000094;DT-900-PRO-X;Beyerdynamic;DT 900 Pro X;Beyerdynamic DT 900 Pro X;Headphones;899;12;2;929;Acme;false;true;1637
 local-seed-0095;5900000000095;RODE-NT-USB-PLUS;Rode;NT-USB+;Rode NT-USB+ USB Microphone;Microphones;899;14;2;929;Acme;false;true;935
 local-seed-0096;5900000000096;ELGATO-FACECAM;Elgato;Facecam;Elgato Facecam 1080p60;Webcams;799;18;2;829;AcmeB;false;true;577
 local-seed-0097;5900000000097;EDIFIER-R1280T;Edifier;R1280T;Edifier R1280T 2.0 Bookshelf Speakers;Speakers;399;24;2;419;Acme;false;true;1081
-local-seed-0098;5900000000098;STEELSERIES-QCK-H;SteelSeries;QcK Heavy;SteelSeries QcK Heavy Large Mousepad;MousePads;129;50;1;139;Acme,AcmeB;true;true;204
+local-seed-0098;5900000000098;STEELSERIES-QCK-H;SteelSeries;QcK Heavy;SteelSeries QcK Heavy Large Mousepad;MousePads;129;50;1;139;Acme,AcmeB;false;true;204
 local-seed-0099;5900000000099;SANDISK-EXTREME-128;SanDisk;Extreme 128GB;SanDisk Extreme microSDXC 128GB;Storage;129;90;1;139;Acme;false;true;1563
-local-seed-0100;5900000000100;LOGI-MX-KEYS-S;Logitech;MX Keys S;Logitech MX Keys S Wireless Keyboard;Keyboards;549;28;1;579;Acme,AcmeB;true;true;194
+local-seed-0100;5900000000100;LOGI-MX-KEYS-S;Logitech;MX Keys S;Logitech MX Keys S Wireless Keyboard;Keyboards;549;28;1;579;Acme,AcmeB;false;true;194
 local-seed-0101;5900000000101;BX8071514400F;Intel;Core i5-14400F;Intel Core i5-14400F;CPU;799;40;1;829;Acme,AcmeB;false;false;989
 local-seed-0102;5900000000102;BX8071513400F;Intel;Core i5-13400F;Intel Core i5-13400F;CPU;759;30;2;789;Acme;false;false;989
 local-seed-0103;5900000000103;100-100000591WOF;AMD;Ryzen 7 7700X;AMD Ryzen 7 7700X;CPU;1349;25;1;1399;AcmeB;false;false;989
@@ -168,3 +168,8 @@ local-seed-9007;5903000000009;BX8071514600KF;Intel;Core i5-14600KF;Intel Core i5
 local-seed-9008;5903000000010;BX8071514900K;Intel;Core i9-14900K;Intel Core i9-14900K;CPU;2599;8;1;2699;AcmeB;false;false;989
 local-seed-9009;5903000000011;NH-D15;Noctua;NH-D15;Noctua NH-D15 CPU Cooler;Cooler;449;40;1;459;Acme,AcmeB;false;false;921
 local-seed-9010;5903000000012;ML360R-RGB;Cooler Master;MasterLiquid 360R;Cooler Master MasterLiquid ML360R RGB;Cooler;559;16;2;599;Acme;false;false;921
+local-seed-sim-01;5900000000901;SIM-OK;Acme;Symulacja: zakup OK;Symulacja: zakup OK;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-02;5900000000902;SIM-UNKNOWN-PLACED;Acme;Symulacja: timeout (zamówienie istnieje);Symulacja: timeout, zamówienie u dostawcy istnieje;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-03;5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502 (zamówienia brak);Symulacja: HTTP 502, zamówienia nie ma;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-04;5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie dostawcy;Symulacja: odrzucenie przez dostawcę;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571
+local-seed-sim-05;5900000000905;SIM-BLANK-ID;Acme;Symulacja: brak numeru zamówienia;Symulacja: odpowiedź bez numeru zamówienia;Akcesoria;20;100;1;20;Acme,AcmeB;false;true;1571

@@ -15,6 +15,7 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
@@ -39,6 +40,7 @@ public class StoreDeletionService {
     private final FileStorage fileStorage;
     private final StoreInventoryCache storeInventoryCache;
     private final CognitoUserService cognitoUserService;
+    private final SupplierProviderFactory supplierProviderFactory;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -70,6 +72,7 @@ public class StoreDeletionService {
         allSucceeded &= step(storeId, "email templates", () -> wipeRepository.deleteAll(wipeRepository.findEmailTemplates(storeId)));
         allSucceeded &= step(storeId, "s3 objects", () -> fileStorage.deleteAll(storesBucket, storeId + "/"));
         allSucceeded &= step(storeId, "inventory cache", () -> storeInventoryCache.evict(storeId));
+        allSucceeded &= step(storeId, "supplier secrets", () -> deleteOwnSupplierSecrets(store));
 
         if (allSucceeded) {
             storesRepository.delete(store);
@@ -78,6 +81,17 @@ public class StoreDeletionService {
             System.err.println("[StoreDeletion] Store " + storeId + " kept for retry after failed steps");
         }
         return allSucceeded;
+    }
+
+    /** OWN supplier connections keep their credentials in per-store secrets that nothing else cleans up. */
+    private void deleteOwnSupplierSecrets(Store store) {
+        FulfilmentConfiguration fulfilment = store.getFulfilmentConfiguration();
+        if (fulfilment == null || fulfilment.getSupplierConnections() == null) {
+            return;
+        }
+        fulfilment.getSupplierConnections().stream()
+                .filter(connection -> connection.getMode() == ConnectionMode.OWN)
+                .forEach(connection -> supplierProviderFactory.deleteConfiguration(store, connection.getSupplierName()));
     }
 
     private void deleteCognitoUser(Store store) {

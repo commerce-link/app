@@ -34,6 +34,8 @@ public class OrderItem extends Item {
 
     @DynamoDBIgnore
     private boolean selected;
+    @DynamoDBIgnore
+    private String warehouseItemId;
 
     // required for DynamoDB
     public OrderItem() {
@@ -63,6 +65,7 @@ public class OrderItem extends Item {
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
         this.position = source.getPosition();
+        this.setCondition(source.getCondition());
 
         this.addFulfilment(
             source.getEan(),
@@ -80,6 +83,16 @@ public class OrderItem extends Item {
             setDeliveryId(GENERIC_WAREHOUSE_ORDER_NO);
             markAsReceived();
         }
+    }
+
+    @DynamoDBIgnore
+    public void requestWarehouseItem(String warehouseItemId) {
+        this.warehouseItemId = warehouseItemId;
+    }
+
+    @DynamoDBIgnore
+    public String getWarehouseItemId() {
+        return warehouseItemId;
     }
 
     @DynamoDBIgnore
@@ -114,6 +127,7 @@ public class OrderItem extends Item {
         this.setManufacturerCode(other.getManufacturerCode());
         this.setCost(other.getCost());
         this.setDeliveryId(other.getDeliveryId());
+        this.setClaimedDeliveryId(other.getClaimedDeliveryId());
 
         this.setConsolidated(other.isConsolidated());
         this.setComment(other.getComment());
@@ -132,6 +146,7 @@ public class OrderItem extends Item {
     public void copyFulfilmentFrom(ReservationConfirmation confirmation) {
         this.setQty(confirmation.qty());
         this.appendComment(confirmation.comment());
+        this.setCondition(confirmation.condition());
         this.addFulfilment(
                 confirmation.ean(),
                 confirmation.mfn(),

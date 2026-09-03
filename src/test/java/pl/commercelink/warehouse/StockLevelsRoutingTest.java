@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,7 +85,7 @@ class StockLevelsRoutingTest {
 
         // when
         List<StockProductLevel> levels =
-                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
 
         // then
         assertThat(levels).extracting(StockProductLevel::getName).containsExactly("Obudowa");
@@ -117,7 +118,7 @@ class StockLevelsRoutingTest {
 
         // when
         List<StockProductLevel> levels =
-                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
 
         // then
         assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Procesory", null);
@@ -145,7 +146,7 @@ class StockLevelsRoutingTest {
 
         // when
         List<StockProductLevel> levels =
-                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
 
         // then
         assertThat(levels).extracting(StockProductLevel::getCategory).containsExactly("Podzespoły");
@@ -154,14 +155,82 @@ class StockLevelsRoutingTest {
     @Test
     void calculateCallsInventoryWithFulfilmentScope() {
         // given
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-1");
+        definition.setName("Procesory");
+
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
-        when(catalog.getCategories()).thenReturn(List.of());
+        when(catalog.getCategories()).thenReturn(List.of(definition));
+        when(productRepository.findAll("cat-1")).thenReturn(List.of());
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
 
         // when
-        stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false);
+        stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
 
         // then
         verify(inventory).withEnabledSuppliersOnly(eq(STORE_ID), eq(SupplierScope.FULFILMENT));
+    }
+
+    @Test
+    void deliverySuggestionsSkipCategoriesWithoutTheFlag() {
+        // given
+        CategoryDefinition includedDefinition = new CategoryDefinition();
+        includedDefinition.setCategoryId("cat-in");
+        includedDefinition.setName("Procesory");
+        includedDefinition.setIncludedInDeliverySuggestions(true);
+        CategoryDefinition excludedDefinition = new CategoryDefinition();
+        excludedDefinition.setCategoryId("cat-out");
+        excludedDefinition.setName("Obudowy");
+
+        Product includedProduct = new Product("cat-in");
+        includedProduct.setName("CPU");
+        includedProduct.setManufacturerCode("MFN-IN");
+        includedProduct.setStockExpectedQty(1);
+        Product excludedProduct = new Product("cat-out");
+        excludedProduct.setName("Obudowa");
+        excludedProduct.setManufacturerCode("MFN-OUT");
+        excludedProduct.setStockExpectedQty(1);
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(includedDefinition, excludedDefinition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-in")).thenReturn(List.of(includedProduct));
+        when(productRepository.findAll("cat-out")).thenReturn(List.of(excludedProduct));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels =
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, true);
+
+        // then
+        assertThat(levels).extracting(StockProductLevel::getName).containsExactly("CPU");
+        verify(productRepository, never()).findAll("cat-out");
+    }
+
+    @Test
+    void warehouseSearchIgnoresTheDeliverySuggestionsFlag() {
+        // given
+        CategoryDefinition excludedDefinition = new CategoryDefinition();
+        excludedDefinition.setCategoryId("cat-out");
+        excludedDefinition.setName("Obudowy");
+
+        Product product = new Product("cat-out");
+        product.setName("Obudowa");
+        product.setManufacturerCode("MFN-OUT");
+        product.setStockExpectedQty(1);
+
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(excludedDefinition));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-out")).thenReturn(List.of(product));
+        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels =
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
+
+        // then
+        assertThat(levels).extracting(StockProductLevel::getName).containsExactly("Obudowa");
     }
 }

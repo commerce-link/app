@@ -186,11 +186,12 @@
                                     <label class="label" th:text="#{offers.fulfilment.type}"></label>
                                     <div class="control">
                                         <div class="select">
-                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder}">
+                                            <select th:field="*{fulfilmentType}" th:disabled="${isCompletedOrder or fulfilmentTypeLocked}">
                                                 <option th:each="fulfilmentType : ${fulfilmentTypes}" th:value="${fulfilmentType}" th:text="${fulfilmentType}"></option>
                                             </select>
                                         </div>
                                     </div>
+                                    <p class="help" th:if="${fulfilmentTypeLocked and !isCompletedOrder}" th:text="#{order.fulfilment.type.locked}"></p>
                                 </div>
                                 <div class="field">
                                     <label class="label" th:text="#{order.affiliate.id}"></label>
@@ -373,6 +374,9 @@
                                   th:text="${enumI18n.localize(item.status)}"
                                   th:id="'status-tag-' + ${iterStat.index}"
                                   th:attr="data-status=${item.status}"></span>
+                            <span class="tag ml-1" th:unless="${item.sealed}"
+                                  th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
+                                  th:text="${enumI18n.localize(item.condition)}"></span>
                         </td>
                         <td>
                             <span th:if="${item.consolidated}" class="icon has-text-success"><i class="fas fa-check"></i></span>
@@ -412,12 +416,12 @@
                                            th:text="#{order.item.assign.warehouse}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.assign.warehouse}"></span>
-                                        <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
+                                        <a th:if="${item.isReleasable() and !item.group and !isSuperAdmin}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId}"
                                            onclick="submitClearSupplier(this); return false;"
                                            th:text="#{order.item.clear.assign}"></a>
-                                        <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
+                                        <span th:unless="${item.isReleasable() and !item.group and !isSuperAdmin}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.clear.assign}"></span>
                                         <a th:if="${item.isNew() and item.group and item.product}" class="dropdown-item"
                                            href="#"
@@ -451,9 +455,9 @@
                     <div class="select is-small">
                         <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument}">
                             <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
-                            <option value="moveSelectedItemsToTheWarehouse" th:text="#{order.items.action.move.warehouse}"></option>
-                            <option value="moveSelectedItemsToTheWarehouseForRMA" th:text="#{order.items.action.move.warehouse.rma}"></option>
-                            <option th:if="${canSplitOrder}" value="splitOrder" th:text="#{order.items.action.split}"></option>
+                            <option value="moveSelectedItemsToTheWarehouse" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse}"></option>
+                            <option value="moveSelectedItemsToTheWarehouseForRMA" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse.rma}"></option>
+                            <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>
@@ -715,7 +719,7 @@
                   onsubmit="return prepareAssignWarehouseSubmit()">
                 <section class="modal-card-body">
                     <input type="hidden" id="assignWarehouseItemId" name="itemId"/>
-                    <input type="hidden" id="assignWarehouseMfn" name="mfn"/>
+                    <input type="hidden" id="assignWarehouseStockItemId" name="warehouseItemId"/>
 
                     <div class="box has-background-white-ter mb-4 py-3">
                         <div class="columns is-vcentered is-mobile">
@@ -753,7 +757,7 @@
 
                     <div class="assign-sku-scroll">
                         <table class="table is-fullwidth is-hoverable assign-sku-table mb-0"
-                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered}">
+                               th:attr="data-status-ordered=#{FulfilmentStatus.Ordered},data-status-delivered=#{FulfilmentStatus.Delivered},data-condition-openbox=#{ItemCondition.OpenBox},data-condition-damaged=#{ItemCondition.Damaged}">
                             <thead>
                             <tr>
                                 <th style="width: 36px;"></th>
@@ -1182,7 +1186,7 @@
                         <div class="dropdown is-hoverable">
                             <div class="dropdown-trigger">
                                 <button class="button is-link is-small" type="button"
-                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !(hasWarehouseDocumentsEnabled and !hasWarehouseDocument))}"
+                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}"
                                         aria-haspopup="true" aria-controls="createDocumentMenu">
                                     <span th:text="#{order.action.create.document}"></span>
                                     <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
@@ -1190,7 +1194,7 @@
                             </div>
                             <div class="dropdown-menu" id="createDocumentMenu" role="menu">
                                 <div class="dropdown-content">
-                                    <form th:if="${hasWarehouseDocumentsEnabled and !hasWarehouseDocument}"
+                                    <form th:if="${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}"
                                           th:action="@{/dashboard/orders/{orderId}/goods-out(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
                                         <button type="submit" class="dropdown-item button is-ghost is-shadowless has-text-left"
                                                 th:disabled="${isCompletedOrder}"
@@ -1943,6 +1947,7 @@
                 const picked = i.itemId === assignWarehouseSelectedId;
                 const delivered = i.status === 'Delivered';
                 const statusLabel = table.getAttribute(delivered ? 'data-status-delivered' : 'data-status-ordered');
+                const conditionTag = renderAssignWarehouseConditionTag(table, i.condition);
                 const row = document.createElement('tr');
                 row.classList.toggle('is-picked', picked);
                 row.innerHTML = `
@@ -1951,7 +1956,7 @@
                     <td class="mono"></td>
                     <td class="mono"></td>
                     <td class="has-text-right">${i.qty}</td>
-                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span></td>`;
+                    <td><span class="tag ${delivered ? 'is-success' : 'is-link'}">${statusLabel}</span>${conditionTag}</td>`;
                 row.children[1].textContent = i.name || '';
                 row.children[2].textContent = i.mfn || '';
                 row.children[3].textContent = i.serialNo || '';
@@ -1965,6 +1970,13 @@
             document.getElementById('assignWarehouseNoResults').style.display = rows.length ? 'none' : 'block';
         }
 
+        function renderAssignWarehouseConditionTag(table, condition) {
+            if (!condition || condition === 'Sealed') return '';
+            const label = table.getAttribute('data-condition-' + condition.toLowerCase()) || condition;
+            const color = condition === 'Damaged' ? 'is-danger' : 'is-warning';
+            return ` <span class="tag ${color}">${label}</span>`;
+        }
+
         function renderAssignWarehouseFooter() {
             const hasSelection = !!assignWarehouseSelectedId;
             document.getElementById('assignWarehouseSubmit').disabled = !hasSelection;
@@ -1973,8 +1985,8 @@
 
         function prepareAssignWarehouseSubmit() {
             const selected = (assignWarehouseData || []).find(i => i.itemId === assignWarehouseSelectedId);
-            if (!selected || !selected.mfn) return false;
-            document.getElementById('assignWarehouseMfn').value = selected.mfn;
+            if (!selected || !selected.itemId) return false;
+            document.getElementById('assignWarehouseStockItemId').value = selected.itemId;
             return true;
         }
 

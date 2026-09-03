@@ -47,9 +47,21 @@ public class DeliveryCreationService {
 
     public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
+        if (delivery.isDropship()) {
+            // dropship goods never reach the warehouse: claim and price exactly the selected order allocations,
+            // whatever quantity a stale or tampered form asked for
+            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
+        }
         delivery.increaseTotalCost(allocationsCost(form));
         orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
-        warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        if (!delivery.isDropship()) {
+            warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        }
+    }
+
+    /** Frees the allocations the operator unchecked on the creation form without creating a delivery. */
+    public void releaseUnselectedAllocations(String storeId, DeliveryCreationForm form) {
+        removeUnselectedAllocations(storeId, form.getItems());
     }
 
     public void releaseAllocations(String storeId, Delivery delivery) {
@@ -66,6 +78,13 @@ public class DeliveryCreationService {
         delivery.setTax(form.getTax());
         delivery.setOrderStatus(null);
 
+        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
+        deliveriesRepository.save(delivery);
+    }
+
+    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
+        delivery.setOrderStatus(null);
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
     }
@@ -120,6 +139,7 @@ public class DeliveryCreationService {
                 form.getTax()
         );
         delivery.setConnectionMode(supplierConnectionModeResolver.resolve(storeId, form.getProvider()));
+        delivery.setType(DeliveryType.WAREHOUSE);
         delivery.addEvent(new Event(EventType.action, "DELIVERY_CREATED", LocalDateTime.now()));
         return delivery;
     }

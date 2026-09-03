@@ -9,6 +9,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -93,13 +94,21 @@ public class MatchedInventory {
     }
 
     public boolean hasOffersFromMultipleSuppliers(int minSuppliersCount, int minQtyPerSupplier) {
-        long count = inventoryItems.stream()
+        return countSuppliersWithMinQty(minQtyPerSupplier, supplier -> true) >= minSuppliersCount;
+    }
+
+    public boolean hasOffersFromMultipleLocalSuppliers(int minSuppliersCount, int minQtyPerSupplier) {
+        return countSuppliersWithMinQty(minQtyPerSupplier, supplier -> supplierRegistry.get(supplier).isLocalFor("PL")) >= minSuppliersCount;
+    }
+
+    private long countSuppliersWithMinQty(int minQtyPerSupplier, Predicate<String> supplierFilter) {
+        return inventoryItems.stream()
+                .filter(i -> supplierFilter.test(i.supplier()))
                 .collect(Collectors.groupingBy(InventoryItem::supplier, Collectors.summingLong(InventoryItem::qty)))
                 .values()
                 .stream()
                 .filter(totalQty -> totalQty >= minQtyPerSupplier)
                 .count();
-        return count >= minSuppliersCount;
     }
 
     public Price getLowestPrice() {
@@ -206,6 +215,10 @@ public class MatchedInventory {
         return inventoryItems.stream().mapToLong(InventoryItem::qty).sum();
     }
 
+    public long getTotalAvailableQtyFromSupplier(String supplierName) {
+        return getInventoryItemsFromSupplier(supplierName).stream().mapToLong(InventoryItem::qty).sum();
+    }
+
     public long getTotalAvailableQty(SupplierType supplierType) {
         return inventoryItems.stream()
                 .filter(i -> supplierRegistry.get(i.supplier()).type() == supplierType)
@@ -213,11 +226,12 @@ public class MatchedInventory {
                 .sum();
     }
 
-    public long getTotalAvailableQty(long grossPrice) {
-        return inventoryItems.stream()
+    public MatchedInventory atPricePoint(long grossPrice) {
+        MatchedInventory filtered = new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        inventoryItems.stream()
                 .filter(i -> Price.fromNet(i.netPrice()).grossValue() <= grossPrice)
-                .mapToLong(InventoryItem::qty)
-                .sum();
+                .forEach(filtered.inventoryItems::add);
+        return filtered;
     }
 
     public long getNoOfSuppliersWithProduct(SupplierType supplierType) {

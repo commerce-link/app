@@ -14,6 +14,7 @@ public class WarehouseItemView {
     private final Price price;
     private final int qty;
     private final FulfilmentStatus status;
+    private final ItemCondition condition;
 
     public WarehouseItemView(
             String storeId,
@@ -22,7 +23,8 @@ public class WarehouseItemView {
             String mfn,
             Price price,
             int qty,
-            FulfilmentStatus status
+            FulfilmentStatus status,
+            ItemCondition condition
     ) {
         this.storeId = storeId;
         this.itemId = itemId;
@@ -31,6 +33,7 @@ public class WarehouseItemView {
         this.price = price;
         this.qty = qty;
         this.status = status;
+        this.condition = condition;
     }
 
     public String getStoreId() {
@@ -41,12 +44,28 @@ public class WarehouseItemView {
         return itemId;
     }
 
+    public String getEan() {
+        return ean;
+    }
+
     public String getMfn() {
         return mfn;
     }
 
+    public Price getPrice() {
+        return price;
+    }
+
     public int getQty() {
         return qty;
+    }
+
+    public ItemCondition getCondition() {
+        return condition;
+    }
+
+    public boolean isSealed() {
+        return condition == ItemCondition.Sealed;
     }
 
     public boolean isInStock() {

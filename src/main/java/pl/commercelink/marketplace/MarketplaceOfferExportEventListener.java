@@ -8,8 +8,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -120,27 +118,10 @@ public class MarketplaceOfferExportEventListener {
             }
 
             AvailabilityAndPrice availabilityAndPrice = priceInPricelist.get();
-            MatchedInventory matchedInventory = inventory.findByProduct(product);
+            MatchedInventory matchedInventory =
+                    inventory.findByProduct(product).atPricePoint(availabilityAndPrice.getPrice());
 
-            long qtyToPublish;
-            if (marketplaceDefinition.getMinWarehouseQty() > 0) {
-                int totalQty = matchedInventory
-                        .getInventoryItemsFromSupplier(SupplierRegistry.WAREHOUSE)
-                        .stream()
-                        .map(InventoryItem::qty)
-                        .mapToInt(Integer::intValue)
-                        .sum();
-                qtyToPublish = totalQty >= marketplaceDefinition.getMinWarehouseQty() ? totalQty : 0L;
-            } else {
-                boolean hasRequiredTotalQty = matchedInventory.hasTotalMinQty(marketplaceDefinition.getMinTotalQty());
-                boolean hasRequiredNumOfDistributorsWithMinQty = matchedInventory.hasOffersFromMultipleSuppliers(
-                        marketplaceDefinition.getMinNumOfDistributors(),
-                        marketplaceDefinition.getMinQtyPerDistributor()
-                );
-                qtyToPublish = (hasRequiredTotalQty && hasRequiredNumOfDistributorsWithMinQty)
-                        ? matchedInventory.getTotalAvailableQty()
-                        : 0L;
-            }
+            long qtyToPublish = marketplaceDefinition.qtyToPublish(matchedInventory);
 
             result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
