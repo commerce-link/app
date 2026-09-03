@@ -33,12 +33,16 @@ class OrderFilterHandlersTest {
 
     private static final String STORE_ID = "store-1";
     private static final List<OrderFilterCondition> COURIER =
-            List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "Courier").orElseThrow());
+            List.of(condition(OrderFilterField.ShipmentType, "Courier"));
     private static final List<OrderFilterCondition> PICKUP_POINT =
-            List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint").orElseThrow());
+            List.of(condition(OrderFilterField.ShipmentType, "PickupPoint"));
 
     @Mock
     private OrderFiltersRepository repository;
+
+    private static OrderFilterCondition condition(OrderFilterField field, String rawValue) {
+        return new OrderFilterCondition(field, field.normalize(rawValue));
+    }
 
     private static FilterActor user(String userId) {
         return new FilterActor(STORE_ID, userId, false);

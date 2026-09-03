@@ -28,8 +28,11 @@ public class OrderFilterForm {
         return conditions;
     }
 
-    private static void add(List<OrderFilterCondition> conditions, OrderFilterField field, String value) {
-        OrderFilterCondition.of(field, value).ifPresent(conditions::add);
+    private static void add(List<OrderFilterCondition> conditions, OrderFilterField field, String rawValue) {
+        String value = field.normalize(rawValue);
+        if (!value.isEmpty()) {
+            conditions.add(new OrderFilterCondition(field, value));
+        }
     }
 
     public String getLabel() {

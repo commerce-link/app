@@ -1,51 +1,41 @@
 package pl.commercelink.orders.filters;
 
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
+
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
-import java.util.TreeSet;
+import java.util.Objects;
 
 public final class OrderFilterConditions {
 
-    private final List<String> entries;
+    private static final Comparator<OrderFilterCondition> BY_FIELD_THEN_VALUE =
+            Comparator.comparing((OrderFilterCondition condition) -> condition.field().name())
+                    .thenComparing(OrderFilterCondition::value);
 
-    private OrderFilterConditions(List<String> entries) {
-        this.entries = List.copyOf(entries);
+    private final List<OrderFilterCondition> conditions;
+
+    private OrderFilterConditions(List<OrderFilterCondition> conditions) {
+        this.conditions = List.copyOf(conditions);
     }
 
     public static OrderFilterConditions of(List<OrderFilterCondition> conditions) {
-        if (conditions == null || conditions.isEmpty()) {
+        List<OrderFilterCondition> unique = conditions == null ? List.of() : new LinkedHashSet<>(conditions).stream()
+                .filter(Objects::nonNull)
+                .sorted(BY_FIELD_THEN_VALUE)
+                .toList();
+
+        if (unique.isEmpty()) {
             throw new OrderFilterInvalidException("A filter needs at least one condition");
         }
-
-        TreeSet<String> canonical = new TreeSet<>();
-        conditions.stream()
-                .filter(java.util.Objects::nonNull)
-                .map(OrderFilterCondition::canonical)
-                .forEach(canonical::add);
-
-        if (canonical.isEmpty()) {
-            throw new OrderFilterInvalidException("A filter needs at least one condition");
-        }
-        return new OrderFilterConditions(List.copyOf(canonical));
-    }
-
-    public static OrderFilterConditions stored(List<String> storedEntries) {
-        return new OrderFilterConditions(storedEntries == null ? List.of() : storedEntries);
-    }
-
-    public List<String> entries() {
-        return entries;
+        return new OrderFilterConditions(unique);
     }
 
     public List<OrderFilterCondition> conditions() {
-        return entries.stream()
-                .map(OrderFilterCondition::stored)
-                .flatMap(Optional::stream)
-                .toList();
+        return conditions;
     }
 
-    public boolean isReadable() {
-        return !entries.isEmpty() && conditions().size() == entries.size();
+    public boolean matchedBy(java.util.function.Predicate<OrderFilterCondition> predicate) {
+        return conditions.stream().allMatch(predicate);
     }
 }

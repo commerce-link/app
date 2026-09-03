@@ -29,19 +29,14 @@ public class OrderFilter {
         OrderFilter filter = new OrderFilter();
         filter.id = UUID.randomUUID().toString();
         filter.label = validLabel(label);
-        filter.conditions = new LinkedList<>(conditions.entries());
+        filter.conditions = new LinkedList<>(OrderFilterConditionSerializer.toStoredEntries(conditions));
         return filter;
     }
 
     @DynamoDBIgnore
     public void changeTo(String label, OrderFilterConditions conditions) {
         this.label = validLabel(label);
-        this.conditions = new LinkedList<>(conditions.entries());
-    }
-
-    @DynamoDBIgnore
-    public OrderFilterConditions conditions() {
-        return OrderFilterConditions.stored(conditions);
+        this.conditions = new LinkedList<>(OrderFilterConditionSerializer.toStoredEntries(conditions));
     }
 
     private static String validLabel(String label) {

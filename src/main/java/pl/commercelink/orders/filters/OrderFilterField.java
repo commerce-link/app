@@ -52,7 +52,7 @@ public enum OrderFilterField {
 
     ShippingPostalCode {
         @Override
-        String normalize(String value) {
+        public String normalize(String value) {
             return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
         }
 
@@ -72,7 +72,7 @@ public enum OrderFilterField {
         }
     };
 
-    String normalize(String value) {
+    public String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase();
     }
 

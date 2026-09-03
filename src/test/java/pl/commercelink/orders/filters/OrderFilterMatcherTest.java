@@ -28,6 +28,10 @@ class OrderFilterMatcherTest {
     private final OrderFilterMatcher matcher =
             new OrderFilterMatcher(Clock.fixed(TODAY.atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()));
 
+    private static OrderFilterCondition condition(OrderFilterField field, String rawValue) {
+        return new OrderFilterCondition(field, field.normalize(rawValue));
+    }
+
     private static Order order() {
         Order order = new Order("store-1");
         order.setShippingDetails(new ShippingDetails());
@@ -38,7 +42,7 @@ class OrderFilterMatcherTest {
         List<OrderFilterCondition> parsed = List.of(conditions).stream()
                 .map(entry -> {
                     String[] parts = entry.split("=", 2);
-                    return OrderFilterCondition.of(OrderFilterField.parse(parts[0]).orElseThrow(), parts[1]).orElseThrow();
+                    return condition(OrderFilterField.parse(parts[0]).orElseThrow(), parts[1]);
                 })
                 .toList();
         return OrderFilter.of("test", OrderFilterConditions.of(parsed));

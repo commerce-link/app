@@ -1,6 +1,7 @@
 package pl.commercelink.orders.filters;
 
 import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.model.OrderFilterConditionSerializer;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
@@ -26,12 +27,10 @@ public class OrderFilterMatcher {
         if (filter == null) {
             return true;
         }
-        OrderFilterConditions conditions = filter.conditions();
-        if (!conditions.isReadable()) {
-            return false;
-        }
         LocalDate today = LocalDate.now(clock);
-        return conditions.conditions().stream().allMatch(condition -> condition.matches(order, today));
+        return OrderFilterConditionSerializer.fromStoredEntries(filter.getConditions())
+                .map(conditions -> conditions.matchedBy(condition -> condition.matches(order, today)))
+                .orElse(false);
     }
 
     public List<Order> apply(List<Order> orders, OrderFilter filter) {

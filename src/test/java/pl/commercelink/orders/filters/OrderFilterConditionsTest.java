@@ -4,6 +4,8 @@ import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import pl.commercelink.orders.filters.model.OrderFilterConditionSerializer;
+
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,8 +13,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderFilterConditionsTest {
 
-    private static OrderFilterCondition condition(OrderFilterField field, String value) {
-        return OrderFilterCondition.of(field, value).orElseThrow();
+    private static OrderFilterCondition condition(OrderFilterField field, String rawValue) {
+        return new OrderFilterCondition(field, field.normalize(rawValue));
     }
 
     @Test
@@ -25,7 +27,7 @@ class OrderFilterConditionsTest {
                 condition(OrderFilterField.ShippingDue, "DueToday"),
                 condition(OrderFilterField.ShipmentType, "Courier")));
 
-        assertThat(first.entries()).isEqualTo(second.entries());
+        assertThat(first.conditions()).isEqualTo(second.conditions());
     }
 
     @Test
@@ -34,7 +36,7 @@ class OrderFilterConditionsTest {
         OrderFilterConditions upper = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, "COURIER")));
         OrderFilterConditions lower = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShipmentType, " courier ")));
 
-        assertThat(upper.entries()).isEqualTo(lower.entries());
+        assertThat(upper.conditions()).isEqualTo(lower.conditions());
     }
 
     @Test
@@ -43,7 +45,7 @@ class OrderFilterConditionsTest {
         OrderFilterConditions dashed = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShippingPostalCode, "00-9")));
         OrderFilterConditions plain = OrderFilterConditions.of(List.of(condition(OrderFilterField.ShippingPostalCode, "009")));
 
-        assertThat(dashed.entries()).isEqualTo(plain.entries());
+        assertThat(dashed.conditions()).isEqualTo(plain.conditions());
     }
 
     @Test
@@ -53,14 +55,14 @@ class OrderFilterConditionsTest {
                 condition(OrderFilterField.ShipmentType, "Courier"),
                 condition(OrderFilterField.ShipmentType, "Courier")));
 
-        assertThat(conditions.entries()).containsExactly("ShipmentType=COURIER");
+        assertThat(conditions.conditions()).containsExactly(condition(OrderFilterField.ShipmentType, "Courier"));
     }
 
     @Test
     @DisplayName("a blank value does not become a condition")
     void blankValueIsNotACondition() {
-        assertThat(OrderFilterCondition.of(OrderFilterField.SourceName, "   ")).isEmpty();
-        assertThat(OrderFilterCondition.of(OrderFilterField.SourceName, null)).isEmpty();
+        assertThat(OrderFilterField.SourceName.normalize("   ")).isEmpty();
+        assertThat(OrderFilterField.SourceName.normalize(null)).isEmpty();
     }
 
     @Test
@@ -73,11 +75,25 @@ class OrderFilterConditionsTest {
     }
 
     @Test
-    @DisplayName("stored conditions referring to an unknown field are not readable")
-    void storedConditionsWithAnUnknownFieldAreNotReadable() {
-        assertThat(OrderFilterConditions.stored(List.of("ShipmentType=COURIER")).isReadable()).isTrue();
-        assertThat(OrderFilterConditions.stored(List.of("RemovedField=WHATEVER")).isReadable()).isFalse();
-        assertThat(OrderFilterConditions.stored(List.of("ShipmentType=COURIER", "RemovedField=X")).isReadable()).isFalse();
-        assertThat(OrderFilterConditions.stored(List.of()).isReadable()).isFalse();
+    @DisplayName("stored entries referring to an unknown field cannot be read back")
+    void storedEntriesWithAnUnknownFieldCannotBeReadBack() {
+        assertThat(OrderFilterConditionSerializer.fromStoredEntries(List.of("ShipmentType=COURIER"))).isPresent();
+        assertThat(OrderFilterConditionSerializer.fromStoredEntries(List.of("RemovedField=WHATEVER"))).isEmpty();
+        assertThat(OrderFilterConditionSerializer.fromStoredEntries(List.of("ShipmentType=COURIER", "RemovedField=X"))).isEmpty();
+        assertThat(OrderFilterConditionSerializer.fromStoredEntries(List.of())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("what is written can be read back unchanged")
+    void whatIsWrittenCanBeReadBack() {
+        OrderFilterConditions original = OrderFilterConditions.of(List.of(
+                condition(OrderFilterField.ShipmentType, "Courier"),
+                condition(OrderFilterField.ShippingDue, "DueToday")));
+
+        List<String> stored = OrderFilterConditionSerializer.toStoredEntries(original);
+
+        assertThat(stored).containsExactly("ShipmentType=COURIER", "ShippingDue=DUETODAY");
+        assertThat(OrderFilterConditionSerializer.fromStoredEntries(stored))
+                .hasValueSatisfying(read -> assertThat(read.conditions()).isEqualTo(original.conditions()));
     }
 }
