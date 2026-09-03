@@ -32,6 +32,7 @@ import pl.commercelink.orders.filters.handlers.CreateOrderFilterHandler;
 import pl.commercelink.orders.filters.handlers.DeleteOrderFilterHandler;
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.handlers.ListOrderFiltersHandler;
+import pl.commercelink.orders.filters.Marketplace;
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.handlers.UpdateOrderFilterHandler;
 import pl.commercelink.orders.filters.VisibleOrderFilters;
@@ -162,8 +163,7 @@ public class OrdersController extends BaseController {
         List<Order> openOrders = listOpenOrders.handle(getStoreId(), selectedFilter);
 
         boolean statusChosenExplicitly = statuses != null && !statuses.isEmpty();
-        boolean showEveryStatus = showAll || (selectedFilter != null && !statusChosenExplicitly);
-        OrderStatusSelection statusSelection = OrderStatusSelection.resolve(openOrders, statuses, showEveryStatus);
+        OrderStatusSelection statusSelection = OrderStatusSelection.resolve(openOrders, statuses, showAll);
         List<Order> filteredOrders = statusSelection.narrow(openOrders);
 
         Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
@@ -176,6 +176,8 @@ public class OrdersController extends BaseController {
                 .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
                 .toList());
         model.addAttribute("selectedStatuses", statusSelection.selected());
+        model.addAttribute("allStatusesShown", showAll);
+        model.addAttribute("requestedStatuses", statusChosenExplicitly ? statuses : List.<String>of());
         model.addAttribute("savedFilters", Stream.concat(
                         savedFilters.sharedWithStore().stream().map(f -> SavedOrderFilterView.of(f, true)),
                         savedFilters.own().stream().map(f -> SavedOrderFilterView.of(f, false)))
@@ -185,6 +187,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("shippingDueOptions", ShippingDue.values());
+        model.addAttribute("marketplaces", Marketplace.values());
         return "orders";
     }
 
@@ -201,7 +204,8 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
                                     RedirectAttributes redirectAttributes) {
-        OrderFilter updated = updateOrderFilter.handle(actor(), filterId, form.getLabel(), form.toConditions());
+        OrderFilter updated = updateOrderFilter.handle(
+                actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
         redirectAttributes.addAttribute("filterId", updated.getId());
         return "redirect:/dashboard/orders";
     }

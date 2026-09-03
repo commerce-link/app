@@ -22,15 +22,24 @@ public class UpdateOrderFilterHandler {
         this.ownerAccess = ownerAccess;
     }
 
-    public OrderFilter handle(FilterActor actor, String filterId, String label,
+    public OrderFilter handle(FilterActor actor, String filterId, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
-        OwnedOrderFilters owned = ownerAccess.openContaining(actor, filterId);
-        OrderFilter filter = owned.byId(filterId)
+        OwnedOrderFilters current = ownerAccess.openContaining(actor, filterId);
+        OrderFilter filter = current.byId(filterId)
                 .orElseThrow(() -> new OrderFilterInvalidException("The filter no longer exists"));
 
         filter.changeTo(label, OrderFilterConditions.of(conditions));
 
-        orderFiltersRepository.save(owned);
+        if (sharedWithStore == current.isWholeStore()) {
+            orderFiltersRepository.save(current);
+            return filter;
+        }
+
+        OwnedOrderFilters target = ownerAccess.open(actor, sharedWithStore);
+        current.remove(filterId);
+        target.add(filter);
+        orderFiltersRepository.save(target);
+        orderFiltersRepository.save(current);
         return filter;
     }
 }

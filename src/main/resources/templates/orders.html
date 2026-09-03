@@ -63,7 +63,7 @@
         <div class="field is-grouped is-grouped-multiline">
             <div class="control">
                 <a class="button is-small"
-                   th:classappend="${selectedFilterKey == null} ? 'is-link' : 'is-link is-light'"
+                   th:classappend="${selectedFilterId == null} ? 'is-link' : 'is-link is-light'"
                    href="/dashboard/orders">All open orders</a>
             </div>
             <div class="control" th:each="saved : ${savedFilters}">
@@ -71,17 +71,22 @@
                     <p class="control">
                         <a class="button is-small"
                            th:classappend="${saved.id == selectedFilterId} ? 'is-link' : 'is-link is-light'"
-                           th:href="@{/dashboard/orders(filterId=${saved.id})}">
+                           th:href="${saved.id == selectedFilterId}
+                                        ? @{/dashboard/orders(showAll=${allStatusesShown}, statuses=${requestedStatuses})}
+                                        : @{/dashboard/orders(filterId=${saved.id}, showAll=${allStatusesShown}, statuses=${requestedStatuses})}"
+                           th:title="${saved.id == selectedFilterId} ? 'Turn this filter off' : 'Turn this filter on'">
                             <span class="icon is-small" th:if="${saved.sharedWithStore}"><i class="fas fa-users"></i></span>
                             <span class="icon is-small" th:unless="${saved.sharedWithStore}"><i class="fas fa-user"></i></span>
                             <span th:text="${saved.label}"></span>
+                            <span class="icon is-small" th:if="${saved.id == selectedFilterId}"><i class="fas fa-times"></i></span>
                         </a>
                     </p>
                     <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
                         <button type="button" class="button is-small edit-filter"
                                 th:data-filter-id="${saved.id}"
                                 th:data-label="${saved.label}"
-                                th:data-conditions="${saved.conditionsByField}">
+                                th:data-conditions="${saved.conditionsByField}"
+                                th:data-shared="${saved.sharedWithStore}">
                             <span class="icon is-small"><i class="fas fa-pen"></i></span>
                         </button>
                     </p>
@@ -148,8 +153,13 @@
                 </div>
                 <div class="column is-one-third">
                     <label class="label is-small">Marketplace</label>
-                    <div class="control">
-                        <input class="input is-small" type="text" name="sourceName" placeholder="Allegro"/>
+                    <div class="select is-small is-fullwidth">
+                        <select name="sourceName">
+                            <option value="">&mdash;</option>
+                            <option th:each="marketplace : ${marketplaces}"
+                                    th:value="${marketplace.sourceName}"
+                                    th:text="${marketplace.name()}"></option>
+                        </select>
                     </div>
                 </div>
                 <div class="column is-one-third">
@@ -209,7 +219,7 @@
     <script th:inline="javascript">
         // Initialize from server-side selected values (includes defaults)
         const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
-        const selectedFilterKey = /*[[${selectedFilterId}]]*/ null;
+        const selectedFilterId = /*[[${selectedFilterId}]]*/ null;
 
         function navigateWithFilters() {
             const params = new URLSearchParams();
@@ -237,7 +247,12 @@
 
         // Clear filters button
         document.getElementById('clearFilters').addEventListener('click', function() {
-            window.location.href = '/dashboard/orders?showAll=true';
+            const params = new URLSearchParams();
+            params.append('showAll', 'true');
+            if (selectedFilterId) {
+                params.append('filterId', selectedFilterId);
+            }
+            window.location.href = '/dashboard/orders?' + params.toString();
         });
 
         const filterForm = document.getElementById('filterForm');
@@ -264,6 +279,11 @@
                 filterIdField.value = this.getAttribute('data-filter-id');
                 filterForm.elements['label'].value = this.getAttribute('data-label');
 
+                const shared = filterForm.elements['sharedWithStore'];
+                if (shared) {
+                    shared.checked = this.getAttribute('data-shared') === 'true';
+                }
+
                 const conditions = this.getAttribute('data-conditions') || '';
                 conditions.replace(/[{}]/g, '').split(',').forEach(pair => {
                     const [field, value] = pair.split('=').map(part => part && part.trim());
@@ -271,7 +291,14 @@
                         return;
                     }
                     const input = filterForm.elements[field.charAt(0).toLowerCase() + field.slice(1)];
-                    if (input) {
+                    if (!input) {
+                        return;
+                    }
+                    if (input.tagName === 'SELECT') {
+                        const match = Array.from(input.options)
+                                .find(option => option.value.toUpperCase() === value.toUpperCase());
+                        input.value = match ? match.value : '';
+                    } else {
                         input.value = value;
                     }
                 });
