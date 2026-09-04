@@ -382,6 +382,22 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
+    void whenReturnsAreDisabledResendPublishesNothing() {
+        // given
+        ReflectionTestUtils.setField(decisions, "returnsEnabled", false);
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-1",
+                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}",
+                LocalDateTime.now()));
+
+        // when
+        boolean resent = decisions.resendDecisions(marketplaceRma);
+
+        // then
+        assertFalse(resent);
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
     void coversWholeOrderWhenRmaQuantitiesMatchOpenOrderItems() {
         // given
         List<OrderItem> orderItems = List.of(

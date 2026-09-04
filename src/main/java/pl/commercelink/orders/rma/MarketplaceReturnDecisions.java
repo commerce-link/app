@@ -194,6 +194,11 @@ public class MarketplaceReturnDecisions {
         if (!rma.isMarketplaceReturn() || rma.getMarketplaceDecisions().isEmpty()) {
             return false;
         }
+        if (!returnsEnabled) {
+            LOGGER.error("marketplace.returns.enabled=false: not resending {} marketplace decision(s) for RMA {}",
+                    rma.getMarketplaceDecisions().size(), rma.getRmaId());
+            return false;
+        }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
             LOGGER.warn("Cannot resend the marketplace decisions for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
