@@ -29,7 +29,7 @@
                     <tr th:each="run : ${exportRuns}">
                         <td>
                             <a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
-                               th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a>
+                               th:text="${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a>
                         </td>
                         <td th:text="${run.marketplace()}"></td>
                         <td th:text="${run.catalogId()}"></td>

@@ -188,7 +188,7 @@ class MarketplaceExportHistoryTemplateTest {
                     <tbody>
                     <tr th:each="run : ${exportRuns}">
                       <td><a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
-                             th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a></td>
+                             th:text="${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a></td>
                       <td>
                         <span th:unless="${run.failed()}" th:text="#{store.marketplaces.exports.status.succeeded}"></span>
                         <span th:if="${run.failed()}" th:text="#{store.marketplaces.exports.status.failed}"></span>
