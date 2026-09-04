@@ -54,6 +54,10 @@ public class MarketplaceOrdersImportEventListener {
             return;
         }
         boolean returnsScope = SCOPE_RETURNS.equals(scope);
+        if (returnsScope && !returnsEnabled) {
+            LOGGER.warn("marketplace.returns.enabled=false: skipping returns import");
+            return;
+        }
         storesRepository.findAll()
                 .stream()
                 .filter(s -> s.hasActiveMarketplaceIntegration(payload.getMarketplace()))
@@ -84,10 +88,6 @@ public class MarketplaceOrdersImportEventListener {
 
     // marketplaces without a returns API are skipped silently: MarketplaceProvider.returns() is empty for them
     private void handleReturnsImport(Store store, String marketplace) {
-        if (!returnsEnabled) {
-            LOGGER.warn("marketplace.returns.enabled=false: skipping returns import for store {}", store.getStoreId());
-            return;
-        }
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
         if (provider == null) {
             return;

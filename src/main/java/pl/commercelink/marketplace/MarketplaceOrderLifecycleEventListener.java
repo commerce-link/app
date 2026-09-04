@@ -137,8 +137,8 @@ public class MarketplaceOrderLifecycleEventListener {
         }
         Optional<MarketplaceReturns> returns = provider.returns();
         if (returns.isEmpty()) {
-            LOGGER.error("Marketplace {} exposes no returns API, but RMA decision {} for order {} requires one - decision dropped; check the deployed adapter version",
-                    payload.getMarketplace(), payload.getReturnAction().getCommandId(), payload.getExternalOrderId());
+            LOGGER.error("Marketplace {} exposes no returns API, but {} decision for RMA {} (order {}) requires one - decision dropped; check the deployed adapter version",
+                    payload.getMarketplace(), payload.getType(), payload.getReturnAction().getRmaId(), payload.getExternalOrderId());
             return;
         }
         action.accept(returns.get());
