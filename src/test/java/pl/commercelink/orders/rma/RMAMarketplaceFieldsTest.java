@@ -62,6 +62,24 @@ class RMAMarketplaceFieldsTest {
     }
 
     @Test
+    void marketplaceDecisionsRoundTripThroughTheTableModel() {
+        // given
+        RMA rma = new RMA("store-1");
+        rma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-1", "{\"commandId\":\"cmd-1\"}",
+                LocalDateTime.of(2026, 9, 4, 12, 0)));
+
+        // when
+        Map<String, AttributeValue> attributes = tableModel().convert(rma);
+        RMA back = tableModel().unconvert(attributes);
+
+        // then
+        assertEquals(1, attributes.get("marketplaceDecisions").getL().size());
+        assertEquals("cmd-1", back.getMarketplaceDecisions().get(0).getCommandId());
+        assertEquals("ReturnAccepted", back.getMarketplaceDecisions().get(0).getType());
+        assertNull(attributes.get("marketplaceActionPayload"));
+    }
+
+    @Test
     void actionEventsAreLookedUpByName() {
         // given
         RMA rma = new RMA("store-1");

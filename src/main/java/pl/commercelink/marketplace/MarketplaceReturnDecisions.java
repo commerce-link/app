@@ -15,11 +15,13 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -170,37 +172,39 @@ public class MarketplaceReturnDecisions {
 
     private void rememberAction(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
         try {
-            // Serialise into a local first: if it fails, neither field is touched, so a resend never pairs
-            // a NEW action type with the PREVIOUS decision's payload.
             String payload = ACTION_MAPPER.writeValueAsString(action);
-            rma.setMarketplaceActionType(type.name());
-            rma.setMarketplaceActionPayload(payload);
+            rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.getCommandId(), payload, LocalDateTime.now()));
         } catch (JsonProcessingException e) {
-            // Never fail the operator's action because the resend hint could not be stored.
-            LOGGER.warn("Could not store the marketplace action for RMA {}", rma.getRmaId(), e);
+            // Never fail the operator's action because the resend record could not be stored.
+            LOGGER.error("Could not store the marketplace decision for RMA {}", rma.getRmaId(), e);
         }
     }
 
-    /** Republishes the last decision with its original commandId; Allegro deduplicates on it. */
-    public boolean resendLastDecision(RMA rma) {
-        if (!rma.isMarketplaceReturn() || rma.getMarketplaceActionPayload() == null) {
+    /**
+     * Republishes every recorded decision with its original commandId. Allegro deduplicates refunds on
+     * commandId and the rejection path gates on live state, so replaying rounds that already succeeded is
+     * harmless - while a round that died in the DLQ is the one this exists for.
+     */
+    public boolean resendDecisions(RMA rma) {
+        if (!rma.isMarketplaceReturn() || rma.getMarketplaceDecisions().isEmpty()) {
             return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
-            LOGGER.warn("Cannot resend the marketplace decision for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            LOGGER.warn("Cannot resend the marketplace decisions for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
-        try {
-            MarketplaceReturnAction action =
-                    ACTION_MAPPER.readValue(rma.getMarketplaceActionPayload(), MarketplaceReturnAction.class);
-            publisher.publishReturnAction(order, rma,
-                    OrderLifecycleEventType.valueOf(rma.getMarketplaceActionType()), action);
-            return true;
-        } catch (JsonProcessingException | IllegalArgumentException e) {
-            LOGGER.warn("Could not resend the marketplace decision for RMA {}", rma.getRmaId(), e);
-            return false;
+        int published = 0;
+        for (MarketplaceDecision decision : rma.getMarketplaceDecisions()) {
+            try {
+                MarketplaceReturnAction action = ACTION_MAPPER.readValue(decision.getPayload(), MarketplaceReturnAction.class);
+                publisher.publishReturnAction(order, rma, OrderLifecycleEventType.valueOf(decision.getType()), action);
+                published++;
+            } catch (JsonProcessingException | IllegalArgumentException | NullPointerException e) {
+                LOGGER.error("Could not resend marketplace decision {} for RMA {}", decision.getCommandId(), rma.getRmaId(), e);
+            }
         }
+        return published > 0;
     }
 
     /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */

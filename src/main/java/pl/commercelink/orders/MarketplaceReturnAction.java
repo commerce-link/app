@@ -1,9 +1,12 @@
 package pl.commercelink.orders;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /** Return-specific part of an {@link OrderLifecycleEvent}; null for plain order events. */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MarketplaceReturnAction {
 
     private String rmaId;
@@ -44,6 +47,7 @@ public class MarketplaceReturnAction {
     public String getExternalReturnReference() { return externalReturnReference; }
     public void setExternalReturnReference(String externalReturnReference) { this.externalReturnReference = externalReturnReference; }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Item {
         private String manufacturerCode;
         private int quantity;

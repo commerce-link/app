@@ -41,6 +41,19 @@ class OrderLifecycleEventWireFormatTest {
     }
 
     @Test
+    void storedReturnActionPayloadsSurviveUnknownFieldsFromNewerReleases() throws Exception {
+        // given
+        String payload = "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"K\",\"quantity\":1,\"futureItemField\":true}],\"refundDelivery\":false,\"commandId\":\"c\",\"futureField\":1}";
+
+        // when
+        MarketplaceReturnAction action = new ObjectMapper().readValue(payload, MarketplaceReturnAction.class);
+
+        // then
+        assertEquals("c", action.getCommandId());
+        assertEquals("K", action.getItems().get(0).getManufacturerCode());
+    }
+
+    @Test
     void legacyEventWithoutReturnActionStillDeserialises() throws Exception {
         // given: a message enqueued by the previous release
         String legacy = "{\"storeId\":\"store-1\",\"orderId\":\"order-1\",\"externalOrderId\":\"ALLEGRO-1\","

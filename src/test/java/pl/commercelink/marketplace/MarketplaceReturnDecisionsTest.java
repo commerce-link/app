@@ -22,6 +22,7 @@ import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
@@ -212,6 +213,51 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
+    void aSecondAcceptRoundIsRecordedNextToTheFirstNotOverIt() {
+        // given
+        List<OrderItem> orderItems = List.of(
+                orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered),
+                orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
+
+        // then
+        assertEquals(2, marketplaceRma.getMarketplaceDecisions().size());
+        assertNotEquals(marketplaceRma.getMarketplaceDecisions().get(0).getCommandId(),
+                marketplaceRma.getMarketplaceDecisions().get(1).getCommandId());
+    }
+
+    @Test
+    void resendRepublishesEveryRecordedRoundWithItsOriginalCommandId() {
+        // given: round 1 went to the DLQ, round 2 succeeded - resend must reach round 1 too
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-1",
+                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"SKU-1\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}",
+                LocalDateTime.now()));
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-2",
+                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"SKU-2\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-2\"}",
+                LocalDateTime.now()));
+
+        // when
+        boolean resent = decisions.resendDecisions(marketplaceRma);
+
+        // then
+        assertTrue(resent);
+        ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
+        verify(publisher, times(2)).publishReturnAction(any(), any(), eq(OrderLifecycleEventType.ReturnAccepted), captor.capture());
+        assertEquals(List.of("cmd-1", "cmd-2"), captor.getAllValues().stream().map(MarketplaceReturnAction::getCommandId).toList());
+    }
+
+    @Test
+    void resendReportsNothingToDoWhenNoDecisionWasRecorded() {
+        // when / then
+        assertFalse(decisions.resendDecisions(marketplaceRma));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
     void manualRmaDecisionsAreIgnored() {
         // given
         RMA manual = new RMA(STORE_ID);
@@ -375,7 +421,7 @@ class MarketplaceReturnDecisionsTest {
         reset(publisher);
 
         // when
-        boolean resent = decisions.resendLastDecision(marketplaceRma);
+        boolean resent = decisions.resendDecisions(marketplaceRma);
 
         // then
         assertTrue(resent);
@@ -387,7 +433,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void resendReturnsFalseWhenNoDecisionWasEverPublished() {
         // when / then
-        assertFalse(decisions.resendLastDecision(marketplaceRma));
+        assertFalse(decisions.resendDecisions(marketplaceRma));
         verifyNoInteractions(publisher);
     }
 
@@ -396,23 +442,23 @@ class MarketplaceReturnDecisionsTest {
         // given
         RMA manual = new RMA(STORE_ID);
         manual.setOrderId(ORDER_ID);
-        manual.setMarketplaceActionType(OrderLifecycleEventType.ReturnAccepted.name());
-        manual.setMarketplaceActionPayload("{}");
+        manual.addMarketplaceDecision(new MarketplaceDecision(OrderLifecycleEventType.ReturnAccepted.name(), "cmd-1",
+                "{}", LocalDateTime.now()));
 
         // when / then
-        assertFalse(decisions.resendLastDecision(manual));
+        assertFalse(decisions.resendDecisions(manual));
         verifyNoInteractions(publisher);
     }
 
     @Test
     void resendReturnsFalseWhenOrderIsMissing() {
         // given
-        marketplaceRma.setMarketplaceActionType(OrderLifecycleEventType.ReturnAccepted.name());
-        marketplaceRma.setMarketplaceActionPayload("{\"rmaId\":\"r-1\"}");
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision(OrderLifecycleEventType.ReturnAccepted.name(),
+                "cmd-1", "{\"rmaId\":\"r-1\"}", LocalDateTime.now()));
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when / then
-        assertFalse(decisions.resendLastDecision(marketplaceRma));
+        assertFalse(decisions.resendDecisions(marketplaceRma));
         verifyNoInteractions(publisher);
     }
 

@@ -586,7 +586,7 @@ class RMAControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/rma");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "not found");
-        verify(marketplaceReturnDecisions, never()).resendLastDecision(any());
+        verify(marketplaceReturnDecisions, never()).resendDecisions(any());
     }
 
     // ------------------------------------------------------------------
@@ -604,8 +604,7 @@ class RMAControllerTest {
                 "email", "buyer@example.com",
                 "storeId", "victim-store",
                 "externalReturnId", "forged",
-                "marketplaceActionType", "ReturnAccepted",
-                "marketplaceActionPayload", "{\"commandId\":\"x\"}"));
+                "marketplaceDecisions[0].commandId", "x"));
 
         // when
         binder.bind(posted);
@@ -614,8 +613,7 @@ class RMAControllerTest {
         assertThat(target.getEmail()).isEqualTo("buyer@example.com");
         assertThat(target.getStoreId()).isEqualTo(STORE_ID);
         assertThat(target.getExternalReturnId()).isNull();
-        assertThat(target.getMarketplaceActionType()).isNull();
-        assertThat(target.getMarketplaceActionPayload()).isNull();
+        assertThat(target.getMarketplaceDecisions()).isEmpty();
     }
 
     @Test

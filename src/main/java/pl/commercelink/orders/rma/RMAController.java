@@ -79,8 +79,8 @@ public class RMAController {
 
     /**
      * RMA is bound straight from the form. The marketplace-decision fields (externalReturnId,
-     * marketplaceActionType, marketplaceActionPayload, ...) feed a real refund through the resend path and
-     * must never come from the request; storeId always comes from the session.
+     * marketplaceDecisions, ...) feed a real refund through the resend path and must never come from the
+     * request; storeId always comes from the session.
      */
     @InitBinder
     void restrictBindableRmaFields(WebDataBinder binder) {
@@ -334,7 +334,7 @@ public class RMAController {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.not.found", null, locale));
             return "redirect:/dashboard/rma";
         }
-        boolean resent = marketplaceReturnDecisions.resendLastDecision(rma);
+        boolean resent = marketplaceReturnDecisions.resendDecisions(rma);
         redirectAttributes.addFlashAttribute(resent ? "successMessage" : "errorMessage",
                 messageSource.getMessage(resent ? "rma.marketplace.resend.success" : "rma.marketplace.resend.unavailable",
                         null, locale));
