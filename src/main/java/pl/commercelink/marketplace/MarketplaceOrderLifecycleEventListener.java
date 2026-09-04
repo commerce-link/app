@@ -136,8 +136,8 @@ public class MarketplaceOrderLifecycleEventListener {
         }
         Optional<MarketplaceReturns> returns = provider.returns();
         if (returns.isEmpty()) {
-            LOGGER.warn("Marketplace {} has no returns API; return event {} for RMA {} skipped",
-                    payload.getMarketplace(), payload.getType(), payload.getReturnAction().getRmaId());
+            LOGGER.error("Marketplace {} exposes no returns API, but RMA decision {} for order {} requires one - decision dropped; check the deployed adapter version",
+                    payload.getMarketplace(), payload.getReturnAction().getCommandId(), payload.getExternalOrderId());
             return;
         }
         action.accept(returns.get());

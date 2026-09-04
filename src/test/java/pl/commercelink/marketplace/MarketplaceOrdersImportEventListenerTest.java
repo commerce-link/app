@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
@@ -133,5 +134,21 @@ class MarketplaceOrdersImportEventListenerTest {
         verifyNoInteractions(marketplaceOrderImporter);
         verifyNoInteractions(marketplaceReturnImporter);
         verify(store, never()).updateLastFetchedAt(any());
+    }
+
+    @Test
+    void returnsScopeIsSkippedWhenReturnsAreDisabled() throws Exception {
+        // given
+        ReflectionTestUtils.setField(listener, "returnsEnabled", false);
+        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload = new ObjectMapper().readValue(
+                "{\"marketplace\":\"Allegro\",\"scope\":\"returns\"}",
+                MarketplaceOrdersImportEventListener.MarketplaceOrderPayload.class);
+
+        // when
+        listener.handleMessage(payload);
+
+        // then
+        verify(returns, never()).fetchReturns();
+        verifyNoInteractions(marketplaceReturnImporter);
     }
 }

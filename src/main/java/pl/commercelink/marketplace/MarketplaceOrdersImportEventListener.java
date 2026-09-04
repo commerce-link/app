@@ -4,6 +4,7 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
@@ -35,6 +36,9 @@ public class MarketplaceOrdersImportEventListener {
 
     @Autowired
     private MarketplaceProviderFactory providerFactory;
+
+    @Value("${marketplace.returns.enabled:true}")
+    private boolean returnsEnabled = true;
 
     @SqsListener(
             value = "marketplace-orders-import-queue",
@@ -80,6 +84,10 @@ public class MarketplaceOrdersImportEventListener {
 
     // marketplaces without a returns API are skipped silently: MarketplaceProvider.returns() is empty for them
     private void handleReturnsImport(Store store, String marketplace) {
+        if (!returnsEnabled) {
+            LOGGER.warn("marketplace.returns.enabled=false: skipping returns import for store {}", store.getStoreId());
+            return;
+        }
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
         if (provider == null) {
             return;

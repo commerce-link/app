@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.MarketplaceReturnAction;
@@ -680,6 +681,24 @@ class MarketplaceReturnDecisionsTest {
 
         // when / then
         assertFalse(decisions.returnRejected(marketplaceRma));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void whenReturnsAreDisabledTheDecisionIsRecordedButNotPublished() {
+        // given
+        ReflectionTestUtils.setField(decisions, "returnsEnabled", false);
+        OrderItem item = orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        boolean sent = decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        assertFalse(sent);
+        assertTrue(marketplaceRma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED));
+        assertEquals(1, marketplaceRma.getMarketplaceDecisions().size());
+        verify(rmaRepository).save(marketplaceRma);
         verifyNoInteractions(publisher);
     }
 }

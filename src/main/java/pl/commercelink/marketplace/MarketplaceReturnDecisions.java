@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.MarketplaceReturnAction;
@@ -61,6 +62,9 @@ public class MarketplaceReturnDecisions {
     @Autowired
     private OrderItemFamily orderItemFamily;
 
+    @Value("${marketplace.returns.enabled:true}")
+    private boolean returnsEnabled = true;
+
     /**
      * Called after the warehouse accepted the items; every call is a separate (partial) refund with its
      * own commandId. Returns false when the decision was refused or could not be published.
@@ -101,6 +105,10 @@ public class MarketplaceReturnDecisions {
         rememberAction(rma, OrderLifecycleEventType.ReturnAccepted, action);
         rmaRepository.save(rma);
 
+        if (!returnsEnabled) {
+            LOGGER.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
+            return false;
+        }
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
         return true;
     }
@@ -166,6 +174,10 @@ public class MarketplaceReturnDecisions {
         rememberAction(rma, OrderLifecycleEventType.ReturnRejected, action);
         rmaRepository.save(rma);
 
+        if (!returnsEnabled) {
+            LOGGER.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
+            return false;
+        }
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
         return true;
     }
