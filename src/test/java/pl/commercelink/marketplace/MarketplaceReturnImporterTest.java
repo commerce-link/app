@@ -24,6 +24,7 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.rma.OpenRmaCoverage;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -60,6 +61,7 @@ class MarketplaceReturnImporterTest {
     @Mock private OrderItemsRepository orderItemsRepository;
     @Mock private StoresRepository storesRepository;
     @Mock private OrderItemFamily orderItemFamily;
+    @Mock private OpenRmaCoverage openRmaCoverage;
     @Mock private Order order;
     @Mock private OrderItem orderItem;
 
@@ -318,10 +320,7 @@ class MarketplaceReturnImporterTest {
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
-        when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("open-rma-1", "item-1")));
-        RMA openRma = new RMA(STORE_ID);
-        openRma.setStatus(RMAStatus.WaitingForItems);
-        when(rmaRepository.findById(STORE_ID, "open-rma-1")).thenReturn(openRma);
+        when(openRmaCoverage.coversOrderItem(eq(STORE_ID), eq("item-1"), any())).thenReturn(true);
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when

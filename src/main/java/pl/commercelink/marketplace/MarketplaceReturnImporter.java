@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.rma.OpenRmaCoverage;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -62,6 +63,9 @@ public class MarketplaceReturnImporter {
 
     @Autowired
     private OrderItemFamily orderItemFamily;
+
+    @Autowired
+    private OpenRmaCoverage openRmaCoverage;
 
     public void importReturn(Store store, String marketplace, MarketplaceReturn ret) {
         RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), marketplace, ret.externalReturnId());
@@ -199,12 +203,12 @@ public class MarketplaceReturnImporter {
         Set<String> used = new HashSet<>();
         List<RMAItem> result = new ArrayList<>();
         for (MarketplaceReturn.Item item : ret.items()) {
-            OrderItem match = findMatch(orderItems, used, order.getStoreId(), item);
+            OrderItem match = findMatch(orderItems, used, order.getStoreId(), rmaId, item);
             if (match == null) {
                 if (siblingItems == null) {
                     siblingItems = orderItemFamily.siblingItems(order);
                 }
-                match = findMatch(siblingItems, used, order.getStoreId(), item);
+                match = findMatch(siblingItems, used, order.getStoreId(), rmaId, item);
             }
             if (match == null) {
                 LOGGER.warn("{} return {}: no order item with key {} in order {}", marketplace,
@@ -227,28 +231,16 @@ public class MarketplaceReturnImporter {
         return result;
     }
 
-    private OrderItem findMatch(List<OrderItem> candidates, Set<String> used, String storeId, MarketplaceReturn.Item item) {
+    private OrderItem findMatch(List<OrderItem> candidates, Set<String> used, String storeId, String rmaId,
+                                MarketplaceReturn.Item item) {
         return candidates.stream()
                 .filter(oi -> !used.contains(oi.getItemId()))
                 .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
                 .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
-                .filter(oi -> !coveredByOpenRma(storeId, oi.getItemId()))
+                .filter(oi -> !oi.isService())
+                .filter(oi -> !openRmaCoverage.coversOrderItem(storeId, oi.getItemId(), rmaId))
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * Merely having an RMAItem for this order item is too broad a filter: after a return is rejected, the
-     * order item must become matchable again. Items from RMAs that completed via acceptance are already
-     * excluded above by the Returned/Replaced fulfilment-status filter, so this only needs to exclude RMAs
-     * that are still open (i.e. not Rejected).
-     */
-    private boolean coveredByOpenRma(String storeId, String orderItemId) {
-        return rmaItemsRepository.findByOrderItemId(orderItemId).stream()
-                .anyMatch(rmaItem -> {
-                    RMA owningRma = rmaRepository.findById(storeId, rmaItem.getRmaId());
-                    return owningRma != null && owningRma.getStatus() != RMAStatus.Rejected;
-                });
     }
 
     /**

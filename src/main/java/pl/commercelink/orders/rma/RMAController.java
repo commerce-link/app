@@ -65,6 +65,9 @@ public class RMAController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private OpenRmaCoverage openRmaCoverage;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -173,6 +176,7 @@ public class RMAController {
                 .stream()
                 .filter(oi -> rmaItems.stream().noneMatch(ri -> ri.getItemId().equals(oi.getItemId())))
                 .filter(oi -> !oi.hasOneOfTheStatuses( FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
+                .filter(oi -> !(rma.isMarketplaceReturn() && oi.isService()))
                 .collect(Collectors.toList());
 
         model.addAttribute("rma", rma);
@@ -336,6 +340,16 @@ public class RMAController {
                 || quantity <= 0 || quantity > orderItem.getQty()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.item.invalid.quantity", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
+        if (rma.isMarketplaceReturn() && orderItem.isService()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("rma.item.service.not.returnable", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
+        if (openRmaCoverage.coversOrderItem(storeId, orderItemId, rmaId)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("rma.item.already.in.open.rma", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
 

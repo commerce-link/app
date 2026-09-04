@@ -71,6 +71,8 @@ class RMAControllerTest {
     private MessageSource messageSource;
     @Mock
     private RedirectAttributes redirectAttributes;
+    @Mock
+    private OpenRmaCoverage openRmaCoverage;
 
     @InjectMocks
     private RMAController controller;
@@ -444,6 +446,49 @@ class RMAControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "invalid");
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void addRmaItemFromOrderRejectsAServiceLineOnAMarketplaceRma() {
+        // given: the Allegro delivery line has no marketplace key, so it can never be refunded per line item
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        rma.setExternalReturnId("r-1");
+        OrderItem shipping = orderItemWithQtyAndStatus("item-ship", 1, FulfilmentStatus.Delivered);
+        shipping.setService(true);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(orderItemsRepository.findById(ORDER_ID, "item-ship")).thenReturn(shipping);
+        when(messageSource.getMessage(eq("rma.item.service.not.returnable"), any(), any())).thenReturn("service");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.addRmaItemFromOrder(RMA_ID, "item-ship", 1, "Return", null, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "service");
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void addRmaItemFromOrderRejectsAnItemAlreadyClaimedByAnotherOpenRma() {
+        // given
+        RMA rma = rmaWithStatus(RMAStatus.New);
+        OrderItem item = orderItemWithQtyAndStatus("item-1", 2, FulfilmentStatus.Delivered);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(item);
+        when(openRmaCoverage.coversOrderItem(STORE_ID, "item-1", RMA_ID)).thenReturn(true);
+        when(messageSource.getMessage(eq("rma.item.already.in.open.rma"), any(), any())).thenReturn("claimed");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "claimed");
         verify(rmaItemsRepository, never()).save(any());
     }
 }
