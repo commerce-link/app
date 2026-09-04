@@ -21,6 +21,9 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -624,6 +627,44 @@ class RMAControllerTest {
         verify(rmaItemsRepository, never()).findById(any(), any());
         verify(rmaItemsRepository, never()).batchSave(any());
         verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void updateShippingDetailsOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setShippingDetails(new ShippingDetails());
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateShippingDetails(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void updateShipmentsOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateShipments(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaRepository, never()).save(any());
     }
 
     @Test
