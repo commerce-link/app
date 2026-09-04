@@ -15,6 +15,7 @@ import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemFamily;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;

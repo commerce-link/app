@@ -10,6 +10,7 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.MarketplaceReturnAction;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemFamily;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;

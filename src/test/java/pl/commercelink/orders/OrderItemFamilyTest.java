@@ -1,4 +1,4 @@
-package pl.commercelink.marketplace;
+package pl.commercelink.orders;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,11 +7,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderItem;
-import pl.commercelink.orders.OrderItemsRepository;
-import pl.commercelink.orders.OrderStatus;
-import pl.commercelink.orders.OrdersRepository;
 
 import java.util.List;
 

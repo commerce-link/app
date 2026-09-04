@@ -1,12 +1,7 @@
-package pl.commercelink.marketplace;
+package pl.commercelink.orders;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderItem;
-import pl.commercelink.orders.OrderItemsRepository;
-import pl.commercelink.orders.OrderStatus;
-import pl.commercelink.orders.OrdersRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +11,7 @@ import java.util.List;
  * copies externalOrderId, which must stay unique per store), so an item moved to a split-off order is no
  * longer reachable from the marketplace order itself. This resolves the order items living on orders split
  * off from a given order, so marketplace-return matching (which item?) and refunding (which key?) can still
- * find an item that moved. Shared by {@link MarketplaceReturnImporter} and {@link MarketplaceReturnDecisions}
+ * find an item that moved. Shared by MarketplaceReturnImporter and MarketplaceReturnDecisions
  * so the family concept and the cancelled-child exclusion live in exactly one place.
  *
  * <p>Reading the family is comparatively expensive: {@link OrdersRepository#findBySplitFromOrderId} queries
