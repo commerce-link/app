@@ -264,6 +264,10 @@ class MarketplaceReturnImporterTest {
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
         verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
         assertEquals(3, itemsCaptor.getValue().get(0).getQty());
+        // the buyer asked for 5, we can only refund 3 - the operator must learn about the shortfall
+        assertEquals(1, store.getNotifications().size());
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
+        assertTrue(store.getNotifications().get(0).getMessage().contains("only partially matched"));
     }
 
     @Test

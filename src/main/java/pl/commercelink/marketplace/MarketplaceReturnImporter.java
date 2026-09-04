@@ -136,9 +136,11 @@ public class MarketplaceReturnImporter {
             notifyUnmatched(store, marketplace, ret, false);
             return;
         }
-        if (rmaItems.size() < ret.items().size()) {
-            LOGGER.warn("{} return {}: only {} of {} items matched order {}", marketplace, ret.externalReturnId(),
-                    rmaItems.size(), ret.items().size(), order.getOrderId());
+        int requestedQty = ret.items().stream().mapToInt(MarketplaceReturn.Item::quantity).sum();
+        int matchedQty = rmaItems.stream().mapToInt(RMAItem::getQty).sum();
+        if (matchedQty < requestedQty) {
+            LOGGER.warn("{} return {}: only {} of {} units matched order {}", marketplace, ret.externalReturnId(),
+                    matchedQty, requestedQty, order.getOrderId());
             // A partial refund disarms the marketplace auto-refund, so the operator must see the shortfall.
             // An RMA WAS created here (unlike the zero-match cases above), so the message must not read as
             // if nothing happened - that wording would invite a manual marketplace refund on top of ours.
