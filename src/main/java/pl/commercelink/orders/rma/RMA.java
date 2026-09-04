@@ -6,6 +6,7 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 
 import java.time.LocalDateTime;
@@ -14,6 +15,10 @@ import java.util.stream.Collectors;
 
 @DynamoDBTable(tableName = "RMA")
 public class RMA {
+
+    public static final String EVENT_REFUND_REQUESTED = "RefundRequested";
+    public static final String EVENT_REJECTION_SENT = "RejectionSent";
+    public static final String EVENT_REFUNDED_BY_MARKETPLACE = "RefundedByMarketplace";
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -190,6 +195,16 @@ public class RMA {
     @DynamoDBIgnore
     public boolean hasEvent(Event other) {
         return events.stream().anyMatch(e -> e.isSameAs(other));
+    }
+
+    @DynamoDBIgnore
+    public boolean hasActionEvent(String name) {
+        return events.stream().anyMatch(e -> e.getType() == EventType.action && name.equals(e.getName()));
+    }
+
+    @DynamoDBIgnore
+    public void addActionEvent(String name) {
+        events.add(new Event(EventType.action, name, LocalDateTime.now()));
     }
 
     public LocalDateTime getCreatedAt() {

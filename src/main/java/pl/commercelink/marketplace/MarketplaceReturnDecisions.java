@@ -14,14 +14,11 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.event.Event;
-import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -66,7 +63,7 @@ public class MarketplaceReturnDecisions {
         if (!rma.isMarketplaceReturn()) {
             return;
         }
-        if (rma.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, null))) {
+        if (rma.hasActionEvent(RMA.EVENT_REJECTION_SENT)) {
             LOGGER.warn("Refusing to refund RMA {}: a rejection was already sent to the marketplace", rma.getRmaId());
             return;
         }
@@ -94,7 +91,7 @@ public class MarketplaceReturnDecisions {
         // publish and then failed, a real refund would be in flight with no RefundRequested event and no
         // stored payload - every guard here would go blind and the resend button could not help. Publishing
         // after a successful save instead means a publish failure is exactly the case resend exists for.
-        rma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        rma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
         rememberAction(rma, OrderLifecycleEventType.ReturnAccepted, action);
         rmaRepository.save(rma);
 
@@ -140,11 +137,10 @@ public class MarketplaceReturnDecisions {
         if (!rma.isMarketplaceReturn()) {
             return;
         }
-        Event rejectionSent = new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, LocalDateTime.now());
-        if (rma.hasEvent(rejectionSent)) {
+        if (rma.hasActionEvent(RMA.EVENT_REJECTION_SENT)) {
             return;
         }
-        if (rma.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, null))) {
+        if (rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED)) {
             // Mirrors the guard in returnAccepted: a refund and a rejection on the same RMA must never both
             // reach the marketplace - the buyer would keep the money and also get a rejection notice.
             LOGGER.warn("Refusing to reject RMA {}: a refund was already requested to the marketplace", rma.getRmaId());
@@ -159,7 +155,7 @@ public class MarketplaceReturnDecisions {
                 List.of(), false, null, rma.getRejectionReason());
 
         // Persist first, publish second - see the comment in returnAccepted.
-        rma.addEvent(rejectionSent);
+        rma.addActionEvent(RMA.EVENT_REJECTION_SENT);
         rememberAction(rma, OrderLifecycleEventType.ReturnRejected, action);
         rmaRepository.save(rma);
 
@@ -212,7 +208,7 @@ public class MarketplaceReturnDecisions {
     public boolean blocksRejectionAfterRefund(RMA existing, RMAStatus newStatus) {
         boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
         return existing.isMarketplaceReturn() && turnsRejected
-                && existing.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, null));
+                && existing.hasActionEvent(RMA.EVENT_REFUND_REQUESTED);
     }
 
     /**

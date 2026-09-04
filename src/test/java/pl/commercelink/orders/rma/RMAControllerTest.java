@@ -14,7 +14,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.marketplace.MarketplaceReturnDecisions;
-import pl.commercelink.marketplace.MarketplaceReturnImporter;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -336,7 +335,7 @@ class RMAControllerTest {
     void updateRmaDoesNotRepublishTheRejectionWhenItWasAlreadySent() {
         // given
         RMA existingRma = rmaWithStatus(RMAStatus.WaitingForItems);
-        existingRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, LocalDateTime.now()));
+        existingRma.addEvent(new Event(EventType.action, RMA.EVENT_REJECTION_SENT, LocalDateTime.now()));
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existingRma);
         RMA postedRma = rmaWithStatus(RMAStatus.Rejected);
         postedRma.setRejectionReason("Damaged on arrival");

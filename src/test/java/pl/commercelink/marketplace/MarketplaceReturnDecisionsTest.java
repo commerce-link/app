@@ -124,7 +124,7 @@ class MarketplaceReturnDecisionsTest {
         assertEquals(2, action.getItems().size());
         assertEquals("SKU-1", action.getItems().get(0).getManufacturerCode());
         assertEquals(2, action.getItems().get(0).getQuantity());
-        assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, null)));
+        assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, null)));
         verify(rmaRepository).save(marketplaceRma);
     }
 
@@ -264,7 +264,7 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(eq(order), eq(marketplaceRma), eq(OrderLifecycleEventType.ReturnRejected), captor.capture());
         assertEquals("Damaged by buyer", captor.getValue().getRejectionReason());
-        assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, null)));
+        assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, RMA.EVENT_REJECTION_SENT, null)));
         verify(rmaRepository).save(marketplaceRma);
     }
 
@@ -310,7 +310,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void blocksRejectionOnceARefundWasRequested() {
         // given
-        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
 
         // when / then
         assertTrue(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
@@ -326,7 +326,7 @@ class MarketplaceReturnDecisionsTest {
     void doesNotBlockRejectionForManualRmaEvenAfterARefundEvent() {
         // given
         RMA manual = new RMA(STORE_ID);
-        manual.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        manual.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
 
         // when / then
         assertFalse(decisions.blocksRejectionAfterRefund(manual, RMAStatus.Rejected));
@@ -335,7 +335,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void doesNotBlockWhenNewStatusIsNotRejected() {
         // given
-        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
 
         // when / then
         assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Processing));
@@ -344,7 +344,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void doesNotBlockWhenRmaIsAlreadyRejected() {
         // given
-        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
         marketplaceRma.setStatus(RMAStatus.Rejected);
 
         // when / then
@@ -354,7 +354,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void doesNotPublishAcceptanceAfterARejectionWasSent() {
         // given
-        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REJECTION_SENT, LocalDateTime.now()));
+        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REJECTION_SENT, LocalDateTime.now()));
 
         // when
         decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
@@ -509,7 +509,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void returnRejectedIsRefusedOnceARefundWasAlreadyRequested() {
         // given
-        marketplaceRma.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
         marketplaceRma.setRejectionReason("Damaged by buyer");
 
         // when

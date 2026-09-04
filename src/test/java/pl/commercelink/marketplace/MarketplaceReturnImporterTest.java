@@ -468,7 +468,7 @@ class MarketplaceReturnImporterTest {
         assertEquals(1, store.getNotifications().size());
         assertEquals(StoreNotificationType.MARKETPLACE_RETURN_REFUNDED, store.getNotifications().get(0).getType());
         assertEquals(existing.getRmaId(), store.getNotifications().get(0).getObject());
-        assertTrue(existing.hasEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUNDED_BY_MARKETPLACE, null)));
+        assertTrue(existing.hasEvent(new Event(EventType.action, RMA.EVENT_REFUNDED_BY_MARKETPLACE, null)));
         assertEquals(RMAStatus.New, existing.getStatus());
         verify(storesRepository, times(1)).save(store);
     }
@@ -479,7 +479,7 @@ class MarketplaceReturnImporterTest {
         RMA existing = new RMA(STORE_ID);
         existing.setExternalReturnId("r-1");
         existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
-        existing.addEvent(new Event(EventType.action, MarketplaceReturnImporter.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+        existing.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
 
         // when

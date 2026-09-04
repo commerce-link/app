@@ -7,7 +7,10 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperTableModel;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,6 +59,32 @@ class RMAMarketplaceFieldsTest {
         assertNull(attributes.get("marketplaceReturn"));
         assertEquals(MarketplaceReturnStatus.IN_TRANSIT,
                 tableModel().unconvert(attributes).getExternalReturnStatus());
+    }
+
+    @Test
+    void actionEventsAreLookedUpByName() {
+        // given
+        RMA rma = new RMA("store-1");
+
+        // when
+        rma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
+
+        // then
+        assertTrue(rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED));
+        assertFalse(rma.hasActionEvent(RMA.EVENT_REJECTION_SENT));
+        assertEquals(1, rma.getEvents().size());
+        assertEquals(EventType.action, rma.getEvents().get(0).getType());
+        assertEquals("RefundRequested", rma.getEvents().get(0).getName());
+    }
+
+    @Test
+    void hasActionEventIgnoresEventsOfOtherTypes() {
+        // given
+        RMA rma = new RMA("store-1");
+        rma.addEvent(new Event(EventType.email, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
+
+        // when / then
+        assertFalse(rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED));
     }
 
     private DynamoDBMapperTableModel<RMA> tableModel() {

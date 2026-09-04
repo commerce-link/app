@@ -14,8 +14,6 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
-import pl.commercelink.orders.event.Event;
-import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -29,7 +27,6 @@ import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -46,10 +43,6 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 public class MarketplaceReturnImporter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnImporter.class);
-
-    public static final String EVENT_REFUND_REQUESTED = "RefundRequested";
-    public static final String EVENT_REJECTION_SENT = "RejectionSent";
-    public static final String EVENT_REFUNDED_BY_MARKETPLACE = "RefundedByMarketplace";
 
     @Autowired
     private RMARepository rmaRepository;
@@ -97,9 +90,8 @@ public class MarketplaceReturnImporter {
         if (statusChanged) {
             rma.setExternalReturnStatus(ret.status());
             if (ret.status() == MarketplaceReturnStatus.REFUNDED && !appDecidedRefund(rma)) {
-                Event refundedByMarketplace = new Event(EventType.action, EVENT_REFUNDED_BY_MARKETPLACE, LocalDateTime.now());
-                if (!rma.hasEvent(refundedByMarketplace)) {
-                    rma.addEvent(refundedByMarketplace);
+                if (!rma.hasActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE)) {
+                    rma.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
                     store.addNotification(new StoreNotification(
                             StoreNotificationSeverity.WARNING,
                             StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
@@ -114,8 +106,7 @@ public class MarketplaceReturnImporter {
     }
 
     private static boolean appDecidedRefund(RMA rma) {
-        return rma.hasEvent(new Event(EventType.action, EVENT_REFUND_REQUESTED, null))
-                || rma.hasEvent(new Event(EventType.action, EVENT_REFUNDED_BY_MARKETPLACE, null));
+        return rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED) || rma.hasActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
     }
 
     private static String referenceOf(RMA rma) {
