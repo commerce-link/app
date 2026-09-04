@@ -26,7 +26,7 @@ public final class OrderFilterConditions {
                 .toList();
 
         if (unique.isEmpty()) {
-            throw new OrderFilterInvalidException("A filter needs at least one condition");
+            throw new OrderFilterInvalidException("orders.filters.error.no.conditions");
         }
         return new OrderFilterConditions(unique);
     }

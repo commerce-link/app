@@ -1,4 +1,4 @@
-package pl.commercelink.orders.filters.handlers;
+package pl.commercelink.orders.filters.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
@@ -9,15 +9,15 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import java.util.List;
 
 @Component
-public class ListOrderFiltersHandler {
+public class ListOrderFiltersQueryService {
 
     private final OrderFiltersRepository orderFiltersRepository;
 
-    public ListOrderFiltersHandler(OrderFiltersRepository orderFiltersRepository) {
+    public ListOrderFiltersQueryService(OrderFiltersRepository orderFiltersRepository) {
         this.orderFiltersRepository = orderFiltersRepository;
     }
 
-    public ListOrderFiltersView handle(FilterActor actor) {
+    public ListOrderFiltersView list(FilterActor actor) {
         return new ListOrderFiltersView(
                 filtersOf(actor.storeId(), OwnedOrderFilters.STORE_FILTER),
                 filtersOf(actor.storeId(), actor.userId()));

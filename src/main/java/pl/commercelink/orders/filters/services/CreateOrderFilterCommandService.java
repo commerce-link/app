@@ -1,4 +1,4 @@
-package pl.commercelink.orders.filters.handlers;
+package pl.commercelink.orders.filters.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
@@ -12,17 +12,17 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import java.util.List;
 
 @Component
-public class CreateOrderFilterHandler {
+public class CreateOrderFilterCommandService {
 
     private final OrderFiltersRepository orderFiltersRepository;
     private final OrderFilterWriteAccess writeAccess;
 
-    public CreateOrderFilterHandler(OrderFiltersRepository orderFiltersRepository, OrderFilterWriteAccess writeAccess) {
+    public CreateOrderFilterCommandService(OrderFiltersRepository orderFiltersRepository, OrderFilterWriteAccess writeAccess) {
         this.orderFiltersRepository = orderFiltersRepository;
         this.writeAccess = writeAccess;
     }
 
-    public OrderFilter handle(FilterActor actor, boolean sharedWithStore, String label,
+    public OrderFilter create(FilterActor actor, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
         OwnedOrderFilters ownersFilters = writeAccess.checkWritePermissionsAndReturn(actor, sharedWithStore);
 

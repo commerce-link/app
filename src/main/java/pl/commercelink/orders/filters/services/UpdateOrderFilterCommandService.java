@@ -1,4 +1,4 @@
-package pl.commercelink.orders.filters.handlers;
+package pl.commercelink.orders.filters.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
@@ -13,21 +13,21 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import java.util.List;
 
 @Component
-public class UpdateOrderFilterHandler {
+public class UpdateOrderFilterCommandService {
 
     private final OrderFiltersRepository orderFiltersRepository;
     private final OrderFilterWriteAccess writeAccess;
 
-    public UpdateOrderFilterHandler(OrderFiltersRepository orderFiltersRepository, OrderFilterWriteAccess writeAccess) {
+    public UpdateOrderFilterCommandService(OrderFiltersRepository orderFiltersRepository, OrderFilterWriteAccess writeAccess) {
         this.orderFiltersRepository = orderFiltersRepository;
         this.writeAccess = writeAccess;
     }
 
-    public OrderFilter handle(FilterActor actor, String filterId, boolean sharedWithStore, String label,
+    public OrderFilter update(FilterActor actor, String filterId, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
         OwnedOrderFilters currentOwnersFilters = writeAccess.checkWritePermissionsAndReturnByFilterId(actor, filterId);
         OrderFilter filterToUpdate = currentOwnersFilters.byId(filterId)
-                .orElseThrow(() -> new OrderFilterInvalidException("The filter no longer exists"));
+                .orElseThrow(() -> new OrderFilterInvalidException("orders.filters.error.not.found"));
 
         filterToUpdate.changeTo(label, OrderFilterConditions.of(conditions));
 

@@ -13,32 +13,61 @@
     <div th:replace="~{fragments/screen-intro :: panel('orders', 'fas fa-shopping-cart')}"></div>
 
     <div class="box">
-        <h4 class="title is-5">Filter by Order Status</h4>
-        <div class="field is-grouped is-grouped-multiline" id="filterTags">
-            <div class="control">
-                <div class="tags has-addons">
-                    <span class="tag is-info">Statuses:</span>
+        <div th:if="${error}" class="notification is-danger is-light" th:text="${error}"></div>
+
+        <div class="is-flex is-flex-wrap-wrap is-align-items-center">
+            <div class="dropdown mr-4" id="statusDropdown">
+                <div class="dropdown-trigger">
+                    <button type="button" class="button is-small" id="statusDropdownButton"
+                            aria-haspopup="true" aria-controls="statusDropdownMenu">
+                        <span th:text="#{orders.status.filter.title}"></span>
+                        <span class="tag is-info ml-2" th:if="${!#lists.isEmpty(selectedStatuses)}"
+                              th:text="${#lists.size(selectedStatuses)}"></span>
+                        <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
+                    </button>
+                </div>
+                <div class="dropdown-menu" id="statusDropdownMenu" role="menu" style="min-width: 16rem;">
+                    <div class="dropdown-content">
+                        <label class="dropdown-item checkbox" th:each="status : ${statuses}">
+                            <input type="checkbox" class="status-option" th:value="${status.name()}"
+                                   th:checked="${#lists.contains(selectedStatuses, status.name())}"/>
+                            <span class="ml-1" th:text="${enumI18n.localize(status)}"></span>
+                            <span class="has-text-grey" th:if="${itemCountsByStatus.get(status) != null}"
+                                  th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
+                            <span class="has-text-grey" th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
+                        </label>
+                        <hr class="dropdown-divider"/>
+                        <div class="dropdown-item is-flex">
+                            <button type="button" class="button is-small is-primary mr-2" id="applyStatuses"
+                                    th:text="#{orders.status.filter.apply}"></button>
+                            <button type="button" class="button is-small" id="clearStatuses"
+                                    th:text="#{orders.status.filter.clear}"></button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="control" th:each="status : ${statuses}">
-                <button type="button"
-                        class="button is-small status-tag"
-                        th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                        th:data-status="${status.name()}">
-                    <span th:text="${enumI18n.localize(status)}"></span>
-                    <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
-                    <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
-                </button>
-            </div>
 
-            <div class="control">
-                <button type="button" class="button is-small is-danger is-light" id="clearFilters">
-                    <span class="icon is-small"><i class="fas fa-times"></i></span>
-                    <span>Clear Filters</span>
-                </button>
-            </div>
+            <a class="button is-small mr-2"
+               th:classappend="${selectedFilterId == null} ? 'is-link' : 'is-link is-light'"
+               href="/dashboard/orders"
+               th:text="#{orders.filters.all}"></a>
 
-            <div class="control ml-auto">
+            <a th:each="saved : ${savedFilters}" class="button is-small mr-2"
+               th:classappend="${saved.id == selectedFilterId} ? 'is-link' : 'is-link is-light'"
+               th:href="${saved.id == selectedFilterId}
+                            ? @{/dashboard/orders}
+                            : @{/dashboard/orders(filterId=${saved.id})}"
+               th:title="${saved.id == selectedFilterId} ? #{orders.filters.turn.off} : #{orders.filters.turn.on}"
+               th:text="${saved.label}"></a>
+
+            <span class="has-text-grey is-size-7 mr-2" th:if="${#lists.isEmpty(savedFilters)}"
+                  th:text="#{orders.filters.empty}"></span>
+
+            <div class="is-flex ml-auto">
+                <button type="button" class="button is-small mr-2" onclick="toggleOrderFiltersModal(true)">
+                    <span class="icon is-small"><i class="fas fa-sliders-h"></i></span>
+                    <span th:text="#{orders.filters.manage}"></span>
+                </button>
                 <form method="post" action="/dashboard/orders/new/pos">
                     <button type="submit" class="button is-small is-success">
                         <span class="icon is-small"><i class="fas fa-cash-register"></i></span>
@@ -49,138 +78,156 @@
         </div>
     </div>
 
-    <div class="box">
-        <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
-            <h4 class="title is-5 mb-0">Saved filters</h4>
-            <button type="button" class="button is-small" id="toggleFilterForm">
-                <span class="icon is-small"><i class="fas fa-plus"></i></span>
-                <span>New filter</span>
-            </button>
+    <div id="orderFiltersModal" class="modal">
+        <div class="modal-background" onclick="toggleOrderFiltersModal(false)"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{orders.filters.title}"></p>
+                <button type="button" class="delete" aria-label="close" onclick="toggleOrderFiltersModal(false)"></button>
+            </header>
+
+            <section class="modal-card-body">
+                <div id="savedFiltersPane">
+                    <table class="table is-fullwidth is-narrow is-hoverable" th:if="${!#lists.isEmpty(savedFilters)}">
+                        <tbody>
+                        <tr th:each="saved : ${savedFilters}">
+                            <td class="is-vcentered" th:text="${saved.label}"></td>
+                            <td class="is-vcentered">
+                                <span class="tag is-light" th:if="${saved.sharedWithStore}"
+                                      th:text="#{orders.filters.scope.store}"></span>
+                                <span class="tag is-light" th:unless="${saved.sharedWithStore}"
+                                      th:text="#{orders.filters.scope.private}"></span>
+                            </td>
+                            <td class="is-vcentered">
+                                <div class="is-flex is-justify-content-flex-end"
+                                     th:if="${!saved.sharedWithStore or canManageStoreFilters}">
+                                    <button type="button" class="button is-small edit-filter mr-2"
+                                            th:title="#{orders.filters.edit}"
+                                            th:data-filter-id="${saved.id}"
+                                            th:data-label="${saved.label}"
+                                            th:data-conditions="${saved.conditionsByField}"
+                                            th:data-shared="${saved.sharedWithStore}">
+                                        <span class="icon is-small"><i class="fas fa-pencil-alt"></i></span>
+                                    </button>
+                                    <form method="post" action="/dashboard/orders/filters/delete">
+                                        <input type="hidden" name="filterId" th:value="${saved.id}"/>
+                                        <input type="hidden" name="activeFilterId" th:value="${selectedFilterId}"/>
+                                        <button type="submit" class="button is-small is-danger is-light"
+                                                th:title="#{orders.filters.delete}">
+                                            <span class="icon is-small"><i class="fas fa-trash"></i></span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="has-text-grey is-size-7" th:if="${#lists.isEmpty(savedFilters)}"
+                       th:text="#{orders.filters.empty}"></p>
+
+                    <button type="button" class="button is-small is-primary mt-3" id="newFilterButton">
+                        <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{orders.filters.new}"></span>
+                    </button>
+                </div>
+
+                <form method="post" action="/dashboard/orders/filters" id="filterForm" style="display: none;">
+                    <input type="hidden" name="filterId" id="filterIdField"/>
+                    <input type="hidden" name="activeFilterId" th:value="${selectedFilterId}"/>
+
+                    <div class="field">
+                        <label class="label is-small" th:text="#{orders.filters.name}"></label>
+                        <div class="control">
+                            <input class="input is-small" type="text" name="label" required/>
+                        </div>
+                    </div>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.shipping.due}"></label>
+                            <div class="select is-small is-fullwidth">
+                                <select name="shippingDue">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}"
+                                            th:text="${enumI18n.localize(due)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.shipment.type}"></label>
+                            <div class="select is-small is-fullwidth">
+                                <select name="shipmentType">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="type : ${shipmentTypes}" th:value="${type.name()}"
+                                            th:text="${enumI18n.localize(type)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.payment.source}"></label>
+                            <div class="select is-small is-fullwidth">
+                                <select name="paymentSource">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="source : ${paymentSources}" th:value="${source.name()}"
+                                            th:text="${enumI18n.localize(source)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.status}"></label>
+                            <div class="select is-small is-fullwidth">
+                                <select name="status">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="status : ${statuses}" th:value="${status.name()}"
+                                            th:text="${enumI18n.localize(status)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.marketplace}"></label>
+                            <div class="select is-small is-fullwidth" th:if="${!#lists.isEmpty(marketplaces)}">
+                                <select name="sourceName">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="marketplace : ${marketplaces}" th:value="${marketplace}"
+                                            th:text="${marketplace}"></option>
+                                </select>
+                            </div>
+                            <p class="has-text-grey is-size-7" th:if="${#lists.isEmpty(marketplaces)}"
+                               th:text="#{orders.filters.marketplaces.empty}"></p>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label is-small" th:text="#{orders.filters.field.postal.code}"></label>
+                            <div class="control">
+                                <input class="input is-small" type="text" name="shippingPostalCode" placeholder="00-9"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field" th:if="${canManageStoreFilters}">
+                        <label class="checkbox is-size-7">
+                            <input type="checkbox" name="sharedWithStore" value="true"/>
+                            <span th:text="#{orders.filters.share}"></span>
+                        </label>
+                    </div>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button type="submit" class="button is-small is-primary" th:text="#{orders.filters.save}"></button>
+                        </div>
+                        <div class="control">
+                            <button type="button" class="button is-small" id="backToFiltersList"
+                                    th:text="#{orders.filters.back}"></button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <footer class="modal-card-foot">
+                <button type="button" class="button is-small" onclick="toggleOrderFiltersModal(false)"
+                        th:text="#{orders.filters.close}"></button>
+            </footer>
         </div>
-
-        <div th:if="${error}" class="notification is-danger is-light" th:text="${error}"></div>
-
-        <div class="field is-grouped is-grouped-multiline">
-            <div class="control">
-                <a class="button is-small"
-                   th:classappend="${selectedFilterId == null} ? 'is-link' : 'is-link is-light'"
-                   href="/dashboard/orders">All open orders</a>
-            </div>
-            <div class="control" th:each="saved : ${savedFilters}">
-                <div class="field has-addons mb-0">
-                    <p class="control">
-                        <a class="button is-small"
-                           th:classappend="${saved.id == selectedFilterId} ? 'is-link' : 'is-link is-light'"
-                           th:href="${saved.id == selectedFilterId}
-                                        ? @{/dashboard/orders(showAll=${allStatusesShown}, statuses=${requestedStatuses})}
-                                        : @{/dashboard/orders(filterId=${saved.id}, showAll=${allStatusesShown}, statuses=${requestedStatuses})}"
-                           th:title="${saved.id == selectedFilterId} ? 'Turn this filter off' : 'Turn this filter on'">
-                            <span class="icon is-small" th:if="${saved.sharedWithStore}"><i class="fas fa-users"></i></span>
-                            <span class="icon is-small" th:unless="${saved.sharedWithStore}"><i class="fas fa-user"></i></span>
-                            <span th:text="${saved.label}"></span>
-                            <span class="icon is-small" th:if="${saved.id == selectedFilterId}"><i class="fas fa-times"></i></span>
-                        </a>
-                    </p>
-                    <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
-                        <button type="button" class="button is-small edit-filter"
-                                th:data-filter-id="${saved.id}"
-                                th:data-label="${saved.label}"
-                                th:data-conditions="${saved.conditionsByField}"
-                                th:data-shared="${saved.sharedWithStore}">
-                            <span class="icon is-small"><i class="fas fa-pen"></i></span>
-                        </button>
-                    </p>
-                    <p class="control" th:if="${!saved.sharedWithStore or canManageStoreFilters}">
-                        <form method="post" action="/dashboard/orders/filters/delete">
-                            <input type="hidden" name="filterId" th:value="${saved.id}"/>
-                            <button type="submit" class="button is-small is-danger is-light">
-                                <span class="icon is-small"><i class="fas fa-times"></i></span>
-                            </button>
-                        </form>
-                    </p>
-                </div>
-            </div>
-            <div class="control" th:if="${#lists.isEmpty(savedFilters)}">
-                <span class="has-text-grey is-size-7">No saved filters yet.</span>
-            </div>
-        </div>
-
-        <form method="post" action="/dashboard/orders/filters" id="filterForm" style="display: none;" class="mt-4">
-            <input type="hidden" name="filterId" id="filterIdField"/>
-            <div class="field">
-                <label class="label is-small">Name</label>
-                <div class="control">
-                    <input class="input is-small" type="text" name="label" required/>
-                </div>
-            </div>
-
-            <div class="columns is-multiline">
-                <div class="column is-one-third">
-                    <label class="label is-small">Shipping due</label>
-                    <div class="select is-small is-fullwidth">
-                        <select name="shippingDue">
-                            <option value="">—</option>
-                            <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}" th:text="${due.name()}"></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="column is-one-third">
-                    <label class="label is-small">Shipment type</label>
-                    <div class="select is-small is-fullwidth">
-                        <select name="shipmentType">
-                            <option value="">—</option>
-                            <option th:each="type : ${shipmentTypes}" th:value="${type.name()}" th:text="${type.name()}"></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="column is-one-third">
-                    <label class="label is-small">Payment</label>
-                    <div class="select is-small is-fullwidth">
-                        <select name="paymentSource">
-                            <option value="">—</option>
-                            <option th:each="source : ${paymentSources}" th:value="${source.name()}" th:text="${source.name()}"></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="column is-one-third">
-                    <label class="label is-small">Status</label>
-                    <div class="select is-small is-fullwidth">
-                        <select name="status">
-                            <option value="">—</option>
-                            <option th:each="status : ${statuses}" th:value="${status.name()}" th:text="${enumI18n.localize(status)}"></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="column is-one-third">
-                    <label class="label is-small">Marketplace</label>
-                    <div class="select is-small is-fullwidth">
-                        <select name="sourceName">
-                            <option value="">&mdash;</option>
-                            <option th:each="marketplace : ${marketplaces}"
-                                    th:value="${marketplace.sourceName}"
-                                    th:text="${marketplace.name()}"></option>
-                        </select>
-                    </div>
-                </div>
-                <div class="column is-one-third">
-                    <label class="label is-small">Postal code starts with</label>
-                    <div class="control">
-                        <input class="input is-small" type="text" name="shippingPostalCode" placeholder="00-9"/>
-                    </div>
-                </div>
-            </div>
-
-            <div class="field" th:if="${canManageStoreFilters}">
-                <label class="checkbox is-size-7">
-                    <input type="checkbox" name="sharedWithStore" value="true"/>
-                    Share with the whole store
-                </label>
-            </div>
-
-            <div class="field">
-                <button type="submit" class="button is-small is-primary">Save filter</button>
-            </div>
-        </form>
     </div>
 
     <!-- Sections for each order status -->
@@ -217,61 +264,84 @@
     </th:block>
 
     <script th:inline="javascript">
-        // Initialize from server-side selected values (includes defaults)
-        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
         const selectedFilterId = /*[[${selectedFilterId}]]*/ null;
 
-        function navigateWithFilters() {
+        function navigateWithStatuses(statuses) {
             const params = new URLSearchParams();
-
-            selectedStatuses.forEach(status => params.append('statuses', status));
+            statuses.forEach(status => params.append('statuses', status));
+            if (statuses.length === 0) {
+                params.append('showAll', 'true');
+            }
             if (selectedFilterId) {
                 params.append('filterId', selectedFilterId);
             }
-
             window.location.href = '/dashboard/orders?' + params.toString();
         }
 
-        // Status tag click handler
-        document.querySelectorAll('.status-tag').forEach(tag => {
-            tag.addEventListener('click', function() {
-                const status = this.getAttribute('data-status');
-                if (selectedStatuses.has(status)) {
-                    selectedStatuses.delete(status);
-                } else {
-                    selectedStatuses.add(status);
-                }
-                navigateWithFilters();
-            });
+        const statusDropdown = document.getElementById('statusDropdown');
+
+        document.getElementById('statusDropdownButton').addEventListener('click', function(event) {
+            event.stopPropagation();
+            statusDropdown.classList.toggle('is-active');
         });
 
-        // Clear filters button
-        document.getElementById('clearFilters').addEventListener('click', function() {
-            const params = new URLSearchParams();
-            params.append('showAll', 'true');
-            if (selectedFilterId) {
-                params.append('filterId', selectedFilterId);
-            }
-            window.location.href = '/dashboard/orders?' + params.toString();
+        document.getElementById('statusDropdownMenu').addEventListener('click', function(event) {
+            event.stopPropagation();
         });
 
+        document.addEventListener('click', function() {
+            statusDropdown.classList.remove('is-active');
+        });
+
+        document.getElementById('applyStatuses').addEventListener('click', function() {
+            navigateWithStatuses([...document.querySelectorAll('.status-option:checked')].map(box => box.value));
+        });
+
+        document.getElementById('clearStatuses').addEventListener('click', function() {
+            navigateWithStatuses([]);
+        });
+
+        const filtersModal = document.getElementById('orderFiltersModal');
+        const savedFiltersPane = document.getElementById('savedFiltersPane');
         const filterForm = document.getElementById('filterForm');
         const filterIdField = document.getElementById('filterIdField');
 
-        function openFilterForm(creating) {
+        function toggleOrderFiltersModal(open) {
+            filtersModal.classList.toggle('is-active', open);
+            if (open) {
+                showSavedFiltersPane();
+            }
+        }
+
+        function showSavedFiltersPane() {
+            savedFiltersPane.style.display = 'block';
+            filterForm.style.display = 'none';
+        }
+
+        function showFilterForm(creating) {
             filterForm.action = creating ? '/dashboard/orders/filters' : '/dashboard/orders/filters/update';
+            savedFiltersPane.style.display = 'none';
             filterForm.style.display = 'block';
         }
 
-        document.getElementById('toggleFilterForm').addEventListener('click', function() {
-            if (filterForm.style.display === 'block') {
-                filterForm.style.display = 'none';
+        function selectOption(select, value) {
+            const match = Array.from(select.options)
+                    .find(option => option.value.toUpperCase() === value.toUpperCase());
+            if (match) {
+                select.value = match.value;
                 return;
             }
+            const missing = new Option(value, value, true, true);
+            select.add(missing);
+        }
+
+        document.getElementById('newFilterButton').addEventListener('click', function() {
             filterForm.reset();
             filterIdField.value = '';
-            openFilterForm(true);
+            showFilterForm(true);
         });
+
+        document.getElementById('backToFiltersList').addEventListener('click', showSavedFiltersPane);
 
         document.querySelectorAll('.edit-filter').forEach(button => {
             button.addEventListener('click', function() {
@@ -295,17 +365,19 @@
                         return;
                     }
                     if (input.tagName === 'SELECT') {
-                        const match = Array.from(input.options)
-                                .find(option => option.value.toUpperCase() === value.toUpperCase());
-                        input.value = match ? match.value : '';
+                        selectOption(input, value);
                     } else {
                         input.value = value;
                     }
                 });
 
-                openFilterForm(false);
+                showFilterForm(false);
             });
         });
+
+        if (/*[[${openFilters}]]*/ false) {
+            toggleOrderFiltersModal(true);
+        }
     </script>
 
 </div>

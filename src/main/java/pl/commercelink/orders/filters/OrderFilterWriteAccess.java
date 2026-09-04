@@ -16,7 +16,7 @@ public class OrderFilterWriteAccess {
 
     public OwnedOrderFilters checkWritePermissionsAndReturn(FilterActor actor, boolean sharedWithStore) {
         if (sharedWithStore && !actor.administrator()) {
-            throw new OrderFilterAccessDeniedException("Only an administrator can change the filters shared with the store");
+            throw new OrderFilterAccessDeniedException("orders.filters.error.store.only.admin");
         }
         String owner = sharedWithStore ? OwnedOrderFilters.STORE_FILTER : actor.userId();
         return orderFiltersRepository.findByOwner(actor.storeId(), owner)
@@ -35,6 +35,6 @@ public class OrderFilterWriteAccess {
 
         return orderFiltersRepository.findByOwner(actor.storeId(), actor.userId())
                 .filter(filters -> filters.byId(filterId).isPresent())
-                .orElseThrow(() -> new OrderFilterInvalidException("The filter no longer exists"));
+                .orElseThrow(() -> new OrderFilterInvalidException("orders.filters.error.not.found"));
     }
 }

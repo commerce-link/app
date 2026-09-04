@@ -41,7 +41,7 @@ public class OrderFilter {
 
     private static String validLabel(String label) {
         if (label == null || label.isBlank()) {
-            throw new OrderFilterInvalidException("A filter needs a label");
+            throw new OrderFilterInvalidException("orders.filters.error.no.label");
         }
         return label.trim();
     }

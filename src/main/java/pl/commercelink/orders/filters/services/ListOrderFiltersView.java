@@ -1,4 +1,4 @@
-package pl.commercelink.orders.filters.handlers;
+package pl.commercelink.orders.filters.services;
 
 import pl.commercelink.orders.filters.model.OrderFilter;
 

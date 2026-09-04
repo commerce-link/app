@@ -54,7 +54,7 @@ public class OwnedOrderFilters {
     @DynamoDBIgnore
     public void add(OrderFilter filter) {
         if (filters.size() >= LIMIT_PER_DOCUMENT) {
-            throw new OrderFilterInvalidException("A filter list cannot hold more than " + LIMIT_PER_DOCUMENT + " filters");
+            throw new OrderFilterInvalidException("orders.filters.error.limit.reached", LIMIT_PER_DOCUMENT);
         }
         filters.add(filter);
     }

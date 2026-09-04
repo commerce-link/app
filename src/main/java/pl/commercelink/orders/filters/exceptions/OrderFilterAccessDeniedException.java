@@ -1,8 +1,8 @@
 package pl.commercelink.orders.filters.exceptions;
 
-public class OrderFilterAccessDeniedException extends RuntimeException {
+public class OrderFilterAccessDeniedException extends OrderFilterException {
 
-    public OrderFilterAccessDeniedException(String message) {
-        super(message);
+    public OrderFilterAccessDeniedException(String messageKey, Object... messageArguments) {
+        super(messageKey, messageArguments);
     }
 }

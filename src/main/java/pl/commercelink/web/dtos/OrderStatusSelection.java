@@ -10,12 +10,12 @@ public record OrderStatusSelection(List<OrderStatus> statuses, List<String> sele
     private static final List<OrderStatus> DEFAULT_ORDER =
             List.of(OrderStatus.Assembled, OrderStatus.Assembly, OrderStatus.New);
 
-    public static OrderStatusSelection resolve(List<Order> orders, List<String> requested, boolean showAll) {
-        if (showAll) {
-            return new OrderStatusSelection(List.of(), List.of());
-        }
+    public static OrderStatusSelection resolve(List<Order> orders, List<String> requested, boolean withoutDefault) {
         if (requested != null && !requested.isEmpty()) {
             return new OrderStatusSelection(requested.stream().map(OrderStatus::valueOf).toList(), requested);
+        }
+        if (withoutDefault) {
+            return new OrderStatusSelection(List.of(), List.of());
         }
         OrderStatus fallback = DEFAULT_ORDER.stream()
                 .filter(status -> orders.stream().anyMatch(order -> order.getStatus() == status))

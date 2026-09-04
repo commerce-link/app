@@ -24,18 +24,17 @@ import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
-import pl.commercelink.orders.filters.exceptions.OrderFilterAccessDeniedException;
-import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
-import pl.commercelink.orders.handlers.ListOpenOrdersHandler;
+import pl.commercelink.orders.filters.exceptions.OrderFilterException;
+import pl.commercelink.orders.services.ListOpenOrdersQueryService;
 
-import pl.commercelink.orders.filters.handlers.CreateOrderFilterHandler;
-import pl.commercelink.orders.filters.handlers.DeleteOrderFilterHandler;
+import pl.commercelink.orders.filters.services.CreateOrderFilterCommandService;
+import pl.commercelink.orders.filters.services.DeleteOrderFilterCommandService;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.handlers.ListOrderFiltersHandler;
+import pl.commercelink.orders.filters.services.ListOrderFiltersQueryService;
 
 import pl.commercelink.orders.filters.ShippingDue;
-import pl.commercelink.orders.filters.handlers.UpdateOrderFilterHandler;
-import pl.commercelink.orders.filters.handlers.ListOrderFiltersView;
+import pl.commercelink.orders.filters.services.UpdateOrderFilterCommandService;
+import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -52,12 +51,12 @@ import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.ClientDataDto;
-import pl.commercelink.web.dtos.Marketplace;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderStatusSelection;
 import pl.commercelink.web.dtos.SavedOrderFilterView;
@@ -139,19 +138,19 @@ public class OrdersController extends BaseController {
     private DropshipItemLookup dropshipItemLookup;
 
     @Autowired
-    private ListOrderFiltersHandler listOrderFilters;
+    private ListOrderFiltersQueryService listOrderFilters;
 
     @Autowired
-    private CreateOrderFilterHandler createOrderFilter;
+    private CreateOrderFilterCommandService createOrderFilter;
 
     @Autowired
-    private UpdateOrderFilterHandler updateOrderFilter;
+    private UpdateOrderFilterCommandService updateOrderFilter;
 
     @Autowired
-    private DeleteOrderFilterHandler deleteOrderFilter;
+    private DeleteOrderFilterCommandService deleteOrderFilter;
 
     @Autowired
-    private ListOpenOrdersHandler listOpenOrders;
+    private ListOpenOrdersQueryService listOpenOrders;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -159,13 +158,13 @@ public class OrdersController extends BaseController {
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
                         @RequestParam(required = false) String filterId,
                         Model model) {
-        ListOrderFiltersView savedFilters = listOrderFilters.handle(actor());
+        ListOrderFiltersView savedFilters = listOrderFilters.list(actor());
         OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
 
-        List<Order> openOrders = listOpenOrders.handle(getStoreId(), selectedFilter);
+        List<Order> openOrders = listOpenOrders.listOpen(getStoreId(), selectedFilter);
 
-        boolean statusChosenExplicitly = statuses != null && !statuses.isEmpty();
-        OrderStatusSelection statusSelection = OrderStatusSelection.resolve(openOrders, statuses, showAll);
+        OrderStatusSelection statusSelection =
+                OrderStatusSelection.resolve(openOrders, statuses, showAll || selectedFilter != null);
         List<Order> filteredOrders = statusSelection.narrow(openOrders);
 
         Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
@@ -178,8 +177,6 @@ public class OrdersController extends BaseController {
                 .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
                 .toList());
         model.addAttribute("selectedStatuses", statusSelection.selected());
-        model.addAttribute("allStatusesShown", showAll);
-        model.addAttribute("requestedStatuses", statusChosenExplicitly ? statuses : List.<String>of());
         model.addAttribute("savedFilters", Stream.concat(
                         savedFilters.sharedWithStore().stream().map(f -> SavedOrderFilterView.of(f, true)),
                         savedFilters.own().stream().map(f -> SavedOrderFilterView.of(f, false)))
@@ -189,44 +186,66 @@ public class OrdersController extends BaseController {
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("shippingDueOptions", ShippingDue.values());
-        model.addAttribute("marketplaces", Marketplace.values());
+        model.addAttribute("marketplaces", connectedMarketplaceNames());
         return "orders";
     }
 
     @PostMapping("/dashboard/orders/filters")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes) {
-        OrderFilter created = createOrderFilter.handle(
-                actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
-        redirectAttributes.addAttribute("filterId", created.getId());
-        return "redirect:/dashboard/orders";
+    public String createOrderFilter(OrderFilterForm form, @RequestParam(required = false) String activeFilterId,
+                                    RedirectAttributes redirectAttributes) {
+        createOrderFilter.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        return backToFilters(activeFilterId, redirectAttributes);
     }
 
     @PostMapping("/dashboard/orders/filters/update")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
+                                    @RequestParam(required = false) String activeFilterId,
                                     RedirectAttributes redirectAttributes) {
-        OrderFilter updated = updateOrderFilter.handle(
-                actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
-        redirectAttributes.addAttribute("filterId", updated.getId());
-        return "redirect:/dashboard/orders";
+        updateOrderFilter.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        return backToFilters(activeFilterId, redirectAttributes);
     }
 
     @PostMapping("/dashboard/orders/filters/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String deleteOrderFilter(@RequestParam String filterId) {
-        deleteOrderFilter.handle(actor(), filterId);
+    public String deleteOrderFilter(@RequestParam String filterId,
+                                    @RequestParam(required = false) String activeFilterId,
+                                    RedirectAttributes redirectAttributes) {
+        deleteOrderFilter.delete(actor(), filterId);
+        return backToFilters(filterId.equals(activeFilterId) ? null : activeFilterId, redirectAttributes);
+    }
+
+    private String backToFilters(String activeFilterId, RedirectAttributes redirectAttributes) {
+        if (activeFilterId != null && !activeFilterId.isBlank()) {
+            redirectAttributes.addAttribute("filterId", activeFilterId);
+        }
+        redirectAttributes.addFlashAttribute("openFilters", true);
         return "redirect:/dashboard/orders";
     }
 
-    @ExceptionHandler({OrderFilterAccessDeniedException.class, OrderFilterInvalidException.class})
-    public String orderFilterRejected(RuntimeException e, RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("error", e.getMessage());
+    @ExceptionHandler(OrderFilterException.class)
+    public String orderFilterRejected(OrderFilterException e, Locale locale, RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage(e.getMessageKey(), e.getMessageArguments(), locale));
         return "redirect:/dashboard/orders";
     }
 
     private FilterActor actor() {
         return new FilterActor(getStoreId(), getUserId(), isAdmin());
+    }
+
+    private List<String> connectedMarketplaceNames() {
+        Store store = storesRepository.findById(getStoreId());
+        if (store == null) {
+            return List.of();
+        }
+        return store.getMarketplaces().stream()
+                .map(MarketplaceIntegration::getName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     @GetMapping("/dashboard/orders/new/from-basket")

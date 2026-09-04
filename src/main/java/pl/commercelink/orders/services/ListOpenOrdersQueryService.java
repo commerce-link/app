@@ -1,4 +1,4 @@
-package pl.commercelink.orders.handlers;
+package pl.commercelink.orders.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
@@ -11,17 +11,17 @@ import java.util.Comparator;
 import java.util.List;
 
 @Component
-public class ListOpenOrdersHandler {
+public class ListOpenOrdersQueryService {
 
     private final OrdersRepository ordersRepository;
     private final OrderFilterMatcher orderFilterMatcher;
 
-    public ListOpenOrdersHandler(OrdersRepository ordersRepository, OrderFilterMatcher orderFilterMatcher) {
+    public ListOpenOrdersQueryService(OrdersRepository ordersRepository, OrderFilterMatcher orderFilterMatcher) {
         this.ordersRepository = ordersRepository;
         this.orderFilterMatcher = orderFilterMatcher;
     }
 
-    public List<Order> handle(String storeId, OrderFilter filter) {
+    public List<Order> listOpen(String storeId, OrderFilter filter) {
         List<Order> openOrders = ordersRepository.findAllActiveOrders(storeId).stream()
                 .filter(order -> order.getStatus() != OrderStatus.Completed && order.getStatus() != OrderStatus.Cancelled)
                 .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
