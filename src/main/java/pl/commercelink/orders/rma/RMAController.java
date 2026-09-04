@@ -394,6 +394,11 @@ public class RMAController {
     public String updateRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId,
                                 @ModelAttribute("rmaItem") RMAItem formItem,
                                 RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
         RMAItem existing = rmaItemsRepository.findById(rmaId, rmaItemId);
         if (existing == null) {
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -413,7 +418,13 @@ public class RMAController {
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/markItemsAsReceived")
-    public String markItemsAsReceived(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form) {
+    public String markItemsAsReceived(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
         rmaManager.markItemsAsReceived(getStoreId(), rmaId, form.getSelectedRMAItemIds());
         return "redirect:/dashboard/rma/" + rmaId;
     }
@@ -517,7 +528,7 @@ public class RMAController {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.not.found", null, locale));
             return Optional.of("redirect:/dashboard/rma");
         }
-        if (rma.getStatus() != null && rma.getStatus().isClosed()) {
+        if (isClosed(rma)) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.already.closed", null, locale));
             return Optional.of("redirect:/dashboard/rma/" + rmaId);
         }
@@ -598,7 +609,12 @@ public class RMAController {
                                @PathVariable("rmaItemId") String rmaItemId,
                                @RequestParam("qty1") int qty1,
                                @RequestParam("qty2") int qty2,
-                               RedirectAttributes redirectAttributes) {
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
         RMAItem original = rmaItemsRepository.findById(rmaId, rmaItemId);
 
         if (original == null) {

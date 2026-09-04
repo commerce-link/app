@@ -573,6 +573,60 @@ class RMAControllerTest {
     }
 
     @Test
+    void updateRmaItemOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateRmaItem(RMA_ID, "rma-item-1", rmaItemWithQty("item-1", 1), redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaItemsRepository, never()).findById(any(), any());
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void markItemsAsReceivedOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.markItemsAsReceived(RMA_ID, new RMAItemsForm(), redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaManager, never()).markItemsAsReceived(any(), any(), any());
+    }
+
+    @Test
+    void splitRmaItemOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaItemsRepository, never()).findById(any(), any());
+        verify(rmaItemsRepository, never()).batchSave(any());
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
     void resendMarketplaceDecisionOnAnUnknownRmaRedirectsToTheListInsteadOfFailing() {
         // given
         when(rmaRepository.findById(STORE_ID, "nope")).thenReturn(null);
