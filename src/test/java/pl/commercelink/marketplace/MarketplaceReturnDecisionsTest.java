@@ -604,4 +604,36 @@ class MarketplaceReturnDecisionsTest {
         // then
         assertEquals("LOCAL-SEED-0051", capturePublishedAction().getItems().get(0).getManufacturerCode());
     }
+
+    // --- Task 7: decisions report refusal instead of silently swallowing it ---
+
+    @Test
+    void returnAcceptedReportsRefusalWhenARejectionWasAlreadySent() {
+        // given
+        marketplaceRma.addActionEvent(RMA.EVENT_REJECTION_SENT);
+
+        // when
+        boolean sent = decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+
+        // then
+        assertFalse(sent);
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void returnAcceptedIsANoOpThatSucceedsForAManualRma() {
+        // when / then
+        assertTrue(decisions.returnAccepted(new RMA(STORE_ID), List.of(), false));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void returnRejectedReportsRefusalWhenARefundWasAlreadyRequested() {
+        // given
+        marketplaceRma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
+
+        // when / then
+        assertFalse(decisions.returnRejected(marketplaceRma));
+        verifyNoInteractions(publisher);
+    }
 }

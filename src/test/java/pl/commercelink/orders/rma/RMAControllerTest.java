@@ -109,6 +109,7 @@ class RMAControllerTest {
         // given
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 1));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any()))
@@ -137,6 +138,7 @@ class RMAControllerTest {
         // given
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 2));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
@@ -160,6 +162,7 @@ class RMAControllerTest {
         // given
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 1));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
@@ -188,6 +191,7 @@ class RMAControllerTest {
         // absorbs this batch's quantity, wrongly reporting full coverage (see bug found in S10).
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 1));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
@@ -211,6 +215,7 @@ class RMAControllerTest {
         // given
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 2));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
@@ -258,6 +263,7 @@ class RMAControllerTest {
         verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
         verify(rmaLifecycle, never()).update(any());
         verify(marketplaceReturnDecisions, never()).returnRejected(any());
+        verify(rmaRepository, never()).save(any());
         assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.Rejected);
         assertThat(existingRma.getEmail()).isEqualTo("buyer@example.com");
         assertThat(existingRma.getRejectionReason()).isEqualTo("Damaged on arrival");
@@ -490,5 +496,91 @@ class RMAControllerTest {
         // then
         verify(redirectAttributes).addFlashAttribute("errorMessage", "claimed");
         verify(rmaItemsRepository, never()).save(any());
+    }
+
+    // ------------------------------------------------------------------
+    // closed-RMA guard on the mutating endpoints (Task 7)
+    // ------------------------------------------------------------------
+
+    @Test
+    void acceptReturnOnAClosedRmaIsBlockedBeforeTouchingTheWarehouse() {
+        // given: tab 2 rejected the return while tab 1 still shows an enabled accept form
+        RMA rejected = rmaWithStatus(RMAStatus.Rejected);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rejected);
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.acceptReturn(RMA_ID, ItemCondition.Sealed, true, new RMAItemsForm(),
+                    redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaManager, never()).returnSelectedItems(any(), any(), any());
+        verify(ordersRMAManager, never()).acceptReturn(any(), any(), any(), any());
+    }
+
+    @Test
+    void acceptReturnFlashesAnErrorWhenTheMarketplaceDecisionWasRefused() {
+        // given
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 1));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(rmaManager.returnSelectedItems(any(), any(), any()))
+                .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
+        when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
+        when(marketplaceReturnDecisions.returnAccepted(rma, rmaItems, false)).thenReturn(false);
+        when(messageSource.getMessage(eq("rma.marketplace.decision.not.sent"), any(), any())).thenReturn("not sent");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.acceptReturn(RMA_ID, ItemCondition.Sealed, false, new RMAItemsForm(),
+                    redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "not sent");
+    }
+
+    @Test
+    void addRmaItemFromOrderOnAClosedRmaIsBlocked() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(orderItemsRepository, never()).findById(any(), any());
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void resendMarketplaceDecisionOnAnUnknownRmaRedirectsToTheListInsteadOfFailing() {
+        // given
+        when(rmaRepository.findById(STORE_ID, "nope")).thenReturn(null);
+        when(messageSource.getMessage(eq("rma.not.found"), any(), any())).thenReturn("not found");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.resendMarketplaceDecision("nope", redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "not found");
+        verify(marketplaceReturnDecisions, never()).resendLastDecision(any());
     }
 }

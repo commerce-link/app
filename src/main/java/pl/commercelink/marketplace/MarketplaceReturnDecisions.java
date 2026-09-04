@@ -59,19 +59,22 @@ public class MarketplaceReturnDecisions {
     @Autowired
     private OrderItemFamily orderItemFamily;
 
-    /** Called after the warehouse accepted the items; every call is a separate (partial) refund with its own commandId. */
-    public void returnAccepted(RMA rma, List<RMAItem> acceptedItems, boolean refundDelivery) {
+    /**
+     * Called after the warehouse accepted the items; every call is a separate (partial) refund with its
+     * own commandId. Returns false when the decision was refused or could not be published.
+     */
+    public boolean returnAccepted(RMA rma, List<RMAItem> acceptedItems, boolean refundDelivery) {
         if (!rma.isMarketplaceReturn()) {
-            return;
+            return true;
         }
         if (rma.hasActionEvent(RMA.EVENT_REJECTION_SENT)) {
             LOGGER.warn("Refusing to refund RMA {}: a rejection was already sent to the marketplace", rma.getRmaId());
-            return;
+            return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
             LOGGER.warn("Cannot publish return acceptance for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
-            return;
+            return false;
         }
 
         Map<String, OrderItem> orderItemsById = orderItemsById(rma, order, acceptedItems);
@@ -97,6 +100,7 @@ public class MarketplaceReturnDecisions {
         rmaRepository.save(rma);
 
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
+        return true;
     }
 
     /**
@@ -134,23 +138,23 @@ public class MarketplaceReturnDecisions {
                 + ": it has no matching order item and no stored mfn");
     }
 
-    public void returnRejected(RMA rma) {
+    public boolean returnRejected(RMA rma) {
         if (!rma.isMarketplaceReturn()) {
-            return;
+            return true;
         }
         if (rma.hasActionEvent(RMA.EVENT_REJECTION_SENT)) {
-            return;
+            return true;
         }
         if (rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED)) {
             // Mirrors the guard in returnAccepted: a refund and a rejection on the same RMA must never both
             // reach the marketplace - the buyer would keep the money and also get a rejection notice.
             LOGGER.warn("Refusing to reject RMA {}: a refund was already requested to the marketplace", rma.getRmaId());
-            return;
+            return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
             LOGGER.warn("Cannot publish return rejection for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
-            return;
+            return false;
         }
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 List.of(), false, null, rma.getRejectionReason());
@@ -161,6 +165,7 @@ public class MarketplaceReturnDecisions {
         rmaRepository.save(rma);
 
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
+        return true;
     }
 
     private void rememberAction(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
