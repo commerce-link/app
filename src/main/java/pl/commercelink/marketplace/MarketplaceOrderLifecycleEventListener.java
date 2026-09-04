@@ -18,6 +18,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 import pl.commercelink.stores.IntegrationType;
 
 
@@ -129,7 +130,7 @@ public class MarketplaceOrderLifecycleEventListener {
     // a return event for a marketplace without a returns API cannot be acted on; skipping (not throwing)
     // keeps it out of the DLQ, and the RMA history shows whether the decision reached the marketplace
     private void withReturns(MarketplaceProvider provider, OrderLifecycleEvent payload,
-                             java.util.function.Consumer<MarketplaceReturns> action) {
+                             Consumer<MarketplaceReturns> action) {
         if (payload.getReturnAction() == null || payload.getReturnAction().getExternalReturnId() == null) {
             LOGGER.warn("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;

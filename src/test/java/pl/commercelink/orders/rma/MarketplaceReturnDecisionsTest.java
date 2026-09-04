@@ -1,4 +1,4 @@
-package pl.commercelink.marketplace;
+package pl.commercelink.orders.rma;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,10 +23,6 @@ import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
-import pl.commercelink.orders.rma.MarketplaceDecision;
-import pl.commercelink.orders.rma.RMA;
-import pl.commercelink.orders.rma.RMAItem;
-import pl.commercelink.orders.rma.RMARepository;
 
 import java.time.LocalDateTime;
 import java.util.List;

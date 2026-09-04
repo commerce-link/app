@@ -1,4 +1,4 @@
-package pl.commercelink.marketplace;
+package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,10 +16,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.rma.MarketplaceDecision;
-import pl.commercelink.orders.rma.RMA;
-import pl.commercelink.orders.rma.RMAItem;
-import pl.commercelink.orders.rma.RMARepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
