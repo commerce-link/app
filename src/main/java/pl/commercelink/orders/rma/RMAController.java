@@ -428,6 +428,16 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        // The checkbox default was computed for the whole RMA at render time; the operator may have
+        // selected a subset, so the delivery refund must be re-derived from what was actually accepted.
+        // This MUST run before ordersRMAManager.acceptReturn: accepting can split an OrderItem (one
+        // fragment marked Returned, the remainder left open), and coversWholeOrder's "already
+        // Returned/Replaced items don't need coverage" rule assumes it is looking at the pre-acceptance
+        // state - evaluated afterwards, the just-split-off fragment is wrongly treated as a prior, separate
+        // decision, while the leftover fragment coincidentally absorbs this batch's quantity instead.
+        boolean deliveryCovered = refundDelivery
+                && marketplaceReturnDecisions.coversWholeOrder(op.getRma(), op.getRmaItems());
+
         OperationResult<?> result = ordersRMAManager.acceptReturn(
                 getStoreId(),
                 op.getRma(),
@@ -438,13 +448,7 @@ public class RMAController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
-        }
-
-        if (result.isSuccess()) {
-            // The checkbox default was computed for the whole RMA at render time; the operator may have
-            // selected a subset, so the delivery refund must be re-derived from what was actually accepted.
-            boolean deliveryCovered = refundDelivery
-                    && marketplaceReturnDecisions.coversWholeOrder(op.getRma(), op.getRmaItems());
+        } else {
             marketplaceReturnDecisions.returnAccepted(op.getRma(), op.getRmaItems(), deliveryCovered);
         }
 

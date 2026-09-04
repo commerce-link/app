@@ -3,6 +3,7 @@ package pl.commercelink.orders.rma;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -175,6 +177,32 @@ class RMAControllerTest {
         ArgumentCaptor<Boolean> refundDeliveryCaptor = ArgumentCaptor.forClass(Boolean.class);
         verify(marketplaceReturnDecisions).returnAccepted(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
         assertThat(refundDeliveryCaptor.getValue()).isFalse();
+    }
+
+    @Test
+    void acceptReturnEvaluatesWholeOrderCoverageBeforeMutatingOrderItems() {
+        // given: accepting can split an OrderItem (one fragment marked Returned, the remainder left
+        // open) - coversWholeOrder must run on the pre-acceptance state, or a just-split-off fragment
+        // gets mistaken for a prior, separate decision and the leftover fragment coincidentally
+        // absorbs this batch's quantity, wrongly reporting full coverage (see bug found in S10).
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        List<RMAItem> rmaItems = List.of(rmaItemWithQty("item-1", 1));
+        when(rmaManager.returnSelectedItems(any(), any(), any()))
+                .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
+        when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
+        when(marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems)).thenReturn(true);
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.acceptReturn(RMA_ID, ItemCondition.Sealed, true, new RMAItemsForm(),
+                    redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        InOrder order = inOrder(marketplaceReturnDecisions, ordersRMAManager);
+        order.verify(marketplaceReturnDecisions).coversWholeOrder(rma, rmaItems);
+        order.verify(ordersRMAManager).acceptReturn(any(), any(), any(), any());
     }
 
     @Test
