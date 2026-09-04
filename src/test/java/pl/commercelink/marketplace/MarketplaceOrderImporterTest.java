@@ -195,7 +195,8 @@ class MarketplaceOrderImporterTest {
                 "500600700", null, address, address);
         MarketplaceProduct product = new MarketplaceProduct("Widget", manufacturerCode, new BigDecimal("100.00"), 2, BigDecimal.ZERO);
         return new MarketplaceOrder("mp-order-1", customer, List.of(product),
-                new BigDecimal("9.99"), "InPost", "BankTransfer", "txn-1", null);
+                new MarketplaceOrder.Shipping(new BigDecimal("9.99"), "InPost", null, null),
+                "BankTransfer", "txn-1");
     }
 
     private List<OrderItem> capturedOrderItems() {
