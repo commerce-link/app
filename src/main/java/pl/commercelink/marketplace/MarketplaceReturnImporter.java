@@ -250,10 +250,9 @@ public class MarketplaceReturnImporter {
     }
 
     /**
-     * The marketplace key is stored raw in externalItemId, so current orders compare verbatim.
-     * Orders imported before that field was populated only carry manufacturerCode, which
-     * Basket.setBasketItems normalised through unifyMfn (uppercase, spaces stripped) — hence the
-     * fallback normalises both sides.
+     * Current orders store the raw marketplace key in externalItemId. Orders imported before that field
+     * existed carry it only in sku, normalised by Basket.setBasketItems (unifyMfn); manufacturerCode is
+     * the supplier's part number after fulfilment and is kept as a last resort only.
      */
     static boolean matchesMarketplaceKey(OrderItem orderItem, String marketplaceKey) {
         if (marketplaceKey == null) {
@@ -263,9 +262,9 @@ public class MarketplaceReturnImporter {
         if (isNotBlank(externalItemId)) {
             return marketplaceKey.equals(externalItemId);
         }
-        String normalisedOrderItem = UnifiedProductIdentifiers.unifyMfn(orderItem.getManufacturerCode());
-        return normalisedOrderItem != null
-                && normalisedOrderItem.equals(UnifiedProductIdentifiers.unifyMfn(marketplaceKey));
+        String normalisedKey = UnifiedProductIdentifiers.unifyMfn(marketplaceKey);
+        return normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getSku()))
+                || normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getManufacturerCode()));
     }
 
     private static List<Shipment> toShipments(MarketplaceReturn ret) {

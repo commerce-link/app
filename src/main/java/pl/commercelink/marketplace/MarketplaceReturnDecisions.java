@@ -255,7 +255,12 @@ public class MarketplaceReturnDecisions {
     }
 
     private static String keyOf(OrderItem orderItem) {
-        String externalItemId = orderItem.getExternalItemId();
-        return isNotBlank(externalItemId) ? externalItemId : orderItem.getManufacturerCode();
+        if (isNotBlank(orderItem.getExternalItemId())) {
+            return orderItem.getExternalItemId();
+        }
+        if (isNotBlank(orderItem.getSku())) {
+            return orderItem.getSku();
+        }
+        return orderItem.getManufacturerCode();
     }
 }

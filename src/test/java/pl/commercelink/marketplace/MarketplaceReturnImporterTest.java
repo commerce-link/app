@@ -118,6 +118,17 @@ class MarketplaceReturnImporterTest {
         return orderItem(itemId, sku, sku, qty);
     }
 
+    private static OrderItem legacyOrderItem(String itemId, String sku, String supplierMfn, int qty) {
+        OrderItem item = mock(OrderItem.class);
+        when(item.getItemId()).thenReturn(itemId);
+        when(item.getExternalItemId()).thenReturn(null);
+        when(item.getSku()).thenReturn(sku);
+        when(item.getManufacturerCode()).thenReturn(supplierMfn);
+        when(item.getQty()).thenReturn(qty);
+        when(item.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)).thenReturn(false);
+        return item;
+    }
+
     private static RMAItem rmaItem(String rmaId, String orderItemId) {
         RMAItem item = new RMAItem();
         item.setRmaId(rmaId);
@@ -207,6 +218,23 @@ class MarketplaceReturnImporterTest {
 
         // then
         verify(rmaRepository).save(any(RMA.class));
+    }
+
+    @Test
+    void matchesAnOrderImportedBeforeExternalItemIdByItsNormalisedSku() {
+        // given: pre-externalItemId orders keep unifyMfn(marketplace key) in sku, while fulfilment
+        // overwrote manufacturerCode with the supplier's part number
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
+        OrderItem legacy = legacyOrderItem("item-legacy", "LOCAL-SEED-0051", "SUPPLIER-MPN-77", 1);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
+
+        // when
+        importer.importReturn(store, MARKETPLACE, returnWithItem("local-seed-0051", 1));
+
+        // then
+        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
+        assertEquals("item-legacy", itemsCaptor.getValue().get(0).getItemId());
     }
 
     @Test

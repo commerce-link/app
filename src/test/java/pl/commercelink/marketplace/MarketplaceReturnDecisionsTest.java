@@ -590,4 +590,18 @@ class MarketplaceReturnDecisionsTest {
         verifyNoInteractions(publisher);
         verify(rmaRepository, never()).save(any());
     }
+
+    @Test
+    void returnAcceptedUsesTheNormalisedSkuAsRefundKeyForALegacyOrderItem() {
+        // given
+        OrderItem legacy = orderItem("item-1", "SUPPLIER-MPN-77", 1, FulfilmentStatus.Delivered);
+        when(legacy.getSku()).thenReturn("LOCAL-SEED-0051");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
+
+        // when
+        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-MPN-77", 1)), false);
+
+        // then
+        assertEquals("LOCAL-SEED-0051", capturePublishedAction().getItems().get(0).getManufacturerCode());
+    }
 }
