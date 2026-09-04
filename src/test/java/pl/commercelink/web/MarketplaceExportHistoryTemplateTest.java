@@ -14,6 +14,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
+import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 
 import java.text.MessageFormat;
@@ -27,7 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MarketplaceExportHistoryTemplateTest {
 
-    private static final String RUN_ID = "2026-08-13_01-31-05";
+    private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
+    private static final String LEGACY_RUN_ID = "2026-08-13_01-31-05";
 
     @Test
     void rendersEveryColumnOfARunRow() {
@@ -47,6 +49,20 @@ class MarketplaceExportHistoryTemplateTest {
         assertThat(html).contains("Zakończony");
         assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "/file");
         assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void showsTheReadableTimestampOfTheRunIdAsTheTitleInsteadOfTheCountdownPrefix() {
+        // given
+        WebContext context = runDetailsContext(List.of(
+                MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)), false);
+
+        // when
+        String html = templateEngine().process("store-marketplace-export-run", context);
+
+        // then
+        assertThat(html).contains(">2026-08-13 01:31:05<");
+        assertThat(html).doesNotContain(">8213415334_2026-08-13_01-31-05<");
     }
 
     @Test
@@ -112,6 +128,37 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
+    void fallsBackToTheReadablePartOfACountdownRunIdWhenTheStoredAtIsMissing() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("exportRuns", List.of(
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, null, false)));
+
+        // when
+        String html = renderRunsTable(context);
+
+        // then
+        assertThat(html).contains(">2026-08-13 01:31:05</a>");
+        assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID);
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void fallsBackToALegacyRunIdWhenTheStoredAtIsMissing() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("exportRuns", List.of(
+                new MarketplaceExportRunHeader("allegro", "catalog-1", LEGACY_RUN_ID, null, false)));
+
+        // when
+        String html = renderRunsTable(context);
+
+        // then
+        assertThat(html).contains(">2026-08-13 01:31:05</a>");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
     void showsAnEmptyStateWhenThereAreNoRuns() {
         // given
         WebContext context = webContext();
@@ -141,7 +188,7 @@ class MarketplaceExportHistoryTemplateTest {
                     <tbody>
                     <tr th:each="run : ${exportRuns}">
                       <td><a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
-                             th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${run.runId()}"></a></td>
+                             th:text="${run.storedAt() != null} ? ${#temporals.format(run.storedAt(), 'yyyy-MM-dd HH:mm:ss')} : ${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a></td>
                       <td>
                         <span th:unless="${run.failed()}" th:text="#{store.marketplaces.exports.status.succeeded}"></span>
                         <span th:if="${run.failed()}" th:text="#{store.marketplaces.exports.status.failed}"></span>
@@ -158,6 +205,7 @@ class MarketplaceExportHistoryTemplateTest {
     private WebContext runDetailsContext(List<MarketplaceOfferSnapshot> rows, boolean failed) {
         WebContext context = webContext();
         context.setVariable("runId", RUN_ID);
+        context.setVariable("runTimestamp", MarketplaceExportRunId.readable(RUN_ID));
         context.setVariable("failed", failed);
         context.setVariable("rows", rows);
         context.setVariable("marketplace", "allegro");

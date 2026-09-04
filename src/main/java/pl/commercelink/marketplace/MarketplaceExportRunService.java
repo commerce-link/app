@@ -6,9 +6,8 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.starter.storage.FileStorage;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +16,6 @@ import java.util.Optional;
 @Service
 public class MarketplaceExportRunService {
 
-    private static final DateTimeFormatter RUN_TIMESTAMP =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").withZone(ZoneOffset.UTC);
     private static final String RUNS_PREFIX = "marketplace-export-runs";
     private static final String RUN_EXTENSION = ".csv";
     private static final String FAILED_RUN_EXTENSION = "-failed.csv";
@@ -44,9 +41,10 @@ public class MarketplaceExportRunService {
         String prefix = catalogPrefix(storeId, marketplace, catalogId);
         List<String> keysNewestFirst;
         try {
-            keysNewestFirst = fileStorage.getAllObjectLastModified(bucketName, prefix).entrySet().stream()
-                    .filter(entry -> isSucceededRunKey(entry.getKey()))
-                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+            keysNewestFirst = fileStorage.getAllObjectLastModified(bucketName, prefix).keySet().stream()
+                    .filter(this::isSucceededRunKey)
+                    .flatMap(key -> runInstantOfKey(key).map(instant -> Map.entry(key, instant)).stream())
+                    .sorted(Map.Entry.<String, Instant>comparingByValue(Comparator.reverseOrder()))
                     .map(Map.Entry::getKey)
                     .toList();
         } catch (Exception exception) {
@@ -73,7 +71,7 @@ public class MarketplaceExportRunService {
 
     public void saveRun(MarketplaceExportRun run) {
         try {
-            String runId = RUN_TIMESTAMP.format(clock.instant());
+            String runId = MarketplaceExportRunId.of(clock.instant());
             String key = runKey(run.getStoreId(), run.getMarketplace(), run.getCatalogId(), runId, run.isFailed());
             List<MarketplaceOfferSnapshot> rows = run.toRows();
             fileStorage.put(bucketName, key, MarketplaceExportRunCsv.toBytes(rows));
@@ -89,7 +87,11 @@ public class MarketplaceExportRunService {
                     .stream()
                     .filter(entry -> isRunKey(entry.getKey()))
                     .flatMap(entry -> toHeader(entry.getKey(), entry.getValue()).stream())
-                    .sorted(Comparator.comparing(MarketplaceExportRunHeader::runId).reversed())
+                    .flatMap(header -> MarketplaceExportRunId.instantOf(header.runId())
+                            .map(instant -> Map.entry(instant, header))
+                            .stream())
+                    .sorted(Map.Entry.<Instant, MarketplaceExportRunHeader>comparingByKey(Comparator.reverseOrder()))
+                    .map(Map.Entry::getValue)
                     .toList();
         } catch (Exception exception) {
             System.err.println("Failed to list marketplace export runs: " + exception.getMessage());
@@ -132,6 +134,10 @@ public class MarketplaceExportRunService {
         return MarketplaceExportRunCsv.parse(fileStorage.getBytes(bucketName, key)).stream()
                 .filter(snapshot -> snapshot.pimId() != null && !snapshot.pimId().isBlank())
                 .toList();
+    }
+
+    private Optional<Instant> runInstantOfKey(String key) {
+        return MarketplaceExportRunId.instantOf(MarketplaceExportRunCsv.runIdFrom(key));
     }
 
     private boolean isRunKey(String key) {

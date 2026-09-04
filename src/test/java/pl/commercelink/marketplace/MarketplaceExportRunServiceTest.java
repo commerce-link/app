@@ -24,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,7 +39,8 @@ class MarketplaceExportRunServiceTest {
     private static final String STORE_PREFIX = "marketplace-export-runs/uma2dqukxr/";
     private static final String CATALOG_PREFIX = "marketplace-export-runs/uma2dqukxr/allegro/catalog-1/";
     private static final Instant RUN_FINISHED_AT = Instant.parse("2026-08-13T01:31:05Z");
-    private static final String RUN_ID = "2026-08-13_01-31-05";
+    private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
+    private static final String LEGACY_RUN_ID = "2026-08-13_01-31-05";
 
     @Mock
     private FileStorage fileStorage;
@@ -58,7 +60,7 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void saveRunWritesCsvRowsUnderTimestampedKey() {
+    void saveRunWritesCsvRowsUnderAKeyPrefixedWithTheCountdownOfTheClockInstant() {
         // given
         MarketplaceExportRun run = run();
         run.offers(List.of(MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)));
@@ -74,6 +76,24 @@ class MarketplaceExportRunServiceTest {
         assertThat(written).hasSize(1);
         assertThat(written.get(0).pimId()).isEqualTo("pim-A");
         assertThat(written.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+    }
+
+    @Test
+    void saveRunGivesANewerRunASmallerCountdownThanAnOlderRun() {
+        // given
+        MarketplaceExportRunService olderRun = serviceAt("2026-08-13T01:31:05Z");
+        MarketplaceExportRunService newerRun = serviceAt("2026-09-05T01:00:00Z");
+
+        // when
+        olderRun.saveRun(run());
+        newerRun.saveRun(run());
+
+        // then
+        verify(fileStorage, times(2)).put(eq(BUCKET), keyCaptor.capture(), bytesCaptor.capture());
+        List<String> keys = keyCaptor.getAllValues();
+        assertThat(keys.get(0)).isEqualTo(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv");
+        assertThat(keys.get(1)).isEqualTo(CATALOG_PREFIX + "8211429999_2026-09-05_01-00-00.csv");
+        assertThat(keys.get(1).compareTo(keys.get(0))).isNegative();
     }
 
     @Test
@@ -97,11 +117,57 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void loadPreviousExportPicksNewestByLastModified() {
+    void loadPreviousExportPicksTheNewestRunIdWhateverOrderTheListingArrivesIn() {
         // given
         givenCatalogObjects(
-                object(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", "2026-08-11T01:00:00", offersCsv("pim-OLD")),
-                object(CATALOG_PREFIX + "2026-08-13_01-31-05.csv", "2026-08-13T01:31:05", offersCsv("pim-NEW")));
+                object(CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv", "2026-08-20T09:00:00", offersCsv("pim-OLD")),
+                object(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", "2026-08-19T09:00:00", offersCsv("pim-NEW")),
+                object(CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv", "2026-08-21T09:00:00", offersCsv("pim-MIDDLE")));
+
+        // when
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+
+        // then
+        assertThat(offers).hasSize(1);
+        assertThat(offers.get(0).pimId()).isEqualTo("pim-NEW");
+    }
+
+    @Test
+    void loadPreviousExportPicksTheCountdownRunWhenItIsNewerThanTheLegacyOnes() {
+        // given
+        givenCatalogObjects(
+                object(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", "2026-08-11T01:00:00", offersCsv("pim-LEGACY")),
+                object(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", "2026-08-13T01:31:05", offersCsv("pim-NEW")));
+
+        // when
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+
+        // then
+        assertThat(offers).hasSize(1);
+        assertThat(offers.get(0).pimId()).isEqualTo("pim-NEW");
+    }
+
+    @Test
+    void loadPreviousExportPicksTheLegacyRunWhenItIsNewerThanTheCountdownOnes() {
+        // given
+        givenCatalogObjects(
+                object(CATALOG_PREFIX + "8211429999_2026-09-05_01-00-00.csv", "2026-09-05T01:00:00", offersCsv("pim-COUNTDOWN")),
+                object(CATALOG_PREFIX + "2026-09-06_01-00-00.csv", "2026-09-06T01:00:00", offersCsv("pim-LEGACY")));
+
+        // when
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+
+        // then
+        assertThat(offers).hasSize(1);
+        assertThat(offers.get(0).pimId()).isEqualTo("pim-LEGACY");
+    }
+
+    @Test
+    void loadPreviousExportSkipsRunsWhoseNameCarriesNoRunInstant() {
+        // given
+        givenCatalogObjects(
+                object(CATALOG_PREFIX + "not-a-run-id.csv", "2026-08-20T01:00:00", offersCsv("pim-JUNK")),
+                object(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", "2026-08-13T01:31:05", offersCsv("pim-NEW")));
 
         // when
         List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
@@ -184,7 +250,7 @@ class MarketplaceExportRunServiceTest {
         // given
         Map<String, LocalDateTime> objects = new LinkedHashMap<>();
         objects.put(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", LocalDateTime.parse("2026-08-11T01:00:00"));
-        objects.put(CATALOG_PREFIX + "2026-08-13_01-31-05-failed.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
+        objects.put(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05-failed.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
         objects.put(STORE_PREFIX + "other/nested/deeper/key.csv", LocalDateTime.parse("2026-08-14T01:00:00"));
         when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
 
@@ -193,12 +259,50 @@ class MarketplaceExportRunServiceTest {
 
         // then
         assertThat(runs).hasSize(2);
-        assertThat(runs.get(0).runId()).isEqualTo("2026-08-13_01-31-05");
+        assertThat(runs.get(0).runId()).isEqualTo("8213415334_2026-08-13_01-31-05");
         assertThat(runs.get(0).marketplace()).isEqualTo(MARKETPLACE);
         assertThat(runs.get(0).catalogId()).isEqualTo(CATALOG_ID);
+        assertThat(runs.get(0).storedAt()).isEqualTo(LocalDateTime.parse("2026-08-13T01:31:05"));
         assertThat(runs.get(0).failed()).isTrue();
         assertThat(runs.get(1).runId()).isEqualTo("2026-08-11_01-00-00");
         assertThat(runs.get(1).failed()).isFalse();
+    }
+
+    @Test
+    void findRunsOrdersLegacyAndCountdownRunIdsNewestFirst() {
+        // given
+        Map<String, LocalDateTime> objects = new LinkedHashMap<>();
+        objects.put(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
+        objects.put(CATALOG_PREFIX + "2026-08-11_01-00-00.csv", LocalDateTime.parse("2026-08-11T01:00:00"));
+        objects.put(CATALOG_PREFIX + "8211429999_2026-09-05_01-00-00.csv", LocalDateTime.parse("2026-09-05T01:00:00"));
+        objects.put(CATALOG_PREFIX + "2026-08-12_01-00-00.csv", LocalDateTime.parse("2026-08-12T01:00:00"));
+        when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
+
+        // when
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+
+        // then
+        assertThat(runs).extracting(MarketplaceExportRunHeader::runId).containsExactly(
+                "8211429999_2026-09-05_01-00-00",
+                "8213415334_2026-08-13_01-31-05",
+                "2026-08-12_01-00-00",
+                "2026-08-11_01-00-00");
+    }
+
+    @Test
+    void findRunsSkipsKeysWhoseNameCarriesNoRunInstant() {
+        // given
+        Map<String, LocalDateTime> objects = new LinkedHashMap<>();
+        objects.put(CATALOG_PREFIX + "not-a-run-id.csv", LocalDateTime.parse("2026-08-14T01:00:00"));
+        objects.put(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
+        when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
+
+        // when
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+
+        // then
+        assertThat(runs).extracting(MarketplaceExportRunHeader::runId)
+                .containsExactly("8213415334_2026-08-13_01-31-05");
     }
 
     @Test
@@ -245,6 +349,27 @@ class MarketplaceExportRunServiceTest {
 
         // when / then
         assertThat(service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID)).isEmpty();
+    }
+
+    @Test
+    void findRunResolvesALegacyRunId() {
+        // given
+        byte[] data = offersCsv("pim-A");
+        String key = CATALOG_PREFIX + LEGACY_RUN_ID + ".csv";
+        when(fileStorage.canRead(BUCKET, key)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, key)).thenReturn(data);
+
+        // when
+        Optional<MarketplaceExportRunFile> runFile = service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, LEGACY_RUN_ID);
+
+        // then
+        assertThat(runFile).isPresent();
+        assertThat(runFile.get().runId()).isEqualTo(LEGACY_RUN_ID);
+    }
+
+    private MarketplaceExportRunService serviceAt(String instant) {
+        return new MarketplaceExportRunService(
+                fileStorage, BUCKET, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
     }
 
     private MarketplaceExportRun run() {

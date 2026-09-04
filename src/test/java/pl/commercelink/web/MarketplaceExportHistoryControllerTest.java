@@ -15,6 +15,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
@@ -29,7 +32,12 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -38,7 +46,8 @@ class MarketplaceExportHistoryControllerTest {
     private static final String STORE_ID = "store-1";
     private static final String MARKETPLACE = "allegro";
     private static final String CATALOG_ID = "catalog-1";
-    private static final String RUN_ID = "2026-08-13_01-31-05";
+    private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
+    private static final String LEGACY_RUN_ID = "2026-08-13_01-31-05";
 
     @Mock
     private MarketplaceExportRunService marketplaceExportRunService;
@@ -68,6 +77,7 @@ class MarketplaceExportHistoryControllerTest {
         // then
         assertThat(view).isEqualTo("store-marketplace-export-run");
         assertThat(model.getAttribute("runId")).isEqualTo(RUN_ID);
+        assertThat(model.getAttribute("runTimestamp")).isEqualTo("2026-08-13 01:31:05");
         assertThat(model.getAttribute("failed")).isEqualTo(false);
         assertThat(model.getAttribute("marketplace")).isEqualTo(MARKETPLACE);
         assertThat(model.getAttribute("catalogId")).isEqualTo(CATALOG_ID);
@@ -92,6 +102,58 @@ class MarketplaceExportHistoryControllerTest {
 
         // then
         assertThat(model.getAttribute("failed")).isEqualTo(true);
+    }
+
+    @Test
+    void keepsALegacyRunIdReadableWithoutACountdownPrefix() {
+        // given
+        givenRun(STORE_ID, LEGACY_RUN_ID, runFile(false));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportRun(MARKETPLACE, CATALOG_ID, LEGACY_RUN_ID, model);
+
+        // then
+        assertThat(model.getAttribute("runId")).isEqualTo(LEGACY_RUN_ID);
+        assertThat(model.getAttribute("runTimestamp")).isEqualTo("2026-08-13 01:31:05");
+    }
+
+    @Test
+    void fallsBackToTheRawRunIdWhenItCarriesNoReadableTimestamp() {
+        // given
+        givenRun(STORE_ID, "no-timestamp", runFile(false));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportRun(MARKETPLACE, CATALOG_ID, "no-timestamp", model);
+
+        // then
+        assertThat(model.getAttribute("runTimestamp")).isEqualTo("no-timestamp");
+    }
+
+    @Test
+    void resolvesACountdownRunIdInTheUrl() throws Exception {
+        // given
+        givenAnyRun(runFile(false));
+
+        // when / then
+        perform(RUN_ID)
+                .andExpect(status().isOk())
+                .andExpect(view().name("store-marketplace-export-run"))
+                .andExpect(model().attribute("runId", RUN_ID))
+                .andExpect(model().attribute("runTimestamp", "2026-08-13 01:31:05"));
+    }
+
+    @Test
+    void resolvesALegacyRunIdInTheUrl() throws Exception {
+        // given
+        givenAnyRun(runFile(false));
+
+        // when / then
+        perform(LEGACY_RUN_ID)
+                .andExpect(status().isOk())
+                .andExpect(view().name("store-marketplace-export-run"))
+                .andExpect(model().attribute("runId", LEGACY_RUN_ID));
     }
 
     @Test
@@ -152,8 +214,23 @@ class MarketplaceExportHistoryControllerTest {
         assertThat(model.getAttribute("isSuperAdmin")).isEqualTo(true);
     }
 
+    private ResultActions perform(String runId) throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        return mockMvc.perform(get("/dashboard/store/marketplaces/exports/{marketplace}/{catalogId}/{runId}",
+                MARKETPLACE, CATALOG_ID, runId));
+    }
+
     private void givenRun(String storeId, MarketplaceExportRunFile runFile) {
-        when(marketplaceExportRunService.findRun(storeId, MARKETPLACE, CATALOG_ID, RUN_ID))
+        givenRun(storeId, RUN_ID, runFile);
+    }
+
+    private void givenRun(String storeId, String runId, MarketplaceExportRunFile runFile) {
+        when(marketplaceExportRunService.findRun(storeId, MARKETPLACE, CATALOG_ID, runId))
+                .thenReturn(Optional.of(runFile));
+    }
+
+    private void givenAnyRun(MarketplaceExportRunFile runFile) {
+        when(marketplaceExportRunService.findRun(eq(STORE_ID), eq(MARKETPLACE), eq(CATALOG_ID), anyString()))
                 .thenReturn(Optional.of(runFile));
     }
 
