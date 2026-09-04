@@ -11,7 +11,9 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.ItemCondition;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @Component
@@ -35,7 +37,7 @@ public class OrdersRMAManager {
         List<OrderItem> orderItems = orderItemsReachableFrom(order, rmaItems);
         List<OrderItem> newOrderItems = new ArrayList<>();
 
-        double totalToDecrement = 0;
+        Map<String, Double> totalToDecrementByOrderId = new HashMap<>();
         for (RMAItem rmaItem : rmaItems) {
             OrderItem originalItem = findOrderItemById(rmaItem.getItemId(), orderItems);
 
@@ -47,18 +49,18 @@ public class OrdersRMAManager {
                 itemToProcess = originalItem;
             }
 
-            totalToDecrement += itemToProcess.getTotalPrice();
+            totalToDecrementByOrderId.merge(itemToProcess.getOrderId(), itemToProcess.getTotalPrice(), Double::sum);
 
             // has to be done after computing total price
             itemToProcess.markAsReturned();
         }
 
-        double finalTotalToDecrement = totalToDecrement;
         OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), false, condition);
         commitCurrentOrderChangesIfSuccess(op, order, fresh -> {
-            fresh.decreaseTotalPrice(finalTotalToDecrement);
+            fresh.decreaseTotalPrice(totalToDecrementByOrderId.getOrDefault(order.getOrderId(), 0.0));
             fresh.reopen();
         }, orderItems, newOrderItems);
+        adjustSplitOffOrders(op, storeId, order.getOrderId(), totalToDecrementByOrderId);
         return op;
     }
 
@@ -89,6 +91,26 @@ public class OrdersRMAManager {
         commitCurrentOrderChangesIfSuccess(op, order, fresh -> { }, orderItems, newOrderItems);
         commitNewOrderChangesIfSuccess(op, replacementOrder, replacementItems);
         return op;
+    }
+
+    private void adjustSplitOffOrders(
+            OperationResult<Document> op, String storeId, String parentOrderId, Map<String, Double> totalToDecrementByOrderId) {
+        if (!op.isSuccess()) {
+            return;
+        }
+        for (Map.Entry<String, Double> entry : totalToDecrementByOrderId.entrySet()) {
+            if (entry.getKey().equals(parentOrderId)) {
+                continue;
+            }
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> ordersRepository.findById(storeId, entry.getKey()),
+                    fresh -> {
+                        fresh.decreaseTotalPrice(entry.getValue());
+                        fresh.reopen();
+                    },
+                    ordersRepository::save
+            );
+        }
     }
 
     private OrderItem splitOrderItem(RMAItem rmaItem, OrderItem originalItem) {

@@ -186,7 +186,10 @@ class OrdersRMAManagerTest {
         Order order = orderWithTotalPrice(100.0, OrderStatus.Completed);
         OrderItem moved = new OrderItem("order-2", "Other", "test-item", 1, 100.0, "SKU-moved", false);
         moved.setItemId("item-moved");
+        Order child = orderWithTotalPrice(100.0, OrderStatus.Completed);
+        child.setOrderId("order-2");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
         when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
@@ -216,6 +219,45 @@ class OrdersRMAManagerTest {
 
         // then
         verify(orderItemFamily, never()).siblingItems(any());
+    }
+
+    @Test
+    void acceptReturnAdjustsTheChildOrderWhenTheReturnedItemLivesOnIt() {
+        // given
+        Order order = orderWithTotalPrice(100.0, OrderStatus.Completed);
+        OrderItem item1 = orderItem("item-1", 100.0, 1);
+        Order child = new Order(STORE_ID);
+        child.setOrderId("order-2");
+        child.setTotalPrice(50.0);
+        child.setStatus(OrderStatus.Completed);
+        child.setBillingDetails(BillingDetails._default());
+        child.setShippingDetails(ShippingDetails._default());
+        OrderItem moved = new OrderItem("order-2", "Other", "test-item", 1, 50.0, "SKU-moved", false);
+        moved.setItemId("item-moved");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
+                .thenReturn(OperationResult.success());
+
+        // when
+        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(moved)), ItemCondition.Sealed);
+
+        // then
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(ordersRepository, org.mockito.Mockito.atLeast(1)).save(orderCaptor.capture());
+        Order savedChild = orderCaptor.getAllValues().stream()
+                .filter(o -> "order-2".equals(o.getOrderId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected the child order to be saved"));
+        assertThat(savedChild.getTotalPrice()).isEqualTo(0.0);
+        assertThat(savedChild.getStatus()).isEqualTo(OrderStatus.Delivered);
+        Order savedParent = orderCaptor.getAllValues().stream()
+                .filter(o -> ORDER_ID.equals(o.getOrderId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected the parent order to be saved"));
+        assertThat(savedParent.getTotalPrice()).isEqualTo(100.0);
     }
 
     @Test
