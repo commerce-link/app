@@ -27,7 +27,6 @@ import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
-import pl.commercelink.orders.rma.RMAStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -327,76 +326,6 @@ class MarketplaceReturnDecisionsTest {
 
         // then
         verify(publisher, times(1)).publishReturnAction(any(), any(), eq(OrderLifecycleEventType.ReturnRejected), any());
-    }
-
-    @Test
-    void rejectionReasonIsRequiredOnlyWhenMarketplaceRmaTurnsRejected() {
-        // given
-        RMA manual = new RMA(STORE_ID);
-
-        // when / then
-        assertTrue(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, " "));
-        assertTrue(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, null));
-        assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, "Damaged"));
-        assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Processing, null));
-        assertFalse(decisions.requiresRejectionReason(manual, RMAStatus.Rejected, null));
-        marketplaceRma.setStatus(RMAStatus.Rejected);
-        assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, null));
-    }
-
-    @Test
-    void rejectionReasonIsRequiredWhenLongerThan250Characters() {
-        // given
-        String tooLong = "x".repeat(251);
-        String maxAllowed = "x".repeat(250);
-
-        // when / then
-        assertTrue(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, tooLong));
-        assertFalse(decisions.requiresRejectionReason(marketplaceRma, RMAStatus.Rejected, maxAllowed));
-    }
-
-    @Test
-    void blocksRejectionOnceARefundWasRequested() {
-        // given
-        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
-
-        // when / then
-        assertTrue(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
-    }
-
-    @Test
-    void doesNotBlockRejectionWhenNoRefundWasRequested() {
-        // when / then
-        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
-    }
-
-    @Test
-    void doesNotBlockRejectionForManualRmaEvenAfterARefundEvent() {
-        // given
-        RMA manual = new RMA(STORE_ID);
-        manual.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
-
-        // when / then
-        assertFalse(decisions.blocksRejectionAfterRefund(manual, RMAStatus.Rejected));
-    }
-
-    @Test
-    void doesNotBlockWhenNewStatusIsNotRejected() {
-        // given
-        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
-
-        // when / then
-        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Processing));
-    }
-
-    @Test
-    void doesNotBlockWhenRmaIsAlreadyRejected() {
-        // given
-        marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, LocalDateTime.now()));
-        marketplaceRma.setStatus(RMAStatus.Rejected);
-
-        // when / then
-        assertFalse(decisions.blocksRejectionAfterRefund(marketplaceRma, RMAStatus.Rejected));
     }
 
     @Test

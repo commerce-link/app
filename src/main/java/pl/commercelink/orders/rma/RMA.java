@@ -19,6 +19,7 @@ public class RMA {
     public static final String EVENT_REFUND_REQUESTED = "RefundRequested";
     public static final String EVENT_REJECTION_SENT = "RejectionSent";
     public static final String EVENT_REFUNDED_BY_MARKETPLACE = "RefundedByMarketplace";
+    public static final int MAX_REJECTION_REASON_LENGTH = 250;
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -292,6 +293,23 @@ public class RMA {
     @DynamoDBIgnore
     public boolean isMarketplaceReturn() {
         return externalReturnId != null && !externalReturnId.isBlank();
+    }
+
+    /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */
+    @DynamoDBIgnore
+    public boolean requiresRejectionReason(RMAStatus newStatus, String reason) {
+        return isMarketplaceReturn() && turnsRejected(newStatus)
+                && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
+    }
+
+    /** A refunded return must not also be rejected: the buyer would keep the money and get a rejection notice. */
+    @DynamoDBIgnore
+    public boolean blocksRejectionAfterRefund(RMAStatus newStatus) {
+        return isMarketplaceReturn() && turnsRejected(newStatus) && hasActionEvent(EVENT_REFUND_REQUESTED);
+    }
+
+    private boolean turnsRejected(RMAStatus newStatus) {
+        return newStatus == RMAStatus.Rejected && status != RMAStatus.Rejected;
     }
 
     public List<MarketplaceDecision> getMarketplaceDecisions() {

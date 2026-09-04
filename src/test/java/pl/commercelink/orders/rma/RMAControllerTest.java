@@ -278,8 +278,8 @@ class RMAControllerTest {
     void rejectionWithoutAReasonIsBlockedBeforeAnyMutation() {
         // given
         RMA existingRma = rmaWithStatus(RMAStatus.New);
+        existingRma.setExternalReturnId("r-1");
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existingRma);
-        when(marketplaceReturnDecisions.requiresRejectionReason(any(), any(), any())).thenReturn(true);
         when(messageSource.getMessage(eq("rma.rejection.reason.required"), any(), any())).thenReturn("reason required");
 
         // when
@@ -302,15 +302,18 @@ class RMAControllerTest {
     void rejectionAfterARefundIsBlocked() {
         // given
         RMA existingRma = rmaWithStatus(RMAStatus.New);
+        existingRma.setExternalReturnId("r-1");
+        existingRma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existingRma);
-        when(marketplaceReturnDecisions.blocksRejectionAfterRefund(any(), any())).thenReturn(true);
         when(messageSource.getMessage(eq("rma.rejection.after.refund"), any(), any())).thenReturn("blocked");
+        RMA postedRma = rmaWithStatus(RMAStatus.Rejected);
+        postedRma.setRejectionReason("Damaged on arrival");
 
         // when
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.updateRma(RMA_ID, rmaWithStatus(RMAStatus.Rejected), null, emptyMedia,
+            view = controller.updateRma(RMA_ID, postedRma, null, emptyMedia,
                     redirectAttributes, Locale.ENGLISH);
         }
 

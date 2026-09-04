@@ -276,12 +276,12 @@ public class RMAController {
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        if (marketplaceReturnDecisions.requiresRejectionReason(existingRma, rma.getStatus(), rma.getRejectionReason())) {
+        if (existingRma.requiresRejectionReason(rma.getStatus(), rma.getRejectionReason())) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.rejection.reason.required", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
-        if (marketplaceReturnDecisions.blocksRejectionAfterRefund(existingRma, rma.getStatus())) {
+        if (existingRma.blocksRejectionAfterRefund(rma.getStatus())) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.rejection.after.refund", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;

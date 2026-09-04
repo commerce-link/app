@@ -6,6 +6,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperTableModel;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -103,6 +105,48 @@ class RMAMarketplaceFieldsTest {
 
         // when / then
         assertFalse(rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED));
+    }
+
+    @ParameterizedTest(name = "marketplace={0} current={1} new={2} refundRequested={3} -> blocks={4}")
+    @CsvSource({
+            "true,  WaitingForItems, Rejected,   true,  true",
+            "true,  WaitingForItems, Rejected,   false, false",
+            "false, WaitingForItems, Rejected,   true,  false",
+            "true,  WaitingForItems, Processing, true,  false",
+            "true,  Rejected,        Rejected,   true,  false"})
+    void blocksRejectionAfterRefundOnlyWhenAMarketplaceRmaTurnsRejectedAfterARefund(
+            boolean marketplace, RMAStatus current, RMAStatus next, boolean refundRequested, boolean expected) {
+        // given
+        RMA rma = new RMA("store-1");
+        rma.setStatus(current);
+        if (marketplace) {
+            rma.setExternalReturnId("r-1");
+        }
+        if (refundRequested) {
+            rma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
+        }
+
+        // when / then
+        assertEquals(expected, rma.blocksRejectionAfterRefund(next));
+    }
+
+    @Test
+    void rejectionReasonIsRequiredOnlyWhenAMarketplaceRmaTurnsRejected() {
+        // given
+        RMA marketplace = new RMA("store-1");
+        marketplace.setExternalReturnId("r-1");
+        marketplace.setStatus(RMAStatus.WaitingForItems);
+        RMA manual = new RMA("store-1");
+
+        // when / then
+        assertTrue(marketplace.requiresRejectionReason(RMAStatus.Rejected, " "));
+        assertTrue(marketplace.requiresRejectionReason(RMAStatus.Rejected, null));
+        assertTrue(marketplace.requiresRejectionReason(RMAStatus.Rejected, "x".repeat(251)));
+        assertFalse(marketplace.requiresRejectionReason(RMAStatus.Rejected, "Damaged"));
+        assertFalse(marketplace.requiresRejectionReason(RMAStatus.Processing, null));
+        assertFalse(manual.requiresRejectionReason(RMAStatus.Rejected, null));
+        marketplace.setStatus(RMAStatus.Rejected);
+        assertFalse(marketplace.requiresRejectionReason(RMAStatus.Rejected, null));
     }
 
     private DynamoDBMapperTableModel<RMA> tableModel() {

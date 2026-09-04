@@ -20,7 +20,6 @@ import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMARepository;
-import pl.commercelink.orders.rma.RMAStatus;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -42,8 +41,6 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 public class MarketplaceReturnDecisions {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnDecisions.class);
-
-    private static final int MAX_REJECTION_REASON_LENGTH = 250;
 
     private static final ObjectMapper ACTION_MAPPER = new ObjectMapper();
 
@@ -217,20 +214,6 @@ public class MarketplaceReturnDecisions {
             }
         }
         return published > 0;
-    }
-
-    /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */
-    public boolean requiresRejectionReason(RMA existing, RMAStatus newStatus, String reason) {
-        boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
-        return existing.isMarketplaceReturn() && turnsRejected
-                && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
-    }
-
-    /** A refunded return must not also be rejected: the buyer would keep the money and get a rejection notice. */
-    public boolean blocksRejectionAfterRefund(RMA existing, RMAStatus newStatus) {
-        boolean turnsRejected = newStatus == RMAStatus.Rejected && existing.getStatus() != RMAStatus.Rejected;
-        return existing.isMarketplaceReturn() && turnsRejected
-                && existing.hasActionEvent(RMA.EVENT_REFUND_REQUESTED);
     }
 
     /**
