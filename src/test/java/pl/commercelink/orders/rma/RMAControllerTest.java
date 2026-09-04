@@ -234,6 +234,35 @@ class RMAControllerTest {
     // ------------------------------------------------------------------
 
     @Test
+    void updateRmaOnAnAlreadyClosedRmaIsBlockedBeforeAnyMutation() {
+        // given: rma-detail.html disables status/email/shippingInsurance/rejectionReason once the RMA
+        // is closed, so a resubmission (double-click, back-button) posts those fields as null/default.
+        RMA existingRma = rmaWithStatus(RMAStatus.Rejected);
+        existingRma.setEmail("buyer@example.com");
+        existingRma.setRejectionReason("Damaged on arrival");
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existingRma);
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setOrderId(ORDER_ID);
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.updateRma(RMA_ID, postedRma, null, emptyMedia, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaLifecycle, never()).update(any());
+        verify(marketplaceReturnDecisions, never()).returnRejected(any());
+        assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.Rejected);
+        assertThat(existingRma.getEmail()).isEqualTo("buyer@example.com");
+        assertThat(existingRma.getRejectionReason()).isEqualTo("Damaged on arrival");
+    }
+
+    @Test
     void rejectionWithoutAReasonIsBlockedBeforeAnyMutation() {
         // given
         RMA existingRma = rmaWithStatus(RMAStatus.New);

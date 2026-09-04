@@ -256,6 +256,14 @@ public class RMAController {
                             @RequestParam MultiValueMap<String, MultipartFile> rmaMedia,
                             RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
+        // The form disables status/email/shippingInsurance/rejectionReason/media once the RMA is closed
+        // (see rma-detail.html th:disabled="${isClosed}"), and a browser never submits disabled fields -
+        // so a resubmission of an already-closed RMA (double-click, back-button) would otherwise bind
+        // those fields to null/default and silently wipe them below.
+        if (existingRma.getStatus() != null && existingRma.getStatus().isClosed()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.already.closed", null, locale));
+            return "redirect:/dashboard/rma/" + rmaId;
+        }
         if (marketplaceReturnDecisions.requiresRejectionReason(existingRma, rma.getStatus(), rma.getRejectionReason())) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.rejection.reason.required", null, locale));
