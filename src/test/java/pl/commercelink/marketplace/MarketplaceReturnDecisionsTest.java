@@ -481,6 +481,21 @@ class MarketplaceReturnDecisionsTest {
                 List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
     }
 
+    @Test
+    void coversWholeOrderNeedsEveryBatchOfAKeySharedByTwoOrderItems() {
+        // given: multi-batch fulfilment left two order items with the same marketplace key
+        List<OrderItem> orderItems = List.of(
+                orderItem("item-a", "SKU-1", 1, FulfilmentStatus.Delivered),
+                orderItem("item-b", "SKU-1", 1, FulfilmentStatus.Delivered));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of());
+
+        // when / then
+        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-a", "SKU-1", 1))));
+        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+                List.of(rmaItem("item-a", "SKU-1", 1), rmaItem("item-b", "SKU-1", 1))));
+    }
+
     // --- Finding 2: refund/rejection mutual exclusion is symmetric ---
 
     @Test

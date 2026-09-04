@@ -241,21 +241,15 @@ public class MarketplaceReturnDecisions {
             returned.merge(key, item.getQty(), Integer::sum);
         }
 
+        Map<String, Integer> required = new HashMap<>();
         for (OrderItem orderItem : orderItems) {
-            if (orderItem.isService()) {
+            if (orderItem.isService() || orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)) {
                 continue;
             }
-            if (orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)) {
-                continue;
-            }
-            String key = keyOf(orderItem);
-            int covered = returned.getOrDefault(key, 0);
-            if (covered < orderItem.getQty()) {
-                return false;
-            }
-            returned.put(key, covered - orderItem.getQty());
+            required.merge(keyOf(orderItem), orderItem.getQty(), Integer::sum);
         }
-        return true;
+        return required.entrySet().stream()
+                .allMatch(e -> returned.getOrDefault(e.getKey(), 0) >= e.getValue());
     }
 
     private static String keyOf(OrderItem orderItem) {
