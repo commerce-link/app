@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -75,6 +76,19 @@ public class RMAController {
     private String bucketName;
 
     private final int RMA_PAGE_SIZE = 25;
+
+    /**
+     * RMA is bound straight from the form. The marketplace-decision fields (externalReturnId,
+     * marketplaceActionType, marketplaceActionPayload, ...) feed a real refund through the resend path and
+     * must never come from the request; storeId always comes from the session.
+     */
+    @InitBinder
+    void restrictBindableRmaFields(WebDataBinder binder) {
+        if (binder.getTarget() instanceof RMA) {
+            binder.setAllowedFields("rmaId", "orderId", "email", "status", "rejectionReason",
+                    "emailNotificationsEnabled", "shippingInsurance", "draftRmaItems*", "shippingDetails*", "shipments*");
+        }
+    }
 
     @GetMapping("/dashboard/rma")
     public String rma(@RequestParam(required = false) String rmaId,
@@ -226,6 +240,7 @@ public class RMAController {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
             return "redirect:/dashboard/rma/new";
         }
+        rma.setStoreId(getStoreId());
 
         List<RMAItem> draftRmaItems = rma.getDraftRmaItems().stream()
                 .filter(RMAItem::isComplete)

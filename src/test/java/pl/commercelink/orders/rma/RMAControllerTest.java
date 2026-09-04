@@ -8,13 +8,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.MutablePropertyValues;
 import org.springframework.context.MessageSource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.marketplace.MarketplaceReturnDecisions;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
@@ -29,12 +32,14 @@ import pl.commercelink.warehouse.api.ItemCondition;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -582,5 +587,60 @@ class RMAControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/rma");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "not found");
         verify(marketplaceReturnDecisions, never()).resendLastDecision(any());
+    }
+
+    // ------------------------------------------------------------------
+    // @InitBinder allow-list: marketplace-decision fields and storeId
+    // must never be bindable from the request (Task 8)
+    // ------------------------------------------------------------------
+
+    @Test
+    void marketplaceDecisionFieldsAndStoreIdAreNotBindableFromTheRequest() {
+        // given
+        RMA target = new RMA(STORE_ID);
+        WebDataBinder binder = new WebDataBinder(target);
+        controller.restrictBindableRmaFields(binder);
+        MutablePropertyValues posted = new MutablePropertyValues(Map.of(
+                "email", "buyer@example.com",
+                "storeId", "victim-store",
+                "externalReturnId", "forged",
+                "marketplaceActionType", "ReturnAccepted",
+                "marketplaceActionPayload", "{\"commandId\":\"x\"}"));
+
+        // when
+        binder.bind(posted);
+
+        // then
+        assertThat(target.getEmail()).isEqualTo("buyer@example.com");
+        assertThat(target.getStoreId()).isEqualTo(STORE_ID);
+        assertThat(target.getExternalReturnId()).isNull();
+        assertThat(target.getMarketplaceActionType()).isNull();
+        assertThat(target.getMarketplaceActionPayload()).isNull();
+    }
+
+    @Test
+    void createRmaStoresTheRmaUnderTheSessionStoreRegardlessOfTheSubmittedOne() {
+        // given
+        RMA posted = new RMA("victim-store");
+        posted.setOrderId(ORDER_ID);
+        RMAItem draft = rmaItemWithQty("item-1", 1);
+        draft.setDesiredResolution(RMAResolutionType.Return);
+        posted.setDraftRmaItems(List.of(draft));
+        Order order = mock(Order.class);
+        when(order.isEligibleForRMACreation()).thenReturn(true);
+        when(orderRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findById(ORDER_ID, "item-1"))
+                .thenReturn(orderItemWithQtyAndStatus("item-1", 1, FulfilmentStatus.Delivered));
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.createRma(posted, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
+        verify(rmaRepository).save(saved.capture());
+        assertThat(saved.getValue().getStoreId()).isEqualTo(STORE_ID);
     }
 }
