@@ -131,13 +131,6 @@ class MarketplaceReturnImporterTest {
         return item;
     }
 
-    private static RMAItem rmaItem(String rmaId, String orderItemId) {
-        RMAItem item = new RMAItem();
-        item.setRmaId(rmaId);
-        item.setItemId(orderItemId);
-        return item;
-    }
-
     @Test
     void createsWaitingForItemsRmaWithMatchedItemsAndParcel() {
         // given
@@ -360,15 +353,13 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
-    void matchesOrderItemsWhoseOnlyReferencingRmaWasRejected() {
-        // given: the earlier RMA on this order item was rejected, so it must become matchable again
+    void matchesOrderItemsNotClaimedByAnOpenRma() {
+        // given: no open RMA claims item-1, so it must be matchable (see OpenRmaCoverageTest for the
+        // rejected-vs-open semantics this relies on)
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
-        when(rmaItemsRepository.findByOrderItemId("item-1")).thenReturn(List.of(rmaItem("rejected-rma-1", "item-1")));
-        RMA rejectedRma = new RMA(STORE_ID);
-        rejectedRma.setStatus(RMAStatus.Rejected);
-        when(rmaRepository.findById(STORE_ID, "rejected-rma-1")).thenReturn(rejectedRma);
+        when(openRmaCoverage.coversOrderItem(eq(STORE_ID), eq("item-1"), any())).thenReturn(false);
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when
