@@ -114,7 +114,7 @@
     </style>
 
     <div class="box mb-5">
-        <div class="columns is-vcentered">
+        <div class="columns is-vcentered mb-0">
             <div class="column">
                 <p class="heading" th:text="#{rma.id}"></p>
                 <p class="title is-5" th:text="${rma.rmaId}"></p>
@@ -128,20 +128,6 @@
             <div class="column">
                 <p class="heading" th:text="#{rma.created.at}"></p>
                 <p class="title is-5" th:text="${rma.createdAt}"></p>
-            </div>
-            <div class="column" th:if="${rma.marketplaceReturn}">
-                <p class="heading" th:text="#{rma.marketplace.return}"></p>
-                <p class="title is-5">
-                    <span th:text="${rma.marketplace}"></span>
-                    <span class="tag is-info is-light" th:if="${rma.externalReturnStatus != null}"
-                          th:text="${enumI18n.localize(rma.externalReturnStatus)}"></span>
-                </p>
-                <p class="is-size-7 has-text-grey" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
-                <form th:if="${rma.marketplaceActionPayload != null}" method="post"
-                      th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
-                    <button class="button is-small is-light mt-2" type="submit"
-                            th:text="#{rma.marketplace.resend}"></button>
-                </form>
             </div>
         </div>
     </div>
@@ -306,6 +292,32 @@
                         </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div th:if="${rma.marketplaceReturn}" class="mt-5">
+                <h2 class="subtitle" th:text="#{rma.marketplace.return}"></h2>
+                <div class="box">
+                    <div class="columns is-vcentered mb-0">
+                        <div class="column">
+                            <p class="heading" th:text="#{store.marketplace.name}"></p>
+                            <p class="title is-5">
+                                <span th:text="${rma.marketplace}"></span>
+                                <span class="tag is-info is-light" th:if="${rma.externalReturnStatus != null}"
+                                      th:text="${enumI18n.localize(rma.externalReturnStatus)}"></span>
+                            </p>
+                        </div>
+                        <div class="column">
+                            <p class="heading" th:text="#{rma.marketplace.reference}"></p>
+                            <p class="title is-5" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
+                        </div>
+                        <div class="column is-narrow" th:if="${rma.marketplaceActionPayload != null}">
+                            <form method="post" th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
+                                <button class="button is-small is-light" type="submit"
+                                        th:text="#{rma.marketplace.resend}"></button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
