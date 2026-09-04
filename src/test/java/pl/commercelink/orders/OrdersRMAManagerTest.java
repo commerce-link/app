@@ -49,6 +49,8 @@ class OrdersRMAManagerTest {
     private OrderLifecycle orderLifecycle;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private OrderItemFamily orderItemFamily;
 
     @InjectMocks
     private OrdersRMAManager ordersRMAManager;
@@ -176,6 +178,63 @@ class OrdersRMAManagerTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Expected replacement item to be saved"));
         assertThat(replacement.isService()).isTrue();
+    }
+
+    @Test
+    void acceptReturnResolvesAnRmaItemThatLivesOnASplitOffOrder() {
+        // given: the importer matched the return against an item moved to a child order (OrderItemFamily)
+        Order order = orderWithTotalPrice(100.0, OrderStatus.Completed);
+        OrderItem moved = new OrderItem("order-2", "Other", "test-item", 1, 100.0, "SKU-moved", false);
+        moved.setItemId("item-moved");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
+                .thenReturn(OperationResult.success());
+
+        // when
+        OperationResult<Document> result = ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(moved)), ItemCondition.Sealed);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(moved.isReturned()).isTrue();
+        verify(orderItemsRepository).batchSave(List.of(moved));
+    }
+
+    @Test
+    void acceptReturnDoesNotReadTheSplitFamilyWhenEveryRmaItemIsOnTheOrderItself() {
+        // given
+        Order order = orderWithTotalPrice(100.0, OrderStatus.Completed);
+        OrderItem item1 = orderItem("item-1", 100.0, 1);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
+                .thenReturn(OperationResult.success());
+
+        // when
+        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)), ItemCondition.Sealed);
+
+        // then
+        verify(orderItemFamily, never()).siblingItems(any());
+    }
+
+    @Test
+    void createReplacementOrderResolvesAnRmaItemThatLivesOnASplitOffOrder() {
+        // given
+        Order order = orderWithTotalPrice(100.0, OrderStatus.Delivered);
+        OrderItem moved = new OrderItem("order-2", "Other", "test-item", 1, 100.0, "SKU-moved", false);
+        moved.setItemId("item-moved");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true), any()))
+                .thenReturn(OperationResult.success());
+
+        // when
+        ordersRMAManager.createReplacementOrder(STORE_ID, rma(), List.of(rmaItemFor(moved)), true, ItemCondition.Damaged);
+
+        // then
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.Replaced);
     }
 
     private Order orderWithTotalPrice(double totalPrice, OrderStatus status) {

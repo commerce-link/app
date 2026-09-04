@@ -27,10 +27,12 @@ public class OrdersRMAManager {
     private OrderLifecycle orderLifecycle;
     @Autowired
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Autowired
+    private OrderItemFamily orderItemFamily;
 
     public OperationResult<Document> acceptReturn(String storeId, RMA rma, List<RMAItem> rmaItems, ItemCondition condition) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());
-        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        List<OrderItem> orderItems = orderItemsReachableFrom(order, rmaItems);
         List<OrderItem> newOrderItems = new ArrayList<>();
 
         double totalToDecrement = 0;
@@ -62,7 +64,7 @@ public class OrdersRMAManager {
 
     public OperationResult<Document> createReplacementOrder(String storeId, RMA rma, List<RMAItem> rmaItems, boolean itemsRequireRepair, ItemCondition condition) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());
-        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        List<OrderItem> orderItems = orderItemsReachableFrom(order, rmaItems);
         List<OrderItem> newOrderItems = new ArrayList<>();
 
         Order replacementOrder = new Order.Builder(order).build();
@@ -105,6 +107,22 @@ public class OrdersRMAManager {
                 .filter(i -> i.getItemId().equals(itemId))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Original order item not found for RMA item id: " + itemId));
+    }
+
+    /**
+     * A marketplace return may have been matched against an item that Order.createSplit() moved to a child
+     * order (see OrderItemFamily); the RMA still points at the parent, so the parent's own items are not
+     * enough to resolve every RMA item. The family is read only when a plain lookup misses.
+     */
+    private List<OrderItem> orderItemsReachableFrom(Order order, List<RMAItem> rmaItems) {
+        List<OrderItem> items = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
+        boolean allOnParent = rmaItems.stream()
+                .map(RMAItem::getItemId)
+                .allMatch(id -> items.stream().anyMatch(i -> i.getItemId().equals(id)));
+        if (!allOnParent) {
+            items.addAll(orderItemFamily.siblingItems(order));
+        }
+        return items;
     }
 
     private OrderItem createReplacementItem(String orderId, OrderItem orderItem, RMAItem rmaItem) {
