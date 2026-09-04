@@ -261,6 +261,44 @@ class OrdersRMAManagerTest {
     }
 
     @Test
+    void acceptReturnAdjustsBothOrdersWhenItemsLiveOnTheParentAndAChild() {
+        // given: one accepted item stayed on the parent, the other moved to a split-off child
+        Order order = orderWithTotalPrice(150.0, OrderStatus.Completed);
+        OrderItem parentItem = orderItem("item-parent", 100.0, 1);
+        Order child = orderWithTotalPrice(50.0, OrderStatus.Completed);
+        child.setOrderId("order-2");
+        OrderItem moved = new OrderItem("order-2", "Other", "test-item", 1, 50.0, "SKU-moved", false);
+        moved.setItemId("item-moved");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(parentItem));
+        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
+                .thenReturn(OperationResult.success());
+
+        // when
+        ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(parentItem), rmaItemFor(moved)), ItemCondition.Sealed);
+
+        // then
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(ordersRepository, org.mockito.Mockito.atLeast(1)).save(orderCaptor.capture());
+        Order savedParent = orderCaptor.getAllValues().stream()
+                .filter(o -> ORDER_ID.equals(o.getOrderId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected the parent order to be saved"));
+        Order savedChild = orderCaptor.getAllValues().stream()
+                .filter(o -> "order-2".equals(o.getOrderId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected the child order to be saved"));
+        assertThat(savedParent.getTotalPrice()).isEqualTo(50.0);
+        assertThat(savedParent.getStatus()).isEqualTo(OrderStatus.Delivered);
+        assertThat(savedChild.getTotalPrice()).isEqualTo(0.0);
+        assertThat(savedChild.getStatus()).isEqualTo(OrderStatus.Delivered);
+        assertThat(parentItem.isReturned()).isTrue();
+        assertThat(moved.isReturned()).isTrue();
+    }
+
+    @Test
     void createReplacementOrderResolvesAnRmaItemThatLivesOnASplitOffOrder() {
         // given
         Order order = orderWithTotalPrice(100.0, OrderStatus.Delivered);
