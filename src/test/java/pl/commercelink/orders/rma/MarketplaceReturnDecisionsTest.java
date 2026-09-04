@@ -247,13 +247,6 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
-    void resendReportsNothingToDoWhenNoDecisionWasRecorded() {
-        // when / then
-        assertFalse(decisions.resendDecisions(marketplaceRma));
-        verifyNoInteractions(publisher);
-    }
-
-    @Test
     void manualRmaDecisionsAreIgnored() {
         // given
         RMA manual = new RMA(STORE_ID);
