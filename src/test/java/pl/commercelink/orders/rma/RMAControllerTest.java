@@ -590,8 +590,8 @@ class RMAControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // @InitBinder allow-list: marketplace-decision fields and storeId
-    // must never be bindable from the request (Task 8)
+    // Form binding: marketplace-decision fields and storeId never come
+    // from the request
     // ------------------------------------------------------------------
 
     @Test
