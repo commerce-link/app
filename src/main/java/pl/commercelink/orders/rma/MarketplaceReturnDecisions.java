@@ -80,20 +80,7 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
 
-        // Persist the event and the resend payload BEFORE publishing. If the save happened after the
-        // publish and then failed, a real refund would be in flight with no RefundRequested event and no
-        // stored payload - every guard here would go blind and the resend button could not help. Publishing
-        // after a successful save instead means a publish failure is exactly the case resend exists for.
-        rma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
-        rememberAction(rma, OrderLifecycleEventType.ReturnAccepted, action);
-        rmaRepository.save(rma);
-
-        if (!returnsEnabled) {
-            log.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
-            return false;
-        }
-        publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
-        return true;
+        return recordThenPublish(rma, order, OrderLifecycleEventType.ReturnAccepted, RMA.EVENT_REFUND_REQUESTED, action);
     }
 
     /**
@@ -152,16 +139,24 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 List.of(), false, null, rma.getRejectionReason());
 
-        // Persist first, publish second - see the comment in returnAccepted.
-        rma.addActionEvent(RMA.EVENT_REJECTION_SENT);
-        rememberAction(rma, OrderLifecycleEventType.ReturnRejected, action);
+        return recordThenPublish(rma, order, OrderLifecycleEventType.ReturnRejected, RMA.EVENT_REJECTION_SENT, action);
+    }
+
+    // Persist the event and the resend payload BEFORE publishing. If the save happened after the publish
+    // and then failed, a real refund would be in flight with no event and no stored payload - every guard
+    // would go blind and the resend button could not help. A publish failure after a successful save is
+    // exactly the case resend exists for.
+    private boolean recordThenPublish(RMA rma, Order order, OrderLifecycleEventType type, String eventName,
+                                      MarketplaceReturnAction action) {
+        rma.addActionEvent(eventName);
+        rememberAction(rma, type, action);
         rmaRepository.save(rma);
 
         if (!returnsEnabled) {
             log.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
             return false;
         }
-        publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
+        publisher.publishReturnAction(order, rma, type, action);
         return true;
     }
 
@@ -170,8 +165,7 @@ public class MarketplaceReturnDecisions {
             String payload = ACTION_MAPPER.writeValueAsString(action);
             rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.commandId(), payload, LocalDateTime.now()));
         } catch (JsonProcessingException e) {
-            // Never fail the operator's action because the resend record could not be stored.
-            log.error("Could not store the marketplace decision for RMA {}", rma.getRmaId(), e);
+            throw new IllegalStateException("Cannot serialise the marketplace decision for RMA " + rma.getRmaId(), e);
         }
     }
 
