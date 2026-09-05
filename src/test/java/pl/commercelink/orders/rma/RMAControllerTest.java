@@ -132,7 +132,7 @@ class RMAControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
-        verify(marketplaceReturnDecisions, never()).returnAccepted(any(), any(), anyBoolean());
+        verify(marketplaceReturnDecisions, never()).publishAcceptance(any(), any(), anyBoolean());
     }
 
     // ------------------------------------------------------------------
@@ -149,7 +149,7 @@ class RMAControllerTest {
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
-        when(marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems)).thenReturn(true);
+        when(marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems)).thenReturn(true);
 
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
@@ -160,7 +160,7 @@ class RMAControllerTest {
 
         // then
         ArgumentCaptor<Boolean> refundDeliveryCaptor = ArgumentCaptor.forClass(Boolean.class);
-        verify(marketplaceReturnDecisions).returnAccepted(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
+        verify(marketplaceReturnDecisions).publishAcceptance(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
         assertThat(refundDeliveryCaptor.getValue()).isTrue();
     }
 
@@ -175,7 +175,7 @@ class RMAControllerTest {
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
         // The operator checked "refund delivery", but the warehouse only accepted part of the order,
         // so the controller must re-derive coverage instead of trusting the checkbox.
-        when(marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems)).thenReturn(false);
+        when(marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems)).thenReturn(false);
 
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
@@ -186,7 +186,7 @@ class RMAControllerTest {
 
         // then
         ArgumentCaptor<Boolean> refundDeliveryCaptor = ArgumentCaptor.forClass(Boolean.class);
-        verify(marketplaceReturnDecisions).returnAccepted(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
+        verify(marketplaceReturnDecisions).publishAcceptance(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
         assertThat(refundDeliveryCaptor.getValue()).isFalse();
     }
 
@@ -202,7 +202,7 @@ class RMAControllerTest {
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
-        when(marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems)).thenReturn(true);
+        when(marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems)).thenReturn(true);
 
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
@@ -213,7 +213,7 @@ class RMAControllerTest {
 
         // then
         InOrder order = inOrder(marketplaceReturnDecisions, ordersRMAManager);
-        order.verify(marketplaceReturnDecisions).coversWholeOrder(rma, rmaItems);
+        order.verify(marketplaceReturnDecisions).coversEveryReturnableItem(rma, rmaItems);
         order.verify(ordersRMAManager).acceptReturn(any(), any(), any(), any());
     }
 
@@ -236,10 +236,10 @@ class RMAControllerTest {
 
         // then
         ArgumentCaptor<Boolean> refundDeliveryCaptor = ArgumentCaptor.forClass(Boolean.class);
-        verify(marketplaceReturnDecisions).returnAccepted(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
+        verify(marketplaceReturnDecisions).publishAcceptance(eq(rma), eq(rmaItems), refundDeliveryCaptor.capture());
         assertThat(refundDeliveryCaptor.getValue()).isFalse();
-        // refundDelivery && coversWholeOrder(...) must short-circuit: an unchecked box never even asks.
-        verify(marketplaceReturnDecisions, never()).coversWholeOrder(any(), any());
+        // refundDelivery && coversEveryReturnableItem(...) must short-circuit: an unchecked box never even asks.
+        verify(marketplaceReturnDecisions, never()).coversEveryReturnableItem(any(), any());
     }
 
     // ------------------------------------------------------------------
@@ -269,7 +269,7 @@ class RMAControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
         verify(rmaLifecycle, never()).update(any());
-        verify(marketplaceReturnDecisions, never()).returnRejected(any());
+        verify(marketplaceReturnDecisions, never()).publishRejection(any());
         verify(rmaRepository, never()).save(any());
         assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.Rejected);
         assertThat(existingRma.getEmail()).isEqualTo("buyer@example.com");
@@ -296,7 +296,7 @@ class RMAControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "reason required");
         verify(rmaLifecycle, never()).update(any());
-        verify(marketplaceReturnDecisions, never()).returnRejected(any());
+        verify(marketplaceReturnDecisions, never()).publishRejection(any());
         assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.New);
     }
 
@@ -346,7 +346,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(marketplaceReturnDecisions).returnRejected(existingRma);
+        verify(marketplaceReturnDecisions).publishRejection(existingRma);
     }
 
     @Test
@@ -365,7 +365,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(marketplaceReturnDecisions, never()).returnRejected(any());
+        verify(marketplaceReturnDecisions, never()).publishRejection(any());
     }
 
     // ------------------------------------------------------------------
@@ -494,7 +494,7 @@ class RMAControllerTest {
         OrderItem item = orderItemWithQtyAndStatus("item-1", 2, FulfilmentStatus.Delivered);
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(item);
-        when(openRmaCoverage.coversOrderItem(STORE_ID, "item-1", RMA_ID)).thenReturn(true);
+        when(openRmaCoverage.coveredByAnotherOpenRma(STORE_ID, "item-1", RMA_ID)).thenReturn(true);
         when(messageSource.getMessage(eq("rma.item.already.in.open.rma"), any(), any())).thenReturn("claimed");
 
         // when
@@ -543,7 +543,7 @@ class RMAControllerTest {
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, rmaItems));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
-        when(marketplaceReturnDecisions.returnAccepted(rma, rmaItems, false)).thenReturn(false);
+        when(marketplaceReturnDecisions.publishAcceptance(rma, rmaItems, false)).thenReturn(false);
         when(messageSource.getMessage(eq("rma.marketplace.decision.not.sent"), any(), any())).thenReturn("not sent");
 
         // when

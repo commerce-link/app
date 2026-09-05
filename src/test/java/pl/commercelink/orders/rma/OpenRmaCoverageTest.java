@@ -46,7 +46,7 @@ class OpenRmaCoverageTest {
         when(rmaRepository.findById(STORE_ID, "rma-a")).thenReturn(rma("rma-a", RMAStatus.WaitingForItems));
 
         // when / then
-        assertTrue(coverage.coversOrderItem(STORE_ID, "oi-1", "rma-new"));
+        assertTrue(coverage.coveredByAnotherOpenRma(STORE_ID, "oi-1", "rma-new"));
     }
 
     @Test
@@ -56,7 +56,7 @@ class OpenRmaCoverageTest {
         when(rmaRepository.findById(STORE_ID, "rma-a")).thenReturn(rma("rma-a", RMAStatus.Rejected));
 
         // when / then
-        assertFalse(coverage.coversOrderItem(STORE_ID, "oi-1", "rma-new"));
+        assertFalse(coverage.coveredByAnotherOpenRma(STORE_ID, "oi-1", "rma-new"));
     }
 
     @Test
@@ -65,7 +65,7 @@ class OpenRmaCoverageTest {
         when(rmaItemsRepository.findByOrderItemId("oi-1")).thenReturn(List.of(rmaItem("rma-a", "oi-1")));
 
         // when / then
-        assertFalse(coverage.coversOrderItem(STORE_ID, "oi-1", "rma-a"));
+        assertFalse(coverage.coveredByAnotherOpenRma(STORE_ID, "oi-1", "rma-a"));
     }
 
     @Test
@@ -76,7 +76,7 @@ class OpenRmaCoverageTest {
         when(rmaRepository.findById(STORE_ID, "rma-a")).thenReturn(rma("rma-a", RMAStatus.Rejected));
 
         // when
-        coverage.coversOrderItem(STORE_ID, "oi-1", "rma-new");
+        coverage.coveredByAnotherOpenRma(STORE_ID, "oi-1", "rma-new");
 
         // then
         verify(rmaRepository, times(1)).findById(STORE_ID, "rma-a");

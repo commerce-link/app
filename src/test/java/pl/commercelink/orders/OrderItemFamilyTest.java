@@ -39,7 +39,7 @@ class OrderItemFamilyTest {
         when(orderItemsRepository.findByOrderId(child.getOrderId())).thenReturn(List.of(movedItem));
 
         // when
-        List<OrderItem> items = orderItemFamily.siblingItems(order);
+        List<OrderItem> items = orderItemFamily.itemsMovedToSplitOffOrders(order);
 
         // then
         assertEquals(List.of(movedItem), items);
@@ -55,7 +55,7 @@ class OrderItemFamilyTest {
         when(ordersRepository.findBySplitFromOrderId(STORE_ID, order.getOrderId())).thenReturn(List.of(cancelledChild));
 
         // when
-        List<OrderItem> items = orderItemFamily.siblingItems(order);
+        List<OrderItem> items = orderItemFamily.itemsMovedToSplitOffOrders(order);
 
         // then
         assertTrue(items.isEmpty());
@@ -68,7 +68,7 @@ class OrderItemFamilyTest {
         when(ordersRepository.findBySplitFromOrderId(STORE_ID, order.getOrderId())).thenReturn(List.of());
 
         // when
-        List<OrderItem> items = orderItemFamily.siblingItems(order);
+        List<OrderItem> items = orderItemFamily.itemsMovedToSplitOffOrders(order);
 
         // then
         assertTrue(items.isEmpty());

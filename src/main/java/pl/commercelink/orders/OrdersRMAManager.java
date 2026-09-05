@@ -138,7 +138,7 @@ public class OrdersRMAManager {
                 .map(RMAItem::getItemId)
                 .allMatch(id -> items.stream().anyMatch(i -> i.getItemId().equals(id)));
         if (!allOnParent) {
-            items.addAll(orderItemFamily.siblingItems(order));
+            items.addAll(orderItemFamily.itemsMovedToSplitOffOrders(order));
         }
         return items;
     }

@@ -53,7 +53,7 @@ public class MarketplaceReturnDecisions {
      * Called after the warehouse accepted the items; every call is a separate (partial) refund with its
      * own commandId. Returns false when the decision was refused or could not be published.
      */
-    public boolean returnAccepted(RMA rma, List<RMAItem> acceptedItems, boolean refundDelivery) {
+    public boolean publishAcceptance(RMA rma, List<RMAItem> acceptedItems, boolean refundDelivery) {
         if (!rma.isMarketplaceReturn()) {
             return true;
         }
@@ -90,7 +90,7 @@ public class MarketplaceReturnDecisions {
                 .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
         boolean allResolved = rmaItems.stream().map(RMAItem::getItemId).allMatch(orderItemsById::containsKey);
         if (!allResolved) {
-            for (OrderItem sibling : orderItemFamily.siblingItems(order)) {
+            for (OrderItem sibling : orderItemFamily.itemsMovedToSplitOffOrders(order)) {
                 orderItemsById.putIfAbsent(sibling.getItemId(), sibling);
             }
         }
@@ -115,7 +115,7 @@ public class MarketplaceReturnDecisions {
                 + ": it has no matching order item and no stored mfn");
     }
 
-    public boolean returnRejected(RMA rma) {
+    public boolean publishRejection(RMA rma) {
         if (!rma.isMarketplaceReturn()) {
             return true;
         }
@@ -146,7 +146,7 @@ public class MarketplaceReturnDecisions {
     private boolean recordThenPublish(RMA rma, Order order, OrderLifecycleEventType type, String eventName,
                                       MarketplaceReturnAction action) {
         rma.addActionEvent(eventName);
-        rememberAction(rma, type, action);
+        rememberDecision(rma, type, action);
         rmaRepository.save(rma);
 
         if (!returnsEnabled) {
@@ -157,7 +157,7 @@ public class MarketplaceReturnDecisions {
         return true;
     }
 
-    private void rememberAction(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
+    private void rememberDecision(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
         try {
             String payload = ACTION_MAPPER.writeValueAsString(action);
             rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.commandId(), payload, LocalDateTime.now()));
@@ -205,14 +205,14 @@ public class MarketplaceReturnDecisions {
      * least one item on the parent, so checking only the parent's own items could never return true once an
      * order had been split.
      */
-    public boolean coversWholeOrder(RMA rma, List<RMAItem> rmaItems) {
+    public boolean coversEveryReturnableItem(RMA rma, List<RMAItem> rmaItems) {
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
             log.warn("Cannot evaluate whole-order coverage for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
         List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(rma.getOrderId()));
-        orderItems.addAll(orderItemFamily.siblingItems(order));
+        orderItems.addAll(orderItemFamily.itemsMovedToSplitOffOrders(order));
         Map<String, OrderItem> orderItemsById = orderItems.stream()
                 .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
 

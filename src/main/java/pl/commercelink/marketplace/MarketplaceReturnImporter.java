@@ -190,7 +190,7 @@ public class MarketplaceReturnImporter {
             OrderItem match = findMatch(orderItems, used, order.getStoreId(), rmaId, item);
             if (match == null) {
                 if (siblingItems == null) {
-                    siblingItems = orderItemFamily.siblingItems(order);
+                    siblingItems = orderItemFamily.itemsMovedToSplitOffOrders(order);
                 }
                 match = findMatch(siblingItems, used, order.getStoreId(), rmaId, item);
             }
@@ -222,7 +222,7 @@ public class MarketplaceReturnImporter {
                 .filter(oi -> MarketplaceItemKey.matches(oi, item.offerKey()))
                 .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                 .filter(oi -> !oi.isService())
-                .filter(oi -> !openRmaCoverage.coversOrderItem(storeId, oi.getItemId(), rmaId))
+                .filter(oi -> !openRmaCoverage.coveredByAnotherOpenRma(storeId, oi.getItemId(), rmaId))
                 .findFirst()
                 .orElse(null);
     }

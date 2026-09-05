@@ -30,7 +30,7 @@ public class OrderItemFamily {
      * Items of every order split off from {@code order}, excluding cancelled children — a cancelled order's
      * items were never fulfilled towards the buyer and must not become matchable or count towards coverage.
      */
-    public List<OrderItem> siblingItems(Order order) {
+    public List<OrderItem> itemsMovedToSplitOffOrders(Order order) {
         List<OrderItem> items = new ArrayList<>();
         for (Order sibling : ordersRepository.findBySplitFromOrderId(order.getStoreId(), order.getOrderId())) {
             if (sibling.getStatus() == OrderStatus.Cancelled) {

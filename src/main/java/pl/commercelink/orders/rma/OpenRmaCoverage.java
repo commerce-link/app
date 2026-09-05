@@ -19,10 +19,10 @@ public class OpenRmaCoverage {
     private final RMAItemsRepository rmaItemsRepository;
     private final RMARepository rmaRepository;
 
-    public boolean coversOrderItem(String storeId, String orderItemId, String ignoringRmaId) {
+    public boolean coveredByAnotherOpenRma(String storeId, String orderItemId, String exceptRmaId) {
         Set<String> rmaIds = new LinkedHashSet<>();
         for (RMAItem rmaItem : rmaItemsRepository.findByOrderItemId(orderItemId)) {
-            if (!rmaItem.getRmaId().equals(ignoringRmaId)) {
+            if (!rmaItem.getRmaId().equals(exceptRmaId)) {
                 rmaIds.add(rmaItem.getRmaId());
             }
         }

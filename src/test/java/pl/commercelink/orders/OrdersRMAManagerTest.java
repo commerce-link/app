@@ -191,7 +191,7 @@ class OrdersRMAManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
         when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.success());
 
@@ -218,7 +218,7 @@ class OrdersRMAManagerTest {
         ordersRMAManager.acceptReturn(STORE_ID, rma(), List.of(rmaItemFor(item1)), ItemCondition.Sealed);
 
         // then
-        verify(orderItemFamily, never()).siblingItems(any());
+        verify(orderItemFamily, never()).itemsMovedToSplitOffOrders(any());
     }
 
     @Test
@@ -237,7 +237,7 @@ class OrdersRMAManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item1));
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
         when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.success());
 
@@ -272,7 +272,7 @@ class OrdersRMAManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(child);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(parentItem));
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
         when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(false), any()))
                 .thenReturn(OperationResult.success());
 
@@ -306,7 +306,7 @@ class OrdersRMAManagerTest {
         moved.setItemId("item-moved");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
         when(rmaGoodsInService.receive(eq(STORE_ID), any(), any(), any(), eq(true), any()))
                 .thenReturn(OperationResult.success());
 

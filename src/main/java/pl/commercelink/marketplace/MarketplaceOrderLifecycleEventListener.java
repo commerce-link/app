@@ -108,11 +108,11 @@ public class MarketplaceOrderLifecycleEventListener {
                         .ifPresent(update -> provider.updateInvoice(externalOrderId, update));
                 break;
             case ReturnAccepted:
-                withReturns(provider, payload, returns -> returns.refundReturn(externalOrderId,
+                ifReturnsApiAvailable(provider, payload, returns -> returns.refundReturn(externalOrderId,
                         payload.getReturnAction().externalReturnId(), toReturnRefund(payload.getReturnAction())));
                 break;
             case ReturnRejected:
-                withReturns(provider, payload, returns -> returns.rejectReturn(
+                ifReturnsApiAvailable(provider, payload, returns -> returns.rejectReturn(
                         payload.getReturnAction().externalReturnId(),
                         new ReturnRejection(payload.getReturnAction().rejectionReason())));
                 break;
@@ -123,8 +123,8 @@ public class MarketplaceOrderLifecycleEventListener {
 
     // a return event for a marketplace without a returns API cannot be acted on; skipping (not throwing)
     // keeps it out of the DLQ, and the RMA history shows whether the decision reached the marketplace
-    private void withReturns(MarketplaceProvider provider, OrderLifecycleEvent payload,
-                             Consumer<MarketplaceReturns> action) {
+    private void ifReturnsApiAvailable(MarketplaceProvider provider, OrderLifecycleEvent payload,
+                                        Consumer<MarketplaceReturns> action) {
         if (payload.getReturnAction() == null || payload.getReturnAction().externalReturnId() == null) {
             log.error("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;

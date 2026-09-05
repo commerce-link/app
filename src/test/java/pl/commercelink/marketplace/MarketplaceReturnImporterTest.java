@@ -312,7 +312,7 @@ class MarketplaceReturnImporterTest {
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
-        when(openRmaCoverage.coversOrderItem(eq(STORE_ID), eq("item-1"), any())).thenReturn(true);
+        when(openRmaCoverage.coveredByAnotherOpenRma(eq(STORE_ID), eq("item-1"), any())).thenReturn(true);
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when
@@ -328,7 +328,7 @@ class MarketplaceReturnImporterTest {
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         OrderItem moved = orderItem("item-2", "sku-a", 1);
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when
@@ -358,7 +358,7 @@ class MarketplaceReturnImporterTest {
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         OrderItem matched = orderItem("item-1", "sku-a", 1);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(matched));
-        when(openRmaCoverage.coversOrderItem(eq(STORE_ID), eq("item-1"), any())).thenReturn(false);
+        when(openRmaCoverage.coveredByAnotherOpenRma(eq(STORE_ID), eq("item-1"), any())).thenReturn(false);
         MarketplaceReturn ret = returnWithItem("sku-a", 1);
 
         // when

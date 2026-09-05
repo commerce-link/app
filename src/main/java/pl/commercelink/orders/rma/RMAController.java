@@ -192,7 +192,7 @@ public class RMAController {
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
         model.addAttribute("refundDeliveryDefault",
-                rma.isMarketplaceReturn() && marketplaceReturnDecisions.coversWholeOrder(rma, rmaItems));
+                rma.isMarketplaceReturn() && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems));
 
         return "rma-detail";
     }
@@ -305,7 +305,7 @@ public class RMAController {
         // (RMA already Rejected, but RejectionSent never recorded) is retried on the next save.
         boolean rejectionPending = existingRma.getStatus() == RMAStatus.Rejected
                 && !existingRma.hasActionEvent(RMA.EVENT_REJECTION_SENT);
-        if (rejectionPending && !marketplaceReturnDecisions.returnRejected(existingRma)) {
+        if (rejectionPending && !marketplaceReturnDecisions.publishRejection(existingRma)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.marketplace.decision.not.sent", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
@@ -357,7 +357,7 @@ public class RMAController {
                     messageSource.getMessage("rma.item.service.not.returnable", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
-        if (openRmaCoverage.coversOrderItem(storeId, orderItemId, rmaId)) {
+        if (openRmaCoverage.coveredByAnotherOpenRma(storeId, orderItemId, rmaId)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.item.already.in.open.rma", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
@@ -482,7 +482,7 @@ public class RMAController {
         // Coverage must be evaluated BEFORE the warehouse splits order items (pinned by
         // RMAControllerTest.acceptReturnEvaluatesWholeOrderCoverageBeforeMutatingOrderItems).
         boolean deliveryCovered = refundDelivery
-                && marketplaceReturnDecisions.coversWholeOrder(op.getRma(), op.getRmaItems());
+                && marketplaceReturnDecisions.coversEveryReturnableItem(op.getRma(), op.getRmaItems());
 
         OperationResult<?> result = ordersRMAManager.acceptReturn(
                 getStoreId(),
@@ -494,7 +494,7 @@ public class RMAController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
-        } else if (!marketplaceReturnDecisions.returnAccepted(op.getRma(), op.getRmaItems(), deliveryCovered)) {
+        } else if (!marketplaceReturnDecisions.publishAcceptance(op.getRma(), op.getRmaItems(), deliveryCovered)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.marketplace.decision.not.sent", null, locale));
         }

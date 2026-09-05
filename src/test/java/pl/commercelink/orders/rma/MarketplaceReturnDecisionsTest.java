@@ -108,7 +108,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        decisions.returnAccepted(marketplaceRma,
+        decisions.publishAcceptance(marketplaceRma,
                 List.of(rmaItem("item-1", "SKU-1", 2), rmaItem("item-2", "SKU-2", 1)), true);
 
         // then
@@ -134,7 +134,7 @@ class MarketplaceReturnDecisionsTest {
         List<RMAItem> accepted = List.of(rmaItem("item-1", "sku-a", 1), rmaItem("item-1", "sku-a", 1));
 
         // when
-        decisions.returnAccepted(marketplaceRma, accepted, false);
+        decisions.publishAcceptance(marketplaceRma, accepted, false);
 
         // then: one entry with the summed quantity, never two entries with the same key
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -155,7 +155,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(mutatedOrderItem));
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-CODE-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-CODE-1", 1)), false);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -169,7 +169,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -186,8 +186,8 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -204,8 +204,8 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
 
         // then
         assertEquals(2, marketplaceRma.getMarketplaceDecisions().size());
@@ -240,8 +240,8 @@ class MarketplaceReturnDecisionsTest {
         manual.setOrderId(ORDER_ID);
 
         // when
-        decisions.returnAccepted(manual, List.of(rmaItem("item-1", "SKU-1", 1)), false);
-        decisions.returnRejected(manual);
+        decisions.publishAcceptance(manual, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishRejection(manual);
 
         // then
         verifyNoInteractions(publisher);
@@ -254,7 +254,7 @@ class MarketplaceReturnDecisionsTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         verifyNoInteractions(publisher);
@@ -268,7 +268,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.setRejectionReason("Damaged by buyer");
 
         // when
-        decisions.returnRejected(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
 
         // then
         verifyNoInteractions(publisher);
@@ -281,7 +281,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.setRejectionReason("Damaged by buyer");
 
         // when
-        decisions.returnRejected(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
 
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
@@ -297,8 +297,8 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.setRejectionReason("Damaged");
 
         // when
-        decisions.returnRejected(marketplaceRma);
-        decisions.returnRejected(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
 
         // then
         verify(publisher, times(1)).publishReturnAction(any(), any(), eq(OrderLifecycleEventType.ReturnRejected), any());
@@ -310,7 +310,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.addEvent(new Event(EventType.action, RMA.EVENT_REJECTION_SENT, LocalDateTime.now()));
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         verify(publisher, never()).publishReturnAction(any(), any(), any(), any());
@@ -322,7 +322,7 @@ class MarketplaceReturnDecisionsTest {
         // given
         List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), true);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), true);
         MarketplaceReturnAction first = capturePublishedAction();
         reset(publisher);
 
@@ -395,11 +395,11 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when / then
-        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+        assertTrue(decisions.coversEveryReturnableItem(marketplaceRma,
                 List.of(rmaItem("item-1", "SKU-1", 2), rmaItem("item-2", "SKU-2", 1))));
-        assertFalse(decisions.coversWholeOrder(marketplaceRma,
+        assertFalse(decisions.coversEveryReturnableItem(marketplaceRma,
                 List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 2))));
+        assertFalse(decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 2))));
     }
 
     @Test
@@ -411,7 +411,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        boolean covers = decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "sku-a", 1)));
+        boolean covers = decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "sku-a", 1)));
 
         // then
         assertFalse(covers);
@@ -423,7 +423,7 @@ class MarketplaceReturnDecisionsTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when / then
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
+        assertFalse(decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
     }
 
     // --- Finding 1: split-family awareness ---
@@ -433,10 +433,10 @@ class MarketplaceReturnDecisionsTest {
         // given: item-1 no longer lives on the parent order - it moved to a split-off child
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         OrderItem movedItem = orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered);
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(movedItem));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(movedItem));
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then: the split family was consulted and gave the real key, not the RMA item's stored (and
         // possibly stale) mfn
@@ -450,7 +450,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then: the expensive family lookup is skipped on the common path
         verifyNoInteractions(orderItemFamily);
@@ -462,14 +462,14 @@ class MarketplaceReturnDecisionsTest {
         OrderItem remaining = orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered);
         OrderItem moved = orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(remaining));
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of(moved));
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of(moved));
 
         // when / then: only the parent's item is being returned - the moved item is still outstanding, so
         // this must NOT count as a whole-order return (a split family can never trivially satisfy this)
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
+        assertFalse(decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1))));
 
         // when / then: once both the parent's and the moved item are returned, the whole family is covered
-        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+        assertTrue(decisions.coversEveryReturnableItem(marketplaceRma,
                 List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
     }
 
@@ -480,11 +480,11 @@ class MarketplaceReturnDecisionsTest {
                 orderItem("item-a", "SKU-1", 1, FulfilmentStatus.Delivered),
                 orderItem("item-b", "SKU-1", 1, FulfilmentStatus.Delivered));
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
-        when(orderItemFamily.siblingItems(order)).thenReturn(List.of());
+        when(orderItemFamily.itemsMovedToSplitOffOrders(order)).thenReturn(List.of());
 
         // when / then
-        assertFalse(decisions.coversWholeOrder(marketplaceRma, List.of(rmaItem("item-a", "SKU-1", 1))));
-        assertTrue(decisions.coversWholeOrder(marketplaceRma,
+        assertFalse(decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-a", "SKU-1", 1))));
+        assertTrue(decisions.coversEveryReturnableItem(marketplaceRma,
                 List.of(rmaItem("item-a", "SKU-1", 1), rmaItem("item-b", "SKU-1", 1))));
     }
 
@@ -497,7 +497,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.setRejectionReason("Damaged by buyer");
 
         // when
-        decisions.returnRejected(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
 
         // then
         verifyNoInteractions(publisher);
@@ -513,7 +513,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         InOrder inOrder = inOrder(rmaRepository, publisher);
@@ -530,7 +530,7 @@ class MarketplaceReturnDecisionsTest {
 
         // when / then
         assertThrows(RuntimeException.class, () ->
-                decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false));
+                decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false));
         verifyNoInteractions(publisher);
     }
 
@@ -540,7 +540,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.setRejectionReason("Damaged");
 
         // when
-        decisions.returnRejected(marketplaceRma);
+        decisions.publishRejection(marketplaceRma);
 
         // then
         InOrder inOrder = inOrder(rmaRepository, publisher);
@@ -555,11 +555,9 @@ class MarketplaceReturnDecisionsTest {
         doThrow(new RuntimeException("version conflict")).when(rmaRepository).save(marketplaceRma);
 
         // when / then
-        assertThrows(RuntimeException.class, () -> decisions.returnRejected(marketplaceRma));
+        assertThrows(RuntimeException.class, () -> decisions.publishRejection(marketplaceRma));
         verifyNoInteractions(publisher);
     }
-
-    // --- M4: refundKeyFor must not silently produce a null grouping key ---
 
     @Test
     void returnAcceptedFailsLoudlyWhenAnItemHasNoOrderItemAndNoStoredMfn() {
@@ -569,7 +567,7 @@ class MarketplaceReturnDecisionsTest {
 
         // when / then
         assertThrows(IllegalStateException.class, () ->
-                decisions.returnAccepted(marketplaceRma, List.of(itemWithoutMfn), false));
+                decisions.publishAcceptance(marketplaceRma, List.of(itemWithoutMfn), false));
         verifyNoInteractions(publisher);
         verify(rmaRepository, never()).save(any());
     }
@@ -582,7 +580,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
 
         // when
-        decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-MPN-77", 1)), false);
+        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-MPN-77", 1)), false);
 
         // then
         assertEquals("LOCAL-SEED-0051", capturePublishedAction().items().get(0).marketplaceKey());
@@ -596,7 +594,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.addActionEvent(RMA.EVENT_REJECTION_SENT);
 
         // when
-        boolean sent = decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        boolean sent = decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         assertFalse(sent);
@@ -606,7 +604,7 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void returnAcceptedIsANoOpThatSucceedsForAManualRma() {
         // when / then
-        assertTrue(decisions.returnAccepted(new RMA(STORE_ID), List.of(), false));
+        assertTrue(decisions.publishAcceptance(new RMA(STORE_ID), List.of(), false));
         verifyNoInteractions(publisher);
     }
 
@@ -616,7 +614,7 @@ class MarketplaceReturnDecisionsTest {
         marketplaceRma.addActionEvent(RMA.EVENT_REFUND_REQUESTED);
 
         // when / then
-        assertFalse(decisions.returnRejected(marketplaceRma));
+        assertFalse(decisions.publishRejection(marketplaceRma));
         verifyNoInteractions(publisher);
     }
 
@@ -628,7 +626,7 @@ class MarketplaceReturnDecisionsTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        boolean sent = decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
+        boolean sent = decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
         // then
         assertFalse(sent);
