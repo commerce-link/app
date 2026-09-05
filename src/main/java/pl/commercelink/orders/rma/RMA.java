@@ -1,6 +1,8 @@
 package pl.commercelink.orders.rma;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.orders.Shipment;
@@ -51,15 +53,25 @@ public class RMA {
     @DynamoDBAttribute(attributeName = "media")
     private List<String> media = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "marketplace")
+    @Getter
+    @Setter
     private String marketplace;
     @DynamoDBAttribute(attributeName = "externalReturnId")
+    @Getter
+    @Setter
     private String externalReturnId;
     @DynamoDBAttribute(attributeName = "externalReturnReference")
+    @Getter
+    @Setter
     private String externalReturnReference;
     @DynamoDBAttribute(attributeName = "externalReturnStatus")
     @DynamoDBTypeConvertedEnum
+    @Getter
+    @Setter
     private MarketplaceReturnStatus externalReturnStatus;
     @DynamoDBAttribute(attributeName = "marketplaceDecisions")
+    @Getter
+    @Setter
     private List<MarketplaceDecision> marketplaceDecisions = new LinkedList<>();
     @DynamoDBVersionAttribute
     private Long version;
@@ -258,38 +270,6 @@ public class RMA {
         this.shippingInsurance -= amount;
     }
 
-    public String getMarketplace() {
-        return marketplace;
-    }
-
-    public void setMarketplace(String marketplace) {
-        this.marketplace = marketplace;
-    }
-
-    public String getExternalReturnId() {
-        return externalReturnId;
-    }
-
-    public void setExternalReturnId(String externalReturnId) {
-        this.externalReturnId = externalReturnId;
-    }
-
-    public String getExternalReturnReference() {
-        return externalReturnReference;
-    }
-
-    public void setExternalReturnReference(String externalReturnReference) {
-        this.externalReturnReference = externalReturnReference;
-    }
-
-    public MarketplaceReturnStatus getExternalReturnStatus() {
-        return externalReturnStatus;
-    }
-
-    public void setExternalReturnStatus(MarketplaceReturnStatus externalReturnStatus) {
-        this.externalReturnStatus = externalReturnStatus;
-    }
-
     @DynamoDBIgnore
     public boolean isMarketplaceReturn() {
         return externalReturnId != null && !externalReturnId.isBlank();
@@ -310,14 +290,6 @@ public class RMA {
 
     private boolean turnsRejected(RMAStatus newStatus) {
         return newStatus == RMAStatus.Rejected && status != RMAStatus.Rejected;
-    }
-
-    public List<MarketplaceDecision> getMarketplaceDecisions() {
-        return marketplaceDecisions;
-    }
-
-    public void setMarketplaceDecisions(List<MarketplaceDecision> marketplaceDecisions) {
-        this.marketplaceDecisions = marketplaceDecisions;
     }
 
     @DynamoDBIgnore

@@ -2,9 +2,8 @@ package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -34,26 +33,17 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * lifecycle event and records the decision in the RMA history. No-op for manual RMAs.
  */
 @Component
+@Slf4j
+@RequiredArgsConstructor
 public class MarketplaceReturnDecisions {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnDecisions.class);
 
     private static final ObjectMapper ACTION_MAPPER = new ObjectMapper();
 
-    @Autowired
-    private OrdersRepository ordersRepository;
-
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
-
-    @Autowired
-    private RMARepository rmaRepository;
-
-    @Autowired
-    private OrderLifecycleEventPublisher publisher;
-
-    @Autowired
-    private OrderItemFamily orderItemFamily;
+    private final OrdersRepository ordersRepository;
+    private final OrderItemsRepository orderItemsRepository;
+    private final RMARepository rmaRepository;
+    private final OrderLifecycleEventPublisher publisher;
+    private final OrderItemFamily orderItemFamily;
 
     @Value("${marketplace.returns.enabled:true}")
     private boolean returnsEnabled = true;
@@ -67,12 +57,12 @@ public class MarketplaceReturnDecisions {
             return true;
         }
         if (rma.hasActionEvent(RMA.EVENT_REJECTION_SENT)) {
-            LOGGER.warn("Refusing to refund RMA {}: a rejection was already sent to the marketplace", rma.getRmaId());
+            log.warn("Refusing to refund RMA {}: a rejection was already sent to the marketplace", rma.getRmaId());
             return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
-            LOGGER.warn("Cannot publish return acceptance for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            log.warn("Cannot publish return acceptance for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
 
@@ -99,7 +89,7 @@ public class MarketplaceReturnDecisions {
         rmaRepository.save(rma);
 
         if (!returnsEnabled) {
-            LOGGER.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
+            log.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
             return false;
         }
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnAccepted, action);
@@ -130,7 +120,7 @@ public class MarketplaceReturnDecisions {
         }
         String fallback = rmaItem.getMfn();
         if (isNotBlank(fallback)) {
-            LOGGER.warn("Accepted RMA item {} has no matching order item; falling back to its stored mfn {}",
+            log.warn("Accepted RMA item {} has no matching order item; falling back to its stored mfn {}",
                     rmaItem.getRmaItemId(), fallback);
             return fallback;
         }
@@ -151,12 +141,12 @@ public class MarketplaceReturnDecisions {
         if (rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED)) {
             // Mirrors the guard in returnAccepted: a refund and a rejection on the same RMA must never both
             // reach the marketplace - the buyer would keep the money and also get a rejection notice.
-            LOGGER.warn("Refusing to reject RMA {}: a refund was already requested to the marketplace", rma.getRmaId());
+            log.warn("Refusing to reject RMA {}: a refund was already requested to the marketplace", rma.getRmaId());
             return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
-            LOGGER.warn("Cannot publish return rejection for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            log.warn("Cannot publish return rejection for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
@@ -168,7 +158,7 @@ public class MarketplaceReturnDecisions {
         rmaRepository.save(rma);
 
         if (!returnsEnabled) {
-            LOGGER.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
+            log.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
             return false;
         }
         publisher.publishReturnAction(order, rma, OrderLifecycleEventType.ReturnRejected, action);
@@ -181,7 +171,7 @@ public class MarketplaceReturnDecisions {
             rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.getCommandId(), payload, LocalDateTime.now()));
         } catch (JsonProcessingException e) {
             // Never fail the operator's action because the resend record could not be stored.
-            LOGGER.error("Could not store the marketplace decision for RMA {}", rma.getRmaId(), e);
+            log.error("Could not store the marketplace decision for RMA {}", rma.getRmaId(), e);
         }
     }
 
@@ -195,13 +185,13 @@ public class MarketplaceReturnDecisions {
             return false;
         }
         if (!returnsEnabled) {
-            LOGGER.error("marketplace.returns.enabled=false: not resending {} marketplace decision(s) for RMA {}",
+            log.error("marketplace.returns.enabled=false: not resending {} marketplace decision(s) for RMA {}",
                     rma.getMarketplaceDecisions().size(), rma.getRmaId());
             return false;
         }
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
-            LOGGER.warn("Cannot resend the marketplace decisions for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            log.warn("Cannot resend the marketplace decisions for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
         int published = 0;
@@ -211,7 +201,7 @@ public class MarketplaceReturnDecisions {
                 publisher.publishReturnAction(order, rma, OrderLifecycleEventType.valueOf(decision.getType()), action);
                 published++;
             } catch (JsonProcessingException | IllegalArgumentException | NullPointerException e) {
-                LOGGER.error("Could not resend marketplace decision {} for RMA {}", decision.getCommandId(), rma.getRmaId(), e);
+                log.error("Could not resend marketplace decision {} for RMA {}", decision.getCommandId(), rma.getRmaId(), e);
             }
         }
         return published > 0;
@@ -227,7 +217,7 @@ public class MarketplaceReturnDecisions {
     public boolean coversWholeOrder(RMA rma, List<RMAItem> rmaItems) {
         Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
         if (order == null) {
-            LOGGER.warn("Cannot evaluate whole-order coverage for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
+            log.warn("Cannot evaluate whole-order coverage for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
             return false;
         }
         List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(rma.getOrderId()));

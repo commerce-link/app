@@ -1,9 +1,8 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -18,24 +17,17 @@ import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@Slf4j
+@RequiredArgsConstructor
 public class MarketplaceOrdersImportEventListener {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceOrdersImportEventListener.class);
 
     public static final String SCOPE_ORDERS = "orders";
     public static final String SCOPE_RETURNS = "returns";
 
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private MarketplaceOrderImporter marketplaceOrderImporter;
-
-    @Autowired
-    private MarketplaceReturnImporter marketplaceReturnImporter;
-
-    @Autowired
-    private MarketplaceProviderFactory providerFactory;
+    private final StoresRepository storesRepository;
+    private final MarketplaceOrderImporter marketplaceOrderImporter;
+    private final MarketplaceReturnImporter marketplaceReturnImporter;
+    private final MarketplaceProviderFactory providerFactory;
 
     @Value("${marketplace.returns.enabled:true}")
     private boolean returnsEnabled = true;
@@ -50,12 +42,12 @@ public class MarketplaceOrdersImportEventListener {
         String scope = payload.getScope();
         if (scope != null && !scope.isBlank() && !SCOPE_ORDERS.equals(scope) && !SCOPE_RETURNS.equals(scope)) {
             // Fail closed: an unrecognised scope must not fall back to a full orders import (e.g. during a rollback).
-            LOGGER.error("Unknown marketplace import scope {}; message ignored", scope);
+            log.error("Unknown marketplace import scope {}; message ignored", scope);
             return;
         }
         boolean returnsScope = SCOPE_RETURNS.equals(scope);
         if (returnsScope && !returnsEnabled) {
-            LOGGER.warn("marketplace.returns.enabled=false: skipping returns import");
+            log.warn("marketplace.returns.enabled=false: skipping returns import");
             return;
         }
         storesRepository.findAll()

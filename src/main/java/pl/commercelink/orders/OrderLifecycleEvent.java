@@ -1,5 +1,11 @@
 package pl.commercelink.orders;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class OrderLifecycleEvent {
 
     private String storeId;
@@ -8,10 +14,6 @@ public class OrderLifecycleEvent {
     private String externalOrderId;
     private String marketplace;
     private MarketplaceReturnAction returnAction;
-
-    private OrderLifecycleEvent() {
-
-    }
 
     public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type) {
         this(storeId, orderId, type, null, null);
@@ -30,29 +32,5 @@ public class OrderLifecycleEvent {
         this.externalOrderId = externalOrderId;
         this.marketplace = marketplace;
         this.returnAction = returnAction;
-    }
-
-    public String getStoreId() {
-        return storeId;
-    }
-
-    public String getOrderId() {
-        return orderId;
-    }
-
-    public OrderLifecycleEventType getType() {
-        return type;
-    }
-
-    public String getExternalOrderId() {
-        return externalOrderId;
-    }
-
-    public String getMarketplace() {
-        return marketplace;
-    }
-
-    public MarketplaceReturnAction getReturnAction() {
-        return returnAction;
     }
 }

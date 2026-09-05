@@ -1,6 +1,6 @@
 package pl.commercelink.orders;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -20,13 +20,11 @@ import java.util.List;
  * eagerly on every return.
  */
 @Component
+@RequiredArgsConstructor
 public class OrderItemFamily {
 
-    @Autowired
-    private OrdersRepository ordersRepository;
-
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
+    private final OrdersRepository ordersRepository;
+    private final OrderItemsRepository orderItemsRepository;
 
     /**
      * Items of every order split off from {@code order}, excluding cancelled children — a cancelled order's

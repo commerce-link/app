@@ -1,7 +1,8 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
@@ -24,21 +25,14 @@ import pl.commercelink.stores.IntegrationType;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@Slf4j
+@RequiredArgsConstructor
 public class MarketplaceOrderLifecycleEventListener {
 
-    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MarketplaceOrderLifecycleEventListener.class);
-
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private OrdersRepository ordersRepository;
-
-    @Autowired
-    private MarketplaceProviderFactory providerFactory;
-
-    @Autowired
-    private CarrierDictionary carrierDictionary;
+    private final StoresRepository storesRepository;
+    private final OrdersRepository ordersRepository;
+    private final MarketplaceProviderFactory providerFactory;
+    private final CarrierDictionary carrierDictionary;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -132,12 +126,12 @@ public class MarketplaceOrderLifecycleEventListener {
     private void withReturns(MarketplaceProvider provider, OrderLifecycleEvent payload,
                              Consumer<MarketplaceReturns> action) {
         if (payload.getReturnAction() == null || payload.getReturnAction().getExternalReturnId() == null) {
-            LOGGER.warn("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
+            log.warn("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;
         }
         Optional<MarketplaceReturns> returns = provider.returns();
         if (returns.isEmpty()) {
-            LOGGER.error("Marketplace {} exposes no returns API, but {} decision for RMA {} (order {}) requires one - decision dropped; check the deployed adapter version",
+            log.error("Marketplace {} exposes no returns API, but {} decision for RMA {} (order {}) requires one - decision dropped; check the deployed adapter version",
                     payload.getMarketplace(), payload.getType(), payload.getReturnAction().getRmaId(), payload.getExternalOrderId());
             return;
         }

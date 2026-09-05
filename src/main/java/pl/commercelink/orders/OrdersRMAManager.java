@@ -1,6 +1,6 @@
 package pl.commercelink.orders;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
@@ -17,20 +17,15 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 @Component
+@RequiredArgsConstructor
 public class OrdersRMAManager {
 
-    @Autowired
-    private OrdersRepository ordersRepository;
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
-    @Autowired
-    private RmaGoodsInService rmaGoodsInService;
-    @Autowired
-    private OrderLifecycle orderLifecycle;
-    @Autowired
-    private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Autowired
-    private OrderItemFamily orderItemFamily;
+    private final OrdersRepository ordersRepository;
+    private final OrderItemsRepository orderItemsRepository;
+    private final RmaGoodsInService rmaGoodsInService;
+    private final OrderLifecycle orderLifecycle;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
+    private final OrderItemFamily orderItemFamily;
 
     public OperationResult<Document> acceptReturn(String storeId, RMA rma, List<RMAItem> rmaItems, ItemCondition condition) {
         Order order = ordersRepository.findById(storeId, rma.getOrderId());

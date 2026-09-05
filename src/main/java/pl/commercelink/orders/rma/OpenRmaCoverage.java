@@ -1,6 +1,6 @@
 package pl.commercelink.orders.rma;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
@@ -13,13 +13,11 @@ import java.util.Set;
  * the manual add-item path so both apply the same rule.
  */
 @Component
+@RequiredArgsConstructor
 public class OpenRmaCoverage {
 
-    @Autowired
-    private RMAItemsRepository rmaItemsRepository;
-
-    @Autowired
-    private RMARepository rmaRepository;
+    private final RMAItemsRepository rmaItemsRepository;
+    private final RMARepository rmaRepository;
 
     public boolean coversOrderItem(String storeId, String orderItemId, String ignoringRmaId) {
         Set<String> rmaIds = new LinkedHashSet<>();

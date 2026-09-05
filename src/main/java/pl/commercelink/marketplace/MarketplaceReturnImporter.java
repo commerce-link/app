@@ -1,8 +1,7 @@
 package pl.commercelink.marketplace;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
@@ -42,30 +41,17 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * ships the parcel on their own, so the label/approval step of the manual flow is skipped).
  */
 @Component
+@Slf4j
+@RequiredArgsConstructor
 public class MarketplaceReturnImporter {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MarketplaceReturnImporter.class);
-
-    @Autowired
-    private RMARepository rmaRepository;
-
-    @Autowired
-    private RMAItemsRepository rmaItemsRepository;
-
-    @Autowired
-    private OrdersRepository ordersRepository;
-
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
-
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private OrderItemFamily orderItemFamily;
-
-    @Autowired
-    private OpenRmaCoverage openRmaCoverage;
+    private final RMARepository rmaRepository;
+    private final RMAItemsRepository rmaItemsRepository;
+    private final OrdersRepository ordersRepository;
+    private final OrderItemsRepository orderItemsRepository;
+    private final StoresRepository storesRepository;
+    private final OrderItemFamily orderItemFamily;
+    private final OpenRmaCoverage openRmaCoverage;
 
     public void importReturn(Store store, String marketplace, MarketplaceReturn ret) {
         RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), marketplace, ret.externalReturnId());
@@ -74,7 +60,7 @@ public class MarketplaceReturnImporter {
             return;
         }
         if (ret.status().isClosed()) {
-            LOGGER.info("Skipping closed {} return {} without an RMA in store {}", marketplace, ret.externalReturnId(),
+            log.info("Skipping closed {} return {} without an RMA in store {}", marketplace, ret.externalReturnId(),
                     store.getStoreId());
             return;
         }
@@ -121,13 +107,13 @@ public class MarketplaceReturnImporter {
     private void createRma(Store store, String marketplace, MarketplaceReturn ret) {
         Order order = ordersRepository.findByStoreIdAndExternalOrderId(store.getStoreId(), ret.externalOrderId());
         if (order == null) {
-            LOGGER.warn("Skipping {} return {}: order {} not found in store {}", marketplace, ret.externalReturnId(),
+            log.warn("Skipping {} return {}: order {} not found in store {}", marketplace, ret.externalReturnId(),
                     ret.externalOrderId(), store.getStoreId());
             notifyUnmatched(store, marketplace, ret, false);
             return;
         }
         if (order.getStatus() == OrderStatus.Cancelled) {
-            LOGGER.warn("Skipping {} return {}: order {} is cancelled", marketplace, ret.externalReturnId(), order.getOrderId());
+            log.warn("Skipping {} return {}: order {} is cancelled", marketplace, ret.externalReturnId(), order.getOrderId());
             notifyUnmatched(store, marketplace, ret, false);
             return;
         }
@@ -135,7 +121,7 @@ public class MarketplaceReturnImporter {
         RMA rma = new RMA(store.getStoreId());
         List<RMAItem> rmaItems = matchItems(rma.getRmaId(), order, ret, marketplace);
         if (rmaItems.isEmpty()) {
-            LOGGER.warn("Skipping {} return {}: none of its items match order {}", marketplace, ret.externalReturnId(),
+            log.warn("Skipping {} return {}: none of its items match order {}", marketplace, ret.externalReturnId(),
                     order.getOrderId());
             notifyUnmatched(store, marketplace, ret, false);
             return;
@@ -143,7 +129,7 @@ public class MarketplaceReturnImporter {
         int requestedQty = ret.items().stream().mapToInt(MarketplaceReturn.Item::quantity).sum();
         int matchedQty = rmaItems.stream().mapToInt(RMAItem::getQty).sum();
         if (matchedQty < requestedQty) {
-            LOGGER.warn("{} return {}: only {} of {} units matched order {}", marketplace, ret.externalReturnId(),
+            log.warn("{} return {}: only {} of {} units matched order {}", marketplace, ret.externalReturnId(),
                     matchedQty, requestedQty, order.getOrderId());
             // A partial refund disarms the marketplace auto-refund, so the operator must see the shortfall.
             // An RMA WAS created here (unlike the zero-match cases above), so the message must not read as
@@ -168,7 +154,7 @@ public class MarketplaceReturnImporter {
 
         rmaItemsRepository.batchSave(rmaItems);
         rmaRepository.save(rma);
-        LOGGER.info("Created RMA {} from {} return {} for order {}", rma.getRmaId(), marketplace, ret.externalReturnId(),
+        log.info("Created RMA {} from {} return {} for order {}", rma.getRmaId(), marketplace, ret.externalReturnId(),
                 order.getOrderId());
     }
 
@@ -211,14 +197,14 @@ public class MarketplaceReturnImporter {
                 match = findMatch(siblingItems, used, order.getStoreId(), rmaId, item);
             }
             if (match == null) {
-                LOGGER.warn("{} return {}: no order item with key {} in order {}", marketplace,
+                log.warn("{} return {}: no order item with key {} in order {}", marketplace,
                         ret.externalReturnId(), item.manufacturerCode(), order.getOrderId());
                 continue;
             }
             used.add(match.getItemId());
             int qty = Math.min(item.quantity(), match.getQty());
             if (qty < item.quantity()) {
-                LOGGER.warn("{} return {}: quantity {} of {} clamped to ordered {}", marketplace, ret.externalReturnId(),
+                log.warn("{} return {}: quantity {} of {} clamped to ordered {}", marketplace, ret.externalReturnId(),
                         item.quantity(), item.manufacturerCode(), match.getQty());
             }
             RMAItem draft = new RMAItem();

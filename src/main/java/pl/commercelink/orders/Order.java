@@ -1,6 +1,8 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.documents.Document;
@@ -29,6 +31,8 @@ public class Order {
     private String externalOrderId;
     // set on the child order created by createSplit(); externalOrderId stays unique to the parent
     @DynamoDBAttribute(attributeName = "splitFromOrderId")
+    @Getter
+    @Setter
     private String splitFromOrderId;
 
     @DynamoDBAttribute(attributeName = "affiliateId")
@@ -591,14 +595,6 @@ public class Order {
 
     public void setExternalOrderId(String externalOrderId) {
         this.externalOrderId = externalOrderId;
-    }
-
-    public String getSplitFromOrderId() {
-        return splitFromOrderId;
-    }
-
-    public void setSplitFromOrderId(String splitFromOrderId) {
-        this.splitFromOrderId = splitFromOrderId;
     }
 
     public String getGclid() {
