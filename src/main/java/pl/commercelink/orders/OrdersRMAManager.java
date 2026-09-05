@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 @Component
@@ -51,11 +52,14 @@ public class OrdersRMAManager {
         }
 
         OperationResult<Document> op = rmaGoodsInService.receive(storeId, rma, rmaItems, order.getBillingDetails(), false, condition);
+        // Taken out before the closure: OptimisticLockingExecutor may run the mutator more than once, and
+        // what stays in the map afterwards is exactly the split-off children's share.
+        double parentShare = Objects.requireNonNullElse(totalToDecrementByOrderId.remove(order.getOrderId()), 0.0);
         commitCurrentOrderChangesIfSuccess(op, order, fresh -> {
-            fresh.decreaseTotalPrice(totalToDecrementByOrderId.getOrDefault(order.getOrderId(), 0.0));
+            fresh.decreaseTotalPrice(parentShare);
             fresh.reopen();
         }, orderItems, newOrderItems);
-        adjustSplitOffOrders(op, storeId, order.getOrderId(), totalToDecrementByOrderId);
+        adjustSplitOffOrders(op, storeId, totalToDecrementByOrderId);
         return op;
     }
 
@@ -89,14 +93,11 @@ public class OrdersRMAManager {
     }
 
     private void adjustSplitOffOrders(
-            OperationResult<Document> op, String storeId, String parentOrderId, Map<String, Double> totalToDecrementByOrderId) {
+            OperationResult<Document> op, String storeId, Map<String, Double> totalToDecrementByOrderId) {
         if (!op.isSuccess()) {
             return;
         }
         for (Map.Entry<String, Double> entry : totalToDecrementByOrderId.entrySet()) {
-            if (entry.getKey().equals(parentOrderId)) {
-                continue;
-            }
             optimisticLockingExecutor.modifyAndSave(
                     () -> ordersRepository.findById(storeId, entry.getKey()),
                     fresh -> {
