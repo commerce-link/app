@@ -124,7 +124,7 @@ public class MarketplaceOrderLifecycleEventListener {
     // a return event for a marketplace without a returns API cannot be acted on; skipping (not throwing)
     // keeps it out of the DLQ, and the RMA history shows whether the decision reached the marketplace
     private void ifReturnsApiAvailable(MarketplaceProvider provider, OrderLifecycleEvent payload,
-                                        Consumer<MarketplaceReturns> action) {
+                                       Consumer<MarketplaceReturns> action) {
         if (payload.getReturnAction() == null || payload.getReturnAction().externalReturnId() == null) {
             log.error("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;

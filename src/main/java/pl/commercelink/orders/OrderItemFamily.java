@@ -16,7 +16,7 @@ import java.util.List;
  *
  * <p>Reading the family is comparatively expensive: {@link OrdersRepository#findBySplitFromOrderId} queries
  * the store's whole Orders partition (with a filter, not a key condition, on splitFromOrderId). Callers
- * should only reach for {@link #siblingItems} after a lookup against the order's own items misses, not
+ * should only reach for {@link #itemsMovedToSplitOffOrders} after a lookup against the order's own items misses, not
  * eagerly on every return.
  */
 @Component

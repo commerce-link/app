@@ -215,10 +215,10 @@ class MarketplaceReturnDecisionsTest {
     void resendRepublishesEveryRecordedRoundWithItsOriginalCommandId() {
         // given: round 1 went to the DLQ, round 2 succeeded - resend must reach round 1 too
         marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-1",
-                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"SKU-1\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}",
+                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"marketplaceKey\":\"SKU-1\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}",
                 LocalDateTime.now()));
         marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-2",
-                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"SKU-2\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-2\"}",
+                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"marketplaceKey\":\"SKU-2\",\"quantity\":1}],\"refundDelivery\":false,\"commandId\":\"cmd-2\"}",
                 LocalDateTime.now()));
 
         // when
@@ -229,6 +229,8 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher, times(2)).publishReturnAction(any(), any(), eq(OrderLifecycleEventType.ReturnAccepted), captor.capture());
         assertEquals(List.of("cmd-1", "cmd-2"), captor.getAllValues().stream().map(MarketplaceReturnAction::commandId).toList());
+        assertEquals(List.of("SKU-1", "SKU-2"),
+                captor.getAllValues().stream().map(a -> a.items().get(0).marketplaceKey()).toList());
     }
 
     @Test

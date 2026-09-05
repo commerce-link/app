@@ -123,7 +123,7 @@ public class MarketplaceReturnDecisions {
             return true;
         }
         if (rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED)) {
-            // Mirrors the guard in returnAccepted: a refund and a rejection on the same RMA must never both
+            // Mirrors the guard in publishAcceptance: a refund and a rejection on the same RMA must never both
             // reach the marketplace - the buyer would keep the money and also get a rejection notice.
             log.warn("Refusing to reject RMA {}: a refund was already requested to the marketplace", rma.getRmaId());
             return false;

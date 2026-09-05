@@ -183,16 +183,16 @@ public class MarketplaceReturnImporter {
     private List<RMAItem> matchItems(String rmaId, Order order, MarketplaceReturn ret, String marketplace) {
         List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
         // lazily: see OrderItemFamily
-        List<OrderItem> siblingItems = null;
+        List<OrderItem> splitOffItems = null;
         Set<String> used = new HashSet<>();
         List<RMAItem> result = new ArrayList<>();
         for (MarketplaceReturn.Item item : ret.items()) {
             OrderItem match = findMatch(orderItems, used, order.getStoreId(), rmaId, item);
             if (match == null) {
-                if (siblingItems == null) {
-                    siblingItems = orderItemFamily.itemsMovedToSplitOffOrders(order);
+                if (splitOffItems == null) {
+                    splitOffItems = orderItemFamily.itemsMovedToSplitOffOrders(order);
                 }
-                match = findMatch(siblingItems, used, order.getStoreId(), rmaId, item);
+                match = findMatch(splitOffItems, used, order.getStoreId(), rmaId, item);
             }
             if (match == null) {
                 log.warn("{} return {}: no order item with key {} in order {}", marketplace,
