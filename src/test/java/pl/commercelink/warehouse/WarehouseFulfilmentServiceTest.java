@@ -84,6 +84,64 @@ class WarehouseFulfilmentServiceTest {
         assertEquals("warehouse-item-1", captor.getValue().getItems().get(0).getWarehouseItemId());
     }
 
+    @Test
+    void keepsTheMarketplaceKeyOnEveryItemProducedByAPartialReservation() {
+        // given: a qty-3 marketplace line reserved 2 + 1 across two batches
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        orderItem.setExternalItemId("local-seed-0051");
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmInTwoBatches(invocation.getArgument(0)));
+
+        // when
+        List<OrderItem> fulfilledItems = warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        assertEquals(2, fulfilledItems.size());
+        fulfilledItems.forEach(item -> assertEquals("local-seed-0051", item.getExternalItemId()));
+    }
+
+    private Reservation confirmInTwoBatches(Reservation reservation) {
+        ReservationItem reservationItem = reservation.getItems().get(0);
+        reservationItem.add(new ReservationConfirmation("delivery-1", "5901234123457", "MFN-1",
+                Price.fromNet(20.0), 2, true, null, ItemCondition.Sealed));
+        reservationItem.add(new ReservationConfirmation("delivery-2", "5901234123457", "MFN-1",
+                Price.fromNet(20.0), 1, true, null, ItemCondition.Sealed));
+        return reservation;
+    }
+
+    @Test
+    void keepsTheMarketplaceKeyOnTheUnreservedRemainderOfAPartiallyReservedItem() {
+        // given: a qty-3 marketplace line of which the warehouse can reserve only 2
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        orderItem.setExternalItemId("local-seed-0051");
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmOnly(invocation.getArgument(0), 2));
+
+        // when
+        List<OrderItem> fulfilledItems = warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        assertEquals(2, fulfilledItems.size());
+        fulfilledItems.forEach(item -> assertEquals("local-seed-0051", item.getExternalItemId()));
+    }
+
+    private Reservation confirmOnly(Reservation reservation, int qty) {
+        ReservationItem reservationItem = reservation.getItems().get(0);
+        reservationItem.add(new ReservationConfirmation("delivery-1", "5901234123457", "MFN-1",
+                Price.fromNet(20.0), qty, true, null, ItemCondition.Sealed));
+        return reservation;
+    }
+
     private Reservation confirmAt(Reservation reservation, double unitCost) {
         ReservationItem reservationItem = reservation.getItems().get(0);
         reservationItem.add(new ReservationConfirmation(

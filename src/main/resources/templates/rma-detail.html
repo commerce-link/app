@@ -114,7 +114,7 @@
     </style>
 
     <div class="box mb-5">
-        <div class="columns is-vcentered">
+        <div class="columns is-vcentered mb-0">
             <div class="column">
                 <p class="heading" th:text="#{rma.id}"></p>
                 <p class="title is-5" th:text="${rma.rmaId}"></p>
@@ -183,7 +183,9 @@
                                   rows="4"
                                   th:field="*{rejectionReason}"
                                   th:disabled="${isClosed}"
+                                  th:attr="data-marketplace=${rma.marketplaceReturn}"
                                   th:placeholder="#{rma.reject.reason.placeholder}"></textarea>
+                        <p class="help" th:if="${rma.marketplaceReturn}" th:text="#{rma.rejection.reason.marketplace.hint}"></p>
                     </div>
 
                     <!-- RMA Link -->
@@ -290,6 +292,32 @@
                         </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div th:if="${rma.marketplaceReturn}" class="mt-5">
+                <h2 class="subtitle" th:text="#{rma.marketplace.return}"></h2>
+                <div class="box">
+                    <div class="columns is-vcentered mb-0">
+                        <div class="column">
+                            <p class="heading" th:text="#{store.marketplace.name}"></p>
+                            <p class="title is-5">
+                                <span th:text="${rma.marketplace}"></span>
+                                <span class="tag is-info is-light" th:if="${rma.externalReturnStatus != null}"
+                                      th:text="${enumI18n.localize(rma.externalReturnStatus)}"></span>
+                            </p>
+                        </div>
+                        <div class="column">
+                            <p class="heading" th:text="#{rma.marketplace.reference}"></p>
+                            <p class="title is-5" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
+                        </div>
+                        <div class="column is-narrow" th:if="${!#lists.isEmpty(rma.marketplaceDecisions)}">
+                            <form method="post" th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
+                                <button class="button is-small is-light" type="submit"
+                                        th:text="#{rma.marketplace.resend}"></button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -409,6 +437,12 @@
                             <option th:each="condition : ${itemConditions}" th:value="${condition}"
                                     th:text="${enumI18n.localize(condition)}"></option>
                         </select>
+                    </div>
+                    <div class="control ml-2" id="refund-delivery-wrapper" style="display: none;" th:if="${rma.marketplaceReturn}">
+                        <label class="checkbox is-size-7">
+                            <input type="checkbox" name="refundDelivery" value="true" th:checked="${refundDeliveryDefault}" th:disabled="${isClosed}">
+                            <span th:text="#{rma.refund.delivery}"></span>
+                        </label>
                     </div>
                     <button class="button is-primary is-small" type="button" onclick="handleRMAAction(this)" th:text="#{general.submit}" th:disabled="${isClosed}"></button>
                 </div>
@@ -682,6 +716,13 @@
     </div>
 
     <script>
+        function toggleRejectionReasonRequired(statusSelect) {
+            const textarea = document.querySelector('textarea[name="rejectionReason"]');
+            if (!textarea) return;
+            // Only a marketplace rejection requires a reason; other saves must stay unblocked.
+            textarea.required = statusSelect.value === 'Rejected' && textarea.dataset.marketplace === 'true';
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll(".rma-media-delete-btn").forEach(btn => {
                 btn.addEventListener("click", function() {
@@ -701,6 +742,14 @@
                     icon.classList.toggle("fa-chevron-down", isHidden);
                 });
             });
+
+            const statusSelect = document.getElementById("status");
+            if (statusSelect) {
+                toggleRejectionReasonRequired(statusSelect);
+                statusSelect.addEventListener("change", function() {
+                    toggleRejectionReasonRequired(statusSelect);
+                });
+            }
         });
 
         const actionsRequiringCondition = ['replaceItems?broken=false', 'replaceItems?broken=true', 'acceptReturn'];
@@ -711,6 +760,10 @@
 
         function toggleConditionSelect() {
             document.getElementById('condition-select-wrapper').style.display = actionRequiresCondition() ? '' : 'none';
+            const refundDelivery = document.getElementById('refund-delivery-wrapper');
+            if (refundDelivery) {
+                refundDelivery.style.display = document.getElementById('action-select').value === 'acceptReturn' ? '' : 'none';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -730,7 +783,10 @@
             if (selectedAction === 'split') {
                 submitSplitAction();
             } else {
-                confirmSave(button, submitRMAItemsForm);
+                confirmSave(button, () => {
+                    button.disabled = true;
+                    submitRMAItemsForm();
+                });
             }
         }
 

@@ -1,11 +1,15 @@
 package pl.commercelink.orders.rma;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -13,6 +17,11 @@ import java.util.stream.Collectors;
 
 @DynamoDBTable(tableName = "RMA")
 public class RMA {
+
+    public static final String EVENT_REFUND_REQUESTED = "RefundRequested";
+    public static final String EVENT_REJECTION_SENT = "RejectionSent";
+    public static final String EVENT_REFUNDED_BY_MARKETPLACE = "RefundedByMarketplace";
+    public static final int MAX_REJECTION_REASON_LENGTH = 250;
 
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
@@ -43,6 +52,27 @@ public class RMA {
     private LocalDateTime createdAt;
     @DynamoDBAttribute(attributeName = "media")
     private List<String> media = new LinkedList<>();
+    @DynamoDBAttribute(attributeName = "marketplace")
+    @Getter
+    @Setter
+    private String marketplace;
+    @DynamoDBAttribute(attributeName = "externalReturnId")
+    @Getter
+    @Setter
+    private String externalReturnId;
+    @DynamoDBAttribute(attributeName = "externalReturnReference")
+    @Getter
+    @Setter
+    private String externalReturnReference;
+    @DynamoDBAttribute(attributeName = "externalReturnStatus")
+    @DynamoDBTypeConvertedEnum
+    @Getter
+    @Setter
+    private MarketplaceReturnStatus externalReturnStatus;
+    @DynamoDBAttribute(attributeName = "marketplaceDecisions")
+    @Getter
+    @Setter
+    private List<MarketplaceDecision> marketplaceDecisions = new LinkedList<>();
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -178,6 +208,16 @@ public class RMA {
         return events.stream().anyMatch(e -> e.isSameAs(other));
     }
 
+    @DynamoDBIgnore
+    public boolean hasActionEvent(String name) {
+        return events.stream().anyMatch(e -> e.getType() == EventType.action && name.equals(e.getName()));
+    }
+
+    @DynamoDBIgnore
+    public void addActionEvent(String name) {
+        events.add(new Event(EventType.action, name, LocalDateTime.now()));
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -228,6 +268,33 @@ public class RMA {
     @DynamoDBIgnore
     public void decreaseShippingInsurance(double amount) {
         this.shippingInsurance -= amount;
+    }
+
+    @DynamoDBIgnore
+    public boolean isMarketplaceReturn() {
+        return externalReturnId != null && !externalReturnId.isBlank();
+    }
+
+    /** A marketplace rejection is shown to the buyer and must carry a reason (1-250 chars); manual RMAs keep the old free-form rules. */
+    @DynamoDBIgnore
+    public boolean requiresRejectionReason(RMAStatus newStatus, String reason) {
+        return isMarketplaceReturn() && turnsRejected(newStatus)
+                && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
+    }
+
+    /** A refunded return must not also be rejected: the buyer would keep the money and get a rejection notice. */
+    @DynamoDBIgnore
+    public boolean blocksRejectionAfterRefund(RMAStatus newStatus) {
+        return isMarketplaceReturn() && turnsRejected(newStatus) && hasActionEvent(EVENT_REFUND_REQUESTED);
+    }
+
+    private boolean turnsRejected(RMAStatus newStatus) {
+        return newStatus == RMAStatus.Rejected && status != RMAStatus.Rejected;
+    }
+
+    @DynamoDBIgnore
+    public void addMarketplaceDecision(MarketplaceDecision decision) {
+        this.marketplaceDecisions.add(decision);
     }
 
     public Long getVersion() {

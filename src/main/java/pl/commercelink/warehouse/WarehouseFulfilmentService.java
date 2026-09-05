@@ -68,6 +68,7 @@ public class WarehouseFulfilmentService {
                         orderItem.getPosition()
                 );
                 remainingItem.setComment(orderItem.getComment());
+                remainingItem.setExternalItemId(orderItem.getExternalItemId());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -96,6 +97,7 @@ public class WarehouseFulfilmentService {
                 orderItem.getPosition()
         );
         newItem.setComment(orderItem.getComment());
+        newItem.setExternalItemId(orderItem.getExternalItemId());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }
