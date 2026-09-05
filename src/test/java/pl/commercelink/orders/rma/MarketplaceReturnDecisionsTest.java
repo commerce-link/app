@@ -91,11 +91,9 @@ class MarketplaceReturnDecisionsTest {
     }
 
     private static OrderItem shippingOrderItem(String itemId) {
-        OrderItem item = mock(OrderItem.class);
-        when(item.getItemId()).thenReturn(itemId);
-        when(item.getManufacturerCode()).thenReturn(BasketItem.SHIPPING_MFN_CODE);
-        when(item.getQty()).thenReturn(1);
-        when(item.isService()).thenReturn(true);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "shipping", 1, 0.0, BasketItem.SHIPPING_MFN_CODE, false);
+        item.setItemId(itemId);
+        item.setService(true);
         return item;
     }
 

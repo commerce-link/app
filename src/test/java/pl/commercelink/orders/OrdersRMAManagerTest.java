@@ -27,6 +27,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -143,7 +144,7 @@ class OrdersRMAManagerTest {
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
-        verify(ordersRepository, org.mockito.Mockito.atLeast(1)).save(orderCaptor.capture());
+        verify(ordersRepository, atLeast(1)).save(orderCaptor.capture());
         Order replacementOrder = orderCaptor.getAllValues().stream()
                 .filter(o -> !ORDER_ID.equals(o.getOrderId()))
                 .findFirst()
@@ -171,7 +172,7 @@ class OrdersRMAManagerTest {
         // then
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(orderItemsRepository, org.mockito.Mockito.atLeast(1)).batchSave(itemsCaptor.capture());
+        verify(orderItemsRepository, atLeast(1)).batchSave(itemsCaptor.capture());
         OrderItem replacement = itemsCaptor.getAllValues().stream()
                 .flatMap(List::stream)
                 .filter(i -> !ORDER_ID.equals(i.getOrderId()))
@@ -246,7 +247,7 @@ class OrdersRMAManagerTest {
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
-        verify(ordersRepository, org.mockito.Mockito.atLeast(1)).save(orderCaptor.capture());
+        verify(ordersRepository, atLeast(1)).save(orderCaptor.capture());
         Order savedChild = orderCaptor.getAllValues().stream()
                 .filter(o -> "order-2".equals(o.getOrderId()))
                 .findFirst()
@@ -281,7 +282,7 @@ class OrdersRMAManagerTest {
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
-        verify(ordersRepository, org.mockito.Mockito.atLeast(1)).save(orderCaptor.capture());
+        verify(ordersRepository, atLeast(1)).save(orderCaptor.capture());
         Order savedParent = orderCaptor.getAllValues().stream()
                 .filter(o -> ORDER_ID.equals(o.getOrderId()))
                 .findFirst()

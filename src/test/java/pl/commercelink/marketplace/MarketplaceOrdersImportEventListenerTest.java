@@ -1,14 +1,11 @@
 package pl.commercelink.marketplace;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
@@ -27,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class MarketplaceOrdersImportEventListenerTest {
 
     private static final String MARKETPLACE = "Allegro";
@@ -46,12 +42,20 @@ class MarketplaceOrdersImportEventListenerTest {
     private final MarketplaceReturn aReturn = new MarketplaceReturn("r-1", "cf-1", null,
             MarketplaceReturnStatus.DECLARED, LocalDateTime.now(), List.of(), List.of());
 
-    @BeforeEach
-    void setUp() {
+    private void stubActiveStore() {
         when(storesRepository.findAll()).thenReturn(List.of(store));
         when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
+    }
+
+    // Split by scope, not one bundled "happy path": under STRICT_STUBS an orders-scope test never touches
+    // provider.returns()/fetchReturns(), and a returns-scope test never touches provider.fetchOrders() - a
+    // single method stubbing all three would leave the unused half flagged as unnecessary in every caller.
+    private void stubOrdersFetched() {
         when(provider.fetchOrders()).thenReturn(List.of(mock(MarketplaceOrder.class)));
+    }
+
+    private void stubReturnsFetched() {
         when(provider.returns()).thenReturn(Optional.of(returns));
         when(returns.fetchReturns()).thenReturn(List.of(aReturn));
     }
@@ -82,6 +86,10 @@ class MarketplaceOrdersImportEventListenerTest {
 
     @Test
     void payloadWithoutScopeImportsOrdersOnly() throws Exception {
+        // given
+        stubActiveStore();
+        stubOrdersFetched();
+
         // when
         listener.handleMessage(payload(null));
 
@@ -94,6 +102,10 @@ class MarketplaceOrdersImportEventListenerTest {
 
     @Test
     void returnsScopeImportsReturnsOnly() throws Exception {
+        // given
+        stubActiveStore();
+        stubReturnsFetched();
+
         // when
         listener.handleMessage(payload("returns"));
 
@@ -106,6 +118,7 @@ class MarketplaceOrdersImportEventListenerTest {
     @Test
     void returnsScopeIsSkippedWhenProviderHasNoReturns() throws Exception {
         // given
+        stubActiveStore();
         when(provider.returns()).thenReturn(Optional.empty());
 
         // when
@@ -117,6 +130,10 @@ class MarketplaceOrdersImportEventListenerTest {
 
     @Test
     void ordersScopeImportsOrdersOnly() throws Exception {
+        // given
+        stubActiveStore();
+        stubOrdersFetched();
+
         // when
         listener.handleMessage(payload("orders"));
 
