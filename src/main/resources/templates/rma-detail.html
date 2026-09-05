@@ -311,12 +311,27 @@
                             <p class="heading" th:text="#{rma.marketplace.reference}"></p>
                             <p class="title is-5" th:text="${rma.externalReturnReference != null ? rma.externalReturnReference : rma.externalReturnId}"></p>
                         </div>
-                        <div class="column is-narrow" th:if="${!#lists.isEmpty(rma.marketplaceDecisions)}">
-                            <form method="post" th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
-                                <button class="button is-small is-light" type="submit"
-                                        th:text="#{rma.marketplace.resend}"></button>
-                            </form>
-                        </div>
+                    </div>
+                    <div th:if="${!#lists.isEmpty(rma.marketplaceDecisions)}">
+                        <p class="heading" th:text="#{rma.marketplace.decisions}"></p>
+                        <table class="table is-narrow is-fullwidth mb-2">
+                            <thead><tr>
+                                <th th:text="#{rma.marketplace.decision.type}"></th>
+                                <th th:text="#{rma.marketplace.decision.command}"></th>
+                                <th th:text="#{rma.marketplace.decision.recorded}"></th>
+                            </tr></thead>
+                            <tbody>
+                            <tr th:each="d : ${rma.marketplaceDecisions}">
+                                <td th:text="${d.type}"></td>
+                                <td class="is-family-monospace" th:text="${d.commandId ?: '—'}"></td>
+                                <td th:text="${d.recordedAt != null ? #temporals.format(d.recordedAt, 'yyyy-MM-dd HH:mm:ss') : ''}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <form method="post" th:action="@{'/dashboard/rma/' + ${rma.rmaId} + '/resend-marketplace-decision'}">
+                            <button class="button is-small is-light" type="submit"
+                                    th:text="#{rma.marketplace.resend}"></button>
+                        </form>
                     </div>
                 </div>
             </div>
