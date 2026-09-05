@@ -449,27 +449,10 @@ class MarketplaceOrderLifecycleEventListenerTest {
         // then
         ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
         verify(returns).refundReturn(eq(EXTERNAL_ORDER_ID), eq("r-1"), captor.capture());
-        assertEquals("cmd-1", captor.getValue().commandId());
+        assertEquals("cmd-1", captor.getValue().idempotencyKey());
         assertTrue(captor.getValue().refundDelivery());
-        assertEquals("SKU-1", captor.getValue().items().get(0).manufacturerCode());
+        assertEquals("SKU-1", captor.getValue().items().get(0).offerKey());
         assertEquals(2, captor.getValue().items().get(0).quantity());
-    }
-
-    @Test
-    void returnAcceptedEventCarriesTheExternalReturnReferenceIntoTheRefund() {
-        // given
-        when(provider.returns()).thenReturn(Optional.of(returns));
-        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1",
-                List.of(new MarketplaceReturnAction.Item("SKU-1", 2)), true, "cmd-1", null);
-        action.setExternalReturnReference("XGQX/2026");
-
-        // when
-        handleReturn(OrderLifecycleEventType.ReturnAccepted, action);
-
-        // then
-        ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
-        verify(returns).refundReturn(eq(EXTERNAL_ORDER_ID), eq("r-1"), captor.capture());
-        assertEquals("XGQX/2026", captor.getValue().referenceNumber());
     }
 
     @Test
@@ -488,8 +471,8 @@ class MarketplaceOrderLifecycleEventListenerTest {
         // then: the payload's commandId is forwarded, never regenerated - Allegro deduplicates on it
         ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
         verify(returns, times(2)).refundReturn(any(), any(), captor.capture());
-        assertEquals("cmd-1", captor.getAllValues().get(0).commandId());
-        assertEquals("cmd-1", captor.getAllValues().get(1).commandId());
+        assertEquals("cmd-1", captor.getAllValues().get(0).idempotencyKey());
+        assertEquals("cmd-1", captor.getAllValues().get(1).idempotencyKey());
     }
 
     @Test

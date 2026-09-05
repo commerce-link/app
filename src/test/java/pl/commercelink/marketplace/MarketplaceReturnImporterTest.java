@@ -36,7 +36,6 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -95,7 +94,7 @@ class MarketplaceReturnImporterTest {
     }
 
     private static MarketplaceReturn.Item item(String mfn, int qty) {
-        return new MarketplaceReturn.Item(mfn, qty, new BigDecimal("100.00"), "NOT_AS_DESCRIBED: wrong colour");
+        return new MarketplaceReturn.Item(mfn, qty, "NOT_AS_DESCRIBED: wrong colour");
     }
 
     private static MarketplaceReturn returnWithItem(String marketplaceKey, int qty) {

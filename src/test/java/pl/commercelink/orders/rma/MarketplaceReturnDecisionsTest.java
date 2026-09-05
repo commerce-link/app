@@ -115,28 +115,15 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(eq(order), eq(marketplaceRma), eq(OrderLifecycleEventType.ReturnAccepted), captor.capture());
         MarketplaceReturnAction action = captor.getValue();
-        assertEquals(marketplaceRma.getRmaId(), action.getRmaId());
-        assertEquals("r-1", action.getExternalReturnId());
-        assertNotNull(action.getCommandId());
-        assertTrue(action.isRefundDelivery());
-        assertEquals(2, action.getItems().size());
-        assertEquals("SKU-1", action.getItems().get(0).getManufacturerCode());
-        assertEquals(2, action.getItems().get(0).getQuantity());
+        assertEquals(marketplaceRma.getRmaId(), action.rmaId());
+        assertEquals("r-1", action.externalReturnId());
+        assertNotNull(action.commandId());
+        assertTrue(action.refundDelivery());
+        assertEquals(2, action.items().size());
+        assertEquals("SKU-1", action.items().get(0).marketplaceKey());
+        assertEquals(2, action.items().get(0).quantity());
         assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, RMA.EVENT_REFUND_REQUESTED, null)));
         verify(rmaRepository).save(marketplaceRma);
-    }
-
-    @Test
-    void returnAcceptedCarriesTheRmasExternalReturnReferenceOntoTheAction() {
-        // given: the buyer's own reference is more meaningful to them than our internal return id
-        marketplaceRma.setExternalReturnReference("XGQX/2026");
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-
-        // when
-        decisions.returnAccepted(marketplaceRma, List.of(), false);
-
-        // then
-        assertEquals("XGQX/2026", capturePublishedAction().getExternalReturnReference());
     }
 
     @Test
@@ -153,9 +140,9 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
         MarketplaceReturnAction action = captor.getValue();
-        assertEquals(1, action.getItems().size());
-        assertEquals("sku-a", action.getItems().get(0).getManufacturerCode());
-        assertEquals(2, action.getItems().get(0).getQuantity());
+        assertEquals(1, action.items().size());
+        assertEquals("sku-a", action.items().get(0).marketplaceKey());
+        assertEquals(2, action.items().get(0).quantity());
     }
 
     @Test
@@ -173,7 +160,7 @@ class MarketplaceReturnDecisionsTest {
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
-        assertEquals("SKU-1", captor.getValue().getItems().get(0).getManufacturerCode());
+        assertEquals("SKU-1", captor.getValue().items().get(0).marketplaceKey());
     }
 
     @Test
@@ -187,7 +174,7 @@ class MarketplaceReturnDecisionsTest {
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(any(), any(), any(), captor.capture());
-        assertEquals("SKU-1", captor.getValue().getItems().get(0).getManufacturerCode());
+        assertEquals("SKU-1", captor.getValue().items().get(0).marketplaceKey());
     }
 
     @Test
@@ -205,7 +192,7 @@ class MarketplaceReturnDecisionsTest {
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher, times(2)).publishReturnAction(any(), any(), any(), captor.capture());
-        assertNotEquals(captor.getAllValues().get(0).getCommandId(), captor.getAllValues().get(1).getCommandId());
+        assertNotEquals(captor.getAllValues().get(0).commandId(), captor.getAllValues().get(1).commandId());
     }
 
     @Test
@@ -243,7 +230,7 @@ class MarketplaceReturnDecisionsTest {
         assertTrue(resent);
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher, times(2)).publishReturnAction(any(), any(), eq(OrderLifecycleEventType.ReturnAccepted), captor.capture());
-        assertEquals(List.of("cmd-1", "cmd-2"), captor.getAllValues().stream().map(MarketplaceReturnAction::getCommandId).toList());
+        assertEquals(List.of("cmd-1", "cmd-2"), captor.getAllValues().stream().map(MarketplaceReturnAction::commandId).toList());
     }
 
     @Test
@@ -299,7 +286,7 @@ class MarketplaceReturnDecisionsTest {
         // then
         ArgumentCaptor<MarketplaceReturnAction> captor = ArgumentCaptor.forClass(MarketplaceReturnAction.class);
         verify(publisher).publishReturnAction(eq(order), eq(marketplaceRma), eq(OrderLifecycleEventType.ReturnRejected), captor.capture());
-        assertEquals("Damaged by buyer", captor.getValue().getRejectionReason());
+        assertEquals("Damaged by buyer", captor.getValue().rejectionReason());
         assertTrue(marketplaceRma.hasEvent(new Event(EventType.action, RMA.EVENT_REJECTION_SENT, null)));
         verify(rmaRepository).save(marketplaceRma);
     }
@@ -345,7 +332,7 @@ class MarketplaceReturnDecisionsTest {
         // then
         assertTrue(resent);
         MarketplaceReturnAction second = capturePublishedAction();
-        assertEquals(first.getCommandId(), second.getCommandId());
+        assertEquals(first.commandId(), second.commandId());
         assertEquals(OrderLifecycleEventType.ReturnAccepted, capturePublishedType());
     }
 
@@ -453,7 +440,7 @@ class MarketplaceReturnDecisionsTest {
 
         // then: the split family was consulted and gave the real key, not the RMA item's stored (and
         // possibly stale) mfn
-        assertEquals("SKU-1", capturePublishedAction().getItems().get(0).getManufacturerCode());
+        assertEquals("SKU-1", capturePublishedAction().items().get(0).marketplaceKey());
     }
 
     @Test
@@ -598,7 +585,7 @@ class MarketplaceReturnDecisionsTest {
         decisions.returnAccepted(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-MPN-77", 1)), false);
 
         // then
-        assertEquals("LOCAL-SEED-0051", capturePublishedAction().getItems().get(0).getManufacturerCode());
+        assertEquals("LOCAL-SEED-0051", capturePublishedAction().items().get(0).marketplaceKey());
     }
 
     // --- Task 7: decisions report refusal instead of silently swallowing it ---

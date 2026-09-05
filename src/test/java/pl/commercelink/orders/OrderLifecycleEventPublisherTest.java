@@ -109,11 +109,11 @@ class OrderLifecycleEventPublisherTest {
         assertEquals(OrderLifecycleEventType.ReturnAccepted, event.getType());
         assertEquals("EXT-1", event.getExternalOrderId());
         assertEquals("Allegro", event.getMarketplace());
-        assertEquals("r-1", event.getReturnAction().getExternalReturnId());
-        assertEquals("cmd-1", event.getReturnAction().getCommandId());
-        assertTrue(event.getReturnAction().isRefundDelivery());
-        assertEquals("SKU-1", event.getReturnAction().getItems().get(0).getManufacturerCode());
-        assertEquals(2, event.getReturnAction().getItems().get(0).getQuantity());
+        assertEquals("r-1", event.getReturnAction().externalReturnId());
+        assertEquals("cmd-1", event.getReturnAction().commandId());
+        assertTrue(event.getReturnAction().refundDelivery());
+        assertEquals("SKU-1", event.getReturnAction().items().get(0).marketplaceKey());
+        assertEquals(2, event.getReturnAction().items().get(0).quantity());
     }
 
     @Test

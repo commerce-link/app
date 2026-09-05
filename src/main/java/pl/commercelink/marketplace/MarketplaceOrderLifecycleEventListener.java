@@ -109,12 +109,12 @@ public class MarketplaceOrderLifecycleEventListener {
                 break;
             case ReturnAccepted:
                 withReturns(provider, payload, returns -> returns.refundReturn(externalOrderId,
-                        payload.getReturnAction().getExternalReturnId(), toReturnRefund(payload.getReturnAction())));
+                        payload.getReturnAction().externalReturnId(), toReturnRefund(payload.getReturnAction())));
                 break;
             case ReturnRejected:
                 withReturns(provider, payload, returns -> returns.rejectReturn(
-                        payload.getReturnAction().getExternalReturnId(),
-                        new ReturnRejection(payload.getReturnAction().getRejectionReason())));
+                        payload.getReturnAction().externalReturnId(),
+                        new ReturnRejection(payload.getReturnAction().rejectionReason())));
                 break;
             case StatusChange:
                 break;
@@ -125,14 +125,14 @@ public class MarketplaceOrderLifecycleEventListener {
     // keeps it out of the DLQ, and the RMA history shows whether the decision reached the marketplace
     private void withReturns(MarketplaceProvider provider, OrderLifecycleEvent payload,
                              Consumer<MarketplaceReturns> action) {
-        if (payload.getReturnAction() == null || payload.getReturnAction().getExternalReturnId() == null) {
+        if (payload.getReturnAction() == null || payload.getReturnAction().externalReturnId() == null) {
             log.warn("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;
         }
         Optional<MarketplaceReturns> returns = provider.returns();
         if (returns.isEmpty()) {
             log.error("Marketplace {} exposes no returns API, but {} decision for RMA {} (order {}) requires one - decision dropped; check the deployed adapter version",
-                    payload.getMarketplace(), payload.getType(), payload.getReturnAction().getRmaId(), payload.getExternalOrderId());
+                    payload.getMarketplace(), payload.getType(), payload.getReturnAction().rmaId(), payload.getExternalOrderId());
             return;
         }
         action.accept(returns.get());
@@ -140,12 +140,11 @@ public class MarketplaceOrderLifecycleEventListener {
 
     private static ReturnRefund toReturnRefund(MarketplaceReturnAction action) {
         return new ReturnRefund(
-                action.getItems().stream()
-                        .map(i -> new ReturnRefund.Item(i.getManufacturerCode(), i.getQuantity()))
+                action.items().stream()
+                        .map(i -> new ReturnRefund.Item(i.marketplaceKey(), i.quantity()))
                         .toList(),
-                action.isRefundDelivery(),
-                action.getCommandId(),
-                action.getExternalReturnReference());
+                action.refundDelivery(),
+                action.commandId());
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order, Store store, String marketplace) {

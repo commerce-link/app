@@ -198,14 +198,14 @@ public class MarketplaceReturnImporter {
             }
             if (match == null) {
                 log.warn("{} return {}: no order item with key {} in order {}", marketplace,
-                        ret.externalReturnId(), item.manufacturerCode(), order.getOrderId());
+                        ret.externalReturnId(), item.offerKey(), order.getOrderId());
                 continue;
             }
             used.add(match.getItemId());
             int qty = Math.min(item.quantity(), match.getQty());
             if (qty < item.quantity()) {
                 log.warn("{} return {}: quantity {} of {} clamped to ordered {}", marketplace, ret.externalReturnId(),
-                        item.quantity(), item.manufacturerCode(), match.getQty());
+                        item.quantity(), item.offerKey(), match.getQty());
             }
             RMAItem draft = new RMAItem();
             draft.setItemId(match.getItemId());
@@ -221,7 +221,7 @@ public class MarketplaceReturnImporter {
                                 MarketplaceReturn.Item item) {
         return candidates.stream()
                 .filter(oi -> !used.contains(oi.getItemId()))
-                .filter(oi -> matchesMarketplaceKey(oi, item.manufacturerCode()))
+                .filter(oi -> matchesMarketplaceKey(oi, item.offerKey()))
                 .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                 .filter(oi -> !oi.isService())
                 .filter(oi -> !openRmaCoverage.coversOrderItem(storeId, oi.getItemId(), rmaId))

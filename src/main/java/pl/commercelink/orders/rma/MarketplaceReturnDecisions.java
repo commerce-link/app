@@ -78,7 +78,6 @@ public class MarketplaceReturnDecisions {
                 .toList();
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
-        action.setExternalReturnReference(rma.getExternalReturnReference());
 
         // Persist the event and the resend payload BEFORE publishing. If the save happened after the
         // publish and then failed, a real refund would be in flight with no RefundRequested event and no
@@ -168,7 +167,7 @@ public class MarketplaceReturnDecisions {
     private void rememberAction(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
         try {
             String payload = ACTION_MAPPER.writeValueAsString(action);
-            rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.getCommandId(), payload, LocalDateTime.now()));
+            rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.commandId(), payload, LocalDateTime.now()));
         } catch (JsonProcessingException e) {
             // Never fail the operator's action because the resend record could not be stored.
             log.error("Could not store the marketplace decision for RMA {}", rma.getRmaId(), e);

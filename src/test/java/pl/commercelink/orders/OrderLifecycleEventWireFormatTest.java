@@ -10,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Pins the real Jackson round-trip of {@link OrderLifecycleEvent} over SQS: no test in this
- * module otherwise touches a plain {@link ObjectMapper}, so a silently dropped or renamed field
- * (e.g. the refund's commandId) would only ever surface in production.
+ * Pins the real Jackson round-trip of {@link OrderLifecycleEvent} over SQS and proves a plain
+ * {@link ObjectMapper} (as used by MarketplaceReturnDecisions.resendDecisions) reads the record
+ * without extra modules.
  */
 class OrderLifecycleEventWireFormatTest {
 
@@ -22,35 +22,30 @@ class OrderLifecycleEventWireFormatTest {
         ObjectMapper mapper = new ObjectMapper();
         MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "ret-1",
                 List.of(new MarketplaceReturnAction.Item("sku-a", 2)), true, "cmd-1", null);
-        // externalReturnReference is the newest field: it is only reachable via its setter and is
-        // deliberately excluded from the 6-arg constructor, making it the field most likely to be
-        // silently dropped by an accidental @JsonIgnore or a future @JsonCreator that omits it.
-        action.setExternalReturnReference("XGQX/2026");
         OrderLifecycleEvent event = new OrderLifecycleEvent("store-1", "order-1", OrderLifecycleEventType.ReturnAccepted,
                 "ALLEGRO-1", "Allegro", action);
 
         // when
         OrderLifecycleEvent parsed = mapper.readValue(mapper.writeValueAsString(event), OrderLifecycleEvent.class);
 
-        // then: these five fields are the refund; losing any of them moves the wrong amount of money
-        assertEquals("cmd-1", parsed.getReturnAction().getCommandId());
-        assertTrue(parsed.getReturnAction().isRefundDelivery());
-        assertEquals("sku-a", parsed.getReturnAction().getItems().get(0).getManufacturerCode());
-        assertEquals(2, parsed.getReturnAction().getItems().get(0).getQuantity());
-        assertEquals("XGQX/2026", parsed.getReturnAction().getExternalReturnReference());
+        // then: these four fields are the refund; losing any of them moves the wrong amount of money
+        assertEquals("cmd-1", parsed.getReturnAction().commandId());
+        assertTrue(parsed.getReturnAction().refundDelivery());
+        assertEquals("sku-a", parsed.getReturnAction().items().get(0).marketplaceKey());
+        assertEquals(2, parsed.getReturnAction().items().get(0).quantity());
     }
 
     @Test
     void storedReturnActionPayloadsSurviveUnknownFieldsFromNewerReleases() throws Exception {
         // given
-        String payload = "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"manufacturerCode\":\"K\",\"quantity\":1,\"futureItemField\":true}],\"refundDelivery\":false,\"commandId\":\"c\",\"futureField\":1}";
+        String payload = "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[{\"marketplaceKey\":\"K\",\"quantity\":1,\"futureItemField\":true}],\"refundDelivery\":false,\"commandId\":\"c\",\"futureField\":1}";
 
         // when
         MarketplaceReturnAction action = new ObjectMapper().readValue(payload, MarketplaceReturnAction.class);
 
         // then
-        assertEquals("c", action.getCommandId());
-        assertEquals("K", action.getItems().get(0).getManufacturerCode());
+        assertEquals("c", action.commandId());
+        assertEquals("K", action.items().get(0).marketplaceKey());
     }
 
     @Test
@@ -64,5 +59,17 @@ class OrderLifecycleEventWireFormatTest {
 
         // then
         assertNull(parsed.getReturnAction());
+    }
+
+    @Test
+    void storedReturnActionPayloadWithoutItemsReadsAsEmptyList() throws Exception {
+        // given: a rejection payload never carries items
+        String payload = "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"refundDelivery\":false,\"rejectionReason\":\"Damaged\"}";
+
+        // when
+        MarketplaceReturnAction action = new ObjectMapper().readValue(payload, MarketplaceReturnAction.class);
+
+        // then
+        assertEquals(List.of(), action.items());
     }
 }
