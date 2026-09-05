@@ -13,6 +13,9 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
+import java.util.Set;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 
 @Component
@@ -40,7 +43,7 @@ public class MarketplaceOrdersImportEventListener {
     )
     public void handleMessage(MarketplaceOrderPayload payload) {
         String scope = payload.getScope();
-        if (scope != null && !scope.isBlank() && !SCOPE_ORDERS.equals(scope) && !SCOPE_RETURNS.equals(scope)) {
+        if (isNotBlank(scope) && !Set.of(SCOPE_ORDERS, SCOPE_RETURNS).contains(scope)) {
             // Fail closed: an unrecognised scope must not fall back to a full orders import (e.g. during a rollback).
             log.error("Unknown marketplace import scope {}; message ignored", scope);
             return;

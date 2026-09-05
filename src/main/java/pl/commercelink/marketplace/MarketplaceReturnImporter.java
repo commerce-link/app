@@ -58,7 +58,7 @@ public class MarketplaceReturnImporter {
             return;
         }
         if (ret.status().isClosed()) {
-            log.info("Skipping closed {} return {} without an RMA in store {}", marketplace, ret.externalReturnId(),
+            log.warn("Skipping closed {} return {} without an RMA in store {}", marketplace, ret.externalReturnId(),
                     store.getStoreId());
             return;
         }
@@ -68,33 +68,31 @@ public class MarketplaceReturnImporter {
     private void refreshExternalStatus(Store store, String marketplace, RMA rma, MarketplaceReturn ret) {
         // A return declared before the buyer generated a waybill has no parcels at creation time; fill
         // them in once they appear, even on a poll where the status itself did not change.
-        boolean shipmentsMissing = (rma.getShipments() == null || rma.getShipments().isEmpty()) && !ret.parcels().isEmpty();
+        boolean parcelsArrivedAfterImport = (rma.getShipments() == null || rma.getShipments().isEmpty()) && !ret.parcels().isEmpty();
         boolean statusChanged = rma.getExternalReturnStatus() != ret.status();
-        if (!statusChanged && !shipmentsMissing) {
+        if (!statusChanged && !parcelsArrivedAfterImport) {
             return;
         }
-        if (shipmentsMissing) {
+        if (parcelsArrivedAfterImport) {
             rma.setShipments(toShipments(ret));
         }
         if (statusChanged) {
             rma.setExternalReturnStatus(ret.status());
-            if (ret.status() == MarketplaceReturnStatus.REFUNDED && !appDecidedRefund(rma)) {
-                if (!rma.hasActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE)) {
-                    rma.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
-                    store.addNotification(new StoreNotification(
-                            StoreNotificationSeverity.WARNING,
-                            StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
-                            rma.getRmaId(),
-                            marketplace + " refunded the buyer for return " + referenceOf(rma)
-                                    + " without a decision in the application"));
-                    storesRepository.save(store);
-                }
+            if (ret.status() == MarketplaceReturnStatus.REFUNDED && !refundAlreadyRecorded(rma)) {
+                rma.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
+                store.addNotification(new StoreNotification(
+                        StoreNotificationSeverity.WARNING,
+                        StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
+                        rma.getRmaId(),
+                        marketplace + " refunded the buyer for return " + referenceOf(rma)
+                                + " without a decision in the application"));
+                storesRepository.save(store);
             }
         }
         rmaRepository.save(rma);
     }
 
-    private static boolean appDecidedRefund(RMA rma) {
+    private static boolean refundAlreadyRecorded(RMA rma) {
         return rma.hasActionEvent(RMA.EVENT_REFUND_REQUESTED) || rma.hasActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
     }
 
@@ -135,6 +133,14 @@ public class MarketplaceReturnImporter {
             notifyUnmatched(store, marketplace, ret, true);
         }
 
+        fillFromMarketplaceReturn(rma, order, marketplace, ret, rmaItems);
+        rmaItemsRepository.batchSave(rmaItems);
+        rmaRepository.save(rma);
+    }
+
+    /** What an imported RMA inherits from the order and what it takes from the marketplace return. */
+    private static void fillFromMarketplaceReturn(RMA rma, Order order, String marketplace, MarketplaceReturn ret,
+                                                  List<RMAItem> rmaItems) {
         rma.setStatus(RMAStatus.WaitingForItems);
         rma.setOrderId(order.getOrderId());
         rma.setEmail(order.getEmail());
@@ -149,11 +155,6 @@ public class MarketplaceReturnImporter {
         rma.setExternalReturnId(ret.externalReturnId());
         rma.setExternalReturnReference(ret.referenceNumber());
         rma.setExternalReturnStatus(ret.status());
-
-        rmaItemsRepository.batchSave(rmaItems);
-        rmaRepository.save(rma);
-        log.info("Created RMA {} from {} return {} for order {}", rma.getRmaId(), marketplace, ret.externalReturnId(),
-                order.getOrderId());
     }
 
     private void notifyUnmatched(Store store, String marketplace, MarketplaceReturn ret, boolean partiallyMatched) {

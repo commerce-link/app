@@ -126,7 +126,7 @@ public class MarketplaceOrderLifecycleEventListener {
     private void withReturns(MarketplaceProvider provider, OrderLifecycleEvent payload,
                              Consumer<MarketplaceReturns> action) {
         if (payload.getReturnAction() == null || payload.getReturnAction().externalReturnId() == null) {
-            log.warn("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
+            log.error("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
             return;
         }
         Optional<MarketplaceReturns> returns = provider.returns();
