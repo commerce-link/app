@@ -1,6 +1,6 @@
 package pl.commercelink.orders.rma;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
@@ -33,40 +33,30 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 @Controller
 @RequestMapping
+@RequiredArgsConstructor
 public class RMAController {
 
-    @Autowired
-    private RMARepository rmaRepository;
+    private final RMARepository rmaRepository;
 
-    @Autowired
-    private MarketplaceReturnDecisions marketplaceReturnDecisions;
+    private final MarketplaceReturnDecisions marketplaceReturnDecisions;
 
-    @Autowired
-    private RMAItemsRepository rmaItemsRepository;
+    private final RMAItemsRepository rmaItemsRepository;
 
-    @Autowired
-    private RMALifecycle rmaLifecycle;
+    private final RMALifecycle rmaLifecycle;
 
-    @Autowired
-    private RMAManager rmaManager;
+    private final RMAManager rmaManager;
 
-    @Autowired
-    private OrdersRepository orderRepository;
+    private final OrdersRepository orderRepository;
 
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
+    private final OrderItemsRepository orderItemsRepository;
 
-    @Autowired
-    private OrdersRMAManager ordersRMAManager;
+    private final OrdersRMAManager ordersRMAManager;
 
-    @Autowired
-    private FileStorage fileStorage;
+    private final FileStorage fileStorage;
 
-    @Autowired
-    private MessageSource messageSource;
+    private final MessageSource messageSource;
 
-    @Autowired
-    private OpenRmaCoverage openRmaCoverage;
+    private final OpenRmaCoverage openRmaCoverage;
 
     @Value("${app.domain}")
     private String appDomain;
@@ -489,13 +479,8 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
-        // The checkbox default was computed for the whole RMA at render time; the operator may have
-        // selected a subset, so the delivery refund must be re-derived from what was actually accepted.
-        // This MUST run before ordersRMAManager.acceptReturn: accepting can split an OrderItem (one
-        // fragment marked Returned, the remainder left open), and coversWholeOrder's "already
-        // Returned/Replaced items don't need coverage" rule assumes it is looking at the pre-acceptance
-        // state - evaluated afterwards, the just-split-off fragment is wrongly treated as a prior, separate
-        // decision, while the leftover fragment coincidentally absorbs this batch's quantity instead.
+        // Coverage must be evaluated BEFORE the warehouse splits order items (pinned by
+        // RMAControllerTest.acceptReturnEvaluatesWholeOrderCoverageBeforeMutatingOrderItems).
         boolean deliveryCovered = refundDelivery
                 && marketplaceReturnDecisions.coversWholeOrder(op.getRma(), op.getRmaItems());
 

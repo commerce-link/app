@@ -182,8 +182,7 @@ public class MarketplaceReturnImporter {
 
     private List<RMAItem> matchItems(String rmaId, Order order, MarketplaceReturn ret, String marketplace) {
         List<OrderItem> orderItems = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
-        // Lazily fetched: consulting the split family reads the store's whole Orders partition, so it is
-        // only worth it once a straight match against the order's own items misses (the rare case).
+        // lazily: see OrderItemFamily
         List<OrderItem> siblingItems = null;
         Set<String> used = new HashSet<>();
         List<RMAItem> result = new ArrayList<>();

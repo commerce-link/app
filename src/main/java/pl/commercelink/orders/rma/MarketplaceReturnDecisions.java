@@ -70,7 +70,8 @@ public class MarketplaceReturnDecisions {
         Map<String, OrderItem> orderItemsById = orderItemsById(rma, order, acceptedItems);
 
         // Two RMA items can point at one OrderItem (item split), and two order items can share a key
-        // (multi-batch fulfilment). Allegro must receive one entry per line item, so merge by key.
+        // (multi-batch fulfilment). the marketplace must receive one entry per line item, so merge by key;
+        // LinkedHashMap keeps the item order stable in the published payload.
         List<MarketplaceReturnAction.Item> items = acceptedItems.stream()
                 .collect(Collectors.groupingBy(i -> refundKeyFor(i, orderItemsById),
                         LinkedHashMap::new, Collectors.summingInt(RMAItem::getQty)))
@@ -83,11 +84,7 @@ public class MarketplaceReturnDecisions {
         return recordThenPublish(rma, order, OrderLifecycleEventType.ReturnAccepted, RMA.EVENT_REFUND_REQUESTED, action);
     }
 
-    /**
-     * Order items by itemId, resolving across the split family (see {@link OrderItemFamily}) only when the
-     * order's own items don't already cover every accepted item - the rare case, and the only one worth the
-     * extra reads.
-     */
+    /** Order items by itemId; the split family is consulted lazily — see {@link OrderItemFamily}. */
     private Map<String, OrderItem> orderItemsById(RMA rma, Order order, List<RMAItem> rmaItems) {
         Map<String, OrderItem> orderItemsById = orderItemsRepository.findByOrderId(rma.getOrderId()).stream()
                 .collect(Collectors.toMap(OrderItem::getItemId, Function.identity(), (first, second) -> first));
@@ -170,8 +167,8 @@ public class MarketplaceReturnDecisions {
     }
 
     /**
-     * Republishes every recorded decision with its original commandId. Allegro deduplicates refunds on
-     * commandId and the rejection path gates on live state, so replaying rounds that already succeeded is
+     * Republishes every recorded decision with its original commandId. The marketplace deduplicates refunds
+     * on commandId and the rejection path gates on live state, so replaying rounds that already succeeded is
      * harmless - while a round that died in the DLQ is the one this exists for.
      */
     public boolean resendDecisions(RMA rma) {
