@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.MarketplaceItemKey;
 import pl.commercelink.orders.MarketplaceReturnAction;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -115,7 +116,7 @@ public class MarketplaceReturnDecisions {
     private static String refundKeyFor(RMAItem rmaItem, Map<String, OrderItem> orderItemsById) {
         OrderItem orderItem = orderItemsById.get(rmaItem.getItemId());
         if (orderItem != null) {
-            return keyOf(orderItem);
+            return MarketplaceItemKey.of(orderItem);
         }
         String fallback = rmaItem.getMfn();
         if (isNotBlank(fallback)) {
@@ -227,7 +228,7 @@ public class MarketplaceReturnDecisions {
         Map<String, Integer> returned = new HashMap<>();
         for (RMAItem item : rmaItems) {
             OrderItem orderItem = orderItemsById.get(item.getItemId());
-            String key = orderItem != null ? keyOf(orderItem) : item.getMfn();
+            String key = orderItem != null ? MarketplaceItemKey.of(orderItem) : item.getMfn();
             returned.merge(key, item.getQty(), Integer::sum);
         }
 
@@ -236,19 +237,9 @@ public class MarketplaceReturnDecisions {
             if (orderItem.isService() || orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)) {
                 continue;
             }
-            required.merge(keyOf(orderItem), orderItem.getQty(), Integer::sum);
+            required.merge(MarketplaceItemKey.of(orderItem), orderItem.getQty(), Integer::sum);
         }
         return required.entrySet().stream()
                 .allMatch(e -> returned.getOrDefault(e.getKey(), 0) >= e.getValue());
-    }
-
-    private static String keyOf(OrderItem orderItem) {
-        if (isNotBlank(orderItem.getExternalItemId())) {
-            return orderItem.getExternalItemId();
-        }
-        if (isNotBlank(orderItem.getSku())) {
-            return orderItem.getSku();
-        }
-        return orderItem.getManufacturerCode();
     }
 }

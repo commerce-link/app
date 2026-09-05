@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.MarketplaceItemKey;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemFamily;
@@ -26,14 +27,11 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 /**
  * Turns marketplace customer returns into RMAs. Idempotent by (storeId, externalReturnId): a known return only
@@ -221,30 +219,12 @@ public class MarketplaceReturnImporter {
                                 MarketplaceReturn.Item item) {
         return candidates.stream()
                 .filter(oi -> !used.contains(oi.getItemId()))
-                .filter(oi -> matchesMarketplaceKey(oi, item.offerKey()))
+                .filter(oi -> MarketplaceItemKey.matches(oi, item.offerKey()))
                 .filter(oi -> !oi.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                 .filter(oi -> !oi.isService())
                 .filter(oi -> !openRmaCoverage.coversOrderItem(storeId, oi.getItemId(), rmaId))
                 .findFirst()
                 .orElse(null);
-    }
-
-    /**
-     * Current orders store the raw marketplace key in externalItemId. Orders imported before that field
-     * existed carry it only in sku, normalised by Basket.setBasketItems (unifyMfn); manufacturerCode is
-     * the supplier's part number after fulfilment and is kept as a last resort only.
-     */
-    static boolean matchesMarketplaceKey(OrderItem orderItem, String marketplaceKey) {
-        if (marketplaceKey == null) {
-            return false;
-        }
-        String externalItemId = orderItem.getExternalItemId();
-        if (isNotBlank(externalItemId)) {
-            return marketplaceKey.equals(externalItemId);
-        }
-        String normalisedKey = UnifiedProductIdentifiers.unifyMfn(marketplaceKey);
-        return normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getSku()))
-                || normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getManufacturerCode()));
     }
 
     private static List<Shipment> toShipments(MarketplaceReturn ret) {
