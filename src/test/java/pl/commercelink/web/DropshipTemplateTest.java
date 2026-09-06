@@ -322,6 +322,11 @@ class DropshipTemplateTest {
         assertThat(pl).contains("order.items.action.move.warehouse.dropship.error=");
         assertThat(en).contains("order.items.action.move.warehouse.dropship=");
         assertThat(en).contains("order.items.action.move.warehouse.dropship.error=");
+        assertThat(html).contains("value=\"moveSelectedItemsToAllocation\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("value=\"removeSelectedItemsFromOrder\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("order.items.action.dropship.locked");
+        assertThat(pl).contains("order.items.action.dropship.locked=");
+        assertThat(en).contains("order.items.action.dropship.locked=");
     }
 
     @Test
