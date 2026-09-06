@@ -4,6 +4,7 @@ import pl.commercelink.starter.csv.CSVReady;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 
 public record PaymentsReportRow(
@@ -16,13 +17,18 @@ public record PaymentsReportRow(
         String referenceNo,
         String bankTransactionNo,
         LocalDate bankTransactionDate,
-        String source
+        String source,
+        List<String> financialDocuments,
+        List<String> warehouseDocuments
 ) implements CSVReady {
+
+    private static final String DOCUMENT_SEPARATOR = ", ";
 
     public static String[] headers() {
         return new String[]{
                 "Typ", "Numer", "Data rejestracji", "Kierunek", "Kwota płatności", "Prowizja",
-                "Nr referencyjny", "Nr operacji bankowej", "Data operacji bankowej", "Metoda płatności"
+                "Nr referencyjny", "Nr operacji bankowej", "Data operacji bankowej", "Metoda płatności",
+                "Dokumenty finansowe", "Dokumenty magazynowe"
         };
     }
 
@@ -38,11 +44,17 @@ public record PaymentsReportRow(
                 referenceNo != null ? referenceNo : "",
                 bankTransactionNo != null ? bankTransactionNo : "",
                 bankTransactionDate != null ? bankTransactionDate.toString() : "",
-                source != null ? source : ""
+                source != null ? source : "",
+                join(financialDocuments),
+                join(warehouseDocuments)
         };
     }
 
     private static String formatMoney(Double value) {
         return value != null ? String.format(Locale.US, "%.2f", value).replace('.', ',') : "";
+    }
+
+    private static String join(List<String> documents) {
+        return documents != null ? String.join(DOCUMENT_SEPARATOR, documents) : "";
     }
 }
