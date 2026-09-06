@@ -760,6 +760,13 @@ public class Order {
             return this;
         }
 
+        public Builder withEstimatedShippingAt(LocalDate estimatedShippingAt) {
+            if (estimatedShippingAt != null) {
+                order.setEstimatedShippingAt(estimatedShippingAt);
+            }
+            return this;
+        }
+
         public Order build() {
             return order;
         }

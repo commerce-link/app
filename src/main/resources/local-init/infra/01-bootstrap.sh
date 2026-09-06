@@ -29,6 +29,15 @@ awslocal sqs create-queue --queue-name order-goods-out-queue.fifo \
 awslocal sqs create-queue --queue-name supplier-purchase-queue.fifo \
   --attributes FifoQueue=true,ContentBasedDeduplication=false
 
+## Invoicing queue with a DLQ + redrive mirroring prod (terraform: order-invoicing-dlq.fifo,
+## maxReceiveCount 1). The listener rethrows on every OperationResult error, so without a redrive
+## a message that can never succeed - no invoicing provider on the store, missing billing details -
+## is redelivered forever and blocks its whole FIFO message group, which is the store id.
+awslocal sqs create-queue --queue-name order-invoicing-dlq.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false,MessageRetentionPeriod=604800
+awslocal sqs create-queue --queue-name order-invoicing-queue.fifo \
+  --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"30","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-invoicing-dlq.fifo\",\"maxReceiveCount\":\"1\"}"}'
+
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
