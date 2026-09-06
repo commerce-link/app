@@ -1,0 +1,94 @@
+package pl.commercelink.inventory.deliveries;
+
+import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class DeliveryRedirectResolverTest {
+
+    private final DeliveryRedirectResolver resolver = new DeliveryRedirectResolver();
+
+    private static Order order(FulfilmentType fulfilmentType) {
+        Order order = new Order();
+        order.setOrderId("order-1");
+        order.setFulfilmentType(fulfilmentType);
+        return order;
+    }
+
+    private static OrderItem item(String deliveryId, FulfilmentStatus status) {
+        OrderItem item = new OrderItem();
+        item.setDeliveryId(deliveryId);
+        item.setStatus(status);
+        return item;
+    }
+
+    @Test
+    void warehouseItemLinksToTheWarehouse() {
+        // given
+        Order order = order(FulfilmentType.WarehouseFulfilment);
+        OrderItem item = item(SupplierRegistry.WAREHOUSE, FulfilmentStatus.Delivered);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/warehouse");
+    }
+
+    @Test
+    void newItemOnWarehouseOrderLinksToDeliveryCreation() {
+        // given
+        Order order = order(FulfilmentType.WarehouseFulfilment);
+        OrderItem item = item("AcmeB", FulfilmentStatus.New);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/deliveries/create/AcmeB");
+    }
+
+    @Test
+    void newItemOnDirectToConsumerOrderLinksToDropshipPage() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item("AcmeB", FulfilmentStatus.New);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
+    }
+
+    @Test
+    void allocationItemOnDirectToConsumerOrderLinksToDropshipPage() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item("AcmeB", FulfilmentStatus.Allocation);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
+    }
+
+    @Test
+    void orderedItemLinksToDeliveryDetails() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item("AcmeB", FulfilmentStatus.Ordered);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=AcmeB");
+    }
+}

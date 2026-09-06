@@ -299,6 +299,15 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void orderDetailsResolvesTheDeliveryLinkWithTheOrder() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains("@{${@deliveryRedirectResolver.resolveFor(order, item)}}");
+    }
+
+    @Test
     void orderDetailsGreysOutWarehouseMovesWhenItemsSitInADropshipDelivery() throws Exception {
         // when
         String html = read("orderDetails.html");
