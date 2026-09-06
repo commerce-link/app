@@ -453,7 +453,7 @@
             <div class="field">
                 <div class="control">
                     <div class="select is-small">
-                        <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument}">
+                        <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}">
                             <option value="moveSelectedItemsToAllocation" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" th:text="#{order.items.action.move.allocation}"></option>
                             <option value="moveSelectedItemsToTheWarehouse" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse}"></option>
                             <option value="moveSelectedItemsToTheWarehouseForRMA" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse.rma}"></option>
@@ -461,7 +461,7 @@
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>
-                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
+                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced}" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or isNewOrder or #lists.isEmpty(serialUpdateItems)}" onclick="toggleSerialUpdateModal(true)" th:text="#{order.update.serial.no}"></button>
                 </div>

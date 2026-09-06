@@ -330,6 +330,18 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void orderDetailsDisablesTheActionControlWhenNoItemActionIsAvailable() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains(
+                "<select id=\"action-select\" th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\">");
+        assertThat(html).contains(
+                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\" onclick=\"confirmSave(this, submitOrderItemsForm)\"");
+    }
+
+    @Test
     void deliveryDetailsHideTheOrderedQuantityPencilForDropshipDeliveries() throws Exception {
         // when
         String html = read("deliveryDetails.html");
