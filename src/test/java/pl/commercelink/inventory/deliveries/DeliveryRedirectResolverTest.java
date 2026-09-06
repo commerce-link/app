@@ -7,6 +7,9 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeliveryRedirectResolverTest {
@@ -90,5 +93,34 @@ class DeliveryRedirectResolverTest {
 
         // then
         assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=AcmeB");
+    }
+
+    @Test
+    void warehouseFulfilledItemOnDirectToConsumerOrderLinksToTheWarehouse() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item(SupplierRegistry.WAREHOUSE, FulfilmentStatus.Allocation);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/warehouse");
+    }
+
+    @Test
+    void newItemWithAProviderNameRequiringEncodingLinksToTheEncodedDropshipPage() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        String provider = "Acme & B";
+        OrderItem item = item(provider, FulfilmentStatus.New);
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        String encodedProvider = URLEncoder.encode(provider, StandardCharsets.UTF_8);
+        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=" + encodedProvider);
+        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=Acme+%26+B");
     }
 }
