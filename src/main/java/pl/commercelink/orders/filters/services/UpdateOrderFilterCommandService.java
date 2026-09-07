@@ -2,8 +2,7 @@ package pl.commercelink.orders.filters.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.OrderFilterCondition;
-import pl.commercelink.orders.filters.OrderFilterConditions;
+import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFilterWriteAccess;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
@@ -29,7 +28,7 @@ public class UpdateOrderFilterCommandService {
         OrderFilter filterToUpdate = currentOwnersFilters.byId(filterId)
                 .orElseThrow(() -> new OrderFilterInvalidException("orders.filters.error.not.found"));
 
-        filterToUpdate.changeTo(label, OrderFilterConditions.of(conditions));
+        filterToUpdate.changeTo(label, conditions);
 
         if (sharedWithStore == currentOwnersFilters.isFiltersForStore()) {
             orderFiltersRepository.save(currentOwnersFilters);

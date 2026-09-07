@@ -8,8 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.exceptions.OrderFilterAccessDeniedException;
-import pl.commercelink.orders.filters.OrderFilterCondition;
-import pl.commercelink.orders.filters.OrderFilterConditions;
+import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFilterWriteAccess;
@@ -41,7 +40,7 @@ class OrderFilterServicesTest {
     private OrderFiltersRepository repository;
 
     private static OrderFilterCondition condition(OrderFilterField field, String rawValue) {
-        return new OrderFilterCondition(field, field.normalize(rawValue));
+        return OrderFilterCondition.of(field, rawValue);
     }
 
     private static FilterActor user(String userId) {
@@ -53,7 +52,7 @@ class OrderFilterServicesTest {
     }
 
     private static OrderFilter filter(String label) {
-        return OrderFilter.of(label, OrderFilterConditions.of(COURIER));
+        return OrderFilter.of(label, COURIER);
     }
 
     private static OwnedOrderFilters rowOf(String userId, OrderFilter... filters) {
@@ -185,7 +184,7 @@ class OrderFilterServicesTest {
 
             assertThat(updated.getId()).isEqualTo(mine.getId());
             assertThat(updated.getLabel()).isEqualTo("Paczkomaty");
-            assertThat(updated.getConditions()).containsExactly("ShipmentType=PICKUPPOINT");
+            assertThat(updated.getConditions()).containsExactly(condition(OrderFilterField.ShipmentType, "PickupPoint"));
             verify(repository).save(own);
             verify(repository, never()).delete(any(OwnedOrderFilters.class));
         }

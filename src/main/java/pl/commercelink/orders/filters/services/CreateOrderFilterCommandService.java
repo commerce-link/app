@@ -2,8 +2,7 @@ package pl.commercelink.orders.filters.services;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.OrderFilterCondition;
-import pl.commercelink.orders.filters.OrderFilterConditions;
+import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterWriteAccess;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
@@ -26,7 +25,7 @@ public class CreateOrderFilterCommandService {
                               List<OrderFilterCondition> conditions) {
         OwnedOrderFilters ownersFilters = writeAccess.checkWritePermissionsAndReturn(actor, sharedWithStore);
 
-        OrderFilter newFilter = OrderFilter.of(label, OrderFilterConditions.of(conditions));
+        OrderFilter newFilter = OrderFilter.of(label, conditions);
         ownersFilters.add(newFilter);
 
         orderFiltersRepository.save(ownersFilters);

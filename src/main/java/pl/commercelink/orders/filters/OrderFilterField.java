@@ -14,14 +14,14 @@ public enum OrderFilterField {
 
     Status {
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             return order.getStatus() != null && normalize(order.getStatus().name()).equals(value);
         }
     },
 
     ShipmentType {
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             List<Shipment> shipments = order.getShipments();
             return shipments != null && shipments.stream()
                     .map(Shipment::getType)
@@ -32,7 +32,7 @@ public enum OrderFilterField {
 
     PaymentSource {
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             List<Payment> payments = order.getPayments();
             return payments != null && payments.stream()
                     .map(Payment::getSource)
@@ -43,7 +43,7 @@ public enum OrderFilterField {
 
     SourceName {
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             return order.getSource() != null
                     && order.getSource().getName() != null
                     && normalize(order.getSource().getName()).equals(value);
@@ -57,7 +57,7 @@ public enum OrderFilterField {
         }
 
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             return order.getShippingDetails() != null
                     && normalize(order.getShippingDetails().getPostalCode()).startsWith(value);
         }
@@ -65,7 +65,7 @@ public enum OrderFilterField {
 
     ShippingDue {
         @Override
-        boolean matches(Order order, String value, LocalDate today) {
+        public boolean matches(Order order, String value, LocalDate today) {
             return pl.commercelink.orders.filters.ShippingDue.parse(value)
                     .map(due -> due.covers(order.getEstimatedShippingAt(), today))
                     .orElse(false);
@@ -76,7 +76,7 @@ public enum OrderFilterField {
         return value == null ? "" : value.trim().toUpperCase();
     }
 
-    abstract boolean matches(Order order, String value, LocalDate today);
+    public abstract boolean matches(Order order, String value, LocalDate today);
 
     public static Optional<OrderFilterField> parse(String value) {
         return Arrays.stream(values())

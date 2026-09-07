@@ -1,6 +1,6 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.orders.filters.OrderFilterCondition;
+import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.OrderFilterField;
 
 import java.util.LinkedList;
@@ -29,9 +29,8 @@ public class OrderFilterForm {
     }
 
     private static void add(List<OrderFilterCondition> conditions, OrderFilterField field, String rawValue) {
-        String value = field.normalize(rawValue);
-        if (!value.isEmpty()) {
-            conditions.add(new OrderFilterCondition(field, value));
+        if (!field.normalize(rawValue).isEmpty()) {
+            conditions.add(OrderFilterCondition.of(field, rawValue));
         }
     }
 
