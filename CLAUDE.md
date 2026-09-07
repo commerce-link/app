@@ -29,13 +29,13 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V009: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, store registration backfill, taxonomy mappings table). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
+**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V011: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, store registration backfill, taxonomy mappings table, claimed-delivery-id index, shipment trackings index table). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
 
 - **Lombok**: Prefer Lombok to remove boilerplate. Use `@RequiredArgsConstructor` (with `access = AccessLevel.PACKAGE`/`PRIVATE` to match the intended constructor visibility) for constructors that are pure `final`-field assignment, and `@Getter`/`@Value`/`@Builder` where they fit. Don't use it where the constructor has real logic (e.g. transforming varargs) or where a `record` already removes the boilerplate.
-- **No Logger**: We log all entries to Sentry automatically. Use `System.out`/`System.err` only in rare cases.
+- **No Logger**: New code logs through SLF4J (`@Slf4j`) — Sentry captures the log appender, and `System.out`/`System.err` bypasses it. `System.out`/`System.err` only in legacy code.
 - **No comments**: Code should be self-explanatory. Refactor instead of commenting.
 - **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.
 - **Email templates**: Stored per store in DynamoDB (`EmailTemplates` table) and rendered at runtime with Mustache by `EmailClient` — there are no `.mustache` files in resources.
