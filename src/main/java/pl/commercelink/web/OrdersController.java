@@ -27,13 +27,10 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
 import pl.commercelink.orders.services.ListOpenOrdersQueryService;
 
-import pl.commercelink.orders.filters.services.CreateOrderFilterCommandService;
-import pl.commercelink.orders.filters.services.DeleteOrderFilterCommandService;
 import pl.commercelink.orders.filters.FilterActor;
-import pl.commercelink.orders.filters.services.ListOrderFiltersQueryService;
+import pl.commercelink.orders.filters.services.OrderFiltersService;
 
 import pl.commercelink.orders.filters.ShippingDue;
-import pl.commercelink.orders.filters.services.UpdateOrderFilterCommandService;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
@@ -138,16 +135,7 @@ public class OrdersController extends BaseController {
     private DropshipItemLookup dropshipItemLookup;
 
     @Autowired
-    private ListOrderFiltersQueryService listOrderFilters;
-
-    @Autowired
-    private CreateOrderFilterCommandService createOrderFilter;
-
-    @Autowired
-    private UpdateOrderFilterCommandService updateOrderFilter;
-
-    @Autowired
-    private DeleteOrderFilterCommandService deleteOrderFilter;
+    private OrderFiltersService orderFilters;
 
     @Autowired
     private ListOpenOrdersQueryService listOpenOrders;
@@ -158,7 +146,7 @@ public class OrdersController extends BaseController {
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
                         @RequestParam(required = false) String filterId,
                         Model model) {
-        ListOrderFiltersView savedFilters = listOrderFilters.list(actor());
+        ListOrderFiltersView savedFilters = orderFilters.list(actor());
         OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
 
         List<Order> openOrders = listOpenOrders.listOpen(getStoreId(), selectedFilter);
@@ -194,7 +182,7 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String createOrderFilter(OrderFilterForm form, @RequestParam(required = false) String activeFilterId,
                                     RedirectAttributes redirectAttributes) {
-        createOrderFilter.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
         return backToFilters(activeFilterId, redirectAttributes);
     }
 
@@ -203,7 +191,7 @@ public class OrdersController extends BaseController {
     public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
                                     @RequestParam(required = false) String activeFilterId,
                                     RedirectAttributes redirectAttributes) {
-        updateOrderFilter.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
         return backToFilters(activeFilterId, redirectAttributes);
     }
 
@@ -212,7 +200,7 @@ public class OrdersController extends BaseController {
     public String deleteOrderFilter(@RequestParam String filterId,
                                     @RequestParam(required = false) String activeFilterId,
                                     RedirectAttributes redirectAttributes) {
-        deleteOrderFilter.delete(actor(), filterId);
+        orderFilters.delete(actor(), filterId);
         return backToFilters(filterId.equals(activeFilterId) ? null : activeFilterId, redirectAttributes);
     }
 
