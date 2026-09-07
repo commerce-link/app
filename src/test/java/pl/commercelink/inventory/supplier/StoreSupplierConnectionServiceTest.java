@@ -330,6 +330,38 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void selectionsForCarriesTheExternalSupplierId() {
+        // given
+        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of("Acme", "Bravo"));
+        StoreSupplierConnection acmeConnection = new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL);
+        acmeConnection.setExternalSupplierId("2");
+        Store store = storeWith(true, acmeConnection);
+
+        // when
+        List<SupplierSelectionForm> selections = service.selectionsFor(store);
+
+        // then
+        assertThat(selections.get(0).getExternalSupplierId()).isEqualTo("2");
+        assertThat(selections.get(1).getExternalSupplierId()).isNull();
+    }
+
+    @Test
+    void buildConnectionsStoresTrimmedExternalSupplierIdAndDropsBlankOnes() {
+        // given
+        SupplierSelectionForm acme = new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL);
+        acme.setExternalSupplierId(" 2 ");
+        SupplierSelectionForm bravo = new SupplierSelectionForm("Bravo", true, ConnectionMode.GLOBAL);
+        bravo.setExternalSupplierId("   ");
+
+        // when
+        List<StoreSupplierConnection> connections = service.buildConnections(List.of(acme, bravo), true);
+
+        // then
+        assertThat(connections.get(0).getExternalSupplierId()).isEqualTo("2");
+        assertThat(connections.get(1).getExternalSupplierId()).isNull();
+    }
+
+    @Test
     void buildConnectionsCarriesIncludeFlags() {
         // given
         List<SupplierSelectionForm> selections = List.of(

@@ -23,6 +23,9 @@ public class StoreSupplierConnection {
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled = true;
 
+    @DynamoDBAttribute(attributeName = "externalSupplierId")
+    private String externalSupplierId;
+
     public StoreSupplierConnection() {
     }
 
@@ -76,5 +79,13 @@ public class StoreSupplierConnection {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
     }
 }

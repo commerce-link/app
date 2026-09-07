@@ -104,6 +104,15 @@
                                         <span th:text="#{store.supplier.include.fulfilment}"></span>
                                     </label>
                                 </div>
+                                <div class="field">
+                                    <label class="label" th:text="#{store.supplier.external.id}"></label>
+                                    <div class="control">
+                                        <input class="input" type="text"
+                                               th:field="*{supplierSelections[__${stat.index}__].externalSupplierId}"
+                                               th:placeholder="#{store.supplier.external.id.placeholder}" />
+                                    </div>
+                                    <p class="help" th:text="#{store.supplier.external.id.description}"></p>
+                                </div>
                                 <div class="supplier-own-fields"
                                      th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
                                     <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">
@@ -172,6 +181,15 @@
                                                    th:field="*{manualSupplierSelections[__${mstat.index}__].includeInFulfilment}" />
                                             <span th:text="#{store.supplier.include.fulfilment}"></span>
                                         </label>
+                                    </div>
+                                    <div class="field">
+                                        <label class="label" th:text="#{store.supplier.external.id}"></label>
+                                        <div class="control">
+                                            <input class="input" type="text"
+                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].externalSupplierId}"
+                                                   th:placeholder="#{store.supplier.external.id.placeholder}" />
+                                        </div>
+                                        <p class="help" th:text="#{store.supplier.external.id.description}"></p>
                                     </div>
                                 </div>
                             </div>
@@ -421,6 +439,14 @@
                                 <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInFulfilment" value="true" checked />
                                 <span th:text="#{store.supplier.include.fulfilment}"></span>
                             </label>
+                        </div>
+                        <div class="field">
+                            <label class="label" th:text="#{store.supplier.external.id}"></label>
+                            <div class="control">
+                                <input class="input" type="text" name="manualSupplierSelections[__INDEX__].externalSupplierId"
+                                       th:placeholder="#{store.supplier.external.id.placeholder}" />
+                            </div>
+                            <p class="help" th:text="#{store.supplier.external.id.description}"></p>
                         </div>
                     </div>
                 </div>
