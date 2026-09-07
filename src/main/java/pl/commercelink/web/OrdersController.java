@@ -25,7 +25,6 @@ import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
-import pl.commercelink.orders.services.ListOpenOrdersQueryService;
 
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
@@ -137,9 +136,6 @@ public class OrdersController extends BaseController {
     @Autowired
     private OrderFiltersService orderFilters;
 
-    @Autowired
-    private ListOpenOrdersQueryService listOpenOrders;
-
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam(required = false) List<String> statuses,
@@ -149,7 +145,7 @@ public class OrdersController extends BaseController {
         ListOrderFiltersView savedFilters = orderFilters.list(actor());
         OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
 
-        List<Order> openOrders = listOpenOrders.listOpen(getStoreId(), selectedFilter);
+        List<Order> openOrders = openOrdersMatching(selectedFilter);
 
         OrderStatusSelection statusSelection =
                 OrderStatusSelection.resolve(openOrders, statuses, showAll || selectedFilter != null);
@@ -221,6 +217,15 @@ public class OrdersController extends BaseController {
 
     private FilterActor actor() {
         return new FilterActor(getStoreId(), getUserId(), isAdmin());
+    }
+
+    private List<Order> openOrdersMatching(OrderFilter filter) {
+        List<Order> openOrders = ordersRepository.findOpenOrders(getStoreId());
+        if (filter == null) {
+            return openOrders;
+        }
+        LocalDate today = LocalDate.now();
+        return openOrders.stream().filter(order -> filter.matches(order, today)).toList();
     }
 
     private List<String> connectedMarketplaceNames() {
