@@ -15,7 +15,7 @@ import java.util.Optional;
 @DynamoDBTable(tableName = "OrderFilters")
 public class OwnedOrderFilters {
 
-    public static final String STORE_FILTER = "default";
+    public static final String STORE_FILTER = "#store";
 
     public static final int LIMIT_PER_DOCUMENT = 20;
 
