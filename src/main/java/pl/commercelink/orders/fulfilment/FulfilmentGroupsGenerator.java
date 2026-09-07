@@ -15,16 +15,18 @@ public class FulfilmentGroupsGenerator {
     private final List<String> acceptedSuppliers;
     private final List<String> excludedSuppliers;
     private final Predicate<String> supplierFilter;
+    private final Predicate<FulfilmentItem> candidateFilter;
 
     private final boolean enforceFulfilmentUnderCost;
     private final boolean enforceCompleteFulfilment;
     private final boolean enforceMultiOrderFulfilment;
 
-    private FulfilmentGroupsGenerator(InventoryView inventory, List<String> acceptedSuppliers, List<String> excludedSuppliers, Predicate<String> supplierFilter, boolean enforceFulfilmentUnderCost, boolean enforceCompleteFulfilment, boolean enforceMultiOrderFulfilment) {
+    private FulfilmentGroupsGenerator(InventoryView inventory, List<String> acceptedSuppliers, List<String> excludedSuppliers, Predicate<String> supplierFilter, Predicate<FulfilmentItem> candidateFilter, boolean enforceFulfilmentUnderCost, boolean enforceCompleteFulfilment, boolean enforceMultiOrderFulfilment) {
         this.inventory = inventory;
         this.acceptedSuppliers = acceptedSuppliers;
         this.excludedSuppliers = excludedSuppliers;
         this.supplierFilter = supplierFilter;
+        this.candidateFilter = candidateFilter;
         this.enforceFulfilmentUnderCost = enforceFulfilmentUnderCost;
         this.enforceCompleteFulfilment = enforceCompleteFulfilment;
         this.enforceMultiOrderFulfilment = enforceMultiOrderFulfilment;
@@ -66,6 +68,7 @@ public class FulfilmentGroupsGenerator {
                 .filter(c -> acceptedSuppliers.isEmpty() || acceptedSuppliers.contains(c.getSource().getProvider()))
                 .filter(c -> !excludedSuppliers.contains(c.getSource().getProvider()))
                 .filter(c -> supplierFilter.test(c.getSource().getProvider()))
+                .filter(candidateFilter)
                 .filter(c -> c.getSource().isService() || isNotBlank(c.getSource().getEan()))
                 .filter(c -> c.getSource().isService() || isNotBlank(c.getSource().getMfn()))
                 .filter(c -> !enforceFulfilmentUnderCost || c.getSource().getPriceGross() > 0)
@@ -108,6 +111,7 @@ public class FulfilmentGroupsGenerator {
         private List<String> acceptedSuppliers = new ArrayList<>();
         private List<String> excludedSuppliers = new ArrayList<>();
         private Predicate<String> supplierFilter = supplier -> true;
+        private Predicate<FulfilmentItem> candidateFilter = candidate -> true;
         private boolean enforceFulfilmentUnderCost;
         private boolean enforceCompleteFulfilment;
         private boolean enforceMultiOrderFulfilment;
@@ -132,6 +136,11 @@ public class FulfilmentGroupsGenerator {
             return this;
         }
 
+        public Builder withCandidateFilter(Predicate<FulfilmentItem> candidateFilter) {
+            this.candidateFilter = candidateFilter;
+            return this;
+        }
+
         public Builder withFulfilmentUnderCost() {
             this.enforceFulfilmentUnderCost = true;
             return this;
@@ -148,7 +157,7 @@ public class FulfilmentGroupsGenerator {
         }
 
         public FulfilmentGroupsGenerator build() {
-            return new FulfilmentGroupsGenerator(this.inventory, this.acceptedSuppliers, this.excludedSuppliers, this.supplierFilter, this.enforceFulfilmentUnderCost, this.enforceCompleteFulfilment, this.enforceMultiOrderFulfilment);
+            return new FulfilmentGroupsGenerator(this.inventory, this.acceptedSuppliers, this.excludedSuppliers, this.supplierFilter, this.candidateFilter, this.enforceFulfilmentUnderCost, this.enforceCompleteFulfilment, this.enforceMultiOrderFulfilment);
         }
     }
 

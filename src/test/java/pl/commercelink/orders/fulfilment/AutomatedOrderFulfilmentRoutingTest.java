@@ -8,25 +8,21 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class ManualOrderFulfilmentRoutingTest {
+class AutomatedOrderFulfilmentRoutingTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
@@ -42,8 +38,6 @@ class ManualOrderFulfilmentRoutingTest {
     @Mock
     private WarehouseFulfilmentService warehouseFulfilmentService;
     @Mock
-    private SupplierRegistry supplierRegistry;
-    @Mock
     private StoresRepository storesRepository;
     @Mock
     private InventoryView inventoryView;
@@ -51,34 +45,17 @@ class ManualOrderFulfilmentRoutingTest {
     private OrderItem orderItem;
 
     @Test
-    void initCallsInventoryWithFulfilmentScope() {
+    void runReadsTheStoreAndTheOrdersToHonourTheirSupplierBinding() {
         // given
-        when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
-        when(orderItemsRepository.findByOrderIdAndStatus(ORDER_ID, FulfilmentStatus.New)).thenReturn(List.of(orderItem));
+        when(inventory.withWarehouseDataOnly(STORE_ID)).thenReturn(inventoryView);
+        when(orderItem.getOrderId()).thenReturn(ORDER_ID);
 
-        ManualOrderFulfilment service = new ManualOrderFulfilment(
+        AutomatedOrderFulfilment service = new AutomatedOrderFulfilment(
                 inventory, ordersRepository, orderLifecycle, orderItemsRepository,
-                warehouseFulfilmentService, supplierRegistry, storesRepository);
+                warehouseFulfilmentService, storesRepository);
 
         // when
-        service.init(STORE_ID, List.of(ORDER_ID), "default", false, false, false);
-
-        // then
-        verify(inventory).withEnabledSuppliersAndWarehouseData(eq(STORE_ID), eq(SupplierScope.FULFILMENT));
-    }
-
-    @Test
-    void initReadsTheStoreAndTheOrdersToHonourTheirSupplierBinding() {
-        // given
-        when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
-        when(orderItemsRepository.findByOrderIdAndStatus(ORDER_ID, FulfilmentStatus.New)).thenReturn(List.of(orderItem));
-
-        ManualOrderFulfilment service = new ManualOrderFulfilment(
-                inventory, ordersRepository, orderLifecycle, orderItemsRepository,
-                warehouseFulfilmentService, supplierRegistry, storesRepository);
-
-        // when
-        service.init(STORE_ID, List.of(ORDER_ID), "default", false, false, false);
+        service.run(STORE_ID, List.of(orderItem));
 
         // then
         verify(storesRepository).findById(STORE_ID);
