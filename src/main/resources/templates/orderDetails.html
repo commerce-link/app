@@ -997,6 +997,7 @@
                         <th th:text="#{order.shipment.carrier}"></th>
                         <th th:text="#{order.shipment.shipped.at}"></th>
                         <th th:text="#{order.shipment.delivered.at}"></th>
+                        <th th:if="${order.hasTrackedShipments()}" th:text="#{order.shipment.tracking.status}"></th>
                     </tr>
                     </thead>
 
@@ -1006,8 +1007,14 @@
                             <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank"></a></td>
                             <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
                             <td th:text="${shipment.carrier}"></td>
-                            <td th:text="${shipment.shippedAt}"></td>
-                            <td th:text="${shipment.deliveredAt}"></td>
+                            <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                            <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                            <td th:if="${order.hasTrackedShipments()}">
+                                <span th:if="${shipment.trackingSubscriptionStatus != null}"
+                                      class="tag"
+                                      th:classappend="${shipment.trackingSubscriptionStatus.name() == 'ACTIVE'} ? 'is-success is-light' : (${shipment.trackingSubscriptionStatus.name() == 'FAILED'} ? 'is-danger is-light' : 'is-light')"
+                                      th:text="#{'order.shipment.tracking.status.' + ${shipment.trackingSubscriptionStatus.name()}}"></span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
