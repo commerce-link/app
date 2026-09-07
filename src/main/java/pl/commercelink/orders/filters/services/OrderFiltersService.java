@@ -54,8 +54,7 @@ public class OrderFiltersService {
         currentOwnersFilters.remove(filterId);
         newOwnersFilters.add(filterToUpdate);
 
-        orderFiltersRepository.save(newOwnersFilters);
-        orderFiltersRepository.save(currentOwnersFilters);
+        orderFiltersRepository.saveBoth(newOwnersFilters, currentOwnersFilters);
         return filterToUpdate;
     }
 

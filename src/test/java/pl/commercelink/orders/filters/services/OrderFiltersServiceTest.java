@@ -203,7 +203,7 @@ class OrderFiltersServiceTest {
         }
 
         @Test
-        @DisplayName("ticking shared moves a private filter into the store row and keeps its id")
+        @DisplayName("ticking shared moves a private filter into the store row in one transaction")
         void tickingSharedMovesTheFilter() {
             OrderFilter mine = filter("Courier");
             OwnedOrderFilters own = rowOf("user-1", mine);
@@ -217,8 +217,8 @@ class OrderFiltersServiceTest {
             assertThat(moved.getId()).isEqualTo(mine.getId());
             assertThat(own.getFilters()).isEmpty();
             assertThat(storeRow.getFilters()).containsExactly(mine);
-            verify(repository).save(storeRow);
-            verify(repository).save(own);
+            verify(repository).saveBoth(storeRow, own);
+            verify(repository, never()).save(any());
         }
 
         @Test
