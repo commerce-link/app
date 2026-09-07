@@ -462,7 +462,7 @@
                         </select>
                     </div>
                     <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
-                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced}" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
+                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or isNewOrder or #lists.isEmpty(serialUpdateItems)}" onclick="toggleSerialUpdateModal(true)" th:text="#{order.update.serial.no}"></button>
                 </div>
             </div>

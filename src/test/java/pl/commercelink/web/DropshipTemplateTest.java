@@ -342,6 +342,16 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void orderDetailsDisablesAddingItemsWhenItemsSitInADropshipDelivery() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains(
+                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}\" th:title=\"${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''\" onclick=\"toggleOrderItemModal(true)\"");
+    }
+
+    @Test
     void deliveryDetailsHideTheOrderedQuantityPencilForDropshipDeliveries() throws Exception {
         // when
         String html = read("deliveryDetails.html");
