@@ -43,6 +43,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
@@ -51,6 +52,7 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -78,6 +80,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private SupplierRegistry supplierRegistry;
 
     @Autowired
     private BasketsRepository basketsRepository;
@@ -326,6 +331,7 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::resolveTaxonomyName)));
 
         model.addAttribute("order", order);
+        model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store, supplierRegistry));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);
