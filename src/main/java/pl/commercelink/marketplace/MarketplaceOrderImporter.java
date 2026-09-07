@@ -78,6 +78,7 @@ public class MarketplaceOrderImporter {
 
         Order.Builder orderBuilder = new Order.Builder(store, basket)
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
+                .withExternalSupplierId(marketplaceOrder.externalSupplierId())
                 .withPayment(payment)
                 .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shipping().carrier()))
                 .withEstimatedShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
