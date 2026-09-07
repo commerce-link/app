@@ -42,7 +42,6 @@ class ShipmentTrackingTemplateTest {
         // then
         assertThat(html).contains("#{order.shipment.tracking.status}");
         assertThat(html).contains("shipment.trackingSubscriptionStatus");
-        assertThat(html).contains("shipment.trackingSubscriptionError");
     }
 
     @Test

@@ -35,7 +35,7 @@ class ShipmentTrackingSubscriptionStateTest {
         Order order = new Order();
         order.addShipment(courier("PKG-1"));
         Shipment tracked = courier("PKG-2");
-        tracked.markTrackingFailed("rejected", AT);
+        tracked.markTrackingFailed();
         order.addShipment(tracked);
 
         // then
@@ -56,20 +56,18 @@ class ShipmentTrackingSubscriptionStateTest {
     void markPendingThenActiveKeepsSubscriptionIdAndClearsError() {
         // given
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingFailed("boom", AT);
+        shipment.markTrackingFailed();
 
         // when
-        shipment.markTrackingPending("cmd-1", AT);
+        shipment.markTrackingPending("cmd-1");
         boolean pending = shipment.isTrackingPending();
-        shipment.markTrackingActive("21037943", AT.plusMinutes(1));
+        shipment.markTrackingActive("21037943");
 
         // then
         assertThat(pending).isTrue();
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
         assertThat(shipment.getTrackingSubscriptionId()).isEqualTo("cmd-1");
         assertThat(shipment.getTrackingExternalId()).isEqualTo("21037943");
-        assertThat(shipment.getTrackingSubscriptionError()).isNull();
-        assertThat(shipment.getTrackingSubscribedAt()).isEqualTo(AT.plusMinutes(1));
         assertThat(shipment.hasTrackingSubscription()).isTrue();
     }
 
@@ -79,11 +77,10 @@ class ShipmentTrackingSubscriptionStateTest {
         Shipment shipment = courier("PKG-1");
 
         // when
-        shipment.markTrackingFailed("carrier not recognised", AT);
+        shipment.markTrackingFailed();
 
         // then
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo("carrier not recognised");
         assertThat(shipment.isTrackingPending()).isFalse();
     }
 
@@ -92,7 +89,7 @@ class ShipmentTrackingSubscriptionStateTest {
         // given
         Shipment previous = courier("PKG-1");
         previous.setExternalId("furg-1");
-        previous.markTrackingActive("21037943", AT);
+        previous.markTrackingActive("21037943");
         Shipment edited = courier("PKG-1");
 
         // when
@@ -108,7 +105,7 @@ class ShipmentTrackingSubscriptionStateTest {
     void doesNotInheritWhenTrackingNoChanged() {
         // given
         Shipment previous = courier("PKG-1");
-        previous.markTrackingActive("21037943", AT);
+        previous.markTrackingActive("21037943");
         Shipment edited = courier("PKG-2");
 
         // when

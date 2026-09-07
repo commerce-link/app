@@ -38,11 +38,6 @@ public class Shipment {
     private String trackingSubscriptionId;
     @DynamoDBAttribute(attributeName = "trackingExternalId")
     private String trackingExternalId;
-    @DynamoDBAttribute(attributeName = "trackingSubscriptionError")
-    private String trackingSubscriptionError;
-    @DynamoDBAttribute(attributeName = "trackingSubscribedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime trackingSubscribedAt;
 
     public Shipment() {
     }
@@ -183,22 +178,6 @@ public class Shipment {
         this.trackingExternalId = trackingExternalId;
     }
 
-    public String getTrackingSubscriptionError() {
-        return trackingSubscriptionError;
-    }
-
-    public void setTrackingSubscriptionError(String trackingSubscriptionError) {
-        this.trackingSubscriptionError = trackingSubscriptionError;
-    }
-
-    public LocalDateTime getTrackingSubscribedAt() {
-        return trackingSubscribedAt;
-    }
-
-    public void setTrackingSubscribedAt(LocalDateTime trackingSubscribedAt) {
-        this.trackingSubscribedAt = trackingSubscribedAt;
-    }
-
     @DynamoDBIgnore
     public boolean hasTrackingSubscription() {
         return trackingSubscriptionStatus != null;
@@ -209,24 +188,18 @@ public class Shipment {
         return trackingSubscriptionStatus == ShipmentTrackingStatus.PENDING;
     }
 
-    public void markTrackingPending(String subscriptionId, LocalDateTime at) {
+    public void markTrackingPending(String subscriptionId) {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.PENDING;
         this.trackingSubscriptionId = subscriptionId;
-        this.trackingSubscriptionError = null;
-        this.trackingSubscribedAt = at;
     }
 
-    public void markTrackingActive(String externalId, LocalDateTime at) {
+    public void markTrackingActive(String externalId) {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.ACTIVE;
         this.trackingExternalId = externalId;
-        this.trackingSubscriptionError = null;
-        this.trackingSubscribedAt = at;
     }
 
-    public void markTrackingFailed(String error, LocalDateTime at) {
+    public void markTrackingFailed() {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
-        this.trackingSubscriptionError = error;
-        this.trackingSubscribedAt = at;
     }
 
     public void inheritTrackingSubscriptionFrom(Shipment previous) {
@@ -236,8 +209,6 @@ public class Shipment {
         this.trackingSubscriptionStatus = previous.trackingSubscriptionStatus;
         this.trackingSubscriptionId = previous.trackingSubscriptionId;
         this.trackingExternalId = previous.trackingExternalId;
-        this.trackingSubscriptionError = previous.trackingSubscriptionError;
-        this.trackingSubscribedAt = previous.trackingSubscribedAt;
         if (externalId == null) {
             this.externalId = previous.externalId;
         }

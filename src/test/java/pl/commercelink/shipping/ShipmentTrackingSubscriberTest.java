@@ -203,7 +203,6 @@ class ShipmentTrackingSubscriberTest {
         // then
         Shipment shipment = order.getShipments().get(0);
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(shipment.getTrackingSubscriptionError()).contains("429");
         verify(orderEventsRepository).save(event.capture());
         assertThat(event.getValue().getName()).isEqualTo(ShipmentTrackingSubscriber.TRACKING_FAILED_EVENT);
     }
@@ -220,7 +219,6 @@ class ShipmentTrackingSubscriberTest {
 
         // then
         assertThat(order.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(order.getShipments().get(0).getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.DUPLICATE_TRACKING_NO);
         verify(provider, never()).trackParcel(any());
     }
 
@@ -255,7 +253,6 @@ class ShipmentTrackingSubscriberTest {
 
         // then
         assertThat(order.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(order.getShipments().get(0).getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.DUPLICATE_TRACKING_NO);
         verify(provider, never()).trackParcel(any());
         verify(shipmentTrackingsRepository, never()).saveIfAbsent(any());
     }
@@ -283,7 +280,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingActive("1", LocalDateTime.now());
+        shipment.markTrackingActive("1");
         Order order = orderWith(shipment);
 
         // when
@@ -299,7 +296,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        shipment.markTrackingPending("cmd-1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenReturn(ParcelTrackingSubscription.active("cmd-1", "21037943", "dpd"));
@@ -317,7 +314,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        shipment.markTrackingPending("cmd-1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenReturn(ParcelTrackingSubscription.pending("cmd-1"));
@@ -333,7 +330,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        shipment.markTrackingPending("cmd-1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenReturn(ParcelTrackingSubscription.pending("cmd-1"));
@@ -343,7 +340,6 @@ class ShipmentTrackingSubscriberTest {
 
         // then
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.CHECK_TIMED_OUT);
         verify(ordersRepository).save(order);
     }
 
@@ -351,7 +347,7 @@ class ShipmentTrackingSubscriberTest {
     void checkIgnoresShipmentsNoLongerPending() {
         // given
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingActive("1", LocalDateTime.now());
+        shipment.markTrackingActive("1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
@@ -396,7 +392,6 @@ class ShipmentTrackingSubscriberTest {
 
         // then
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo(ShipmentTrackingSubscriber.RMA_RETRY_UNSUPPORTED);
         verify(publisher, never()).publish(any());
         verify(orderEventsRepository, never()).save(any());
     }
@@ -406,7 +401,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending(null, LocalDateTime.now());
+        shipment.markTrackingPending(null);
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.active("cmd-2", "21037943", "dpd"));
@@ -427,7 +422,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending(null, LocalDateTime.now());
+        shipment.markTrackingPending(null);
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.pending("cmd-9"));
@@ -445,7 +440,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        shipment.markTrackingPending("cmd-1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 401: token revoked"));
@@ -462,7 +457,7 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1", LocalDateTime.now());
+        shipment.markTrackingPending("cmd-1");
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(provider.checkParcelTracking("cmd-1")).thenThrow(new ShippingException("HTTP 502: bad gateway"));
@@ -472,7 +467,6 @@ class ShipmentTrackingSubscriberTest {
 
         // then
         assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.FAILED);
-        assertThat(shipment.getTrackingSubscriptionError()).isEqualTo("HTTP 502: bad gateway");
         verify(ordersRepository).save(order);
         ArgumentCaptor<OrderEvent> event = ArgumentCaptor.forClass(OrderEvent.class);
         verify(orderEventsRepository).save(event.capture());
@@ -484,9 +478,9 @@ class ShipmentTrackingSubscriberTest {
         // given
         providerAvailable();
         Shipment stale = courier("PKG-1");
-        stale.markTrackingPending("cmd-1", LocalDateTime.now());
+        stale.markTrackingPending("cmd-1");
         Shipment fresh = courier("PKG-1");
-        fresh.markTrackingPending("cmd-1", LocalDateTime.now());
+        fresh.markTrackingPending("cmd-1");
         Order staleOrder = orderWith(stale);
         Order freshOrder = orderWith(fresh);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(staleOrder, freshOrder);
@@ -508,7 +502,7 @@ class ShipmentTrackingSubscriberTest {
         // given: the tracking number was edited while the re-check was queued
         providerAvailable();
         Shipment stale = courier("PKG-1");
-        stale.markTrackingPending("cmd-1", LocalDateTime.now());
+        stale.markTrackingPending("cmd-1");
         Order staleOrder = orderWith(stale);
         Order freshOrder = orderWith(courier("PKG-2"));
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(staleOrder, freshOrder);

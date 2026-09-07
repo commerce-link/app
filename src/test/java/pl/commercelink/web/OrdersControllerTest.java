@@ -361,7 +361,7 @@ class OrdersControllerTest {
         tracked.setCarrier("DPD");
         tracked.setTrackingNo("PKG-1");
         tracked.setShippedAt(LocalDateTime.now());
-        tracked.markTrackingActive("21037943", LocalDateTime.now());
+        tracked.markTrackingActive("21037943");
         existingOrder.setShipments(new ArrayList<>(List.of(tracked)));
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
         Shipment resubmittedFirst = new Shipment(ShipmentType.Courier);

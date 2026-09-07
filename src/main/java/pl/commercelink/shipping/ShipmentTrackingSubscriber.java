@@ -78,19 +78,19 @@ public class ShipmentTrackingSubscriber {
             boolean sameEntity = (orderId != null && orderId.equals(tracking.getOrderId()))
                     || (rmaId != null && rmaId.equals(tracking.getRmaId()));
             if (!sameEntity) {
-                fail(orderId, shipment, DUPLICATE_TRACKING_NO, now);
+                fail(storeId, orderId, shipment, DUPLICATE_TRACKING_NO, now);
                 return;
             }
         } else {
             boolean indexed = shipmentTrackingsRepository.saveIfAbsent(
                     new ShipmentTracking(storeId, shipment.getTrackingNo(), orderId, rmaId, now));
             if (!indexed) {
-                fail(orderId, shipment, DUPLICATE_TRACKING_NO, now);
+                fail(storeId, orderId, shipment, DUPLICATE_TRACKING_NO, now);
                 return;
             }
         }
         if (shipment.getExternalId() != null) {
-            shipment.markTrackingActive(shipment.getExternalId(), now);
+            shipment.markTrackingActive(shipment.getExternalId());
             return;
         }
         ParcelTrackingSubscription result;
@@ -104,19 +104,17 @@ public class ShipmentTrackingSubscriber {
                         storeId, orderId, shipment.getTrackingNo());
                 result = ParcelTrackingSubscription.pending(null);
             } else {
-                log.warn("Tracking subscription failed store={} order={} trackingNo={}: {}",
-                        storeId, orderId, shipment.getTrackingNo(), e.getMessage());
-                fail(orderId, shipment, e.getMessage(), now);
+                fail(storeId, orderId, shipment, e.getMessage(), now);
                 return;
             }
         }
         if (result.status() == ParcelTrackingSubscription.Status.PENDING && orderId == null) {
             // RMA shipments come from the shipping provider and are ACTIVE right away; there is no
             // re-check queue for RMA, so a PENDING result must not be left waiting forever
-            fail(null, shipment, RMA_RETRY_UNSUPPORTED, now);
+            fail(storeId, null, shipment, RMA_RETRY_UNSUPPORTED, now);
             return;
         }
-        apply(shipment, result, now);
+        apply(storeId, orderId, shipment, result);
         if (result.status() == ParcelTrackingSubscription.Status.PENDING) {
             publisher.publish(new ShipmentTrackingCheckRequest(storeId, orderId, shipment.getTrackingNo()));
         }
@@ -183,7 +181,7 @@ public class ShipmentTrackingSubscriber {
                     Shipment target = pendingShipment(fresh, request.getTrackingNo());
                     changed.set(target != null);
                     if (target != null) {
-                        apply(target, result, now);
+                        apply(request.getStoreId(), request.getOrderId(), target, result);
                     }
                 },
                 fresh -> {
@@ -221,19 +219,29 @@ public class ShipmentTrackingSubscriber {
         return false;
     }
 
-    private void apply(Shipment shipment, ParcelTrackingSubscription result, LocalDateTime now) {
+    private void apply(String storeId, String orderId, Shipment shipment, ParcelTrackingSubscription result) {
         switch (result.status()) {
-            case ACTIVE -> shipment.markTrackingActive(result.externalId(), now);
-            case PENDING -> shipment.markTrackingPending(result.subscriptionId(), now);
-            case FAILED -> shipment.markTrackingFailed(result.error(), now);
+            case ACTIVE -> shipment.markTrackingActive(result.externalId());
+            case PENDING -> shipment.markTrackingPending(result.subscriptionId());
+            case FAILED -> {
+                logFailure(storeId, orderId, shipment, result.error());
+                shipment.markTrackingFailed();
+            }
         }
     }
 
-    private void fail(String orderId, Shipment shipment, String error, LocalDateTime now) {
-        shipment.markTrackingFailed(error, now);
+    private void fail(String storeId, String orderId, Shipment shipment, String error, LocalDateTime now) {
+        logFailure(storeId, orderId, shipment, error);
+        shipment.markTrackingFailed();
         if (orderId != null) {
             orderEventsRepository.save(new OrderEvent(orderId, EventType.action, TRACKING_FAILED_EVENT, now));
         }
+    }
+
+    // the failure reason is not persisted on the shipment, so the log is the only place it is kept
+    private static void logFailure(String storeId, String orderId, Shipment shipment, String error) {
+        log.warn("Tracking subscription failed store={} order={} trackingNo={}: {}",
+                storeId, orderId, shipment.getTrackingNo(), error);
     }
 
     private static ParcelTrackingRequest trackingRequest(Shipment shipment, String orderId, String rmaId) {
