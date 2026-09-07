@@ -9,9 +9,29 @@
     <section class="section">
         <div class="container">
 
-            <h1 class="title">Shipping Configuration</h1>
+            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
+                <h1 class="title mb-0" th:text="#{store.shipping.title}">Shipping Configuration</h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+            </div>
+
+            <div th:replace="~{fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')}"></div>
 
             <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.shipping.provider.label}, ${form.providerConfiguration}, 'shipping', ${form.store.storeId}, false)}"></div>
+
+            <div class="box mt-4" th:if="${shippingWebhookUrl != null}">
+                <h2 class="subtitle" th:text="#{store.shipping.webhook.title}">Webhook notifications</h2>
+                <p class="mb-3" th:text="#{store.shipping.webhook.lead}"></p>
+                <div class="notification is-warning is-light" th:if="${webhookTokenMissing}" th:text="#{store.shipping.webhook.tokenMissing}"></div>
+                <div class="field">
+                    <label class="label" th:text="#{store.shipping.webhook.url}"></label>
+                    <div class="control">
+                        <input class="input" type="text" readonly th:value="${shippingWebhookUrl}" onclick="this.select()"/>
+                    </div>
+                </div>
+                <p class="help" th:text="#{store.shipping.webhook.token}"></p>
+                <p class="help" th:text="#{store.shipping.webhook.states}"></p>
+                <p class="help" th:text="#{store.shipping.webhook.help}"></p>
+            </div>
 
             <!-- Authorized Carriers Section -->
             <div class="box mt-4">

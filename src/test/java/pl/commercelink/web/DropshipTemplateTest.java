@@ -299,6 +299,15 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void orderDetailsResolvesTheDeliveryLinkWithTheOrder() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains("@{${@deliveryRedirectResolver.resolveFor(order, item)}}");
+    }
+
+    @Test
     void orderDetailsGreysOutWarehouseMovesWhenItemsSitInADropshipDelivery() throws Exception {
         // when
         String html = read("orderDetails.html");
@@ -313,6 +322,33 @@ class DropshipTemplateTest {
         assertThat(pl).contains("order.items.action.move.warehouse.dropship.error=");
         assertThat(en).contains("order.items.action.move.warehouse.dropship=");
         assertThat(en).contains("order.items.action.move.warehouse.dropship.error=");
+        assertThat(html).contains("value=\"moveSelectedItemsToAllocation\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("value=\"removeSelectedItemsFromOrder\" th:disabled=\"${hasDropshipItems}\"");
+        assertThat(html).contains("order.items.action.dropship.locked");
+        assertThat(pl).contains("order.items.action.dropship.locked=");
+        assertThat(en).contains("order.items.action.dropship.locked=");
+    }
+
+    @Test
+    void orderDetailsDisablesTheActionControlWhenNoItemActionIsAvailable() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains(
+                "<select id=\"action-select\" th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\">");
+        assertThat(html).contains(
+                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\" onclick=\"confirmSave(this, submitOrderItemsForm)\"");
+    }
+
+    @Test
+    void orderDetailsDisablesAddingItemsWhenItemsSitInADropshipDelivery() throws Exception {
+        // when
+        String html = read("orderDetails.html");
+
+        // then
+        assertThat(html).contains(
+                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}\" th:title=\"${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''\" onclick=\"toggleOrderItemModal(true)\"");
     }
 
     @Test

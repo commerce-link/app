@@ -4,9 +4,10 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
 public class Shipment {
@@ -30,6 +31,13 @@ public class Shipment {
     @DynamoDBAttribute(attributeName = "deliveredAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime deliveredAt;
+    @DynamoDBAttribute(attributeName = "trackingSubscriptionStatus")
+    @DynamoDBTypeConvertedEnum
+    private ShipmentTrackingStatus trackingSubscriptionStatus;
+    @DynamoDBAttribute(attributeName = "trackingSubscriptionId")
+    private String trackingSubscriptionId;
+    @DynamoDBAttribute(attributeName = "trackingExternalId")
+    private String trackingExternalId;
 
     public Shipment() {
     }
@@ -107,9 +115,15 @@ public class Shipment {
         this.deliveredAt = deliveredAt;
     }
 
+    /** Carriers (and Furgonetka's webhooks) echo tracking numbers upper-cased; compare and index them case-insensitively. */
+    public static String normalizeTrackingNo(String trackingNo) {
+        return trackingNo == null ? null : trackingNo.trim().toUpperCase(Locale.ROOT);
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingNo(String other) {
-        return trackingNo != null && trackingNo.equals(other);
+        return trackingNo != null && other != null
+                && normalizeTrackingNo(trackingNo).equals(normalizeTrackingNo(other));
     }
 
     @DynamoDBIgnore
@@ -119,12 +133,13 @@ public class Shipment {
 
     @DynamoDBIgnore
     public boolean isDeliveredToCollectionPoint() {
-        return isNotEmpty(collectionPointCode);
+        return isNotBlank(collectionPointCode);
     }
 
     @DynamoDBIgnore
     public boolean hasShippingData() {
-        return isCarrierShipment() && isNotEmpty(carrier) && isNotEmpty(trackingNo) && shippedAt != null;
+        // a blank tracking number normalizes to an empty string, which is not a valid DynamoDB index key
+        return isCarrierShipment() && isNotBlank(carrier) && isNotBlank(trackingNo) && shippedAt != null;
     }
 
     private boolean isCarrierShipment() {
@@ -137,5 +152,65 @@ public class Shipment {
 
     public void setTrackingUrl(String trackingUrl) {
         this.trackingUrl = trackingUrl;
+    }
+
+    public ShipmentTrackingStatus getTrackingSubscriptionStatus() {
+        return trackingSubscriptionStatus;
+    }
+
+    public void setTrackingSubscriptionStatus(ShipmentTrackingStatus trackingSubscriptionStatus) {
+        this.trackingSubscriptionStatus = trackingSubscriptionStatus;
+    }
+
+    public String getTrackingSubscriptionId() {
+        return trackingSubscriptionId;
+    }
+
+    public void setTrackingSubscriptionId(String trackingSubscriptionId) {
+        this.trackingSubscriptionId = trackingSubscriptionId;
+    }
+
+    public String getTrackingExternalId() {
+        return trackingExternalId;
+    }
+
+    public void setTrackingExternalId(String trackingExternalId) {
+        this.trackingExternalId = trackingExternalId;
+    }
+
+    @DynamoDBIgnore
+    public boolean hasTrackingSubscription() {
+        return trackingSubscriptionStatus != null;
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrackingPending() {
+        return trackingSubscriptionStatus == ShipmentTrackingStatus.PENDING;
+    }
+
+    public void markTrackingPending(String subscriptionId) {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.PENDING;
+        this.trackingSubscriptionId = subscriptionId;
+    }
+
+    public void markTrackingActive(String externalId) {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.ACTIVE;
+        this.trackingExternalId = externalId;
+    }
+
+    public void markTrackingFailed() {
+        this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
+    }
+
+    public void inheritTrackingSubscriptionFrom(Shipment previous) {
+        if (previous == null || !previous.hasTrackingNo(trackingNo)) {
+            return;
+        }
+        this.trackingSubscriptionStatus = previous.trackingSubscriptionStatus;
+        this.trackingSubscriptionId = previous.trackingSubscriptionId;
+        this.trackingExternalId = previous.trackingExternalId;
+        if (externalId == null) {
+            this.externalId = previous.externalId;
+        }
     }
 }

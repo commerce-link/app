@@ -2,6 +2,7 @@ package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,6 +18,7 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.util.OperationResult;
 
 import java.time.LocalDateTime;
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +55,8 @@ class DropshipDeliveryCompletionTest {
     private OrderLifecycle orderLifecycle;
     @Mock
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    @Mock
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @InjectMocks
     private DropshipDeliveryCompletion completion;
@@ -124,6 +129,26 @@ class DropshipDeliveryCompletionTest {
         assertThat(delivery.hasBeenReceived()).isTrue();
         assertThat(delivery.hasEvent("DROPSHIP_SHIPMENT_CONFIRMED")).isTrue();
         verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void subscribesTheOrderShipmentsToTrackingBeforeTheLifecycleUpdate() {
+        // given
+        Order order = order();
+        Delivery delivery = dropshipDelivery();
+        OrderItem item = item("item-1", delivery.getDeliveryId(), FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        List<Allocation> selected = List.of(Allocation.fromOrderItem(order, item));
+
+        // when
+        completion.confirmShipped(STORE_ID, delivery, selected, List.of(), COURIER);
+
+        // then
+        InOrder inOrder = inOrder(shipmentTrackingSubscriber, orderLifecycle);
+        inOrder.verify(shipmentTrackingSubscriber).subscribe(STORE_ID, order);
+        inOrder.verify(orderLifecycle).update(same(order), anyList());
+        assertThat(order.getShipments().get(0).getTrackingNo()).isEqualTo("PKG-1");
     }
 
     @Test

@@ -549,6 +549,12 @@ public class Order {
         return shipments.isEmpty() ? Optional.empty() : Optional.of(shipments.get(0));
     }
 
+    /** True when at least one shipment was registered for carrier tracking (drives the tracking column on the order page). */
+    @DynamoDBIgnore
+    public boolean hasTrackedShipments() {
+        return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
+    }
+
     public List<Document> getDocuments() {
         return documents;
     }

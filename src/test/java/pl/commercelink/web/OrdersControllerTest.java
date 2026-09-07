@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
@@ -21,25 +23,35 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.event.OrderEventsRepository;
 import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,6 +79,18 @@ class OrdersControllerTest {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock
     private RedirectAttributes redirectAttributes;
+    @Mock
+    private ProductCatalogRepository productCatalogRepository;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private OrderEventsRepository orderEventsRepository;
+    @Mock
+    private ShipmentCarrierOptions shipmentCarrierOptions;
+    @Mock
+    private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -343,6 +367,42 @@ class OrdersControllerTest {
 
         // then
         verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    @DisplayName("updateShipments keeps tracking subscription of an unchanged shipment and subscribes new ones")
+    void updateShipmentsKeepsTrackingSubscriptionOfUnchangedShipmentAndSubscribesNewOnes() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment tracked = new Shipment(ShipmentType.Courier);
+        tracked.setCarrier("DPD");
+        tracked.setTrackingNo("PKG-1");
+        tracked.setShippedAt(LocalDateTime.now());
+        tracked.markTrackingActive("21037943");
+        existingOrder.setShipments(new ArrayList<>(List.of(tracked)));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Shipment resubmittedFirst = new Shipment(ShipmentType.Courier);
+        resubmittedFirst.setCarrier("DPD");
+        resubmittedFirst.setTrackingNo("PKG-1");
+        resubmittedFirst.setShippedAt(LocalDateTime.now());
+        Shipment resubmittedSecond = new Shipment(ShipmentType.Courier);
+        resubmittedSecond.setCarrier("DPD");
+        resubmittedSecond.setTrackingNo("PKG-2");
+        resubmittedSecond.setShippedAt(LocalDateTime.now());
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(resubmittedFirst, resubmittedSecond));
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        assertThat(existingOrder.getShipments()).hasSize(2);
+        assertThat(existingOrder.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(existingOrder.getShipments().get(1).hasTrackingSubscription()).isFalse();
+        verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
+        InOrder order = inOrder(shipmentTrackingSubscriber, orderLifecycle);
+        order.verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
+        order.verify(orderLifecycle).update(existingOrder);
     }
 
     @Test
@@ -779,5 +839,43 @@ class OrdersControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "skipped");
+    }
+
+    @Test
+    void orderDetailsModelDisablesItemActionsWhenDropshipItemsExistAndOrderCannotBeSplit() {
+        // given
+        Order order = orderBase();
+        order.setStatus(OrderStatus.Assembly);
+        OrderItem item = new OrderItem(ORDER_ID, "Obudowy", "pozycja", 1, 100.0, null, false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of(item.getItemId()));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, model);
+
+        // then
+        assertThat(model.getAttribute("hasAvailableItemActions")).isEqualTo(false);
+    }
+
+    @Test
+    void orderDetailsModelKeepsItemActionsAvailableForAPlainOrder() {
+        // given
+        Order order = orderBase();
+        OrderItem itemOne = new OrderItem(ORDER_ID, "Obudowy", "pozycja 1", 1, 100.0, null, false);
+        OrderItem itemTwo = new OrderItem(ORDER_ID, "Obudowy", "pozycja 2", 1, 100.0, null, false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemOne, itemTwo));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, model);
+
+        // then
+        assertThat(model.getAttribute("hasAvailableItemActions")).isEqualTo(true);
     }
 }

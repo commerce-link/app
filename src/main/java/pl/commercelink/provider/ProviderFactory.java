@@ -94,7 +94,8 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
         RestApiWithRetry restApiWithRetry = new RestApiWithRetry(
                 restApiBuilder.build(),
-                () -> authService.getAccessToken(store.getStoreId()));
+                () -> authService.getAccessToken(store.getStoreId()),
+                () -> authService.renewAccessToken(store.getStoreId()));
 
         return Map.of("restApi", restApiWithRetry);
     }
