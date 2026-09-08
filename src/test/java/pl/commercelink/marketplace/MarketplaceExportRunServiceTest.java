@@ -36,8 +36,8 @@ class MarketplaceExportRunServiceTest {
     private static final String STORE_ID = "uma2dqukxr";
     private static final String CATALOG_ID = "catalog-1";
     private static final String MARKETPLACE = "allegro";
-    private static final String STORE_PREFIX = "marketplace-export-runs/uma2dqukxr/";
-    private static final String CATALOG_PREFIX = "marketplace-export-runs/uma2dqukxr/allegro/catalog-1/";
+    private static final String STORE_PREFIX = "uma2dqukxr/marketplace-exports/";
+    private static final String CATALOG_PREFIX = "uma2dqukxr/marketplace-exports/allegro/catalog-1/";
     private static final Instant RUN_FINISHED_AT = Instant.parse("2026-08-13T01:31:05Z");
     private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
     private static final String LEGACY_RUN_ID = "2026-08-13_01-31-05";
@@ -178,6 +178,30 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
+    void loadPreviousExportNeverPicksTheLegacyLatestFileLeftInTheExportsDirectory() {
+        // given
+        givenCatalogObjects(
+                object(CATALOG_PREFIX + "latest.csv", "2026-09-01T01:00:00", offersCsv("pim-LATEST")),
+                object(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", "2026-08-13T01:31:05", offersCsv("pim-NEW")));
+
+        // when
+        List<MarketplaceOfferSnapshot> offers = service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE);
+
+        // then
+        assertThat(offers).hasSize(1);
+        assertThat(offers.get(0).pimId()).isEqualTo("pim-NEW");
+    }
+
+    @Test
+    void loadPreviousExportReturnsEmptyListWhenTheLegacyLatestFileIsTheOnlyObject() {
+        // given
+        givenCatalogObjects(object(CATALOG_PREFIX + "latest.csv", "2026-09-01T01:00:00", offersCsv("pim-LATEST")));
+
+        // when / then
+        assertThat(service.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE)).isEmpty();
+    }
+
+    @Test
     void loadPreviousExportIgnoresFailedRunsAndNonCsvObjects() {
         // given
         givenCatalogObjects(
@@ -294,6 +318,22 @@ class MarketplaceExportRunServiceTest {
         // given
         Map<String, LocalDateTime> objects = new LinkedHashMap<>();
         objects.put(CATALOG_PREFIX + "not-a-run-id.csv", LocalDateTime.parse("2026-08-14T01:00:00"));
+        objects.put(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
+        when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
+
+        // when
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+
+        // then
+        assertThat(runs).extracting(MarketplaceExportRunHeader::runId)
+                .containsExactly("8213415334_2026-08-13_01-31-05");
+    }
+
+    @Test
+    void findRunsSkipsTheLegacyLatestFileLeftInTheExportsDirectory() {
+        // given
+        Map<String, LocalDateTime> objects = new LinkedHashMap<>();
+        objects.put(CATALOG_PREFIX + "latest.csv", LocalDateTime.parse("2026-09-01T01:00:00"));
         objects.put(CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", LocalDateTime.parse("2026-08-13T01:31:05"));
         when(fileStorage.getAllObjectLastModified(BUCKET, STORE_PREFIX)).thenReturn(objects);
 

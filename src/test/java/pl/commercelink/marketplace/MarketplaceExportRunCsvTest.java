@@ -92,10 +92,10 @@ class MarketplaceExportRunCsvTest {
     void runIdDropsDirectoriesExtensionAndTheFailedSuffix() {
         // when / then
         assertThat(MarketplaceExportRunCsv.runIdFrom(
-                "marketplace-export-runs/store-1/allegro/catalog-1/2026-08-13_01-31-05.csv"))
+                "store-1/marketplace-exports/allegro/catalog-1/2026-08-13_01-31-05.csv"))
                 .isEqualTo("2026-08-13_01-31-05");
         assertThat(MarketplaceExportRunCsv.runIdFrom(
-                "marketplace-export-runs/store-1/allegro/catalog-1/2026-08-13_01-31-05-failed.csv"))
+                "store-1/marketplace-exports/allegro/catalog-1/2026-08-13_01-31-05-failed.csv"))
                 .isEqualTo("2026-08-13_01-31-05");
     }
 

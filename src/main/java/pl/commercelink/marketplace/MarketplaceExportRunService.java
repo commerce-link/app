@@ -16,7 +16,7 @@ import java.util.Optional;
 @Service
 public class MarketplaceExportRunService {
 
-    private static final String RUNS_PREFIX = "marketplace-export-runs";
+    private static final String EXPORTS_DIRECTORY = "marketplace-exports";
     private static final String RUN_EXTENSION = ".csv";
     private static final String FAILED_RUN_EXTENSION = "-failed.csv";
     private static final int UNREADABLE_RUN_ATTEMPTS = 5;
@@ -162,11 +162,11 @@ public class MarketplaceExportRunService {
     }
 
     private String storePrefix(String storeId) {
-        return String.format("%s/%s/", RUNS_PREFIX, storeId);
+        return String.format("%s/%s/", storeId, EXPORTS_DIRECTORY);
     }
 
     private String catalogPrefix(String storeId, String marketplace, String catalogId) {
-        return String.format("%s/%s/%s/%s/", RUNS_PREFIX, storeId, marketplace, catalogId);
+        return String.format("%s/%s/%s/%s/", storeId, EXPORTS_DIRECTORY, marketplace, catalogId);
     }
 
     private String runKey(String storeId, String marketplace, String catalogId, String runId, boolean failed) {
