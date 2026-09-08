@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -16,12 +15,8 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
-import pl.commercelink.marketplace.api.MarketplaceReturns;
-import pl.commercelink.marketplace.api.ReturnRefund;
-import pl.commercelink.marketplace.api.ReturnRejection;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.shipping.CarrierDictionary;
-import pl.commercelink.orders.MarketplaceReturnAction;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEvent;
 import pl.commercelink.orders.OrderLifecycleEventType;
@@ -34,13 +29,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -73,7 +65,6 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private Order order;
     @Mock private OrderSource source;
     @Mock private MarketplaceProvider provider;
-    @Mock private MarketplaceReturns returns;
 
     @InjectMocks
     private MarketplaceOrderLifecycleEventListener listener;
@@ -430,90 +421,5 @@ class MarketplaceOrderLifecycleEventListenerTest {
 
     private void handleDeleted(OrderLifecycleEventType type) {
         listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type, EXTERNAL_ORDER_ID, MARKETPLACE));
-    }
-
-    private void handleReturn(OrderLifecycleEventType type, MarketplaceReturnAction action) {
-        listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type, EXTERNAL_ORDER_ID, MARKETPLACE, action));
-    }
-
-    @Test
-    void returnAcceptedEventRefundsThroughProviderReturns() {
-        // given
-        when(provider.returns()).thenReturn(Optional.of(returns));
-        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1",
-                List.of(new MarketplaceReturnAction.Item("SKU-1", 2)), true, "cmd-1", null);
-
-        // when
-        handleReturn(OrderLifecycleEventType.ReturnAccepted, action);
-
-        // then
-        ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
-        verify(returns).refundReturn(eq(EXTERNAL_ORDER_ID), eq("r-1"), captor.capture());
-        assertEquals("cmd-1", captor.getValue().idempotencyKey());
-        assertTrue(captor.getValue().refundDelivery());
-        assertEquals("SKU-1", captor.getValue().items().get(0).offerKey());
-        assertEquals(2, captor.getValue().items().get(0).quantity());
-    }
-
-    @Test
-    void redeliveredReturnAcceptedRefundsWithTheSameCommandId() {
-        // given
-        when(provider.returns()).thenReturn(Optional.of(returns));
-        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1",
-                List.of(new MarketplaceReturnAction.Item("SKU-1", 2)), true, "cmd-1", null);
-        OrderLifecycleEvent event = new OrderLifecycleEvent(STORE_ID, ORDER_ID,
-                OrderLifecycleEventType.ReturnAccepted, EXTERNAL_ORDER_ID, MARKETPLACE, action);
-
-        // when: at-least-once delivery hands us the same message twice
-        listener.handleMessage(event);
-        listener.handleMessage(event);
-
-        // then: the payload's commandId is forwarded, never regenerated - Allegro deduplicates on it
-        ArgumentCaptor<ReturnRefund> captor = ArgumentCaptor.forClass(ReturnRefund.class);
-        verify(returns, times(2)).refundReturn(any(), any(), captor.capture());
-        assertEquals("cmd-1", captor.getAllValues().get(0).idempotencyKey());
-        assertEquals("cmd-1", captor.getAllValues().get(1).idempotencyKey());
-    }
-
-    @Test
-    void returnRejectedEventRejectsThroughProviderReturns() {
-        // given
-        when(provider.returns()).thenReturn(Optional.of(returns));
-        MarketplaceReturnAction action = new MarketplaceReturnAction("rma-1", "r-1", List.of(), false, null, "Damaged");
-
-        // when
-        handleReturn(OrderLifecycleEventType.ReturnRejected, action);
-
-        // then
-        ArgumentCaptor<ReturnRejection> captor = ArgumentCaptor.forClass(ReturnRejection.class);
-        verify(returns).rejectReturn(eq("r-1"), captor.capture());
-        assertEquals("Damaged", captor.getValue().reason());
-    }
-
-    @Test
-    void returnEventsAreSkippedWhenProviderHasNoReturnsOrPayloadLacksAction() {
-        // given
-        when(provider.returns()).thenReturn(Optional.empty());
-
-        // when
-        handleReturn(OrderLifecycleEventType.ReturnAccepted,
-                new MarketplaceReturnAction("rma-1", "r-1", List.of(), false, "cmd-1", null));
-        when(provider.returns()).thenReturn(Optional.of(returns));
-        handleReturn(OrderLifecycleEventType.ReturnRejected, null);
-
-        // then
-        verifyNoInteractions(returns);
-    }
-
-    @Test
-    void returnEventsStillRequireAnAuthenticatedIntegration() {
-        // given
-        MarketplaceIntegration loggedOut = new MarketplaceIntegration(MARKETPLACE);
-        loggedOut.setLoggedIn(false);
-        when(store.getMarketplaceIntegration(MARKETPLACE)).thenReturn(loggedOut);
-
-        // when / then
-        assertThrows(IllegalStateException.class, () -> handleReturn(OrderLifecycleEventType.ReturnAccepted,
-                new MarketplaceReturnAction("rma-1", "r-1", List.of(), false, "cmd-1", null)));
     }
 }

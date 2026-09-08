@@ -8,9 +8,6 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
-import pl.commercelink.marketplace.api.MarketplaceReturns;
-import pl.commercelink.marketplace.api.ReturnRefund;
-import pl.commercelink.marketplace.api.ReturnRejection;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.orders.*;
@@ -19,7 +16,6 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
-import java.util.function.Consumer;
 import pl.commercelink.stores.IntegrationType;
 
 
@@ -107,44 +103,9 @@ public class MarketplaceOrderLifecycleEventListener {
                 extractInvoiceUpdate(order)
                         .ifPresent(update -> provider.updateInvoice(externalOrderId, update));
                 break;
-            case ReturnAccepted:
-                ifReturnsApiAvailable(provider, payload, returns -> returns.refundReturn(externalOrderId,
-                        payload.getReturnAction().externalReturnId(), toReturnRefund(payload.getReturnAction())));
-                break;
-            case ReturnRejected:
-                ifReturnsApiAvailable(provider, payload, returns -> returns.rejectReturn(
-                        payload.getReturnAction().externalReturnId(),
-                        new ReturnRejection(payload.getReturnAction().rejectionReason())));
-                break;
             case StatusChange:
                 break;
         }
-    }
-
-    // a return event for a marketplace without a returns API cannot be acted on; skipping (not throwing)
-    // keeps it out of the DLQ, and the RMA history shows whether the decision reached the marketplace
-    private void ifReturnsApiAvailable(MarketplaceProvider provider, OrderLifecycleEvent payload,
-                                       Consumer<MarketplaceReturns> action) {
-        if (payload.getReturnAction() == null || payload.getReturnAction().externalReturnId() == null) {
-            log.error("Return event {} for order {} has no return action; skipped", payload.getType(), payload.getOrderId());
-            return;
-        }
-        Optional<MarketplaceReturns> returns = provider.returns();
-        if (returns.isEmpty()) {
-            log.error("Marketplace {} exposes no returns API, but {} decision for RMA {} (order {}) requires one - decision dropped; check the deployed adapter version",
-                    payload.getMarketplace(), payload.getType(), payload.getReturnAction().rmaId(), payload.getExternalOrderId());
-            return;
-        }
-        action.accept(returns.get());
-    }
-
-    private static ReturnRefund toReturnRefund(MarketplaceReturnAction action) {
-        return new ReturnRefund(
-                action.items().stream()
-                        .map(i -> new ReturnRefund.Item(i.marketplaceKey(), i.quantity()))
-                        .toList(),
-                action.refundDelivery(),
-                action.commandId());
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order, Store store, String marketplace) {
