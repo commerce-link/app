@@ -25,17 +25,17 @@ class PurchaseReportExportTest {
     @InjectMocks private PurchaseReportExport export;
 
     @Test
-    void runWritesHeaderLineAndRowWithSupplierFirst() throws Exception {
+    void runWritesHeaderLineAndRowWithCategoryFirst() throws Exception {
         // given
         when(service.generate(eq("store-1"), any(), any()))
-                .thenReturn(List.of(new PurchaseReportRow("AcmeA", "GPU", "MFN-A", "DUAL 4070", 5)));
+                .thenReturn(List.of(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "DUAL 4070", "MFN-A", 5)));
 
         // when
         byte[] bytes = export.run("store-1", LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31));
 
         // then
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertThat(csv).startsWith("\"Supplier\";\"Category\";\"MFN\";\"Name\";\"Quantity\"");
-        assertThat(csv).contains("\"AcmeA\";\"GPU\";\"MFN-A\";\"DUAL 4070\";\"5\"");
+        assertThat(csv).startsWith("\"Category\";\"Supplier\";\"Brand\";\"Name\";\"MFN\";\"Quantity\"");
+        assertThat(csv).contains("\"GPU\";\"AcmeA\";\"ASUS\";\"DUAL 4070\";\"MFN-A\";\"5\"");
     }
 }

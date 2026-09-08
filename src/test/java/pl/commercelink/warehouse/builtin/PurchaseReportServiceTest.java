@@ -65,7 +65,7 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("AcmeA", "GPU", "RTX4070-DUAL", "DUAL RTX 4070", 5));
+        assertThat(rows).containsExactly(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "DUAL RTX 4070", "RTX4070-DUAL", 5));
     }
 
     @Test
@@ -133,7 +133,7 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("AcmeA", "GPU", "MFN-A", "Name A", 5));
+        assertThat(rows).containsExactly(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "Name A", "MFN-A", 5));
     }
 
     @Test
@@ -157,7 +157,7 @@ class PurchaseReportServiceTest {
     }
 
     @Test
-    void usesUnknownCategoryWhenPimEntryMissing() {
+    void usesUnknownCategoryAndNoBrandWhenPimEntryMissing() {
         // given
         givenDocuments(goodsReceiptDoc("doc-pim-miss", "delivery-1", "Acme"));
         givenDelivery("delivery-1", "AcmeA");
@@ -169,7 +169,7 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("AcmeA", "Unknown", "MFN-MISS", "Mystery", 4));
+        assertThat(rows).containsExactly(new PurchaseReportRow("Unknown", "AcmeA", null, "Mystery", "MFN-MISS", 4));
     }
 
     @Test
@@ -240,7 +240,7 @@ class PurchaseReportServiceTest {
     }
 
     @Test
-    void sortsResultBySupplierThenCategoryThenMfn() {
+    void sortsResultByCategoryThenSupplierThenMfn() {
         // given
         givenDocuments(
                 goodsReceiptDoc("doc-1", "delivery-1", "Acme"),
@@ -262,12 +262,12 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).extracting(PurchaseReportRow::supplier, PurchaseReportRow::category, PurchaseReportRow::mfn)
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::supplier, PurchaseReportRow::mfn)
                 .containsExactly(
-                        tuple("Alpha", "GPU", "M-A-GPU"),
-                        tuple("Alpha", "PSU", "M-A-PSU"),
-                        tuple("Zeta", "GPU", "M-Z-GPU"),
-                        tuple("Zeta", "PSU", "M-Z-PSU"));
+                        tuple("GPU", "Alpha", "M-A-GPU"),
+                        tuple("GPU", "Zeta", "M-Z-GPU"),
+                        tuple("PSU", "Alpha", "M-A-PSU"),
+                        tuple("PSU", "Zeta", "M-Z-PSU"));
     }
 
     private void givenDocuments(WarehouseDocument... docs) {
@@ -309,6 +309,6 @@ class PurchaseReportServiceTest {
     }
 
     private static PimEntry pimEntry(String category) {
-        return new PimEntry("pim-" + category, List.<PimIdentifier>of(), "Brand", "Name", category, null, true, null, null);
+        return new PimEntry("pim-" + category, List.<PimIdentifier>of(), "ASUS", "Name", category, null, true, null, null);
     }
 }

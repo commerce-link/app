@@ -37,8 +37,8 @@ public class PurchaseReportService {
 
         return aggregates.entrySet().stream()
                 .map(PurchaseReportService::toRow)
-                .sorted(Comparator.comparing(PurchaseReportRow::supplier)
-                        .thenComparing(PurchaseReportRow::category)
+                .sorted(Comparator.comparing(PurchaseReportRow::category)
+                        .thenComparing(PurchaseReportRow::supplier)
                         .thenComparing(PurchaseReportRow::mfn))
                 .toList();
     }
@@ -60,13 +60,14 @@ public class PurchaseReportService {
 
     private void accumulate(WarehouseDocumentItem item, String supplier, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        String category = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn())
-                .map(PimEntry::category)
-                .orElse(null);
+        Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
+        String category = pim.map(PimEntry::category).orElse(null);
+        String brand = pim.map(PimEntry::brand).orElse(null);
 
         Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(supplier, category, item.getMfn()), k -> new Aggregate());
         agg.qty += item.getQty();
         if (item.getName() != null && !item.getName().isBlank()) agg.latestName = item.getName();
+        if (brand != null && !brand.isBlank()) agg.latestBrand = brand;
     }
 
     private String resolveSupplier(String storeId, WarehouseDocument doc, Map<String, String> supplierByDeliveryId) {
@@ -91,10 +92,11 @@ public class PurchaseReportService {
         AggregateKey k = entry.getKey();
         Aggregate a = entry.getValue();
         return new PurchaseReportRow(
-                k.supplier(),
                 k.category() != null ? k.category() : UNKNOWN,
-                k.mfn(),
+                k.supplier(),
+                a.latestBrand,
                 a.latestName,
+                k.mfn(),
                 a.qty);
     }
 
@@ -102,6 +104,7 @@ public class PurchaseReportService {
 
     private static class Aggregate {
         String latestName;
+        String latestBrand;
         int qty;
     }
 }

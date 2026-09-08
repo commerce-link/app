@@ -3,24 +3,26 @@ package pl.commercelink.warehouse.builtin;
 import pl.commercelink.starter.csv.CSVReady;
 
 public record PurchaseReportRow(
-        String supplier,
         String category,
-        String mfn,
+        String supplier,
+        String brand,
         String name,
+        String mfn,
         int qty
 ) implements CSVReady {
 
     public static String[] headers() {
-        return new String[]{"Supplier", "Category", "MFN", "Name", "Quantity"};
+        return new String[]{"Category", "Supplier", "Brand", "Name", "MFN", "Quantity"};
     }
 
     @Override
     public String[] asStringArray() {
         return new String[]{
-                supplier != null ? supplier : "",
                 category != null ? category : "",
-                mfn != null ? mfn : "",
+                supplier != null ? supplier : "",
+                brand != null ? brand : "",
                 name != null ? name : "",
+                mfn != null ? mfn : "",
                 String.valueOf(qty)
         };
     }
