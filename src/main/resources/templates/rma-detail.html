@@ -162,7 +162,8 @@
                         <div class="control">
                             <input class="input" type="email"
                                    th:field="*{email}"
-                                   th:placeholder="#{rma.email.placeholder}" th:disabled="${isClosed}" required>
+                                   th:placeholder="#{rma.email.placeholder}" th:disabled="${isClosed}"
+                                   th:required="${!rma.marketplaceReturn}">
                         </div>
                     </div>
 
@@ -818,7 +819,10 @@
 
         function submitSplitAction() {
             const form = document.getElementById('rmaItemsForm');
-            const selectedItems = form.querySelectorAll('input[type="checkbox"]:checked');
+            // Restrict the selector to the item checkboxes (rmaItems[<i>].selected): the
+            // refundDelivery checkbox lives in the same form and is checked by default, so a
+            // broad input[type="checkbox"]:checked selector miscounts the selected items.
+            const selectedItems = form.querySelectorAll('input[type="checkbox"][name^="rmaItems"]:checked');
 
             if (selectedItems.length !== 1) {
                 alert('Only one item can be split at a time.');

@@ -282,10 +282,16 @@ public class RMA {
                 && (reason == null || reason.isBlank() || reason.length() > MAX_REJECTION_REASON_LENGTH);
     }
 
-    /** A refunded return must not also be rejected: the buyer would keep the money and get a rejection notice. */
+    /**
+     * A refunded return must not also be rejected: the buyer would keep the money and get a rejection
+     * notice. Both refund paths count - the one this application requested and the one the marketplace
+     * performed on its own (the module would refuse the rejection anyway, and the RMA would be left
+     * showing "rejected" over money that was already returned).
+     */
     @DynamoDBIgnore
     public boolean blocksRejectionAfterRefund(RMAStatus newStatus) {
-        return isMarketplaceReturn() && turnsRejected(newStatus) && hasActionEvent(EVENT_REFUND_REQUESTED);
+        return isMarketplaceReturn() && turnsRejected(newStatus)
+                && (hasActionEvent(EVENT_REFUND_REQUESTED) || hasActionEvent(EVENT_REFUNDED_BY_MARKETPLACE));
     }
 
     private boolean turnsRejected(RMAStatus newStatus) {

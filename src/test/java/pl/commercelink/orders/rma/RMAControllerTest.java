@@ -15,6 +15,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.dialect.SpringStandardDialect;
+import org.thymeleaf.templatemode.TemplateMode;
+import org.thymeleaf.templateresolver.StringTemplateResolver;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -31,10 +36,15 @@ import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.ItemCondition;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -737,5 +747,65 @@ class RMAControllerTest {
         ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
         verify(rmaRepository).save(saved.capture());
         assertThat(saved.getValue().getStoreId()).isEqualTo(STORE_ID);
+    }
+
+    // ------------------------------------------------------------------
+    // rma-detail.html: the email field is mandatory only for manual RMAs
+    // ------------------------------------------------------------------
+
+    @Test
+    void theEmailInputIsRequiredOnManualRmasButNotOnMarketplaceReturns() {
+        // given: marketplace returns are imported with email == null (the Allegro address is an alias
+        // and buyer notifications are disabled), so a static required attribute on the email input
+        // would block every save on such an RMA - the operator could not even reject the return.
+        RMA marketplaceReturn = rmaWithStatus(RMAStatus.New);
+        marketplaceReturn.setExternalReturnId("r-1");
+        RMA manualRma = rmaWithStatus(RMAStatus.New);
+
+        // when: the email input taken from the real template is rendered for both kinds of RMA
+        String marketplaceHtml = renderEmailInputOfRmaDetail(marketplaceReturn);
+        String manualHtml = renderEmailInputOfRmaDetail(manualRma);
+
+        // then: Thymeleaf drops a false th:required entirely and expands a true one to required="required"
+        assertThat(marketplaceHtml).doesNotContainIgnoringCase("required");
+        assertThat(manualHtml).containsIgnoringCase("required");
+    }
+
+    /**
+     * Renders the email input of {@code rma-detail.html} in isolation. The tag is taken from the real
+     * template so a reverted {@code th:required} fails this test; only {@code th:field} and
+     * {@code th:placeholder} are dropped, because those need a Spring binding context and the message
+     * bundle, neither of which this plain unit test has.
+     */
+    private static String renderEmailInputOfRmaDetail(RMA rma) {
+        Matcher emailInput = Pattern.compile("<input\\b[^>]*type=\"email\"[^>]*>")
+                .matcher(readTemplate("templates/rma-detail.html"));
+        assertThat(emailInput.find())
+                .withFailMessage("no <input type=\"email\"> found in rma-detail.html")
+                .isTrue();
+        String tag = emailInput.group().replaceAll("th:(field|placeholder)=\"[^\"]*\"", "");
+
+        StringTemplateResolver resolver = new StringTemplateResolver();
+        resolver.setTemplateMode(TemplateMode.HTML);
+        TemplateEngine templateEngine = new TemplateEngine();
+        templateEngine.setDialect(new SpringStandardDialect());
+        templateEngine.setTemplateResolver(resolver);
+
+        Context context = new Context();
+        context.setVariable("rma", rma);
+        context.setVariable("isClosed", false);
+        return templateEngine.process(tag, context);
+    }
+
+    private static String readTemplate(String classpathLocation) {
+        try (InputStream template = RMAControllerTest.class.getClassLoader()
+                .getResourceAsStream(classpathLocation)) {
+            assertThat(template)
+                    .withFailMessage("%s is not on the test classpath", classpathLocation)
+                    .isNotNull();
+            return new String(template.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + classpathLocation, e);
+        }
     }
 }

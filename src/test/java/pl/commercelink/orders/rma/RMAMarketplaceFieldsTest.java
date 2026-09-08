@@ -131,6 +131,23 @@ class RMAMarketplaceFieldsTest {
     }
 
     @Test
+    void blocksRejectionWhenTheMarketplaceRefundedTheBuyerOnItsOwn() {
+        // given
+        RMA marketplace = new RMA("store-1");
+        marketplace.setExternalReturnId("r-1");
+        marketplace.setStatus(RMAStatus.WaitingForItems);
+        marketplace.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
+        RMA manual = new RMA("store-1");
+        manual.setStatus(RMAStatus.WaitingForItems);
+        manual.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
+
+        // when / then
+        assertTrue(marketplace.blocksRejectionAfterRefund(RMAStatus.Rejected));
+        assertFalse(marketplace.blocksRejectionAfterRefund(RMAStatus.Processing));
+        assertFalse(manual.blocksRejectionAfterRefund(RMAStatus.Rejected));
+    }
+
+    @Test
     void rejectionReasonIsRequiredOnlyWhenAMarketplaceRmaTurnsRejected() {
         // given
         RMA marketplace = new RMA("store-1");
