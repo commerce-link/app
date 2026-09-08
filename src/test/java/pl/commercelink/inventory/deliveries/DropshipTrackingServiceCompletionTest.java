@@ -26,6 +26,7 @@ import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -73,6 +74,8 @@ class DropshipTrackingServiceCompletionTest {
     private SupplierProviderResolver providerResolver;
     @Mock
     private SupplierProvider provider;
+    @Mock
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     private DropshipTrackingService service;
     private Order order;
@@ -83,7 +86,7 @@ class DropshipTrackingServiceCompletionTest {
     @BeforeEach
     void setUp() {
         DropshipDeliveryCompletion completion = new DropshipDeliveryCompletion(deliveriesRepository, ordersRepository,
-                orderItemsRepository, orderLifecycle, orderLifecycleEventPublisher);
+                orderItemsRepository, orderLifecycle, orderLifecycleEventPublisher, shipmentTrackingSubscriber);
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
                 providerResolver, completion, DropshipTrackingProperties.defaults(),
                 Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));

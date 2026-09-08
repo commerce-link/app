@@ -43,6 +43,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -132,6 +133,8 @@ public class OrdersController extends BaseController {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @Autowired
     private OrderFiltersService orderFilters;
@@ -392,11 +395,14 @@ public class OrdersController extends BaseController {
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
-        model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
+        boolean canSplitOrder = order.canBeSplit() && orderItems.size() > 1;
+        model.addAttribute("canSplitOrder", canSplitOrder);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems);
-        model.addAttribute("hasDropshipItems", !dropshipItemIds.isEmpty());
+        boolean hasDropshipItems = !dropshipItemIds.isEmpty();
+        model.addAttribute("hasDropshipItems", hasDropshipItems);
+        model.addAttribute("hasAvailableItemActions", canSplitOrder || !hasDropshipItems);
         model.addAttribute("hasWarehouseItems", orderItems.stream()
                 .filter(OrderItem::isProduct)
                 .anyMatch(item -> !dropshipItemIds.contains(item.getItemId())));
@@ -914,8 +920,14 @@ public class OrdersController extends BaseController {
                 shipments.add(updatedOrder.getShipments().get(0));
             }
 
+            List<Shipment> previousShipments = existingOrder.getShipments();
+            shipments.forEach(shipment -> previousShipments.stream()
+                    .filter(previous -> previous.hasTrackingNo(shipment.getTrackingNo()))
+                    .findFirst()
+                    .ifPresent(shipment::inheritTrackingSubscriptionFrom));
             existingOrder.replaceShipments(shipments);
         }
+        shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         String view = save(existingOrder);
         boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()
                 .anyMatch(s -> s.hasShippingData() || s.hasCollectionData());
