@@ -13,8 +13,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemFamily;
 import pl.commercelink.orders.OrderItemsRepository;
-import pl.commercelink.orders.OrderLifecycleEventPublisher;
-import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
 
 import java.time.LocalDateTime;
@@ -43,7 +41,7 @@ public class MarketplaceReturnDecisions {
     private final OrdersRepository ordersRepository;
     private final OrderItemsRepository orderItemsRepository;
     private final RMARepository rmaRepository;
-    private final OrderLifecycleEventPublisher publisher;
+    private final ReturnLifecycleEventPublisher publisher;
     private final OrderItemFamily orderItemFamily;
 
     @Value("${marketplace.returns.enabled:true}")
@@ -81,7 +79,7 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 items, refundDelivery, UUID.randomUUID().toString(), null);
 
-        return recordThenPublish(rma, order, OrderLifecycleEventType.ReturnAccepted, RMA.EVENT_REFUND_REQUESTED, action);
+        return recordThenPublish(rma, order, ReturnLifecycleEventType.ReturnAccepted, RMA.EVENT_REFUND_REQUESTED, action);
     }
 
     /** Order items by itemId; the split family is consulted lazily — see {@link OrderItemFamily}. */
@@ -136,40 +134,52 @@ public class MarketplaceReturnDecisions {
         MarketplaceReturnAction action = new MarketplaceReturnAction(rma.getRmaId(), rma.getExternalReturnId(),
                 List.of(), false, null, rma.getRejectionReason());
 
-        return recordThenPublish(rma, order, OrderLifecycleEventType.ReturnRejected, RMA.EVENT_REJECTION_SENT, action);
+        return recordThenPublish(rma, order, ReturnLifecycleEventType.ReturnRejected, RMA.EVENT_REJECTION_SENT, action);
     }
 
     // Persist the event and the resend payload BEFORE publishing. If the save happened after the publish
     // and then failed, a real refund would be in flight with no event and no stored payload - every guard
     // would go blind and the resend button could not help. A publish failure after a successful save is
     // exactly the case resend exists for.
-    private boolean recordThenPublish(RMA rma, Order order, OrderLifecycleEventType type, String eventName,
+    private boolean recordThenPublish(RMA rma, Order order, ReturnLifecycleEventType type, String eventName,
                                       MarketplaceReturnAction action) {
+        ReturnLifecycleEvent event = new ReturnLifecycleEvent(order.getStoreId(), order.getOrderId(),
+                order.getExternalOrderId(), order.getSource().getName(), type, action);
+
         rma.addActionEvent(eventName);
-        rememberDecision(rma, type, action);
+        rememberDecision(rma, event);
         rmaRepository.save(rma);
 
+        if (!order.isMarketplaceOrder()) {
+            // Previously this was a silent skip inside the publisher while the caller still reported success,
+            // so the operator saw "sent" for a decision that never left the app.
+            log.error("RMA {} is a marketplace return but order {} is not a marketplace order:"
+                    + " decision recorded but NOT published", rma.getRmaId(), order.getOrderId());
+            return false;
+        }
         if (!returnsEnabled) {
             log.error("marketplace.returns.enabled=false: decision for RMA {} recorded but NOT published", rma.getRmaId());
             return false;
         }
-        publisher.publishReturnAction(order, rma, type, action);
+        publisher.publish(event);
         return true;
     }
 
-    private void rememberDecision(RMA rma, OrderLifecycleEventType type, MarketplaceReturnAction action) {
+    private void rememberDecision(RMA rma, ReturnLifecycleEvent event) {
         try {
-            String payload = ACTION_MAPPER.writeValueAsString(action);
-            rma.addMarketplaceDecision(new MarketplaceDecision(type.name(), action.commandId(), payload, LocalDateTime.now()));
+            String payload = ACTION_MAPPER.writeValueAsString(event);
+            rma.addMarketplaceDecision(new MarketplaceDecision(event.type().name(),
+                    event.action().commandId(), payload, LocalDateTime.now()));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Cannot serialise the marketplace decision for RMA " + rma.getRmaId(), e);
         }
     }
 
     /**
-     * Republishes every recorded decision with its original commandId. The marketplace deduplicates refunds
-     * on commandId and the rejection path gates on live state, so replaying rounds that already succeeded is
-     * harmless - while a round that died in the DLQ is the one this exists for.
+     * Republishes every recorded decision as the exact message it was. The marketplace deduplicates refunds
+     * on commandId and the rejection path gates on live state, so replaying a round that already succeeded is
+     * harmless - while a round that died in the DLQ is the one this exists for. The order is deliberately not
+     * loaded: a decision must stay resendable after the order was deleted.
      */
     public boolean resendDecisions(RMA rma) {
         if (!rma.isMarketplaceReturn() || rma.getMarketplaceDecisions().isEmpty()) {
@@ -180,18 +190,12 @@ public class MarketplaceReturnDecisions {
                     rma.getMarketplaceDecisions().size(), rma.getRmaId());
             return false;
         }
-        Order order = ordersRepository.findById(rma.getStoreId(), rma.getOrderId());
-        if (order == null) {
-            log.warn("Cannot resend the marketplace decisions for RMA {}: order {} not found", rma.getRmaId(), rma.getOrderId());
-            return false;
-        }
         int published = 0;
         for (MarketplaceDecision decision : rma.getMarketplaceDecisions()) {
             try {
-                MarketplaceReturnAction action = ACTION_MAPPER.readValue(decision.getPayload(), MarketplaceReturnAction.class);
-                publisher.publishReturnAction(order, rma, OrderLifecycleEventType.valueOf(decision.getType()), action);
+                publisher.publish(ACTION_MAPPER.readValue(decision.getPayload(), ReturnLifecycleEvent.class));
                 published++;
-            } catch (JsonProcessingException | IllegalArgumentException | NullPointerException e) {
+            } catch (JsonProcessingException e) {
                 log.error("Could not resend marketplace decision {} for RMA {}", decision.getCommandId(), rma.getRmaId(), e);
             }
         }
