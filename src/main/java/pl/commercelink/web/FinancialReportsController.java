@@ -34,6 +34,9 @@ public class FinancialReportsController {
     private ProductWeightOriginComplianceReportExport productWeightOriginComplianceReportExport;
 
     @Autowired
+    private PurchaseReportExport purchaseReportExport;
+
+    @Autowired
     private PaymentsExport paymentsExport;
 
     @Autowired
@@ -99,6 +102,16 @@ public class FinancialReportsController {
 
         response.setContentType("text/csv; charset=UTF-8");
         response.setHeader("Content-Disposition", "attachment; filename=\"product-weight-origin-compliance-" + dateFrom + "_" + dateTo + ".csv\"");
+        response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+        response.getOutputStream().write(csv);
+    }
+
+    @GetMapping("/dashboard/reports/purchaseExport")
+    public void purchaseExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
+        byte[] csv = purchaseReportExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"purchases-" + dateFrom + "_" + dateTo + ".csv\"");
         response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         response.getOutputStream().write(csv);
     }
