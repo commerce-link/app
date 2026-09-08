@@ -13,7 +13,7 @@
 
             <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId}, false)}"></div>
 
-            <div class="box" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${form.store.storeId} : '/dashboard/store'">
+            <div class="box" id="marketplace-export-history" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${form.store.storeId} : '/dashboard/store'">
                 <h2 class="title is-5" th:text="#{store.marketplaces.exports.title}"></h2>
 
                 <table class="table is-fullwidth is-narrow" th:if="${!exportRuns.isEmpty()}">

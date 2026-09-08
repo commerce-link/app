@@ -16,12 +16,13 @@ import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
+import pl.commercelink.web.dtos.ConnectedIntegration;
 
 import java.text.MessageFormat;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ResourceBundle;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +49,8 @@ class MarketplaceExportHistoryTemplateTest {
         assertThat(html).contains("price out of range");
         assertThat(html).contains("Zakończony");
         assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "/file");
+        assertThat(html).contains("Otwórz surowy plik");
+        assertThat(html).doesNotContain("<pre>");
         assertThat(html).doesNotContain("??");
     }
 
@@ -82,21 +85,22 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void limitsTheRowsTableAndAnnouncesTheRealTotalWhenThereAreTooManyRows() {
+    void rendersEveryRowWhenTheRunHasMoreThanFiveHundred() {
         // given
-        WebContext context = runDetailsContext(rows(620), false);
+        WebContext context = runDetailsContext(rows(1200), false);
 
         // when
         String html = templateEngine().process("store-marketplace-export-run", context);
 
         // then
-        assertThat(countRows(html)).isEqualTo(500);
-        assertThat(html).contains("Pokazano 500 z 620 wierszy");
+        assertThat(countRows(html)).isEqualTo(1200);
+        assertThat(html).contains("pim-1199");
+        assertThat(html).doesNotContain("Pokazano");
         assertThat(html).doesNotContain("??");
     }
 
     @Test
-    void rendersEveryRowWithoutTheTruncationNoticeWhenBelowTheLimit() {
+    void rendersEveryRowOfASmallRun() {
         // given
         WebContext context = runDetailsContext(rows(12), false);
 
@@ -110,12 +114,32 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
+    void showsTheExportHistoryLinkNextToTheDisconnectButtonOfTheMarketplacePanel() {
+        // when
+        String html = renderIntegrationPanel("marketplace");
+
+        // then
+        assertThat(html).contains("Zobacz historię eksportu");
+        assertThat(html).contains("href=\"#marketplace-export-history\"");
+        assertThat(html).contains("Rozłącz");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void hidesTheExportHistoryLinkOnPanelsOtherThanMarketplace() {
+        // when / then
+        assertThat(renderIntegrationPanel("shipping")).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("payments")).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("invoicing")).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("printing")).doesNotContain("Zobacz historię eksportu");
+    }
+
+    @Test
     void rendersRunHistoryTableWithTheFailureStatusOnTheMarketplacesPage() {
         // given
         WebContext context = webContext();
         context.setVariable("exportRuns", List.of(
-                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID,
-                        LocalDateTime.parse("2026-08-13T01:31:05"), true)));
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, true)));
 
         // when
         String html = renderRunsTable(context);
@@ -128,11 +152,11 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void fallsBackToTheReadablePartOfACountdownRunIdWhenTheStoredAtIsMissing() {
+    void showsTheReadablePartOfACountdownRunIdInTheRunsTable() {
         // given
         WebContext context = webContext();
         context.setVariable("exportRuns", List.of(
-                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, null, false)));
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, false)));
 
         // when
         String html = renderRunsTable(context);
@@ -144,11 +168,11 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void fallsBackToALegacyRunIdWhenTheStoredAtIsMissing() {
+    void showsTheReadableTimestampOfARunIdWithoutACountdownPrefix() {
         // given
         WebContext context = webContext();
         context.setVariable("exportRuns", List.of(
-                new MarketplaceExportRunHeader("allegro", "catalog-1", LEGACY_RUN_ID, null, false)));
+                new MarketplaceExportRunHeader("allegro", "catalog-1", LEGACY_RUN_ID, false)));
 
         // when
         String html = renderRunsTable(context);
@@ -183,7 +207,7 @@ class MarketplaceExportHistoryTemplateTest {
     private String renderRunsTable(WebContext context) {
         context.setVariable("isSuperAdmin", false);
         String template = """
-                <div th:with="basePath=${isSuperAdmin} ? '/dashboard/store/x' : '/dashboard/store'">
+                <div id="marketplace-export-history" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/x' : '/dashboard/store'">
                   <table class="table" th:if="${!exportRuns.isEmpty()}">
                     <tbody>
                     <tr th:each="run : ${exportRuns}">
@@ -212,9 +236,20 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("catalogId", "catalog-1");
         context.setVariable("storeId", "store-1");
         context.setVariable("isSuperAdmin", false);
-        context.setVariable("rawTooLarge", false);
-        context.setVariable("raw", null);
         return context;
+    }
+
+    private String renderIntegrationPanel(String providerType) {
+        WebContext context = webContext();
+        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
+        context.setVariable("providers", List.of());
+        context.setVariable("selectedProviderName", "allegro");
+        context.setVariable("selectLabel", "Marketplace");
+        context.setVariable("providerConfiguration", Map.of());
+        context.setVariable("providerType", providerType);
+        context.setVariable("storeId", "store-1");
+        context.setVariable("showDefault", false);
+        return templateEngine().process("fragments/integration-panel", context);
     }
 
     private List<MarketplaceOfferSnapshot> rows(int count) {

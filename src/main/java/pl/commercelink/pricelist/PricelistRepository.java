@@ -6,14 +6,17 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.starter.storage.TimeOrderedFileName;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.starter.csv.CSVWriter;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -26,10 +29,16 @@ public class PricelistRepository {
 
     private final FileStorage fileStorage;
     private final String bucketName;
+    private final Clock clock;
 
     public PricelistRepository(FileStorage fileStorage, @Value("${s3.bucket.stores}") String bucketName) {
+        this(fileStorage, bucketName, Clock.systemUTC());
+    }
+
+    PricelistRepository(FileStorage fileStorage, String bucketName, Clock clock) {
         this.fileStorage = fileStorage;
         this.bucketName = bucketName;
+        this.clock = clock;
     }
 
     @Cacheable(value = "pricelists", key = "#storeId + '-' + #catalogId + '-' + #pricelistId")
@@ -43,7 +52,7 @@ public class PricelistRepository {
     }
 
     public String save(String storeId, String catalogId, List<AvailabilityAndPrice> availabilityAndPrices) throws IOException {
-        String pricelistId = UUID.randomUUID().toString();
+        String pricelistId = TimeOrderedFileName.of(clock.instant()) + "_" + UUID.randomUUID();
         String s3Key = getKey(storeId, catalogId, pricelistId);
         byte[] bytes = new CSVWriter().writeAllRowsToBytes(availabilityAndPrices, AvailabilityAndPrice.HEADERS);
         fileStorage.put(bucketName, s3Key, bytes);
@@ -70,7 +79,9 @@ public class PricelistRepository {
     }
 
     public String findNewestPricelistId(String storeId, String catalogId) {
-        return fileStorage.findNewestFileName(bucketName, prefix(storeId, catalogId))
+        String prefix = prefix(storeId, catalogId);
+        return newestTimeOrderedFileName(prefix)
+                .or(() -> fileStorage.findNewestFileNameByLastModified(bucketName, prefix))
                 .map(PricelistRepository::extractPricelistId)
                 .orElse(null);
     }
@@ -81,7 +92,10 @@ public class PricelistRepository {
     }
 
     public Pricelist findNewestPricelist(String storeId, String catalogId) {
-        Pair<String, InputStreamReader> reader = fileStorage.findNewest(bucketName, prefix(storeId, catalogId));
+        String prefix = prefix(storeId, catalogId);
+        Pair<String, InputStreamReader> reader = newestTimeOrderedFileName(prefix).isPresent()
+                ? fileStorage.findNewestByKeyOrder(bucketName, prefix)
+                : fileStorage.findNewestByLastModified(bucketName, prefix);
         if (reader == null) {
             return null;
         }
@@ -89,7 +103,12 @@ public class PricelistRepository {
     }
 
     public List<Pricelist> findTopNPricelist(String storeId, String catalogId, int n) {
-        return  fileStorage.findTopN(bucketName, prefix(storeId, catalogId), n).stream()
+        String prefix = prefix(storeId, catalogId);
+        List<Pair<String, String>> byKeyOrder = fileStorage.findTopNByKeyOrder(bucketName, prefix, n);
+        List<Pair<String, String>> newest = byKeyOrder.stream().allMatch(pair -> isTimeOrdered(pair.getLeft()))
+                ? byKeyOrder
+                : fileStorage.findTopNByLastModified(bucketName, prefix, n);
+        return newest.stream()
                 .map(pair -> new Pricelist(extractPricelistId(pair.getLeft()), pair.getRight()))
                 .collect(Collectors.toList());
     }
@@ -98,8 +117,20 @@ public class PricelistRepository {
         return fileName.replace(".csv", "");
     }
 
+    private Optional<String> newestTimeOrderedFileName(String prefix) {
+        return fileStorage.findNewestFileNameByKeyOrder(bucketName, prefix)
+                .filter(PricelistRepository::isTimeOrdered);
+    }
+
+    private static boolean isTimeOrdered(String fileName) {
+        return TimeOrderedFileName.instantOf(fileName).isPresent();
+    }
+
     public byte[] findNewestPricelistAsBytes(String storeId, String catalogId) {
-        return fileStorage.findNewestAsBytes(bucketName, prefix(storeId, catalogId));
+        String prefix = prefix(storeId, catalogId);
+        return newestTimeOrderedFileName(prefix).isPresent()
+                ? fileStorage.findNewestAsBytesByKeyOrder(bucketName, prefix)
+                : fileStorage.findNewestAsBytesByLastModified(bucketName, prefix);
     }
 
     private AvailabilityAndPrice mapFieldsToObject(String[] fields) {

@@ -26,6 +26,7 @@ import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.starter.security.model.CustomUser;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -82,13 +83,40 @@ class MarketplaceExportHistoryControllerTest {
         assertThat(model.getAttribute("marketplace")).isEqualTo(MARKETPLACE);
         assertThat(model.getAttribute("catalogId")).isEqualTo(CATALOG_ID);
         assertThat(model.getAttribute("storeId")).isEqualTo(STORE_ID);
-        assertThat(model.getAttribute("rawTooLarge")).isEqualTo(false);
-        assertThat(model.getAttribute("raw")).asString().contains("pim-A");
 
         @SuppressWarnings("unchecked")
         List<MarketplaceOfferSnapshot> rows = (List<MarketplaceOfferSnapshot>) model.getAttribute("rows");
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).pimId()).isEqualTo("pim-A");
+    }
+
+    @Test
+    void doesNotExposeTheRawFileContentToThePage() {
+        // given
+        givenRun(STORE_ID, runFile(false));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+
+        // then
+        assertThat(model.getAttribute("raw")).isNull();
+        assertThat(model.getAttribute("rawTooLarge")).isNull();
+    }
+
+    @Test
+    void rendersEveryRowOfALargeRunWithoutCappingTheModel() {
+        // given
+        givenRun(STORE_ID, runFileWithRows(620));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<MarketplaceOfferSnapshot> rows = (List<MarketplaceOfferSnapshot>) model.getAttribute("rows");
+        assertThat(rows).hasSize(620);
     }
 
     @Test
@@ -240,6 +268,14 @@ class MarketplaceExportHistoryControllerTest {
         byte[] raw = "pimId;price;quantity;removalAttempts;outcome;reasonCode;message\npim-A;3503;7;0;PUBLISHED;;\n"
                 .getBytes(StandardCharsets.UTF_8);
         return new MarketplaceExportRunFile(RUN_ID, failed, rows, raw);
+    }
+
+    private MarketplaceExportRunFile runFileWithRows(int count) {
+        List<MarketplaceOfferSnapshot> rows = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            rows.add(MarketplaceOfferSnapshot.published("pim-" + index, 1999L, 7L));
+        }
+        return new MarketplaceExportRunFile(RUN_ID, false, rows, new byte[0]);
     }
 
     private void authenticateAs(String storeId, String role) {

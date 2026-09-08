@@ -48,8 +48,8 @@ class TaxonomyRepositoryTest {
 
     private void givenTaxonomyFile(String csv) {
         byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
-        when(fileStorage.findNewestFileName(any(), anyString())).thenReturn(Optional.of("taxonomy-merged-full.csv"));
-        when(fileStorage.findNewestAsBytes(any(), anyString())).thenReturn(bytes);
+        when(fileStorage.findNewestFileNameByLastModified(any(), anyString())).thenReturn(Optional.of("taxonomy-merged-full.csv"));
+        when(fileStorage.findNewestAsBytesByLastModified(any(), anyString())).thenReturn(bytes);
         when(brandMapper.unifyBrand(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 }

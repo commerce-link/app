@@ -23,7 +23,6 @@ public class MarketplaceExportHistoryController {
     private static final String RUN_PATH =
             "/{marketplace:[A-Za-z0-9_.-]+}/{catalogId:[A-Za-z0-9_-]+}"
                     + "/{runId:(?:\\d{10}_)?\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}}";
-    private static final int MAX_INLINE_RAW_BYTES = 512 * 1024;
 
     private final MarketplaceExportRunService marketplaceExportRunService;
 
@@ -77,14 +76,11 @@ public class MarketplaceExportHistoryController {
         }
 
         MarketplaceExportRunFile presentRunFile = runFile.get();
-        boolean rawTooLarge = presentRunFile.raw().length > MAX_INLINE_RAW_BYTES;
 
         model.addAttribute("runId", runId);
         model.addAttribute("runTimestamp", MarketplaceExportRunId.readable(runId));
         model.addAttribute("failed", presentRunFile.failed());
         model.addAttribute("rows", presentRunFile.rows());
-        model.addAttribute("raw", rawTooLarge ? null : new String(presentRunFile.raw(), StandardCharsets.UTF_8));
-        model.addAttribute("rawTooLarge", rawTooLarge);
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("catalogId", catalogId);
         model.addAttribute("storeId", storeId);

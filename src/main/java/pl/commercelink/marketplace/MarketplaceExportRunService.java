@@ -6,11 +6,8 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.starter.storage.FileStorage;
 
 import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -20,6 +17,7 @@ public class MarketplaceExportRunService {
     private static final String RUN_EXTENSION = ".csv";
     private static final String FAILED_RUN_EXTENSION = "-failed.csv";
     private static final int UNREADABLE_RUN_ATTEMPTS = 5;
+    private static final int PREVIOUS_EXPORT_CANDIDATES = 100;
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -41,11 +39,9 @@ public class MarketplaceExportRunService {
         String prefix = catalogPrefix(storeId, marketplace, catalogId);
         List<String> keysNewestFirst;
         try {
-            keysNewestFirst = fileStorage.getAllObjectLastModified(bucketName, prefix).keySet().stream()
+            keysNewestFirst = fileStorage.findKeysByKeyOrder(bucketName, prefix, PREVIOUS_EXPORT_CANDIDATES).stream()
                     .filter(this::isSucceededRunKey)
-                    .flatMap(key -> runInstantOfKey(key).map(instant -> Map.entry(key, instant)).stream())
-                    .sorted(Map.Entry.<String, Instant>comparingByValue(Comparator.reverseOrder()))
-                    .map(Map.Entry::getKey)
+                    .filter(this::isRunIdKey)
                     .toList();
         } catch (Exception exception) {
             System.err.println("Failed to load previous marketplace export: " + exception.getMessage());
@@ -82,16 +78,11 @@ public class MarketplaceExportRunService {
 
     public List<MarketplaceExportRunHeader> findRuns(String storeId) {
         try {
-            return fileStorage.getAllObjectLastModified(bucketName, storePrefix(storeId))
-                    .entrySet()
-                    .stream()
-                    .filter(entry -> isRunKey(entry.getKey()))
-                    .flatMap(entry -> toHeader(entry.getKey(), entry.getValue()).stream())
-                    .flatMap(header -> MarketplaceExportRunId.instantOf(header.runId())
-                            .map(instant -> Map.entry(instant, header))
-                            .stream())
-                    .sorted(Map.Entry.<Instant, MarketplaceExportRunHeader>comparingByKey(Comparator.reverseOrder()))
-                    .map(Map.Entry::getValue)
+            return fileStorage.findAllKeysByKeyOrder(bucketName, storePrefix(storeId)).stream()
+                    .filter(this::isRunKey)
+                    .filter(this::isRunIdKey)
+                    .flatMap(key -> toHeader(key).stream())
+                    .sorted(Comparator.comparing(MarketplaceExportRunHeader::runId))
                     .toList();
         } catch (Exception exception) {
             System.err.println("Failed to list marketplace export runs: " + exception.getMessage());
@@ -136,8 +127,8 @@ public class MarketplaceExportRunService {
                 .toList();
     }
 
-    private Optional<Instant> runInstantOfKey(String key) {
-        return MarketplaceExportRunId.instantOf(MarketplaceExportRunCsv.runIdFrom(key));
+    private boolean isRunIdKey(String key) {
+        return MarketplaceExportRunId.instantOf(MarketplaceExportRunCsv.runIdFrom(key)).isPresent();
     }
 
     private boolean isRunKey(String key) {
@@ -152,13 +143,13 @@ public class MarketplaceExportRunService {
         return isRunKey(key) && !isFailedRunKey(key);
     }
 
-    private Optional<MarketplaceExportRunHeader> toHeader(String key, LocalDateTime storedAt) {
+    private Optional<MarketplaceExportRunHeader> toHeader(String key) {
         String[] segments = key.split("/");
         if (segments.length != 5) {
             return Optional.empty();
         }
         return Optional.of(new MarketplaceExportRunHeader(
-                segments[2], segments[3], MarketplaceExportRunCsv.runIdFrom(key), storedAt, isFailedRunKey(key)));
+                segments[2], segments[3], MarketplaceExportRunCsv.runIdFrom(key), isFailedRunKey(key)));
     }
 
     private String storePrefix(String storeId) {
