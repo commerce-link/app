@@ -2,7 +2,6 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
@@ -21,7 +20,6 @@ import pl.commercelink.stores.IntegrationType;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
-@Slf4j
 @RequiredArgsConstructor
 public class MarketplaceOrderLifecycleEventListener {
 
