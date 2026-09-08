@@ -39,7 +39,13 @@
                         <span th:text="#{catalog.deletion.protection}"></span>
                     </label>
                 </div>
+
+                <div class="field">
+                    <label class="label" th:text="#{catalog.pricelist.schedule}"></label>
+                    <div th:replace="~{fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, ${scheduleMinIntervalMinutes})}"></div>
+                </div>
             </form>
+            <script th:replace="~{fragments/schedule-field :: script}"></script>
 
                 <div class="field" th:if="${productCatalog.name != null}">
                     <label class="label" th:text="#{catalog.category.definition}"></label>

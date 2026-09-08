@@ -26,6 +26,8 @@ public class ProductCatalog implements DeletionProtection {
     private boolean deletionProtection = true;
     @DynamoDBAttribute(attributeName = "categories")
     private List<CategoryDefinition> categories = new LinkedList<>();
+    @DynamoDBAttribute(attributeName = "pricelistSchedule")
+    private String pricelistSchedule;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -133,6 +135,14 @@ public class ProductCatalog implements DeletionProtection {
     @Override
     public boolean isDeletionProtection() {
         return deletionProtection;
+    }
+
+    public String getPricelistSchedule() {
+        return pricelistSchedule;
+    }
+
+    public void setPricelistSchedule(String pricelistSchedule) {
+        this.pricelistSchedule = pricelistSchedule;
     }
 
     @DynamoDBIgnore
