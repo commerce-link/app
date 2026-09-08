@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -110,6 +111,7 @@ class MarketplaceReturnLifecycleEventListenerTest {
         ArgumentCaptor<ReturnRejection> captor = ArgumentCaptor.forClass(ReturnRejection.class);
         verify(returns).rejectReturn(eq("r-1"), captor.capture());
         assertEquals("Damaged", captor.getValue().reason());
+        verify(returns, never()).refundReturn(any(), any(), any());
     }
 
     @Test
@@ -146,6 +148,23 @@ class MarketplaceReturnLifecycleEventListenerTest {
         // when
         listener.handleMessage(nullExternalOrderId);
         listener.handleMessage(blankExternalOrderId);
+
+        // then
+        verifyNoInteractions(returns);
+    }
+
+    @Test
+    void anAcceptedReturnWithNoCommandIdIsDroppedInsteadOfRefundingWithoutAnIdempotencyKey() {
+        // given: a null or blank commandId would forward a refund with no idempotency key, so Allegro could
+        // not deduplicate a redelivered SQS message and might refund the same return twice
+        ReturnLifecycleEvent nullCommandId = event(ReturnLifecycleEventType.ReturnAccepted,
+                new MarketplaceReturnAction("rma-1", "r-1", List.of(), true, null, null));
+        ReturnLifecycleEvent blankCommandId = event(ReturnLifecycleEventType.ReturnAccepted,
+                new MarketplaceReturnAction("rma-1", "r-1", List.of(), true, "   ", null));
+
+        // when
+        listener.handleMessage(nullCommandId);
+        listener.handleMessage(blankCommandId);
 
         // then
         verifyNoInteractions(returns);

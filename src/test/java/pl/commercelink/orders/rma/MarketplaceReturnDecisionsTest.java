@@ -440,7 +440,7 @@ class MarketplaceReturnDecisionsTest {
 
     // resendReturnsFalseWhenOrderIsMissing was removed: resendDecisions no longer loads the order at all
     // (that is the point of this task, see §1.3 of the spec), so "the order is missing" can no longer make
-    // a resend fail. aResendRepublishesTheSameMessageWithoutLoadingTheOrder below proves the new contract:
+    // a resend fail. aResendRepublishesTheSameMessageWithoutLoadingTheOrder above proves the new contract:
     // a resend succeeds even after the order was hard-deleted.
 
     @Test

@@ -36,8 +36,13 @@ public class MarketplaceReturnLifecycleEventListener {
     )
     public void handleMessage(ReturnLifecycleEvent event) {
         if (event.type() == null || event.action() == null || event.action().externalReturnId() == null) {
-            log.error("Incomplete return decision for order {}; dropped without calling the marketplace",
-                    event.orderId());
+            MarketplaceReturnAction incompleteAction = event.action();
+            log.error("Incomplete return decision for order {} (RMA {}, type {}, idempotency key {}); dropped"
+                            + " without calling the marketplace",
+                    event.orderId(),
+                    incompleteAction != null ? incompleteAction.rmaId() : null,
+                    event.type(),
+                    incompleteAction != null ? incompleteAction.commandId() : null);
             return;
         }
 
@@ -46,6 +51,9 @@ public class MarketplaceReturnLifecycleEventListener {
         Store store = storesRepository.findById(event.storeId());
         MarketplaceIntegration integration = store.getMarketplaceIntegration(event.marketplace());
         if (integration == null) {
+            log.error("No {} integration configured for store {}; {} decision for RMA {} dropped without"
+                            + " calling the marketplace",
+                    event.marketplace(), event.storeId(), event.type(), event.action().rmaId());
             return;
         }
         // a logged-out integration must fail loud so SQS retries until the store re-authenticates;
@@ -57,6 +65,9 @@ public class MarketplaceReturnLifecycleEventListener {
 
         MarketplaceProvider provider = providerFactory.get(store, event.marketplace());
         if (provider == null) {
+            log.error("No provider available for marketplace {} (store {}); {} decision for RMA {} dropped"
+                            + " without calling the marketplace",
+                    event.marketplace(), event.storeId(), event.type(), event.action().rmaId());
             return;
         }
         // retrying cannot add a returns API to a deployed adapter, so this is logged and dropped rather
@@ -78,6 +89,11 @@ public class MarketplaceReturnLifecycleEventListener {
                     // silently hit the wrong marketplace order. Every producer of this event - live publish and
                     // resend alike - passes through this listener, so this is the one place that can catch it.
                     log.error("Return acceptance for RMA {} (order {}) has no externalOrderId - decision dropped"
+                                    + " without calling the marketplace", action.rmaId(), event.orderId());
+                } else if (isBlank(action.commandId())) {
+                    // Refunding without an idempotency key loses deduplication on the marketplace side, so a
+                    // redelivered SQS message could refund the same return twice.
+                    log.error("Return acceptance for RMA {} (order {}) has no idempotency key - decision dropped"
                                     + " without calling the marketplace", action.rmaId(), event.orderId());
                 } else {
                     returns.get().refundReturn(event.externalOrderId(), action.externalReturnId(), toReturnRefund(action));
