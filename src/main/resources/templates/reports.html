@@ -95,6 +95,9 @@
                    th:href="@{'/dashboard/reports/productWeightOriginComplianceExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
                    th:text="#{reports.productWeightOriginCompliance.export}"></a>
                 <a class="button is-link"
+                   th:href="@{'/dashboard/reports/purchaseExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
+                   th:text="#{reports.purchases.export}"></a>
+                <a class="button is-link"
                    th:href="@{'/dashboard/reports/paymentsExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
                    th:text="#{reports.payments.export}"></a>
             </div>
