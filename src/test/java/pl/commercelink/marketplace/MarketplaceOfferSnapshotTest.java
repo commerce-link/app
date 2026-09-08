@@ -3,57 +3,64 @@ package pl.commercelink.marketplace;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MarketplaceOfferSnapshotTest {
 
     @Test
-    void csvHeadersIncludePimIdPriceQtyAndRemovalAttempts() {
-        assertThat(MarketplaceOfferSnapshot.csvHeaders())
-                .containsExactly("pimId", "price", "qty", "removalAttempts");
+    void publishedSnapshotHasNoRemovalAttemptsAndNoRejection() {
+        // when
+        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.published("pim-1", 1999L, 7L);
+
+        // then
+        assertThat(snapshot.pimId()).isEqualTo("pim-1");
+        assertThat(snapshot.price()).isEqualTo(1999L);
+        assertThat(snapshot.quantity()).isEqualTo(7L);
+        assertThat(snapshot.removalAttempts()).isZero();
+        assertThat(snapshot.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+        assertThat(snapshot.reasonCode()).isNull();
+        assertThat(snapshot.message()).isNull();
     }
 
     @Test
-    void asStringArraySerializesAllFourFieldsInOrder() {
-        MarketplaceOfferSnapshot snapshot = new MarketplaceOfferSnapshot("pim-1", 12345L, 7L, 2);
+    void removalPendingSnapshotHasZeroQuantityAndKeepsTheAttemptCount() {
+        // when
+        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.removalPending("pim-1", 1999L, 2);
 
-        assertThat(snapshot.asStringArray())
-                .containsExactly("pim-1", "12345", "7", "2");
+        // then
+        assertThat(snapshot.quantity()).isZero();
+        assertThat(snapshot.removalAttempts()).isEqualTo(2);
+        assertThat(snapshot.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING);
     }
 
     @Test
-    void fromStringArrayParsesFourColumnCurrentFormat() {
-        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.fromStringArray(
-                new String[]{"pim-1", "12345", "7", "2"}
-        );
+    void exportAbortedSnapshotCarriesOnlyTheMessage() {
+        // when
+        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.exportAborted("java.lang.IllegalStateException: boom");
 
-        assertThat(snapshot.getPimId()).isEqualTo("pim-1");
-        assertThat(snapshot.getPrice()).isEqualTo(12345L);
-        assertThat(snapshot.getQty()).isEqualTo(7L);
-        assertThat(snapshot.getRemovalAttempts()).isEqualTo(2);
+        // then
+        assertThat(snapshot.pimId()).isEmpty();
+        assertThat(snapshot.price()).isZero();
+        assertThat(snapshot.quantity()).isZero();
+        assertThat(snapshot.removalAttempts()).isZero();
+        assertThat(snapshot.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_EXPORT_ABORTED);
+        assertThat(snapshot.message()).isEqualTo("java.lang.IllegalStateException: boom");
     }
 
     @Test
-    void fromStringArrayParsesLegacyThreeColumnFormatWithoutRemovalAttempts() {
-        MarketplaceOfferSnapshot snapshot = MarketplaceOfferSnapshot.fromStringArray(
-                new String[]{"pim-1", "12345", "7"}
-        );
+    void rejectedCopiesTheSnapshotAndFillsTheRejectionColumns() {
+        // given
+        MarketplaceOfferSnapshot published = MarketplaceOfferSnapshot.published("pim-1", 1999L, 7L);
 
-        assertThat(snapshot.getPimId()).isEqualTo("pim-1");
-        assertThat(snapshot.getPrice()).isEqualTo(12345L);
-        assertThat(snapshot.getQty()).isEqualTo(7L);
-        assertThat(snapshot.getRemovalAttempts()).isEqualTo(0);
-    }
+        // when
+        MarketplaceOfferSnapshot rejected = published.rejected("VALIDATION_ERROR", "price out of range");
 
-    @Test
-    void fromStringArrayThrowsOnTwoColumnInput() {
-        assertThatThrownBy(() -> MarketplaceOfferSnapshot.fromStringArray(new String[]{"pim-1", "12345"}))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void fromStringArrayThrowsOnFiveColumnInput() {
-        assertThatThrownBy(() -> MarketplaceOfferSnapshot.fromStringArray(new String[]{"a", "b", "c", "d", "e"}))
-                .isInstanceOf(IllegalArgumentException.class);
+        // then
+        assertThat(rejected.pimId()).isEqualTo("pim-1");
+        assertThat(rejected.price()).isEqualTo(1999L);
+        assertThat(rejected.quantity()).isEqualTo(7L);
+        assertThat(rejected.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REJECTED);
+        assertThat(rejected.reasonCode()).isEqualTo("VALIDATION_ERROR");
+        assertThat(rejected.message()).isEqualTo("price out of range");
+        assertThat(published.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
     }
 }
