@@ -13,6 +13,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemFamily;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrdersRepository;
 
 import java.time.LocalDateTime;
@@ -143,8 +144,12 @@ public class MarketplaceReturnDecisions {
     // exactly the case resend exists for.
     private boolean recordThenPublish(RMA rma, Order order, ReturnLifecycleEventType type, String eventName,
                                       MarketplaceReturnAction action) {
+        // Order.getSource() can be null (Order.java guards it the same way in isRMAReplacementOrder/
+        // isMarketplaceOrder), and a non-marketplace order is exactly the case this method must still
+        // record a decision for - so this read cannot NPE ahead of the isMarketplaceOrder() guard below.
+        OrderSource source = order.getSource();
         ReturnLifecycleEvent event = new ReturnLifecycleEvent(order.getStoreId(), order.getOrderId(),
-                order.getExternalOrderId(), order.getSource().getName(), type, action);
+                order.getExternalOrderId(), source != null ? source.getName() : null, type, action);
 
         rma.addActionEvent(eventName);
         rememberDecision(rma, event);
@@ -195,7 +200,10 @@ public class MarketplaceReturnDecisions {
             try {
                 publisher.publish(ACTION_MAPPER.readValue(decision.getPayload(), ReturnLifecycleEvent.class));
                 published++;
-            } catch (JsonProcessingException e) {
+            } catch (JsonProcessingException | IllegalArgumentException e) {
+                // IllegalArgumentException also covers a null payload: ObjectMapper.readValue(null, ...) throws
+                // it directly rather than JsonProcessingException. One bad row must only skip itself, not abort
+                // the whole resend - the resend button exists precisely to recover the OTHER decisions on this RMA.
                 log.error("Could not resend marketplace decision {} for RMA {}", decision.getCommandId(), rma.getRmaId(), e);
             }
         }

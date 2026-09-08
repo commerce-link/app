@@ -69,8 +69,18 @@ public class MarketplaceReturnLifecycleEventListener {
 
         MarketplaceReturnAction action = event.action();
         switch (event.type()) {
-            case ReturnAccepted -> returns.get().refundReturn(event.externalOrderId(),
-                    action.externalReturnId(), toReturnRefund(action));
+            case ReturnAccepted -> {
+                if (event.externalOrderId() == null || event.externalOrderId().isEmpty()) {
+                    // A decision recorded for a non-marketplace order (MarketplaceReturnDecisions guard) has no
+                    // externalOrderId; refunding with a null one would either NPE deep in the adapter or, worse,
+                    // silently hit the wrong marketplace order. Every producer of this event - live publish and
+                    // resend alike - passes through this listener, so this is the one place that can catch it.
+                    log.error("Return acceptance for RMA {} (order {}) has no externalOrderId - decision dropped"
+                                    + " without calling the marketplace", action.rmaId(), event.orderId());
+                } else {
+                    returns.get().refundReturn(event.externalOrderId(), action.externalReturnId(), toReturnRefund(action));
+                }
+            }
             case ReturnRejected -> returns.get().rejectReturn(action.externalReturnId(),
                     new ReturnRejection(action.rejectionReason()));
         }

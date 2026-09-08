@@ -134,6 +134,20 @@ class MarketplaceReturnLifecycleEventListenerTest {
     }
 
     @Test
+    void anAcceptedReturnWithNoExternalOrderIdIsDroppedInsteadOfRefundingWithANullOrderId() {
+        // given: a decision recorded for a non-marketplace order (or one deserialized from a stale/corrupt
+        // payload) carries no externalOrderId - refunding with a null one must never reach the marketplace
+        ReturnLifecycleEvent noExternalOrderId = new ReturnLifecycleEvent(STORE_ID, ORDER_ID, null, MARKETPLACE,
+                ReturnLifecycleEventType.ReturnAccepted, refundAction());
+
+        // when
+        listener.handleMessage(noExternalOrderId);
+
+        // then
+        verifyNoInteractions(returns);
+    }
+
+    @Test
     void aMarketplaceWithoutAReturnsApiDropsTheDecisionInsteadOfRetrying() {
         // given: retrying cannot fix a missing adapter capability, so this must not fill the DLQ
         when(provider.returns()).thenReturn(Optional.empty());

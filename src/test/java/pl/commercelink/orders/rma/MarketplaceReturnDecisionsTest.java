@@ -121,6 +121,11 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
         verify(publisher).publish(captor.capture());
         assertEquals(ReturnLifecycleEventType.ReturnAccepted, captor.getValue().type());
+        // Four String fields in a row on the ReturnLifecycleEvent constructor - pin each to its source so an
+        // accidental swap (e.g. sending the internal orderId where externalOrderId belongs) fails loudly here.
+        assertEquals(STORE_ID, captor.getValue().storeId());
+        assertEquals(ORDER_ID, captor.getValue().orderId());
+        assertEquals("Allegro", captor.getValue().marketplace());
         MarketplaceReturnAction action = captor.getValue().action();
         assertEquals(marketplaceRma.getRmaId(), action.rmaId());
         assertEquals("r-1", action.externalReturnId());
@@ -439,11 +444,35 @@ class MarketplaceReturnDecisionsTest {
     // a resend succeeds even after the order was hard-deleted.
 
     @Test
+    void aCorruptSingleDecisionDoesNotAbortTheRestOfTheResend() {
+        // given: MarketplaceDecision is a @NoArgsConstructor DynamoDB document, so a row saved without its
+        // payload attribute deserializes with payload == null; ObjectMapper.readValue(null, ...) throws
+        // IllegalArgumentException, not JsonProcessingException - that single bad row must not sink the loop
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-bad", null, LocalDateTime.now()));
+        marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-good",
+                "{\"storeId\":\"store-1\",\"orderId\":\"order-1\",\"externalOrderId\":\"ext-1\",\"marketplace\":\"Allegro\","
+                        + "\"type\":\"ReturnAccepted\",\"action\":{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\","
+                        + "\"items\":[],\"refundDelivery\":false,\"commandId\":\"cmd-good\"}}",
+                LocalDateTime.now()));
+
+        // when
+        boolean resent = decisions.resendDecisions(marketplaceRma);
+
+        // then: the corrupt row is skipped, not fatal - the other decision on this RMA still gets resent
+        assertTrue(resent);
+        ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
+        verify(publisher).publish(captor.capture());
+        assertEquals("cmd-good", captor.getValue().action().commandId());
+    }
+
+    @Test
     void whenReturnsAreDisabledResendPublishesNothing() {
         // given
         ReflectionTestUtils.setField(decisions, "returnsEnabled", false);
         marketplaceRma.addMarketplaceDecision(new MarketplaceDecision("ReturnAccepted", "cmd-1",
-                "{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\",\"items\":[],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}",
+                "{\"storeId\":\"store-1\",\"orderId\":\"order-1\",\"externalOrderId\":\"ext-1\",\"marketplace\":\"Allegro\","
+                        + "\"type\":\"ReturnAccepted\",\"action\":{\"rmaId\":\"r\",\"externalReturnId\":\"r-1\","
+                        + "\"items\":[],\"refundDelivery\":false,\"commandId\":\"cmd-1\"}}",
                 LocalDateTime.now()));
 
         // when
