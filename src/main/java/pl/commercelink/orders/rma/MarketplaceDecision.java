@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class MarketplaceDecision {
 
-    /** Name of an OrderLifecycleEventType; kept as a String so an unknown value breaks only the replay, not the read of the whole RMA. */
+    /** Name of a ReturnLifecycleEventType; kept as a String so an unknown value breaks only the replay, not the read of the whole RMA. */
     @DynamoDBAttribute(attributeName = "type")
     private String type;
     @DynamoDBAttribute(attributeName = "commandId")

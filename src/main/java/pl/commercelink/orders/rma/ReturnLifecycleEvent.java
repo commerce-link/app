@@ -1,7 +1,6 @@
 package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import pl.commercelink.orders.MarketplaceReturnAction;
 
 /**
  * A marketplace return decision, published to marketplace-return-lifecycle-queue and stored verbatim in

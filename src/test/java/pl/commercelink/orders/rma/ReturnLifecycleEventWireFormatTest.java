@@ -2,7 +2,6 @@ package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import pl.commercelink.orders.MarketplaceReturnAction;
 
 import java.util.List;
 

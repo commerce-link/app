@@ -1,12 +1,13 @@
-package pl.commercelink.orders;
+package pl.commercelink.orders.rma;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.List;
 
 /**
- * Return-specific part of an {@link OrderLifecycleEvent}; null for plain order events. Also stored verbatim
- * (as JSON) in {@code RMA.marketplaceDecisions} so a decision can be republished with the same commandId.
+ * Body of a {@link ReturnLifecycleEvent}: what to refund or why the return was rejected. Stored verbatim
+ * (as part of the event JSON) in {@code RMA.marketplaceDecisions} so a decision can be republished with the
+ * same commandId.
  *
  * @param commandId idempotency key for the marketplace refund; generated once, stable across SQS redeliveries
  */

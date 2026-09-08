@@ -13,7 +13,6 @@ public class OrderLifecycleEvent {
     private OrderLifecycleEventType type;
     private String externalOrderId;
     private String marketplace;
-    private MarketplaceReturnAction returnAction;
 
     public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type) {
         this(storeId, orderId, type, null, null);
@@ -21,16 +20,10 @@ public class OrderLifecycleEvent {
 
     public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type,
                                String externalOrderId, String marketplace) {
-        this(storeId, orderId, type, externalOrderId, marketplace, null);
-    }
-
-    public OrderLifecycleEvent(String storeId, String orderId, OrderLifecycleEventType type,
-                               String externalOrderId, String marketplace, MarketplaceReturnAction returnAction) {
         this.storeId = storeId;
         this.orderId = orderId;
         this.type = type;
         this.externalOrderId = externalOrderId;
         this.marketplace = marketplace;
-        this.returnAction = returnAction;
     }
 }

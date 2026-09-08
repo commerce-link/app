@@ -9,7 +9,7 @@ import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturns;
 import pl.commercelink.marketplace.api.ReturnRefund;
 import pl.commercelink.marketplace.api.ReturnRejection;
-import pl.commercelink.orders.MarketplaceReturnAction;
+import pl.commercelink.orders.rma.MarketplaceReturnAction;
 import pl.commercelink.orders.rma.ReturnLifecycleEvent;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
