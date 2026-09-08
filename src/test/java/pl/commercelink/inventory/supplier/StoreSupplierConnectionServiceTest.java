@@ -145,7 +145,7 @@ class StoreSupplierConnectionServiceTest {
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result =
@@ -164,7 +164,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
 
         // when
         service.apply(existing, submitted, List.of(), Map.of(), true);
@@ -182,7 +182,7 @@ class StoreSupplierConnectionServiceTest {
         submitted.setEnabledCategories(null);
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
 
         // when
         service.apply(existing, submitted, List.of(), Map.of(), true);
@@ -200,7 +200,7 @@ class StoreSupplierConnectionServiceTest {
         submitted.setEnabledCategories(new ArrayList<>());
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
 
         // when
         service.apply(existing, submitted, List.of(), Map.of(), true);
@@ -217,7 +217,7 @@ class StoreSupplierConnectionServiceTest {
         List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
         when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(false, Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(false, Set.of(), Set.of(), Set.of()));
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result =
@@ -234,7 +234,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = new FulfilmentConfiguration();
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of("B"), Set.of()));
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of("B"), Set.of(), Set.of()));
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result =
@@ -343,5 +343,57 @@ class StoreSupplierConnectionServiceTest {
         assertThat(connections.get(0).getSupplierName()).isEqualTo("AbGroup");
         assertThat(connections.get(0).isIncludeInPricing()).isFalse();
         assertThat(connections.get(0).isIncludeInFulfilment()).isTrue();
+    }
+
+    @Test
+    void buildConnectionsKeepsNormalizedScheduleForOwnMode() {
+        // given
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", true, ConnectionMode.OWN, true, true, "  0/30  9-17 * * ? * ");
+
+        // when
+        List<StoreSupplierConnection> connections = service.buildConnections(List.of(selection), true);
+
+        // then
+        assertEquals("0/30 9-17 * * ? *", connections.get(0).getFeedSchedule());
+    }
+
+    @Test
+    void buildConnectionsDropsScheduleForGlobalMode() {
+        // given
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL, true, true, "0 5 * * ? *");
+
+        // when
+        List<StoreSupplierConnection> connections = service.buildConnections(List.of(selection), true);
+
+        // then
+        assertThat(connections.get(0).getFeedSchedule()).isNull();
+    }
+
+    @Test
+    void buildConnectionsStoresNullForBlankSchedule() {
+        // given
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", true, ConnectionMode.OWN, true, true, "   ");
+
+        // when
+        List<StoreSupplierConnection> connections = service.buildConnections(List.of(selection), true);
+
+        // then
+        assertThat(connections.get(0).getFeedSchedule()).isNull();
+    }
+
+    @Test
+    void selectionsForExposesStoredFeedSchedule() {
+        // given
+        StoreSupplierConnection acme = new StoreSupplierConnection("Acme", ConnectionMode.OWN);
+        acme.setFeedSchedule("0 5 * * ? *");
+        Store store = storeWith(true, acme);
+        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of("Acme", "Other"));
+
+        // when
+        List<SupplierSelectionForm> selections = service.selectionsFor(store);
+
+        // then
+        assertEquals("0 5 * * ? *", selections.get(0).getFeedSchedule());
+        assertThat(selections.get(1).getFeedSchedule()).isNull();
     }
 }

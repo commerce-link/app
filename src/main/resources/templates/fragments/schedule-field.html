@@ -1,0 +1,60 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="input(inputName, value, minInterval)" class="schedule-field">
+    <div class="field has-addons mb-1">
+        <div class="control">
+            <div class="select">
+                <select class="schedule-preset">
+                    <option value="" th:text="#{schedule.preset.default}"></option>
+                    <option value="custom" th:text="#{schedule.preset.custom}"></option>
+                    <option value="0/15 * * * ? *" th:text="#{schedule.preset.every15}"></option>
+                    <option value="0/30 * * * ? *" th:text="#{schedule.preset.every30}"></option>
+                    <option value="0 * * * ? *" th:text="#{schedule.preset.hourly}"></option>
+                    <option value="0/30 9-17 * * ? *" th:text="#{schedule.preset.every30.daytime}"></option>
+                    <option value="0 6,14 * * ? *" th:text="#{schedule.preset.twice.daily}"></option>
+                    <option value="0 5 * * ? *" th:text="#{schedule.preset.daily}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="control is-expanded">
+            <input class="input schedule-input" type="text" autocomplete="off" spellcheck="false"
+                   th:name="${inputName}" th:value="${value}" th:placeholder="#{schedule.placeholder}">
+        </div>
+    </div>
+    <p class="help" th:text="#{schedule.description(${minInterval})}"></p>
+</div>
+
+<script th:fragment="script">
+    (function () {
+        function bind(field) {
+            var preset = field.querySelector('.schedule-preset');
+            var input = field.querySelector('.schedule-input');
+            function sync() {
+                var value = input.value.trim();
+                if (value === '') {
+                    preset.value = '';
+                    return;
+                }
+                var known = Array.prototype.some.call(preset.options, function (option) {
+                    return option.value === value;
+                });
+                preset.value = known ? value : 'custom';
+            }
+            preset.addEventListener('change', function () {
+                if (preset.value === 'custom') {
+                    input.focus();
+                    return;
+                }
+                input.value = preset.value;
+            });
+            input.addEventListener('input', sync);
+            sync();
+        }
+        document.querySelectorAll('.schedule-field').forEach(bind);
+    })();
+</script>
+
+</body>
+</html>

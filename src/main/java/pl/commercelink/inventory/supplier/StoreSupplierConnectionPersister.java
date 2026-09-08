@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -13,10 +14,11 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,37 +49,54 @@ public class StoreSupplierConnectionPersister {
         triggerImmediateImports(changes);
         deleteRemovedFeeds(changes);
         storeInventoryCache.evict(existingStore.getStoreId());
-        return PersistOutcome.success(changes.added(), changes.removed());
+        return PersistOutcome.success(changes.added(), changes.removed(), changes.rescheduled());
     }
 
-    public record PersistOutcome(boolean success, Set<String> added, Set<String> removed) {
+    public record PersistOutcome(boolean success, Set<String> added, Set<String> removed, Set<String> rescheduled) {
         static PersistOutcome failure() {
-            return new PersistOutcome(false, Set.of(), Set.of());
+            return new PersistOutcome(false, Set.of(), Set.of(), Set.of());
         }
 
-        static PersistOutcome success(Set<String> added, Set<String> removed) {
-            return new PersistOutcome(true, Set.copyOf(added), Set.copyOf(removed));
+        static PersistOutcome success(Set<String> added, Set<String> removed, Set<String> rescheduled) {
+            return new PersistOutcome(true, Set.copyOf(added), Set.copyOf(removed), Set.copyOf(rescheduled));
         }
     }
 
     private ConnectionChanges computeChanges(Store existingStore, FulfilmentConfiguration submitted) {
-        Set<String> previousOwn = new HashSet<>(existingStore.getOwnSupplierNames());
-        Set<String> newOwn = ownSupplierNames(submitted);
+        Map<String, String> previousSchedules = ownFeedSchedules(existingStore.getFulfilmentConfiguration());
+        Map<String, String> newSchedules = ownFeedSchedules(submitted);
+        Set<String> previousOwn = previousSchedules.keySet();
+        Set<String> newOwn = newSchedules.keySet();
+        Set<String> rescheduled = new HashSet<>();
+        for (String supplier : newOwn) {
+            if (previousOwn.contains(supplier)
+                    && !Objects.equals(newSchedules.get(supplier), previousSchedules.get(supplier))) {
+                rescheduled.add(supplier);
+            }
+        }
         return new ConnectionChanges(
                 existingStore.getStoreId(),
                 difference(newOwn, previousOwn),
                 difference(previousOwn, newOwn),
+                rescheduled,
+                previousSchedules,
+                newSchedules,
                 union(newOwn, previousOwn));
     }
 
     private void applyScheduleChanges(ConnectionChanges changes, Deque<Runnable> compensations) {
+        String storeId = changes.storeId();
         for (String supplier : changes.added()) {
-            feedScheduler.createSchedule(changes.storeId(), supplier);
-            compensations.push(() -> feedScheduler.deleteSchedule(changes.storeId(), supplier));
+            feedScheduler.createSchedule(storeId, supplier, changes.newSchedules().get(supplier));
+            compensations.push(() -> feedScheduler.deleteSchedule(storeId, supplier));
         }
         for (String supplier : changes.removed()) {
-            feedScheduler.deleteSchedule(changes.storeId(), supplier);
-            compensations.push(() -> feedScheduler.createSchedule(changes.storeId(), supplier));
+            feedScheduler.deleteSchedule(storeId, supplier);
+            compensations.push(() -> feedScheduler.createSchedule(storeId, supplier, changes.previousSchedules().get(supplier)));
+        }
+        for (String supplier : changes.rescheduled()) {
+            feedScheduler.updateSchedule(storeId, supplier, changes.newSchedules().get(supplier));
+            compensations.push(() -> feedScheduler.updateSchedule(storeId, supplier, changes.previousSchedules().get(supplier)));
         }
     }
 
@@ -109,7 +128,7 @@ public class StoreSupplierConnectionPersister {
     }
 
     void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
-        Set<String> newOwnSuppliers = ownSupplierNames(submitted);
+        Set<String> newOwnSuppliers = ownFeedSchedules(submitted).keySet();
 
         for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
@@ -142,11 +161,17 @@ public class StoreSupplierConnectionPersister {
         }
     }
 
-    private Set<String> ownSupplierNames(FulfilmentConfiguration config) {
-        return config.getSupplierConnections().stream()
-                .filter(connection -> connection.getMode() == ConnectionMode.OWN)
-                .map(StoreSupplierConnection::getSupplierName)
-                .collect(Collectors.toSet());
+    private Map<String, String> ownFeedSchedules(FulfilmentConfiguration config) {
+        Map<String, String> schedules = new HashMap<>();
+        if (config == null) {
+            return schedules;
+        }
+        for (StoreSupplierConnection connection : config.getSupplierConnections()) {
+            if (connection.getMode() == ConnectionMode.OWN) {
+                schedules.put(connection.getSupplierName(), PollingSchedule.normalizeOrNull(connection.getFeedSchedule()));
+            }
+        }
+        return schedules;
     }
 
     private Set<String> difference(Set<String> from, Set<String> remove) {
@@ -161,6 +186,12 @@ public class StoreSupplierConnectionPersister {
         return result;
     }
 
-    private record ConnectionChanges(String storeId, Set<String> added, Set<String> removed, Set<String> affectedSecrets) {
+    private record ConnectionChanges(String storeId,
+                                     Set<String> added,
+                                     Set<String> removed,
+                                     Set<String> rescheduled,
+                                     Map<String, String> previousSchedules,
+                                     Map<String, String> newSchedules,
+                                     Set<String> affectedSecrets) {
     }
 }
