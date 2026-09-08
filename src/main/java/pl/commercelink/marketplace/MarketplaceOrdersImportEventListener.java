@@ -11,6 +11,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -32,10 +33,22 @@ public class MarketplaceOrdersImportEventListener {
             pollTimeoutSeconds = "20"
     )
     public void handleMessage(MarketplaceOrderPayload payload) {
+        if (isNotBlank(payload.getStoreId())) {
+            importForStore(payload.getStoreId(), payload.getMarketplace());
+            return;
+        }
         storesRepository.findAll()
                 .stream()
                 .filter(s -> s.hasActiveMarketplaceIntegration(payload.getMarketplace()))
                 .forEach(s -> handleMarketplaceImport(s, payload.getMarketplace()));
+    }
+
+    private void importForStore(String storeId, String marketplace) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
+            return;
+        }
+        handleMarketplaceImport(store, marketplace);
     }
 
     private void handleMarketplaceImport(Store store, String marketplace) {
@@ -57,12 +70,22 @@ public class MarketplaceOrdersImportEventListener {
     public static class MarketplaceOrderPayload {
 
         private String marketplace;
+        private String storeId;
 
         public MarketplaceOrderPayload() {
         }
 
+        public MarketplaceOrderPayload(String marketplace, String storeId) {
+            this.marketplace = marketplace;
+            this.storeId = storeId;
+        }
+
         public String getMarketplace() {
             return marketplace;
+        }
+
+        public String getStoreId() {
+            return storeId;
         }
 
     }

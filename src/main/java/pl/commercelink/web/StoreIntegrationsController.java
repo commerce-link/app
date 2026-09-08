@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
+import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.provider.ProviderFactory;
@@ -28,6 +29,7 @@ public class StoreIntegrationsController {
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final PaymentProviderFactory paymentProviderFactory;
     private final MarketplaceProviderFactory marketplaceProviderFactory;
+    private final MarketplaceOrdersImportScheduler ordersImportScheduler;
     private final MessageSource messageSource;
 
     public StoreIntegrationsController(StoresRepository storesRepository,
@@ -35,12 +37,14 @@ public class StoreIntegrationsController {
                                        InvoicingProviderFactory invoicingProviderFactory,
                                        PaymentProviderFactory paymentProviderFactory,
                                        MarketplaceProviderFactory marketplaceProviderFactory,
+                                       MarketplaceOrdersImportScheduler ordersImportScheduler,
                                        MessageSource messageSource) {
         this.storesRepository = storesRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.paymentProviderFactory = paymentProviderFactory;
         this.marketplaceProviderFactory = marketplaceProviderFactory;
+        this.ordersImportScheduler = ordersImportScheduler;
         this.messageSource = messageSource;
     }
 
@@ -108,7 +112,10 @@ public class StoreIntegrationsController {
             case "shipping" -> store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
             case "invoicing" -> store.removeIntegration(IntegrationType.INVOICING_PROVIDER);
             case "payments" -> store.removePaymentIntegration(providerName);
-            case "marketplace" -> store.removeMarketplaceIntegration(providerName);
+            case "marketplace" -> {
+                store.removeMarketplaceIntegration(providerName);
+                ordersImportScheduler.delete(store.getStoreId(), providerName);
+            }
         }
 
         storesRepository.save(store);
