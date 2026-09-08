@@ -136,12 +136,16 @@ class MarketplaceReturnLifecycleEventListenerTest {
     @Test
     void anAcceptedReturnWithNoExternalOrderIdIsDroppedInsteadOfRefundingWithANullOrderId() {
         // given: a decision recorded for a non-marketplace order (or one deserialized from a stale/corrupt
-        // payload) carries no externalOrderId - refunding with a null one must never reach the marketplace
-        ReturnLifecycleEvent noExternalOrderId = new ReturnLifecycleEvent(STORE_ID, ORDER_ID, null, MARKETPLACE,
+        // payload) carries no externalOrderId - refunding with a null or whitespace-only one must never
+        // reach the marketplace
+        ReturnLifecycleEvent nullExternalOrderId = new ReturnLifecycleEvent(STORE_ID, ORDER_ID, null, MARKETPLACE,
+                ReturnLifecycleEventType.ReturnAccepted, refundAction());
+        ReturnLifecycleEvent blankExternalOrderId = new ReturnLifecycleEvent(STORE_ID, ORDER_ID, "   ", MARKETPLACE,
                 ReturnLifecycleEventType.ReturnAccepted, refundAction());
 
         // when
-        listener.handleMessage(noExternalOrderId);
+        listener.handleMessage(nullExternalOrderId);
+        listener.handleMessage(blankExternalOrderId);
 
         // then
         verifyNoInteractions(returns);

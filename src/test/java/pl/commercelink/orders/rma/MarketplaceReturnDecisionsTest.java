@@ -125,6 +125,7 @@ class MarketplaceReturnDecisionsTest {
         // accidental swap (e.g. sending the internal orderId where externalOrderId belongs) fails loudly here.
         assertEquals(STORE_ID, captor.getValue().storeId());
         assertEquals(ORDER_ID, captor.getValue().orderId());
+        assertEquals(EXTERNAL_ORDER_ID, captor.getValue().externalOrderId());
         assertEquals("Allegro", captor.getValue().marketplace());
         MarketplaceReturnAction action = captor.getValue().action();
         assertEquals(marketplaceRma.getRmaId(), action.rmaId());

@@ -17,6 +17,8 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @Slf4j
@@ -70,7 +72,7 @@ public class MarketplaceReturnLifecycleEventListener {
         MarketplaceReturnAction action = event.action();
         switch (event.type()) {
             case ReturnAccepted -> {
-                if (event.externalOrderId() == null || event.externalOrderId().isEmpty()) {
+                if (isBlank(event.externalOrderId())) {
                     // A decision recorded for a non-marketplace order (MarketplaceReturnDecisions guard) has no
                     // externalOrderId; refunding with a null one would either NPE deep in the adapter or, worse,
                     // silently hit the wrong marketplace order. Every producer of this event - live publish and
