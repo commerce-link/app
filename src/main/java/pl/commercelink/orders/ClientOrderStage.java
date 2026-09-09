@@ -26,6 +26,10 @@ public enum ClientOrderStage {
     }
 
     public boolean isReachedBy(ClientOrderStage current) {
-        return current != null && current.ordinal() > ordinal();
+        return current != null && (current.ordinal() > ordinal() || current == this && isLast());
+    }
+
+    private boolean isLast() {
+        return ordinal() == values().length - 1;
     }
 }

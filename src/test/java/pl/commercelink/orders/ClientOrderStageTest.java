@@ -46,4 +46,12 @@ class ClientOrderStageTest {
         assertThat(ClientOrderStage.Shipping.isReachedBy(current)).isFalse();
         assertThat(ClientOrderStage.Accepted.isReachedBy(null)).isFalse();
     }
+
+    @Test
+    @DisplayName("isReachedBy treats the final stage as completed once the order arrives at it")
+    void isReachedByTreatsFinalStageAsCompleted() {
+        // when / then
+        assertThat(ClientOrderStage.Delivered.isReachedBy(ClientOrderStage.Delivered)).isTrue();
+        assertThat(ClientOrderStage.Shipping.isReachedBy(ClientOrderStage.Shipping)).isFalse();
+    }
 }

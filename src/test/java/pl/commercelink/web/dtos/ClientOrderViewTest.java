@@ -221,6 +221,28 @@ class ClientOrderViewTest {
         // then
         assertThat(view.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 15, 11, 5));
         assertThat(view.getNoteKey()).isEqualTo("client.order.note.delivered");
+        assertThat(view.isStageDone(ClientOrderStage.Shipping)).isTrue();
+        assertThat(view.isStageDone(ClientOrderStage.Delivered)).isTrue();
+    }
+
+    @Test
+    @DisplayName("from marks every stage done for a collected personal-collection order")
+    void fromMarksEveryStageDoneForCollectedOrder() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        Shipment collected = new Shipment(ShipmentType.PersonalCollection);
+        collected.setShippedAt(LocalDateTime.of(2026, 9, 12, 16, 40));
+        collected.setDeliveredAt(LocalDateTime.of(2026, 9, 13, 9, 15));
+        order.setShipments(new LinkedList<>(List.of(collected)));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(view.isPersonalCollection()).isTrue();
+        assertThat(view.isStageDone(ClientOrderStage.Shipping)).isTrue();
+        assertThat(view.isStageDone(ClientOrderStage.Delivered)).isTrue();
+        assertThat(view.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 13, 9, 15));
     }
 
     @Test
