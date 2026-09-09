@@ -33,6 +33,7 @@ public class WebSecurityConfiguration {
                             "/Global/**",
                             "/Store/**",
                             "/store/*/individual/offer/**",
+                            "/store/*/client/offer/**",
                             "/store/*/client/rma/**",
                             "/store/*/client/order/**",
                             "/StoreLogo/**",

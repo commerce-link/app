@@ -35,7 +35,7 @@ import java.util.Optional;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @Controller
-@RequestMapping("/store/{storeId}/individual/offer/{offerId}")
+@RequestMapping({"/store/{storeId}/individual/offer/{offerId}", "/store/{storeId}/client/offer/{offerId}"})
 public class ClientOfferController {
 
     @Autowired
@@ -82,6 +82,7 @@ public class ClientOfferController {
         DeliveryOption deliveryOption = existingOffer.resolveDeliveryOption(store).orElse(null);
         double totalPrice = existingOffer.getTotalPrice() + existingOffer.getDeliveryPrice(store);
         model.addAttribute("offer", existingOffer);
+        model.addAttribute("offerPath", existingOffer.createOfferUrl(""));
         model.addAttribute("deliveryOption", deliveryOption);
         model.addAttribute("totalPrice", totalPrice);
         model.addAttribute("totalPriceNet", Price.fromGross(totalPrice, DEFAULT_VAT_RATE).netValue());
@@ -130,7 +131,7 @@ public class ClientOfferController {
         basket.setShippingDetails(clientDataDto.getShippingDetails());
 
         basketsRepository.save(basket);
-        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+        return "redirect:" + basket.createOfferUrl("");
     }
 
     @PostMapping("/checkout")
@@ -155,11 +156,11 @@ public class ClientOfferController {
 
         if (op.hasError()) {
             redirectAttributes.addFlashAttribute("errorMessage", op.getErrorMessage());
-            return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+            return "redirect:" + basket.createOfferUrl("");
         }
 
         redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("offers.send.invoice.success", null, locale));
-        return "redirect:/store/" + storeId + "/individual/offer/" + offerId;
+        return "redirect:" + basket.createOfferUrl("");
     }
 
 }
