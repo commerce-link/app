@@ -24,7 +24,7 @@ public class RollingPriceAggregateRepository {
         Map<String, RollingPriceAggregate> aggregates = new HashMap<>();
 
         try {
-            Pair<String, InputStreamReader> newest = fileStorage.findNewest(bucketName, "rolling-price-aggregate/");
+            Pair<String, InputStreamReader> newest = fileStorage.findNewestByLastModified(bucketName, "rolling-price-aggregate/");
             if (newest == null) {
                 return aggregates;
             }
