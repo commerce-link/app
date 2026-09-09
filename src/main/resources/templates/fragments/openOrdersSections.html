@@ -1,0 +1,38 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <th:block th:fragment="sections">
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(NewStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('Nowe', ${ordersByStatus.get(NewStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssemblyStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('W trakcie kompletowania', ${ordersByStatus.get(AssemblyStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssembledStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('Gotowe do realizacji', ${ordersByStatus.get(AssembledStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(BlockedStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('Zablokowane', ${ordersByStatus.get(BlockedStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(RealizationStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('W realizacji', ${ordersByStatus.get(RealizationStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(PackagingStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('W trakcie pakowania', ${ordersByStatus.get(PackagingStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(ShippingStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('W dostawie', ${ordersByStatus.get(ShippingStatus)})}"></div>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(DeliveredStatus))}">
+            <div th:replace="~{fragments/ordersListFragment :: box('Dostarczone', ${ordersByStatus.get(DeliveredStatus)})}"></div>
+        </th:block>
+    </th:block>
+</body>
+</html>

@@ -123,6 +123,12 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return dynamoDBMapper.scan(Order.class, scanExpression);
     }
 
+    public List<Order> findOpenOrders(String storeId) {
+        return findAllActiveOrders(storeId).stream()
+                .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
     public List<OrderIndexEntry> findAllWarehouseFulfilmentOrder(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
