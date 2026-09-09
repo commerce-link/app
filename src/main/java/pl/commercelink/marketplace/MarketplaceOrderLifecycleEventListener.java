@@ -1,7 +1,7 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
@@ -20,19 +20,13 @@ import pl.commercelink.stores.IntegrationType;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@RequiredArgsConstructor
 public class MarketplaceOrderLifecycleEventListener {
 
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private OrdersRepository ordersRepository;
-
-    @Autowired
-    private MarketplaceProviderFactory providerFactory;
-
-    @Autowired
-    private CarrierDictionary carrierDictionary;
+    private final StoresRepository storesRepository;
+    private final OrdersRepository ordersRepository;
+    private final MarketplaceProviderFactory providerFactory;
+    private final CarrierDictionary carrierDictionary;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
