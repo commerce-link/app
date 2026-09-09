@@ -53,12 +53,13 @@ public enum OrderFilterField {
     ShippingPostalCode {
         @Override
         public String normalize(String value) {
-            return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+            return value == null ? "" : value.replaceAll("[^0-9]", "");
         }
 
         @Override
         public boolean matches(Order order, String value, LocalDate today) {
-            return order.getShippingDetails() != null
+            return !value.isEmpty()
+                    && order.getShippingDetails() != null
                     && normalize(order.getShippingDetails().getPostalCode()).startsWith(value);
         }
     },

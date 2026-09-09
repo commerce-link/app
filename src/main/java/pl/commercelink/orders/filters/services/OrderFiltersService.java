@@ -1,24 +1,26 @@
 package pl.commercelink.orders.filters.services;
 
+import com.amazonaws.services.dynamodbv2.model.TransactionCanceledException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
 import pl.commercelink.orders.filters.exceptions.OrderFilterAccessDeniedException;
+import pl.commercelink.orders.filters.exceptions.OrderFilterConflictException;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class OrderFiltersService {
 
     private final OrderFiltersRepository orderFiltersRepository;
-
-    public OrderFiltersService(OrderFiltersRepository orderFiltersRepository) {
-        this.orderFiltersRepository = orderFiltersRepository;
-    }
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public ListOrderFiltersView list(FilterActor actor) {
         return new ListOrderFiltersView(
@@ -28,41 +30,65 @@ public class OrderFiltersService {
 
     public OrderFilter create(FilterActor actor, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
-        OwnedOrderFilters ownersFilters = checkWritePermissionsAndReturn(actor, sharedWithStore);
+        OrderFilter.checkValid(label, conditions);
+        checkWritePermissionsAndReturn(actor, sharedWithStore).checkRoomForOneMore();
 
-        OrderFilter newFilter = OrderFilter.of(label, conditions);
-        ownersFilters.add(newFilter);
-
-        orderFiltersRepository.save(ownersFilters);
-        return newFilter;
+        return optimisticLockingExecutor.modifyAndSaveReturning(
+                () -> checkWritePermissionsAndReturn(actor, sharedWithStore),
+                ownersFilters -> {
+                    OrderFilter newFilter = OrderFilter.of(label, conditions);
+                    ownersFilters.add(newFilter);
+                    return newFilter;
+                },
+                orderFiltersRepository::save);
     }
 
     public OrderFilter update(FilterActor actor, String filterId, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
+        OrderFilter.checkValid(label, conditions);
+
+        if (sharedWithStore != checkWritePermissionsAndReturnByFilterId(actor, filterId).isFiltersForStore()) {
+            return moveBetweenScopes(actor, filterId, sharedWithStore, label, conditions);
+        }
+
+        return optimisticLockingExecutor.modifyAndSaveReturning(
+                () -> checkWritePermissionsAndReturnByFilterId(actor, filterId),
+                ownersFilters -> {
+                    OrderFilter filterToUpdate = ownersFilters.byId(filterId)
+                            .orElseThrow(() -> new OrderFilterInvalidException("orders.filters.error.not.found"));
+                    filterToUpdate.changeTo(label, conditions);
+                    return filterToUpdate;
+                },
+                orderFiltersRepository::save);
+    }
+
+    public void delete(FilterActor actor, String filterId) {
+        checkWritePermissionsAndReturnByFilterId(actor, filterId);
+
+        optimisticLockingExecutor.modifyAndSave(
+                () -> checkWritePermissionsAndReturnByFilterId(actor, filterId),
+                ownersFilters -> ownersFilters.remove(filterId),
+                orderFiltersRepository::save);
+    }
+
+    private OrderFilter moveBetweenScopes(FilterActor actor, String filterId, boolean sharedWithStore, String label,
+                                          List<OrderFilterCondition> conditions) {
         OwnedOrderFilters currentOwnersFilters = checkWritePermissionsAndReturnByFilterId(actor, filterId);
         OrderFilter filterToUpdate = currentOwnersFilters.byId(filterId)
                 .orElseThrow(() -> new OrderFilterInvalidException("orders.filters.error.not.found"));
 
         filterToUpdate.changeTo(label, conditions);
 
-        if (sharedWithStore == currentOwnersFilters.isFiltersForStore()) {
-            orderFiltersRepository.save(currentOwnersFilters);
-            return filterToUpdate;
-        }
-
         OwnedOrderFilters newOwnersFilters = checkWritePermissionsAndReturn(actor, sharedWithStore);
         currentOwnersFilters.remove(filterId);
         newOwnersFilters.add(filterToUpdate);
 
-        orderFiltersRepository.saveBoth(newOwnersFilters, currentOwnersFilters);
-        return filterToUpdate;
-    }
-
-    public void delete(FilterActor actor, String filterId) {
-        OwnedOrderFilters ownersFilters = checkWritePermissionsAndReturnByFilterId(actor, filterId);
-        if (ownersFilters.remove(filterId)) {
-            orderFiltersRepository.save(ownersFilters);
+        try {
+            orderFiltersRepository.saveBoth(newOwnersFilters, currentOwnersFilters);
+        } catch (TransactionCanceledException e) {
+            throw new OrderFilterConflictException("orders.filters.error.conflict");
         }
+        return filterToUpdate;
     }
 
     private List<OrderFilter> filtersOf(String storeId, String userId) {

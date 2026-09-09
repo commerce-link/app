@@ -1,5 +1,6 @@
 package pl.commercelink.orders.filters.services;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,12 @@ import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 import pl.commercelink.orders.filters.OrderFiltersRepository;
 import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.exceptions.OrderFilterConflictException;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
+
+import com.amazonaws.services.dynamodbv2.model.TransactionCanceledException;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +45,9 @@ class OrderFiltersServiceTest {
 
     @Mock
     private OrderFiltersRepository repository;
+
+    @Mock
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     private static OrderFilterCondition condition(OrderFilterField field, String rawValue) {
         return OrderFilterCondition.of(field, rawValue);
@@ -62,8 +73,16 @@ class OrderFiltersServiceTest {
         return owned;
     }
 
+    @BeforeEach
+    void passThroughOptimisticLocking() {
+        lenient().when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+        lenient().when(optimisticLockingExecutor.modifyAndSaveReturning(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSaveReturning());
+    }
+
     private OrderFiltersService service() {
-        return new OrderFiltersService(repository);
+        return new OrderFiltersService(repository, optimisticLockingExecutor);
     }
 
     @Nested
@@ -157,13 +176,16 @@ class OrderFiltersServiceTest {
         }
 
         @Test
-        @DisplayName("a filter needs a label")
+        @DisplayName("a filter needs a label, which is refused before the row is even read")
         void filterNeedsALabel() {
-            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
-
+            // when / then
             assertThatThrownBy(() -> service()
                     .create(user("user-1"), false, "  ", COURIER))
-                    .isInstanceOf(OrderFilterInvalidException.class);
+                    .isInstanceOf(OrderFilterInvalidException.class)
+                    .hasMessage("orders.filters.error.no.label");
+
+            // then
+            verify(repository, never()).findByOwner(any(), any());
         }
     }
 
@@ -200,6 +222,25 @@ class OrderFiltersServiceTest {
                     .isInstanceOf(OrderFilterAccessDeniedException.class);
 
             verify(repository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a cancelled move transaction is reported as a conflict, not a server error")
+        void cancelledMoveIsReportedAsConflict() {
+            // given
+            OrderFilter mine = filter("Courier");
+            OwnedOrderFilters own = rowOf("user-1", mine);
+            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.STORE_FILTER);
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.of(storeRow));
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+            doThrow(new TransactionCanceledException("version check failed"))
+                    .when(repository).saveBoth(storeRow, own);
+
+            // when / then
+            assertThatThrownBy(() -> service()
+                    .update(admin("user-1"), mine.getId(), true, "Courier", COURIER))
+                    .isInstanceOf(OrderFilterConflictException.class)
+                    .hasMessage("orders.filters.error.conflict");
         }
 
         @Test

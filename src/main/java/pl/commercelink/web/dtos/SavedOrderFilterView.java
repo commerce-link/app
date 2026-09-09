@@ -7,13 +7,13 @@ import java.util.Map;
 import java.util.Objects;
 
 public record SavedOrderFilterView(String id, String label, boolean sharedWithStore,
-                                   Map<String, String> conditionsByField) {
+                                   Map<String, String> conditionsByField, long matchingOrders) {
 
-    public static SavedOrderFilterView of(OrderFilter filter, boolean sharedWithStore) {
+    public static SavedOrderFilterView of(OrderFilter filter, boolean sharedWithStore, long matchingOrders) {
         Map<String, String> byField = new LinkedHashMap<>();
         filter.getConditions().stream()
                 .filter(condition -> Objects.nonNull(condition.getField()))
                 .forEach(condition -> byField.put(condition.getField().name(), condition.getValue()));
-        return new SavedOrderFilterView(filter.getId(), filter.getLabel(), sharedWithStore, byField);
+        return new SavedOrderFilterView(filter.getId(), filter.getLabel(), sharedWithStore, byField, matchingOrders);
     }
 }

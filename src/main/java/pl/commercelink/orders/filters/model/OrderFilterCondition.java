@@ -25,12 +25,12 @@ public class OrderFilterCondition {
     public static OrderFilterCondition of(OrderFilterField field, String rawValue) {
         OrderFilterCondition condition = new OrderFilterCondition();
         condition.field = field;
-        condition.value = field.normalize(rawValue);
+        condition.value = rawValue == null ? "" : rawValue.trim();
         return condition;
     }
 
     public boolean matches(Order order, LocalDate today) {
-        return field != null && field.matches(order, value, today);
+        return field != null && field.matches(order, field.normalize(value), today);
     }
 
     public OrderFilterField getField() {

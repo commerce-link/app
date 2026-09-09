@@ -52,10 +52,14 @@ public class OwnedOrderFilters {
     }
 
     @DynamoDBIgnore
-    public void add(OrderFilter filter) {
+    public void checkRoomForOneMore() {
         if (filters.size() >= LIMIT_PER_DOCUMENT) {
             throw new OrderFilterInvalidException("orders.filters.error.limit.reached", LIMIT_PER_DOCUMENT);
         }
+    }
+
+    public void add(OrderFilter filter) {
+        checkRoomForOneMore();
         filters.add(filter);
     }
 

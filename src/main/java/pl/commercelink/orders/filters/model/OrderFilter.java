@@ -34,6 +34,11 @@ public class OrderFilter {
         return filter;
     }
 
+    public static void checkValid(String label, List<OrderFilterCondition> conditions) {
+        validLabel(label);
+        validConditions(conditions);
+    }
+
     public void changeTo(String label, List<OrderFilterCondition> conditions) {
         this.label = validLabel(label);
         this.conditions = validConditions(conditions);

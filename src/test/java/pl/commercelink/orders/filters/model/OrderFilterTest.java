@@ -43,17 +43,26 @@ class OrderFilterTest {
     class Building {
 
         @Test
-        @DisplayName("letter case and surrounding spaces do not change a condition")
-        void letterCaseDoesNotMatter() {
-            assertThat(condition(OrderFilterField.ShipmentType, "COURIER"))
-                    .isEqualTo(condition(OrderFilterField.ShipmentType, " courier "));
+        @DisplayName("a condition keeps the value as it was typed, only trimmed")
+        void conditionKeepsWhatWasTyped() {
+            // when / then
+            assertThat(condition(OrderFilterField.ShippingPostalCode, "00-9").getValue()).isEqualTo("00-9");
+            assertThat(condition(OrderFilterField.ShipmentType, " courier ").getValue()).isEqualTo("courier");
         }
 
         @Test
-        @DisplayName("a postal code is normalised the same way matching normalises it")
-        void postalCodeIsNormalised() {
-            assertThat(condition(OrderFilterField.ShippingPostalCode, "00-9"))
-                    .isEqualTo(condition(OrderFilterField.ShippingPostalCode, "009"));
+        @DisplayName("letter case and punctuation are ignored when the condition is matched, not when it is stored")
+        void spellingIsIgnoredWhenMatching() {
+            // given
+            Order courierToWarsaw = order();
+            courierToWarsaw.addShipment(new Shipment(ShipmentType.Courier));
+            courierToWarsaw.getShippingDetails().setPostalCode("00-950");
+
+            // when / then
+            assertThat(filter(condition(OrderFilterField.ShipmentType, " courier ")).matches(courierToWarsaw, TODAY))
+                    .isTrue();
+            assertThat(filter(condition(OrderFilterField.ShippingPostalCode, "00-9")).matches(courierToWarsaw, TODAY))
+                    .isTrue();
         }
 
         @Test
@@ -150,6 +159,30 @@ class OrderFilterTest {
 
             assertThat(filter(condition(OrderFilterField.ShippingDue, "Unscheduled")).matches(withoutDate, TODAY)).isTrue();
             assertThat(filter(condition(OrderFilterField.ShippingDue, "DueToday")).matches(withoutDate, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("a postal code prefix that carries no digits matches nothing instead of everything")
+        void postalCodeWithoutDigitsMatchesNothing() {
+            // given
+            Order warsaw = order();
+            warsaw.getShippingDetails().setPostalCode("00-950");
+
+            // when / then
+            assertThat(filter(condition(OrderFilterField.ShippingPostalCode, "abc")).matches(warsaw, TODAY)).isFalse();
+            assertThat(filter(condition(OrderFilterField.ShippingPostalCode, "--")).matches(warsaw, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("letters in a postal code prefix are ignored, the digits still decide")
+        void lettersInAPostalCodePrefixAreIgnored() {
+            // given
+            Order warsaw = order();
+            warsaw.getShippingDetails().setPostalCode("00-950");
+
+            // when / then
+            assertThat(filter(condition(OrderFilterField.ShippingPostalCode, "00-9x")).matches(warsaw, TODAY)).isTrue();
+            assertThat(filter(condition(OrderFilterField.ShippingPostalCode, "02x")).matches(warsaw, TODAY)).isFalse();
         }
 
         @Test
