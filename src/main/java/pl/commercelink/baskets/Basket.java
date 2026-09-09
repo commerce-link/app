@@ -13,6 +13,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
@@ -25,6 +26,8 @@ import java.util.stream.Collectors;
 
 @DynamoDBTable(tableName = "Baskets")
 public class Basket {
+
+    private static final LocalDateTime CLIENT_OFFER_URL_SINCE = LocalDate.of(2026, 9, 10).atStartOfDay();
 
     @DynamoDBHashKey(attributeName = "storeId")
     @DynamoDBIndexHashKey(globalSecondaryIndexNames = "BasketCreatedAtIndex", attributeName = "storeId")
@@ -318,7 +321,15 @@ public class Basket {
 
     @DynamoDBIgnore
     public String createOfferUrl(String domain) {
-        return domain + "/store/" + this.storeId + "/individual/offer/" + this.basketId;
+        return domain + "/store/" + this.storeId + offerPathSegment() + this.basketId;
+    }
+
+    private String offerPathSegment() {
+        return createdSinceClientOfferUrlCutoff() ? "/client/offer/" : "/individual/offer/";
+    }
+
+    private boolean createdSinceClientOfferUrlCutoff() {
+        return createdAt != null && !createdAt.isBefore(CLIENT_OFFER_URL_SINCE);
     }
 
     @DynamoDBIgnore

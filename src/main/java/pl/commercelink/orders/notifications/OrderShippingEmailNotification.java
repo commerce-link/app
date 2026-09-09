@@ -10,6 +10,8 @@ class OrderShippingEmailNotification extends EmailNotification {
 
     @JsonProperty("orderId")
     private String orderId;
+    @JsonProperty("orderStatusLink")
+    private String orderStatusLink;
     @JsonProperty("isReceipt")
     private boolean isReceipt;
     @JsonProperty("isInvoice")
@@ -17,10 +19,11 @@ class OrderShippingEmailNotification extends EmailNotification {
     @JsonProperty("trackingUrls")
     private List<String> trackingUrls = new LinkedList<>();
 
-    public OrderShippingEmailNotification(String recipientEmail, String recipientName, String orderId, boolean isReceipt, boolean isInvoice) {
+    public OrderShippingEmailNotification(String recipientEmail, String recipientName, String orderId, String orderStatusLink, boolean isReceipt, boolean isInvoice) {
         super(recipientEmail, recipientName);
 
         this.orderId = orderId;
+        this.orderStatusLink = orderStatusLink;
         this.isReceipt = isReceipt;
         this.isInvoice = isInvoice;
     }
@@ -31,6 +34,10 @@ class OrderShippingEmailNotification extends EmailNotification {
 
     public String getOrderId() {
         return orderId;
+    }
+
+    public String getOrderStatusLink() {
+        return orderStatusLink;
     }
 
     public boolean isReceipt() {

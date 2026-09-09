@@ -134,7 +134,14 @@
         <div class="columns is-vcentered">
             <div class="column">
                 <p class="heading" th:text="#{order.order.id}"></p>
-                <p class="title is-5 mb-1" th:text="${order.orderId}"></p>
+                <p class="title is-5 mb-1">
+                    <span th:text="${order.orderId}"></span>
+                    <span th:if="${clientOrderUrl != null}" class="icon is-small has-text-grey copyable cl-tooltip ml-1"
+                          style="font-size: 0.7rem; vertical-align: middle;"
+                          th:attr="data-tooltip=#{client.order.link.copy}" th:data-copy="${clientOrderUrl}" onclick="copyClientOrderLink(this)">
+                        <i class="fas fa-link"></i>
+                    </span>
+                </p>
                 <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="#{order.external.order.id(${order.externalOrderId})}"></p>
             </div>
             <div class="column">
@@ -1099,9 +1106,7 @@
                                         <input th:if="${carrierOptions.isEmpty()}" class="input"
                                                th:field="*{shipments[__${i.index}__].carrier}">
                                     </td>
-                                    <td><input class="input" data-collection-point
-                                               th:field="*{shipments[__${i.index}__].collectionPointCode}"
-                                               th:disabled="${shipment.type == null or shipment.type.name() != 'PickupPoint'}"></td>
+                                    <td><input class="input" th:field="*{shipments[__${i.index}__].collectionPointCode}"></td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingUrl}" type="url"></td>
                                     <td>
                                         <input class="input"
@@ -1449,6 +1454,10 @@
             navigator.clipboard.writeText(element.getAttribute('data-copy'));
         }
 
+        function copyClientOrderLink(element) {
+            navigator.clipboard.writeText(element.getAttribute('data-copy')).then(() => showToast(CL_TOAST_COPIED));
+        }
+
         function toggleEditShipmentsModal(show) {
             const modal = document.getElementById('editShipmentsModal');
             if (!modal) return;
@@ -1498,7 +1507,6 @@
 
         <td>
             <input class="input"
-                   data-collection-point
                    name="shipments[${index}].collectionPointCode"/>
         </td>
 
@@ -1522,26 +1530,7 @@
     `;
 
             tbody.appendChild(row);
-            syncCollectionPointCell(row);
         }
-
-        function syncCollectionPointCell(row) {
-            const type = row.querySelector('select[name$=".type"]');
-            const point = row.querySelector('[data-collection-point]');
-            if (!type || !point) return;
-            point.disabled = type.value !== 'PickupPoint';
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const tbody = document.getElementById('editShipmentsBody');
-            if (!tbody) return;
-            tbody.querySelectorAll('tr').forEach(syncCollectionPointCell);
-            tbody.addEventListener('change', function (event) {
-                if (event.target.matches('select[name$=".type"]')) {
-                    syncCollectionPointCell(event.target.closest('tr'));
-                }
-            });
-        });
 
         function addEmptyPaymentRow() {
             const tbody = document.getElementById('editPaymentsBody');

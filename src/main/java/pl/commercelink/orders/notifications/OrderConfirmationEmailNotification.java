@@ -15,6 +15,8 @@ class OrderConfirmationEmailNotification extends EmailNotification {
 
     @JsonProperty("orderId")
     private String orderId;
+    @JsonProperty("orderStatusLink")
+    private String orderStatusLink;
     @JsonProperty("totalAmount")
     private double totalAmount;
     @JsonProperty("paymentMethod")
@@ -31,11 +33,12 @@ class OrderConfirmationEmailNotification extends EmailNotification {
     private boolean personalCollection;
 
     OrderConfirmationEmailNotification(
-            String recipientEmail, String recipientName, String orderId, double totalAmount, String paymentMethod,
+            String recipientEmail, String recipientName, String orderId, String orderStatusLink, double totalAmount, String paymentMethod,
             List<OrderItem> orderItems, ShippingDetails shippingDetails, DocumentType documentType, boolean personalCollection,
             CategoryLocalizer categoryLocalizer) {
         super(recipientEmail, recipientName);
         this.orderId = orderId;
+        this.orderStatusLink = orderStatusLink;
         this.totalAmount = totalAmount;
         this.paymentMethod = paymentMethod;
         this.shippingDetails = shippingDetails;

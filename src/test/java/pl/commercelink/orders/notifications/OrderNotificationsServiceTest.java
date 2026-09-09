@@ -120,6 +120,31 @@ class OrderNotificationsServiceTest {
     }
 
     @Test
+    @DisplayName("send carries the public order status link built from the app domain in the dispatched notification")
+    void sendCarriesOrderStatusLinkInNotification() {
+        // given
+        OrderNotificationsService service = new OrderNotificationsService(
+                ordersRepository, orderItemsRepository, orderEventsRepository, emailClient, null, "https://app.example.com");
+        Order order = orderBase(OrderStatus.Shipping);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setCarrier("DHL");
+        courier.setTrackingNo("TRK-123");
+        courier.setShippedAt(LocalDateTime.now().minusHours(1));
+        order.setShipments(List.of(courier));
+        when(emailClient.send(eq(STORE_ID), eq(EmailNotificationType.ORDER_SHIPPING), any(EmailNotification.class)))
+                .thenReturn(true);
+
+        // when
+        service.send(order);
+
+        // then
+        ArgumentCaptor<EmailNotification> messageCaptor = ArgumentCaptor.forClass(EmailNotification.class);
+        verify(emailClient).send(eq(STORE_ID), eq(EmailNotificationType.ORDER_SHIPPING), messageCaptor.capture());
+        OrderShippingEmailNotification message = (OrderShippingEmailNotification) messageCaptor.getValue();
+        assertThat(message.getOrderStatusLink()).isEqualTo("https://app.example.com/store/store-1/client/order/" + ORDER_ID);
+    }
+
+    @Test
     @DisplayName("send does not persist order when only non-review notifications were dispatched")
     void sendDoesNotPersistOrderWhenOnlyNonReviewNotificationsSent() {
         // given

@@ -445,6 +445,11 @@ public class Order {
         return ConversionUtil.getShortenedId(orderId);
     }
 
+    @DynamoDBIgnore
+    public String createClientOrderUrl(String domain) {
+        return domain + "/store/" + this.storeId + "/client/order/" + this.orderId;
+    }
+
     public void setOrderId(String orderId) {
         this.orderId = orderId;
     }
