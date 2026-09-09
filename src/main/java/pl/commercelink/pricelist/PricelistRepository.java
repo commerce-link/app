@@ -1,6 +1,7 @@
 package pl.commercelink.pricelist;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.EnableCaching;
@@ -31,6 +32,7 @@ public class PricelistRepository {
     private final String bucketName;
     private final Clock clock;
 
+    @Autowired
     public PricelistRepository(FileStorage fileStorage, @Value("${s3.bucket.stores}") String bucketName) {
         this(fileStorage, bucketName, Clock.systemUTC());
     }
