@@ -10,6 +10,8 @@ class OrderAssemblyEmailNotification extends EmailNotification {
 
     @JsonProperty("orderId")
     private String orderId;
+    @JsonProperty("orderStatusLink")
+    private String orderStatusLink;
     @JsonProperty("estimatedAssemblyDate")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate estimatedAssemblyDate;
@@ -19,10 +21,11 @@ class OrderAssemblyEmailNotification extends EmailNotification {
     @JsonProperty("personalCollection")
     private boolean personalCollection;
 
-    OrderAssemblyEmailNotification(String recipientEmail, String recipientName, String orderId, LocalDate estimatedAssemblyDate, LocalDate estimatedShippingDate, boolean personalCollection) {
+    OrderAssemblyEmailNotification(String recipientEmail, String recipientName, String orderId, String orderStatusLink, LocalDate estimatedAssemblyDate, LocalDate estimatedShippingDate, boolean personalCollection) {
         super(recipientEmail, recipientName);
 
         this.orderId = orderId;
+        this.orderStatusLink = orderStatusLink;
         this.estimatedAssemblyDate = estimatedAssemblyDate;
         this.estimatedShippingDate = estimatedShippingDate;
         this.personalCollection = personalCollection;
@@ -30,6 +33,10 @@ class OrderAssemblyEmailNotification extends EmailNotification {
 
     public String getOrderId() {
         return orderId;
+    }
+
+    public String getOrderStatusLink() {
+        return orderStatusLink;
     }
 
     public LocalDate getEstimatedAssemblyDate() {
