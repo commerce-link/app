@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.stores.Store;
+import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -37,10 +38,10 @@ public class MarketplaceOrdersImportEventListener {
                 .toList();
 
         log.info("Marketplace {} orders import started: stores={}", marketplace, stores.size());
-        long startedAt = System.nanoTime();
+        ElapsedTime elapsed = ElapsedTime.started();
         stores.forEach(s -> importOrders(s, marketplace));
         log.info("Marketplace {} orders import finished: stores={} importDurationInMs={}",
-                marketplace, stores.size(), millisSince(startedAt));
+                marketplace, stores.size(), elapsed.inMillis());
     }
 
     private void importOrders(Store store, String marketplace) {
@@ -52,9 +53,9 @@ public class MarketplaceOrdersImportEventListener {
             return;
         }
 
-        long startedAt = System.nanoTime();
+        ElapsedTime elapsed = ElapsedTime.started();
         List<MarketplaceOrder> orders = provider.fetchOrders();
-        long fetchDurationInMs = millisSince(startedAt);
+        long fetchDurationInMs = elapsed.inMillis();
 
         int imported = 0;
         for (MarketplaceOrder order : orders) {
@@ -68,11 +69,7 @@ public class MarketplaceOrdersImportEventListener {
         log.info("Marketplace {} orders import store={}: fetched={} imported={} duplicates={}"
                         + " fetchDurationInMs={} importDurationInMs={}",
                 marketplace, store.getStoreId(), orders.size(), imported, orders.size() - imported,
-                fetchDurationInMs, millisSince(startedAt));
-    }
-
-    private static long millisSince(long startNanos) {
-        return (System.nanoTime() - startNanos) / 1_000_000;
+                fetchDurationInMs, elapsed.inMillis());
     }
 
     /** Scheduler payload: {"marketplace":"Allegro"}. */

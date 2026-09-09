@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.stores.Store;
+import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -43,10 +44,10 @@ public class MarketplaceReturnsImportEventListener {
                 .filter(s -> s.hasActiveMarketplaceIntegration(marketplace))
                 .toList();
         log.info("Marketplace {} returns import started: stores={}", marketplace, stores.size());
-        long startedAt = System.nanoTime();
+        ElapsedTime elapsed = ElapsedTime.started();
         stores.forEach(s -> importReturns(s, marketplace));
         log.info("Marketplace {} returns import finished: stores={} importDurationInMs={}",
-                marketplace, stores.size(), millisSince(startedAt));
+                marketplace, stores.size(), elapsed.inMillis());
     }
 
     // marketplaces without a returns API are skipped silently: MarketplaceProvider.returns() is empty for them
@@ -59,9 +60,9 @@ public class MarketplaceReturnsImportEventListener {
             return;
         }
         provider.returns().ifPresent(returns -> {
-            long startedAt = System.nanoTime();
+            ElapsedTime elapsed = ElapsedTime.started();
             List<MarketplaceReturn> fetched = returns.fetchReturns();
-            long fetchDurationInMs = millisSince(startedAt);
+            long fetchDurationInMs = elapsed.inMillis();
 
             for (MarketplaceReturn ret : fetched) {
                 marketplaceReturnImporter.importReturn(store, marketplace, ret);
@@ -69,12 +70,8 @@ public class MarketplaceReturnsImportEventListener {
 
             log.info("Marketplace {} returns import store={}: fetched={} fetchDurationInMs={}"
                             + " importDurationInMs={}",
-                    marketplace, store.getStoreId(), fetched.size(), fetchDurationInMs, millisSince(startedAt));
+                    marketplace, store.getStoreId(), fetched.size(), fetchDurationInMs, elapsed.inMillis());
         });
-    }
-
-    private static long millisSince(long startNanos) {
-        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     /** Scheduler payload: {"marketplace":"Allegro"}. */
