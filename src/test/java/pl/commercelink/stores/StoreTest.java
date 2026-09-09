@@ -88,4 +88,39 @@ class StoreTest {
         // then
         assertThat(enabledCategories).isEmpty();
     }
+
+    @Test
+    void addNotificationSkipsAnAlreadyPresentDuplicate() {
+        // given
+        Store store = new Store();
+        StoreNotification notification = new StoreNotification(
+                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj", "message");
+        store.addNotification(notification);
+
+        // when
+        store.addNotification(new StoreNotification(
+                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj", "message"));
+
+        // then
+        assertThat(store.getNotifications()).hasSize(1);
+    }
+
+    @Test
+    void addNotificationDropsTheOldestOnceTheCapIsExceeded() {
+        // given: notifications have no dismiss path, so unbounded accumulation must be prevented
+        Store store = new Store();
+        for (int i = 0; i < 200; i++) {
+            store.addNotification(new StoreNotification(
+                    StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj-" + i, "message"));
+        }
+
+        // when
+        store.addNotification(new StoreNotification(
+                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj-200", "message"));
+
+        // then
+        assertThat(store.getNotifications()).hasSize(200);
+        assertThat(store.getNotifications().get(0).getObject()).isEqualTo("obj-1");
+        assertThat(store.getNotifications().get(199).getObject()).isEqualTo("obj-200");
+    }
 }

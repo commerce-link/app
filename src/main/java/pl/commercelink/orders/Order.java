@@ -1,6 +1,8 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.documents.Document;
@@ -27,6 +29,11 @@ public class Order {
     @DynamoDBAttribute(attributeName = "externalOrderId")
     @DynamoDBIndexRangeKey(globalSecondaryIndexName = "ExternalOrderIdIndex", attributeName = "externalOrderId")
     private String externalOrderId;
+    // set on the child order created by createSplit(); externalOrderId stays unique to the parent
+    @DynamoDBAttribute(attributeName = "splitFromOrderId")
+    @Getter
+    @Setter
+    private String splitFromOrderId;
 
     @DynamoDBAttribute(attributeName = "affiliateId")
     private String affiliateId;
@@ -364,6 +371,7 @@ public class Order {
         payment.setSource(payments.isEmpty() ? PaymentSource.BankTransfer : payments.get(0).getSource());
         copy.addPayment(payment);
 
+        copy.setSplitFromOrderId(this.orderId);
         return copy;
     }
 

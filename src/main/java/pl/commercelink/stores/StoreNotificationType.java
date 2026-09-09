@@ -2,5 +2,7 @@ package pl.commercelink.stores;
 
 public enum StoreNotificationType {
     UNAUTHENTICATED,
-    WELCOME
+    WELCOME,
+    MARKETPLACE_RETURN_REFUNDED,
+    MARKETPLACE_RETURN_UNMATCHED
 }
