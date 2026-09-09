@@ -1,0 +1,59 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'">
+
+            <h1 class="title is-4" th:text="#{store.marketplaces.exports.title}"></h1>
+            <p class="subtitle is-6" th:text="${marketplace}"></p>
+
+            <div class="box" id="marketplace-export-history">
+
+                <table class="table is-fullwidth is-narrow" th:if="${!exportRuns.isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{store.marketplaces.exports.column.date}"></th>
+                        <th th:text="#{store.marketplaces.exports.column.catalog}"></th>
+                        <th th:text="#{store.marketplaces.exports.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="run : ${exportRuns}">
+                        <td>
+                            <a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
+                               th:text="${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a>
+                        </td>
+                        <td th:text="${run.catalogId()}"></td>
+                        <td>
+                            <span class="tag is-success" th:unless="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                            <span class="tag is-danger" th:if="${run.failed()}"
+                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <p th:if="${exportRuns.size() == runLimit}" class="has-text-grey is-size-7"
+                   th:text="#{store.marketplaces.exports.limited(${runLimit})}"></p>
+
+                <p th:if="${exportRuns.isEmpty()}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.empty}"></p>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <a th:href="@{${basePath + '/marketplaces'}}" class="button is-light"
+                       th:text="#{general.back}"></a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

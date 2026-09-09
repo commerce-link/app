@@ -134,35 +134,58 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void showsTheExportHistoryLinkNextToTheDisconnectButtonOfTheMarketplacePanel() {
+    void linksToTheMarketplaceExportHistoryPageNextToTheDisconnectButtonOfTheMarketplacePanel() {
         // when
-        String html = renderIntegrationPanel("marketplace");
+        String html = renderIntegrationPanel("marketplace", false);
 
         // then
         assertThat(html).contains("Zobacz historię eksportu");
-        assertThat(html).contains("href=\"#marketplace-export-history\"");
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/allegro\"");
+        assertThat(html).doesNotContain("#marketplace-export-history");
         assertThat(html).contains("Rozłącz");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void linksToTheExportHistoryOfTheViewedStoreForASuperAdmin() {
+        // when
+        String html = renderIntegrationPanel("marketplace", true);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/store-1/marketplaces/exports/allegro\"");
         assertThat(html).doesNotContain("??");
     }
 
     @Test
     void hidesTheExportHistoryLinkOnPanelsOtherThanMarketplace() {
         // when / then
-        assertThat(renderIntegrationPanel("shipping")).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("payments")).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("invoicing")).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("printing")).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("shipping", false)).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("payments", false)).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("invoicing", false)).doesNotContain("Zobacz historię eksportu");
+        assertThat(renderIntegrationPanel("printing", false)).doesNotContain("Zobacz historię eksportu");
     }
 
     @Test
-    void rendersRunHistoryTableWithTheFailureStatusOnTheMarketplacesPage() {
+    void marketplacesPageNoLongerRendersTheExportHistoryTable() {
+        // when
+        String html = renderMarketplacesPage();
+
+        // then
+        assertThat(html).doesNotContain("id=\"marketplace-export-history\"");
+        assertThat(html).doesNotContain("Historia eksportów ofert");
+        assertThat(html).doesNotContain("Brak zapisanych przebiegów eksportu.");
+        assertThat(html).contains("Zobacz historię eksportu");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void rendersRunHistoryTableWithTheFailureStatusOnTheHistoryPage() {
         // given
-        WebContext context = webContext();
-        context.setVariable("exportRuns", List.of(
+        WebContext context = historyContext(List.of(
                 new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, true)));
 
         // when
-        String html = renderRunsTable(context);
+        String html = renderHistoryPage(context);
 
         // then
         assertThat(html).contains("2026-08-13 01:31:05");
@@ -174,12 +197,11 @@ class MarketplaceExportHistoryTemplateTest {
     @Test
     void showsTheReadablePartOfACountdownRunIdInTheRunsTable() {
         // given
-        WebContext context = webContext();
-        context.setVariable("exportRuns", List.of(
+        WebContext context = historyContext(List.of(
                 new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, false)));
 
         // when
-        String html = renderRunsTable(context);
+        String html = renderHistoryPage(context);
 
         // then
         assertThat(html).contains(">2026-08-13 01:31:05</a>");
@@ -190,12 +212,11 @@ class MarketplaceExportHistoryTemplateTest {
     @Test
     void showsTheReadableTimestampOfARunIdWithoutACountdownPrefix() {
         // given
-        WebContext context = webContext();
-        context.setVariable("exportRuns", List.of(
+        WebContext context = historyContext(List.of(
                 new MarketplaceExportRunHeader("allegro", "catalog-1", LEGACY_RUN_ID, false)));
 
         // when
-        String html = renderRunsTable(context);
+        String html = renderHistoryPage(context);
 
         // then
         assertThat(html).contains(">2026-08-13 01:31:05</a>");
@@ -205,15 +226,84 @@ class MarketplaceExportHistoryTemplateTest {
     @Test
     void showsAnEmptyStateWhenThereAreNoRuns() {
         // given
-        WebContext context = webContext();
-        context.setVariable("exportRuns", List.of());
+        WebContext context = historyContext(List.of());
 
         // when
-        String html = renderRunsTable(context);
+        String html = renderHistoryPage(context);
 
         // then
         assertThat(html).contains("Brak zapisanych przebiegów eksportu.");
         assertThat(html).doesNotContain("<table");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void dropsTheMarketplaceColumnAndKeepsTheCatalogOneOnTheHistoryPage() {
+        // given
+        WebContext context = historyContext(List.of(
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, false)));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("Data przebiegu");
+        assertThat(html).contains("Katalog");
+        assertThat(html).contains("Status");
+        assertThat(html).doesNotContain("<th>Marketplace</th>");
+        assertThat(countHeaderCells(html)).isEqualTo(3);
+    }
+
+    @Test
+    void linksBackToTheMarketplacesPageFromTheHistoryPage() {
+        // given
+        WebContext context = historyContext(List.of());
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces\"");
+        assertThat(html).contains("Powrót");
+    }
+
+    @Test
+    void linksBackToTheViewedStoreMarketplacesPageForASuperAdmin() {
+        // given
+        WebContext context = historyContext(List.of());
+        context.setVariable("isSuperAdmin", true);
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/store-1/marketplaces\"");
+    }
+
+    @Test
+    void tellsTheReaderHowManyRunsAreShownOnceTheLimitIsReached() {
+        // given
+        WebContext context = historyContext(headers(25));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("Pokazano 25 najnowszych przebiegów eksportu.");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void staysSilentAboutTheLimitWhenFewerRunsThanTheLimitExist() {
+        // given
+        WebContext context = historyContext(headers(24));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).doesNotContain("Pokazano");
+        assertThat(html).doesNotContain("??");
     }
 
     private WebContext webContext() {
@@ -224,26 +314,41 @@ class MarketplaceExportHistoryTemplateTest {
         return new WebContext(exchange, Locale.forLanguageTag("pl"));
     }
 
-    private String renderRunsTable(WebContext context) {
+    private WebContext historyContext(List<MarketplaceExportRunHeader> runs) {
+        WebContext context = webContext();
+        context.setVariable("marketplace", "allegro");
+        context.setVariable("storeId", "store-1");
+        context.setVariable("exportRuns", runs);
+        context.setVariable("runLimit", 25);
         context.setVariable("isSuperAdmin", false);
-        String template = """
-                <div id="marketplace-export-history" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/x' : '/dashboard/store'">
-                  <table class="table" th:if="${!exportRuns.isEmpty()}">
-                    <tbody>
-                    <tr th:each="run : ${exportRuns}">
-                      <td><a th:href="@{${basePath + '/marketplaces/exports/' + run.marketplace() + '/' + run.catalogId() + '/' + run.runId()}}"
-                             th:text="${T(pl.commercelink.marketplace.MarketplaceExportRunId).readable(run.runId())}"></a></td>
-                      <td>
-                        <span th:unless="${run.failed()}" th:text="#{store.marketplaces.exports.status.succeeded}"></span>
-                        <span th:if="${run.failed()}" th:text="#{store.marketplaces.exports.status.failed}"></span>
-                      </td>
-                    </tr>
-                    </tbody>
-                  </table>
-                  <p th:if="${exportRuns.isEmpty()}" th:text="#{store.marketplaces.exports.empty}"></p>
-                </div>
-                """;
-        return stringTemplateEngine().process(template, context);
+        return context;
+    }
+
+    private String renderHistoryPage(WebContext context) {
+        return templateEngine().process("store-marketplace-export-history", context);
+    }
+
+    private String renderMarketplacesPage() {
+        WebContext context = webContext();
+        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
+        context.setVariable("availableProviders", List.of());
+        context.setVariable("selectedProviderName", "allegro");
+        context.setVariable("form", new StubStoreForm());
+        context.setVariable("isSuperAdmin", false);
+        return templateEngine().process("store-marketplaces", context);
+    }
+
+    private List<MarketplaceExportRunHeader> headers(int count) {
+        List<MarketplaceExportRunHeader> headers = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            headers.add(new MarketplaceExportRunHeader(
+                    "allegro", "catalog-1", String.format("82134153%02d_2026-08-13_01-31-05", index), false));
+        }
+        return headers;
+    }
+
+    private int countHeaderCells(String html) {
+        return html.split("<th>", -1).length - 1;
     }
 
     private WebContext runDetailsContext(List<MarketplaceOfferSnapshot> rows, boolean failed) {
@@ -259,8 +364,9 @@ class MarketplaceExportHistoryTemplateTest {
         return context;
     }
 
-    private String renderIntegrationPanel(String providerType) {
+    private String renderIntegrationPanel(String providerType, boolean superAdmin) {
         WebContext context = webContext();
+        context.setVariable("isSuperAdmin", superAdmin);
         context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
         context.setVariable("providers", List.of());
         context.setVariable("selectedProviderName", "allegro");
@@ -297,11 +403,22 @@ class MarketplaceExportHistoryTemplateTest {
         return engine;
     }
 
-    private TemplateEngine stringTemplateEngine() {
-        TemplateEngine engine = new TemplateEngine();
-        engine.setDialect(new SpringStandardDialect());
-        engine.setMessageResolver(new PolishMessages());
-        return engine;
+    public static class StubStoreForm {
+
+        public Map<String, String> getProviderConfiguration() {
+            return Map.of();
+        }
+
+        public StubStore getStore() {
+            return new StubStore();
+        }
+    }
+
+    public static class StubStore {
+
+        public String getStoreId() {
+            return "store-1";
+        }
     }
 
     private static class PolishMessages implements IMessageResolver {

@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -37,9 +38,10 @@ class MarketplaceExportRunServiceTest {
     private static final String STORE_ID = "uma2dqukxr";
     private static final String CATALOG_ID = "catalog-1";
     private static final String MARKETPLACE = "allegro";
-    private static final String STORE_PREFIX = "uma2dqukxr/marketplace-exports/";
+    private static final String MARKETPLACE_PREFIX = "uma2dqukxr/marketplace-exports/allegro/";
     private static final String CATALOG_PREFIX = "uma2dqukxr/marketplace-exports/allegro/catalog-1/";
-    private static final String OTHER_CATALOG_PREFIX = "uma2dqukxr/marketplace-exports/empik/catalog-2/";
+    private static final String OTHER_CATALOG_PREFIX = "uma2dqukxr/marketplace-exports/allegro/catalog-2/";
+    private static final int LIMIT = 25;
     private static final Instant RUN_FINISHED_AT = Instant.parse("2026-08-13T01:31:05Z");
     private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
 
@@ -255,13 +257,12 @@ class MarketplaceExportRunServiceTest {
     @Test
     void findRunsParsesMarketplaceCatalogRunIdAndFailureFromKeys() {
         // given
-        givenStoreObjects(
+        givenMarketplaceObjects(
                 CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv",
-                CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05-failed.csv",
-                STORE_PREFIX + "other/nested/deeper/key.csv");
+                CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05-failed.csv");
 
         // when
-        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
         assertThat(runs).hasSize(2);
@@ -274,16 +275,16 @@ class MarketplaceExportRunServiceTest {
     }
 
     @Test
-    void findRunsOrdersRunsOfEveryMarketplaceAndCatalogNewestFirst() {
+    void findRunsOrdersRunsOfEveryCatalogOfTheMarketplaceNewestFirst() {
         // given
-        givenStoreObjects(
+        givenMarketplaceObjects(
                 CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv",
                 CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv",
                 OTHER_CATALOG_PREFIX + "8211429999_2026-09-05_01-00-00.csv",
                 OTHER_CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv");
 
         // when
-        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
         assertThat(runs).extracting(MarketplaceExportRunHeader::runId).containsExactly(
@@ -291,33 +292,76 @@ class MarketplaceExportRunServiceTest {
                 "8213415334_2026-08-13_01-31-05",
                 "8213503599_2026-08-12_01-00-00",
                 "8213589999_2026-08-11_01-00-00");
-        assertThat(runs).extracting(MarketplaceExportRunHeader::marketplace)
-                .containsExactly("empik", MARKETPLACE, "empik", MARKETPLACE);
+        assertThat(runs).extracting(MarketplaceExportRunHeader::catalogId)
+                .containsExactly("catalog-2", CATALOG_ID, "catalog-2", CATALOG_ID);
     }
 
     @Test
-    void findRunsAsksForEveryKeyInKeyOrderAndNeverForLastModifiedTimestamps() {
+    void findRunsListsOnlyThePrefixOfTheAskedMarketplace() {
         // given
-        givenStoreObjects(CATALOG_PREFIX + RUN_ID + ".csv");
+        givenMarketplaceObjects(CATALOG_PREFIX + RUN_ID + ".csv");
 
         // when
-        service.findRuns(STORE_ID);
+        service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
-        verify(fileStorage).findAllKeysByKeyOrder(BUCKET, STORE_PREFIX);
+        verify(fileStorage).findAllKeysByKeyOrder(BUCKET, MARKETPLACE_PREFIX);
         verify(fileStorage, never()).getAllObjectLastModified(anyString(), anyString());
+    }
+
+    @Test
+    void findRunsCutsTheListingToTheGivenLimit() {
+        // given
+        givenMarketplaceObjects(runKeysOf(CATALOG_PREFIX, 40));
+
+        // when
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
+
+        // then
+        assertThat(runs).hasSize(LIMIT);
+    }
+
+    @Test
+    void findRunsKeepsTheNewestRunsWhenTheMarketplaceHasMoreThanOneCatalog() {
+        // given
+        List<String> keys = new ArrayList<>(List.of(
+                CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv",
+                CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv",
+                OTHER_CATALOG_PREFIX + "8211429999_2026-09-05_01-00-00.csv",
+                OTHER_CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv"));
+        givenMarketplaceObjects(keys.toArray(new String[0]));
+
+        // when
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, 2);
+
+        // then
+        assertThat(runs).extracting(MarketplaceExportRunHeader::runId).containsExactly(
+                "8211429999_2026-09-05_01-00-00",
+                "8213415334_2026-08-13_01-31-05");
+        assertThat(runs).extracting(MarketplaceExportRunHeader::catalogId)
+                .containsOnly("catalog-2");
+    }
+
+    @Test
+    void findRunsReturnsNothingWhenTheLimitIsNotPositive() {
+        // given
+        givenMarketplaceObjects(CATALOG_PREFIX + RUN_ID + ".csv");
+
+        // when / then
+        assertThat(service.findRuns(STORE_ID, MARKETPLACE, 0)).isEmpty();
+        verify(fileStorage, never()).findAllKeysByKeyOrder(anyString(), anyString());
     }
 
     @Test
     void findRunsSkipsKeysWhoseNameIsNotARunId() {
         // given
-        givenStoreObjects(
+        givenMarketplaceObjects(
                 CATALOG_PREFIX + "0000-report.csv",
                 CATALOG_PREFIX + "not-a-run-id.csv",
                 CATALOG_PREFIX + RUN_ID + ".csv");
 
         // when
-        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
         assertThat(runs).extracting(MarketplaceExportRunHeader::runId).containsExactly(RUN_ID);
@@ -326,10 +370,10 @@ class MarketplaceExportRunServiceTest {
     @Test
     void findRunsSkipsTheLatestFileLeftInTheExportsDirectory() {
         // given
-        givenStoreObjects(CATALOG_PREFIX + "latest.csv", CATALOG_PREFIX + RUN_ID + ".csv");
+        givenMarketplaceObjects(CATALOG_PREFIX + "latest.csv", CATALOG_PREFIX + RUN_ID + ".csv");
 
         // when
-        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
         assertThat(runs).extracting(MarketplaceExportRunHeader::runId).containsExactly(RUN_ID);
@@ -338,12 +382,12 @@ class MarketplaceExportRunServiceTest {
     @Test
     void findRunsListsAFailedRunAlongsideTheSucceededOnes() {
         // given
-        givenStoreObjects(
+        givenMarketplaceObjects(
                 CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05-failed.csv",
                 CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv");
 
         // when
-        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID);
+        List<MarketplaceExportRunHeader> runs = service.findRuns(STORE_ID, MARKETPLACE, LIMIT);
 
         // then
         assertThat(runs).extracting(MarketplaceExportRunHeader::runId, MarketplaceExportRunHeader::failed)
@@ -416,8 +460,16 @@ class MarketplaceExportRunServiceTest {
         when(fileStorage.findKeysByKeyOrder(eq(BUCKET), eq(CATALOG_PREFIX), anyInt())).thenReturn(inKeyOrder(keys));
     }
 
-    private void givenStoreObjects(String... keys) {
-        when(fileStorage.findAllKeysByKeyOrder(BUCKET, STORE_PREFIX)).thenReturn(inKeyOrder(keys));
+    private void givenMarketplaceObjects(String... keys) {
+        when(fileStorage.findAllKeysByKeyOrder(BUCKET, MARKETPLACE_PREFIX)).thenReturn(inKeyOrder(keys));
+    }
+
+    private String[] runKeysOf(String prefix, int count) {
+        List<String> keys = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            keys.add(String.format("%s82134153%02d_2026-08-13_01-31-05.csv", prefix, index));
+        }
+        return keys.toArray(new String[0]);
     }
 
     private List<String> inKeyOrder(String... keys) {

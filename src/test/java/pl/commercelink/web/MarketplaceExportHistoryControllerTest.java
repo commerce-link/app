@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
+import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -33,7 +34,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -242,10 +245,118 @@ class MarketplaceExportHistoryControllerTest {
         assertThat(model.getAttribute("isSuperAdmin")).isEqualTo(true);
     }
 
+    @Test
+    void historyPageListsTheRunsOfOneMarketplaceForTheLoggedInAdmin() {
+        // given
+        givenRuns(STORE_ID, headers(3));
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.exportHistory(MARKETPLACE, model);
+
+        // then
+        assertThat(view).isEqualTo("store-marketplace-export-history");
+        assertThat(model.getAttribute("marketplace")).isEqualTo(MARKETPLACE);
+        assertThat(model.getAttribute("storeId")).isEqualTo(STORE_ID);
+        assertThat(model.getAttribute("isSuperAdmin")).isEqualTo(false);
+        assertThat(model.getAttribute("runLimit")).isEqualTo(25);
+        assertThat(exportRunsOf(model)).hasSize(3);
+    }
+
+    @Test
+    void historyPageAsksForAtMostTwentyFiveRuns() {
+        // given
+        givenRuns(STORE_ID, headers(25));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, model);
+
+        // then
+        verify(marketplaceExportRunService).findRuns(STORE_ID, MARKETPLACE, 25);
+        assertThat(exportRunsOf(model)).hasSize(25);
+    }
+
+    @Test
+    void superAdminHistoryPageReadsTheStoreFromThePathInsteadOfTheSession() {
+        // given
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+        givenRuns("store-2", headers(2));
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.superAdminExportHistory("store-2", MARKETPLACE, model);
+
+        // then
+        assertThat(view).isEqualTo("store-marketplace-export-history");
+        assertThat(model.getAttribute("storeId")).isEqualTo("store-2");
+        assertThat(model.getAttribute("isSuperAdmin")).isEqualTo(true);
+        verify(marketplaceExportRunService).findRuns("store-2", MARKETPLACE, 25);
+        assertThat(exportRunsOf(model)).hasSize(2);
+    }
+
+    @Test
+    void historyPageShowsAnEmptyListWhenTheMarketplaceHasNoRuns() {
+        // given
+        givenRuns(STORE_ID, List.of());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, model);
+
+        // then
+        assertThat(exportRunsOf(model)).isEmpty();
+    }
+
+    @Test
+    void resolvesTheHistoryUrlOfAMarketplace() throws Exception {
+        // given
+        givenRuns(STORE_ID, headers(1));
+
+        // when / then
+        MockMvcBuilders.standaloneSetup(controller).build()
+                .perform(get("/dashboard/store/marketplaces/exports/{marketplace}", MARKETPLACE))
+                .andExpect(status().isOk())
+                .andExpect(view().name("store-marketplace-export-history"))
+                .andExpect(model().attribute("marketplace", MARKETPLACE));
+    }
+
+    @Test
+    void resolvesTheSuperAdminHistoryUrlOfAMarketplace() throws Exception {
+        // given
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+        givenRuns("store-2", headers(1));
+
+        // when / then
+        MockMvcBuilders.standaloneSetup(controller).build()
+                .perform(get("/dashboard/store/{storeId}/marketplaces/exports/{marketplace}", "store-2", MARKETPLACE))
+                .andExpect(status().isOk())
+                .andExpect(view().name("store-marketplace-export-history"))
+                .andExpect(model().attribute("storeId", "store-2"));
+    }
+
     private ResultActions perform(String runId) throws Exception {
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
         return mockMvc.perform(get("/dashboard/store/marketplaces/exports/{marketplace}/{catalogId}/{runId}",
                 MARKETPLACE, CATALOG_ID, runId));
+    }
+
+    private void givenRuns(String storeId, List<MarketplaceExportRunHeader> runs) {
+        when(marketplaceExportRunService.findRuns(eq(storeId), eq(MARKETPLACE), anyInt())).thenReturn(runs);
+    }
+
+    private List<MarketplaceExportRunHeader> headers(int count) {
+        List<MarketplaceExportRunHeader> headers = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            headers.add(new MarketplaceExportRunHeader(
+                    MARKETPLACE, CATALOG_ID, String.format("82134153%02d_2026-08-13_01-31-05", index), false));
+        }
+        return headers;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<MarketplaceExportRunHeader> exportRunsOf(Model model) {
+        return (List<MarketplaceExportRunHeader>) model.getAttribute("exportRuns");
     }
 
     private void givenRun(String storeId, MarketplaceExportRunFile runFile) {

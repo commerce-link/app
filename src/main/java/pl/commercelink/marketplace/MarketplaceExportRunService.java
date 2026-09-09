@@ -76,13 +76,17 @@ public class MarketplaceExportRunService {
         }
     }
 
-    public List<MarketplaceExportRunHeader> findRuns(String storeId) {
+    public List<MarketplaceExportRunHeader> findRuns(String storeId, String marketplace, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
         try {
-            return fileStorage.findAllKeysByKeyOrder(bucketName, storePrefix(storeId)).stream()
+            return fileStorage.findAllKeysByKeyOrder(bucketName, marketplacePrefix(storeId, marketplace)).stream()
                     .filter(this::isRunKey)
                     .filter(this::isRunIdKey)
                     .flatMap(key -> toHeader(key).stream())
                     .sorted(Comparator.comparing(MarketplaceExportRunHeader::runId))
+                    .limit(limit)
                     .toList();
         } catch (Exception exception) {
             System.err.println("Failed to list marketplace export runs: " + exception.getMessage());
@@ -152,8 +156,8 @@ public class MarketplaceExportRunService {
                 segments[2], segments[3], MarketplaceExportRunCsv.runIdFrom(key), isFailedRunKey(key)));
     }
 
-    private String storePrefix(String storeId) {
-        return String.format("%s/%s/", storeId, EXPORTS_DIRECTORY);
+    private String marketplacePrefix(String storeId, String marketplace) {
+        return String.format("%s/%s/%s/", storeId, EXPORTS_DIRECTORY, marketplace);
     }
 
     private String catalogPrefix(String storeId, String marketplace, String catalogId) {

@@ -42,7 +42,9 @@
                             <button type="button" class="button is-small is-danger is-outlined" onclick="confirmDelete(this)"
                                     th:text="#{store.integrations.disconnect}"></button>
                         </form>
-                        <a th:if="${providerType == 'marketplace'}" href="#marketplace-export-history"
+                        <a th:if="${providerType == 'marketplace'}"
+                           th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'"
+                           th:href="@{${basePath + '/marketplaces/exports/' + integration.name}}"
                            class="button is-small is-link is-outlined ml-2"
                            th:text="#{store.marketplaces.exports.history.link}"></a>
                     </td>
