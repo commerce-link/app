@@ -10,25 +10,44 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
+import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 
 @Controller
 public class MarketplaceExportHistoryController {
 
+    private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}";
+
     private static final String RUN_PATH =
-            "/{marketplace:[A-Za-z0-9_.-]+}/{catalogId:[A-Za-z0-9_-]+}"
+            MARKETPLACE_PATH + "/{catalogId:[A-Za-z0-9_-]+}"
                     + "/{runId:(?:\\d{10}_)?\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}}";
-    private static final int MAX_INLINE_RAW_BYTES = 512 * 1024;
+
+    static final int LISTED_RUNS_LIMIT = 25;
 
     private final MarketplaceExportRunService marketplaceExportRunService;
 
     MarketplaceExportHistoryController(MarketplaceExportRunService marketplaceExportRunService) {
         this.marketplaceExportRunService = marketplaceExportRunService;
+    }
+
+    @GetMapping("/dashboard/store/marketplaces/exports" + MARKETPLACE_PATH)
+    @PreAuthorize("hasRole('ADMIN')")
+    public String exportHistory(@PathVariable String marketplace, Model model) {
+        return renderHistory(getStoreId(), marketplace, model);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/marketplaces/exports" + MARKETPLACE_PATH)
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminExportHistory(@PathVariable String storeId,
+                                          @PathVariable String marketplace,
+                                          Model model) {
+        return renderHistory(storeId, marketplace, model);
     }
 
     @GetMapping("/dashboard/store/marketplaces/exports" + RUN_PATH)
@@ -67,6 +86,19 @@ public class MarketplaceExportHistoryController {
         return renderRunFile(storeId, marketplace, catalogId, runId);
     }
 
+    private String renderHistory(String storeId, String marketplace, Model model) {
+        List<MarketplaceExportRunHeader> runs =
+                marketplaceExportRunService.findRuns(storeId, marketplace, LISTED_RUNS_LIMIT);
+
+        model.addAttribute("marketplace", marketplace);
+        model.addAttribute("storeId", storeId);
+        model.addAttribute("exportRuns", runs);
+        model.addAttribute("runLimit", LISTED_RUNS_LIMIT);
+        model.addAttribute("isSuperAdmin", isSuperAdmin());
+
+        return "store-marketplace-export-history";
+    }
+
     private String renderRun(String storeId, String marketplace, String catalogId, String runId, Model model) {
         Optional<MarketplaceExportRunFile> runFile =
                 marketplaceExportRunService.findRun(storeId, marketplace, catalogId, runId);
@@ -77,14 +109,11 @@ public class MarketplaceExportHistoryController {
         }
 
         MarketplaceExportRunFile presentRunFile = runFile.get();
-        boolean rawTooLarge = presentRunFile.raw().length > MAX_INLINE_RAW_BYTES;
 
         model.addAttribute("runId", runId);
         model.addAttribute("runTimestamp", MarketplaceExportRunId.readable(runId));
         model.addAttribute("failed", presentRunFile.failed());
         model.addAttribute("rows", presentRunFile.rows());
-        model.addAttribute("raw", rawTooLarge ? null : new String(presentRunFile.raw(), StandardCharsets.UTF_8));
-        model.addAttribute("rawTooLarge", rawTooLarge);
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("catalogId", catalogId);
         model.addAttribute("storeId", storeId);

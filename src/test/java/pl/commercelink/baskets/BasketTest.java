@@ -282,6 +282,38 @@ class BasketTest {
         assertThat(copy.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
     }
 
+    @Test
+    @DisplayName("createOfferUrl uses the client offer path for offers created on or after 10 September 2026")
+    void createOfferUrlUsesClientPathForOffersCreatedSinceCutoff() {
+        // given
+        Basket atCutoff = offer(LocalDateTime.of(2026, 9, 10, 0, 0));
+        Basket afterCutoff = offer(LocalDateTime.of(2026, 11, 3, 14, 15));
+
+        // when / then
+        assertThat(atCutoff.createOfferUrl("https://app.example")).isEqualTo("https://app.example/store/store-1/client/offer/offer-1");
+        assertThat(afterCutoff.createOfferUrl("https://app.example")).isEqualTo("https://app.example/store/store-1/client/offer/offer-1");
+    }
+
+    @Test
+    @DisplayName("createOfferUrl keeps the individual offer path for offers created before 10 September 2026 or without a creation date")
+    void createOfferUrlKeepsIndividualPathForOffersCreatedBeforeCutoff() {
+        // given
+        Basket beforeCutoff = offer(LocalDateTime.of(2026, 9, 9, 23, 59, 59));
+        Basket undated = offer(null);
+
+        // when / then
+        assertThat(beforeCutoff.createOfferUrl("https://app.example")).isEqualTo("https://app.example/store/store-1/individual/offer/offer-1");
+        assertThat(undated.createOfferUrl("https://app.example")).isEqualTo("https://app.example/store/store-1/individual/offer/offer-1");
+    }
+
+    private Basket offer(LocalDateTime createdAt) {
+        Basket basket = new Basket();
+        basket.setStoreId("store-1");
+        basket.setBasketId("offer-1");
+        basket.setCreatedAt(createdAt);
+        return basket;
+    }
+
     private BasketItem basketItem(String mfn) {
         return basketItem(mfn, "Laptops");
     }

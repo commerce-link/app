@@ -176,21 +176,9 @@
         </div>
     </section>
 
-    <div id="copyNotification" style="display:none; position:fixed; top:32px; right:32px; z-index:9999; background:#48c774; color:#fff; padding:16px 32px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); font-size:1.1em; transition: opacity 0.3s;">
-        <span th:text="#{general.copied}">Skopiowano!</span>
-    </div>
-
     <script>
         function copyOfferLink(button) {
-            navigator.clipboard.writeText(button.getAttribute('data-copy')).then(function () {
-                const notification = document.getElementById('copyNotification');
-                notification.style.display = 'block';
-                notification.style.opacity = '1';
-                setTimeout(() => {
-                    notification.style.opacity = '0';
-                    setTimeout(() => notification.style.display = 'none', 300);
-                }, 2000);
-            });
+            navigator.clipboard.writeText(button.getAttribute('data-copy')).then(() => showToast(CL_TOAST_COPIED));
         }
     </script>
 

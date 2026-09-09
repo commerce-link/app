@@ -4,15 +4,15 @@ import java.util.Arrays;
 import java.util.List;
 
 public enum EmailNotificationType {
-    ORDER_CONFIRMATION("OrderConfirmationTemplate", Arrays.asList("orderId", "totalAmount", "paymentMethod", "products (category, name, quantity, price)", "services (category, name, quantity, price)", "shippingDetails", "receiptType", "personalCollection")),
-    ORDER_ASSEMBLY("OrderAssemblyTemplate", Arrays.asList("orderId", "estimatedAssemblyDate", "estimatedShippingDate", "personalCollection")),
-    ORDER_ASSEMBLED("OrderAssembledTemplate", Arrays.asList("orderId", "estimatedShippingDate")),
-    ORDER_REALIZATION("OrderRealizationTemplate", Arrays.asList("orderId", "estimatedShippingDate")),
-    ORDER_SHIPPING("OrderShippingTemplate", Arrays.asList("orderId", "isReceipt", "isInvoice", "trackingUrls")),
-    ORDER_PICKUP("OrderPickupTemplate", Arrays.asList("orderId", "estimatedCollectionDate")),
+    ORDER_CONFIRMATION("OrderConfirmationTemplate", Arrays.asList("orderId", "orderStatusLink", "totalAmount", "paymentMethod", "products (category, name, quantity, price)", "services (category, name, quantity, price)", "shippingDetails", "receiptType", "personalCollection")),
+    ORDER_ASSEMBLY("OrderAssemblyTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedAssemblyDate", "estimatedShippingDate", "personalCollection")),
+    ORDER_ASSEMBLED("OrderAssembledTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedShippingDate")),
+    ORDER_REALIZATION("OrderRealizationTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedShippingDate")),
+    ORDER_SHIPPING("OrderShippingTemplate", Arrays.asList("orderId", "orderStatusLink", "isReceipt", "isInvoice", "trackingUrls")),
+    ORDER_PICKUP("OrderPickupTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedCollectionDate")),
     ORDER_INVOICE("OrderInvoiceTemplate", Arrays.asList("orderId", "invoiceNumber")),
-    ORDER_REVIEW("OrderReviewTemplate", Arrays.asList("orderId")),
-    ORDER_ASSEMBLY_DATE_CHANGED("OrderAssemblyDateChangedTemplate", Arrays.asList("orderId", "oldAssemblyDate", "newAssemblyDate")),
+    ORDER_REVIEW("OrderReviewTemplate", Arrays.asList("orderId", "orderStatusLink")),
+    ORDER_ASSEMBLY_DATE_CHANGED("OrderAssemblyDateChangedTemplate", Arrays.asList("orderId", "orderStatusLink", "oldAssemblyDate", "newAssemblyDate")),
     ORDER_INVOICE_PROFORMA("OrderInvoiceProformaTemplate", Arrays.asList("invoiceNumber")),
     RMA_CARRIER_ARRANGEMENT("RMACarrierArrangementTemplate", Arrays.asList("rmaId", "orderId", "status", "rmaClientLink")),
     RMA_CARRIER_CONFIRMATION("RMACarrierConfirmationTemplate", Arrays.asList("rmaId", "orderId", "shippingDetails", "trackingUrls")),
