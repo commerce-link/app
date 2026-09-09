@@ -13,32 +13,131 @@
     <div th:replace="~{fragments/screen-intro :: panel('orders', 'fas fa-shopping-cart')}"></div>
 
     <div class="box">
-        <h4 class="title is-5">Filter by Order Status</h4>
-        <div class="field is-grouped is-grouped-multiline" id="filterTags">
-            <div class="control">
-                <div class="tags has-addons">
-                    <span class="tag is-info">Statuses:</span>
+        <div id="filterMessages">
+            <div th:if="${error}" class="notification is-danger is-light" th:text="${error}"></div>
+        </div>
+
+        <div class="is-flex is-flex-wrap-wrap is-align-items-center">
+            <style>
+                #viewDropdownMenu .dropdown-item.is-selected {
+                    font-weight: 600;
+                }
+
+                #viewDropdownButton .view-label {
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                #viewDropdownMenu .dropdown-item {
+                    padding-right: 1rem;
+                }
+
+                #viewDropdownMenu .filter-option {
+                    display: flex;
+                    align-items: center;
+                }
+
+                #viewDropdownMenu .filter-option-name {
+                    flex: 1;
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                #savedFiltersPane .filter-name {
+                    word-break: break-word;
+                }
+            </style>
+
+            <div class="field has-addons mb-0 mr-2" id="filterModeSwitch">
+                <div class="control">
+                    <button type="button" class="button is-small" id="statusModeButton"
+                            th:classappend="${selectedFilterId == null} ? 'is-primary is-selected' : ''"
+                            th:text="#{orders.filters.mode.statuses}"></button>
+                </div>
+                <div class="control">
+                    <button type="button" class="button is-small" id="customModeButton"
+                            th:classappend="${selectedFilterId != null} ? 'is-primary is-selected' : ''"
+                            th:text="#{orders.filters.mode.custom}"></button>
                 </div>
             </div>
-            <div class="control" th:each="status : ${statuses}">
-                <button type="button"
-                        class="button is-small status-tag"
-                        th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                        th:data-status="${status.name()}">
-                    <span th:text="${enumI18n.localize(status)}"></span>
-                    <span th:if="${itemCountsByStatus.get(status) != null}" th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
-                    <span th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
-                </button>
+
+            <div class="dropdown mr-4" id="viewDropdown"
+                 th:data-selected-filter-id="${selectedFilterId}">
+                <div class="dropdown-trigger">
+                    <button type="button" class="button is-small" id="viewDropdownButton"
+                            style="width: 14rem; justify-content: space-between;"
+                            aria-haspopup="true" aria-controls="viewDropdownMenu">
+                        <span id="viewLabelStatuses" class="view-label"
+                              th:data-placeholder="#{orders.filters.view.pick.status}"
+                              th:data-selected="#{orders.filters.view.selected('{0}')}"
+                              th:text="${#lists.isEmpty(selectedStatusEnums)}
+                                           ? #{orders.filters.view.pick.status}
+                                           : (${#lists.size(selectedStatusEnums) == 1}
+                                                 ? ${enumI18n.localize(selectedStatusEnums[0])}
+                                                 : #{orders.filters.view.selected(${#lists.size(selectedStatusEnums)})})"></span>
+                        <span id="viewLabelCustom" class="view-label" style="display: none;"
+                              th:title="${selectedFilterLabel}"
+                              th:data-placeholder="#{orders.filters.view.pick.filter}"
+                              th:text="${selectedFilterLabel != null}
+                                           ? ${selectedFilterLabel}
+                                           : #{orders.filters.view.pick.filter}"></span>
+                        <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
+                    </button>
+                </div>
+                <div class="dropdown-menu" id="viewDropdownMenu" role="menu" style="min-width: 18rem;">
+                    <div class="dropdown-content">
+                        <div id="statusPane">
+                            <label class="dropdown-item checkbox" th:each="status : ${statuses}">
+                                <input type="checkbox" class="status-option" th:value="${status.name()}"
+                                       th:checked="${#lists.contains(selectedStatuses, status.name())}"/>
+                                <span class="ml-1 status-name" th:text="${enumI18n.localize(status)}"></span>
+                                <span class="has-text-grey" th:if="${itemCountsByStatus.get(status) != null}"
+                                      th:text="' (' + ${itemCountsByStatus.get(status)} + ')'"></span>
+                                <span class="has-text-grey" th:if="${itemCountsByStatus.get(status) == null}"> (0)</span>
+                            </label>
+                            <div id="clearStatusesRow"
+                                 th:style="${#lists.isEmpty(selectedStatuses)} ? 'display: none' : ''">
+                                <hr class="dropdown-divider"/>
+                                <div class="dropdown-item">
+                                    <button type="button" class="button is-small" id="clearStatuses"
+                                            th:text="#{orders.status.filter.clear}"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="customPane" style="display: none;">
+                            <p class="dropdown-item has-text-grey" th:if="${#lists.isEmpty(savedFilters)}"
+                               th:text="#{orders.filters.empty}"></p>
+                            <a th:each="saved : ${savedFilters}" class="dropdown-item filter-option"
+                               th:classappend="${saved.id == selectedFilterId} ? 'is-selected' : ''"
+                               th:data-filter-id="${saved.id}"
+                               th:data-label="${saved.label}"
+                               th:href="${saved.id == selectedFilterId}
+                                            ? @{/dashboard/orders}
+                                            : @{/dashboard/orders(filterId=${saved.id})}"
+                               th:title="${saved.label}">
+                                <span class="icon is-small mr-1">
+                                    <i class="fas fa-check filter-check"
+                                       th:style="${saved.id != selectedFilterId} ? 'display: none' : ''"></i>
+                                </span>
+                                <span class="filter-option-name" th:text="${saved.label}"></span>
+                                <span class="has-text-grey ml-1"
+                                      th:text="'(' + ${saved.matchingOrders} + ')'"></span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="control">
-                <button type="button" class="button is-small is-danger is-light" id="clearFilters">
-                    <span class="icon is-small"><i class="fas fa-times"></i></span>
-                    <span>Clear Filters</span>
+            <div class="is-flex ml-auto">
+                <button type="button" class="button is-small mr-2" onclick="toggleOrderFiltersModal(true)">
+                    <span class="icon is-small"><i class="fas fa-sliders-h"></i></span>
+                    <span th:text="#{orders.filters.manage}"></span>
                 </button>
-            </div>
-
-            <div class="control ml-auto">
                 <form method="post" action="/dashboard/orders/new/pos">
                     <button type="submit" class="button is-small is-success">
                         <span class="icon is-small"><i class="fas fa-cash-register"></i></span>
@@ -49,68 +148,517 @@
         </div>
     </div>
 
+    <div id="orderFiltersModal" class="modal">
+        <div class="modal-background" onclick="toggleOrderFiltersModal(false)"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{orders.filters.title}"></p>
+                <button type="button" class="delete" aria-label="close" onclick="toggleOrderFiltersModal(false)"></button>
+            </header>
+
+            <section class="modal-card-body">
+                <div id="filterFormError" class="notification is-danger is-light" style="display: none;"></div>
+
+                <div id="savedFiltersPane">
+                    <table class="table is-fullwidth is-narrow is-hoverable" th:if="${!#lists.isEmpty(savedFilters)}">
+                        <tbody>
+                        <tr th:each="saved : ${savedFilters}">
+                            <td class="is-vcentered filter-name" th:text="${saved.label}"></td>
+                            <td class="is-vcentered">
+                                <span class="tag is-light" th:if="${saved.sharedWithStore}"
+                                      th:text="#{orders.filters.scope.store}"></span>
+                                <span class="tag is-light" th:unless="${saved.sharedWithStore}"
+                                      th:text="#{orders.filters.scope.private}"></span>
+                            </td>
+                            <td class="is-vcentered">
+                                <div class="is-flex is-justify-content-flex-end"
+                                     th:if="${!saved.sharedWithStore or canManageStoreFilters}">
+                                    <button type="button" class="button is-small edit-filter mr-2"
+                                            th:title="#{orders.filters.edit}"
+                                            th:data-filter-id="${saved.id}"
+                                            th:data-label="${saved.label}"
+                                            th:data-status="${saved.conditionsByField.get('Status')}"
+                                            th:data-shipment-type="${saved.conditionsByField.get('ShipmentType')}"
+                                            th:data-payment-source="${saved.conditionsByField.get('PaymentSource')}"
+                                            th:data-source-name="${saved.conditionsByField.get('SourceName')}"
+                                            th:data-shipping-postal-code="${saved.conditionsByField.get('ShippingPostalCode')}"
+                                            th:data-shipping-due="${saved.conditionsByField.get('ShippingDue')}"
+                                            th:data-shared="${saved.sharedWithStore}">
+                                        <span class="icon is-small"><i class="fas fa-pencil-alt"></i></span>
+                                    </button>
+                                    <form method="post" action="/dashboard/orders/filters/delete"
+                                          class="delete-filter-form">
+                                        <input type="hidden" name="filterId" th:value="${saved.id}"/>
+                                        <input type="hidden" name="activeFilterId" th:value="${selectedFilterId}"/>
+                                        <button type="submit" class="button is-small is-danger is-light"
+                                                th:title="#{orders.filters.delete}">
+                                            <span class="icon is-small"><i class="fas fa-trash"></i></span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="has-text-grey" th:if="${#lists.isEmpty(savedFilters)}"
+                       th:text="#{orders.filters.empty}"></p>
+
+                    <button type="button" class="button is-primary mt-3" id="newFilterButton">
+                        <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{orders.filters.new}"></span>
+                    </button>
+                </div>
+
+                <form method="post" action="/dashboard/orders/filters" id="filterForm" style="display: none;">
+                    <input type="hidden" name="filterId" id="filterIdField"/>
+                    <input type="hidden" name="activeFilterId" th:value="${selectedFilterId}"/>
+
+                    <div class="field">
+                        <label class="label" th:text="#{orders.filters.name}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="label" required maxlength="60"/>
+                        </div>
+                    </div>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.shipping.due}"></label>
+                            <div class="select is-fullwidth">
+                                <select name="shippingDue">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}"
+                                            th:text="${enumI18n.localize(due)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.shipment.type}"></label>
+                            <div class="select is-fullwidth">
+                                <select name="shipmentType">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="type : ${shipmentTypes}" th:value="${type.name()}"
+                                            th:text="${enumI18n.localize(type)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.payment.source}"></label>
+                            <div class="select is-fullwidth">
+                                <select name="paymentSource">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="source : ${paymentSources}" th:value="${source.name()}"
+                                            th:text="${enumI18n.localize(source)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.status}"></label>
+                            <div class="select is-fullwidth">
+                                <select name="status">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="status : ${statuses}" th:value="${status.name()}"
+                                            th:text="${enumI18n.localize(status)}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.marketplace}"></label>
+                            <div class="select is-fullwidth" th:if="${!#lists.isEmpty(marketplaces)}">
+                                <select name="sourceName">
+                                    <option value="" th:text="#{orders.filters.any}"></option>
+                                    <option th:each="marketplace : ${marketplaces}" th:value="${marketplace}"
+                                            th:text="${marketplace}"></option>
+                                </select>
+                            </div>
+                            <p class="has-text-grey" th:if="${#lists.isEmpty(marketplaces)}"
+                               th:text="#{orders.filters.marketplaces.empty}"></p>
+                        </div>
+                        <div class="column is-half">
+                            <label class="label" th:text="#{orders.filters.field.postal.code}"></label>
+                            <div class="control">
+                                <input class="input" type="text" name="shippingPostalCode" placeholder="00-9"
+                                       inputmode="numeric" maxlength="6"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field" th:if="${canManageStoreFilters}">
+                        <label class="checkbox">
+                            <input type="checkbox" name="sharedWithStore" value="true"/>
+                            <span th:text="#{orders.filters.share}"></span>
+                        </label>
+                    </div>
+
+                </form>
+            </section>
+
+            <footer class="modal-card-foot" id="filterFormActions" style="display: none;">
+                <button type="submit" form="filterForm" class="button is-primary"
+                        th:text="#{orders.filters.save}"></button>
+                <button type="button" class="button" id="backToFiltersList"
+                        th:text="#{orders.filters.back}"></button>
+            </footer>
+        </div>
+    </div>
+
     <!-- Sections for each order status -->
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(NewStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('Nowe', ${ordersByStatus.get(NewStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssemblyStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('W trakcie kompletowania', ${ordersByStatus.get(AssemblyStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(AssembledStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('Gotowe do realizacji', ${ordersByStatus.get(AssembledStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(BlockedStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('Zablokowane', ${ordersByStatus.get(BlockedStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(RealizationStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('W realizacji', ${ordersByStatus.get(RealizationStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(PackagingStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('W trakcie pakowania', ${ordersByStatus.get(PackagingStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(ShippingStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('W dostawie', ${ordersByStatus.get(ShippingStatus)})}"></div>
-    </th:block>
-
-    <th:block th:if="${!#lists.isEmpty(ordersByStatus.get(DeliveredStatus))}">
-        <div th:replace="~{fragments/ordersListFragment :: box('Dostarczone', ${ordersByStatus.get(DeliveredStatus)})}"></div>
-    </th:block>
+    <div id="ordersSections" th:insert="~{fragments/openOrdersSections :: sections}"></div>
 
     <script th:inline="javascript">
-        // Initialize from server-side selected values (includes defaults)
-        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
+        let selectedFilterId = /*[[${selectedFilterId}]]*/ null;
 
-        function navigateWithFilters() {
-            const params = new URLSearchParams();
+        const ordersSections = document.getElementById('ordersSections');
+        const viewDropdown = document.getElementById('viewDropdown');
+        const modeSwitch = document.getElementById('filterModeSwitch');
+        const clearStatusesRow = document.getElementById('clearStatusesRow');
+        const modeButtons = {
+            statuses: document.getElementById('statusModeButton'),
+            custom: document.getElementById('customModeButton')
+        };
+        const panes = {
+            statuses: document.getElementById('statusPane'),
+            custom: document.getElementById('customPane')
+        };
+        const labels = {
+            statuses: document.getElementById('viewLabelStatuses'),
+            custom: document.getElementById('viewLabelCustom')
+        };
 
-            selectedStatuses.forEach(status => params.append('statuses', status));
-
-            window.location.href = '/dashboard/orders?' + params.toString();
+        function statusOptions() {
+            return [...document.querySelectorAll('.status-option')];
         }
 
-        // Status tag click handler
-        document.querySelectorAll('.status-tag').forEach(tag => {
-            tag.addEventListener('click', function() {
-                const status = this.getAttribute('data-status');
-                if (selectedStatuses.has(status)) {
-                    selectedStatuses.delete(status);
-                } else {
-                    selectedStatuses.add(status);
+        function checkedStatuses() {
+            return statusOptions().filter(box => box.checked);
+        }
+
+        function activeMode() {
+            return selectedFilterId ? 'custom' : 'statuses';
+        }
+
+        function showMode(mode) {
+            Object.keys(panes).forEach(function(name) {
+                const shown = name === mode;
+                panes[name].style.display = shown ? 'block' : 'none';
+                labels[name].style.display = shown ? '' : 'none';
+                modeButtons[name].classList.toggle('is-selected', shown);
+                modeButtons[name].classList.toggle('is-primary', shown);
+            });
+        }
+
+        function refreshStatusLabel() {
+            const checked = checkedStatuses();
+            const label = labels.statuses;
+            if (checked.length === 0) {
+                label.textContent = label.dataset.placeholder;
+            } else if (checked.length === 1) {
+                label.textContent = checked[0].parentElement.querySelector('.status-name').textContent;
+            } else {
+                label.textContent = label.dataset.selected.replace('{0}', checked.length);
+            }
+            clearStatusesRow.style.display = checked.length === 0 ? 'none' : '';
+        }
+
+        function refreshFilterList() {
+            document.querySelectorAll('.filter-option').forEach(function(option) {
+                const chosen = option.dataset.filterId === selectedFilterId;
+                option.classList.toggle('is-selected', chosen);
+                option.querySelector('.filter-check').style.display = chosen ? '' : 'none';
+                option.href = chosen ? '/dashboard/orders' : '/dashboard/orders?filterId=' + option.dataset.filterId;
+                option.title = option.dataset.label;
+                if (chosen) {
+                    labels.custom.textContent = option.dataset.label;
+                    labels.custom.title = option.dataset.label;
                 }
-                navigateWithFilters();
+            });
+            if (!selectedFilterId) {
+                labels.custom.textContent = labels.custom.dataset.placeholder;
+                labels.custom.title = '';
+            }
+        }
+
+        function refreshCustomLabel() {
+            const chosen = document.querySelector('.filter-option.is-selected');
+            labels.custom.textContent = chosen ? chosen.dataset.label : labels.custom.dataset.placeholder;
+            labels.custom.title = chosen ? chosen.dataset.label : '';
+        }
+
+        function refreshFiltersFromServer() {
+            const url = window.location.href;
+            fetch(url, {headers: {'X-Requested-With': 'fetch'}})
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(function(html) {
+                    const fetched = new DOMParser().parseFromString(html, 'text/html');
+                    ['filterMessages', 'statusPane', 'customPane', 'savedFiltersPane', 'ordersSections']
+                            .forEach(function(id) {
+                                const incoming = fetched.getElementById(id);
+                                const current = document.getElementById(id);
+                                if (incoming && current) {
+                                    current.innerHTML = incoming.innerHTML;
+                                }
+                            });
+                    const dropdown = fetched.getElementById('viewDropdown');
+                    selectedFilterId = dropdown ? (dropdown.dataset.selectedFilterId || null) : null;
+                    history.replaceState(null, '',
+                            selectedFilterId ? '/dashboard/orders?filterId=' + selectedFilterId : '/dashboard/orders');
+                    refreshStatusLabel();
+                    refreshCustomLabel();
+                    showMode(activeMode());
+                })
+                .catch(function() {
+                    window.location.reload();
+                });
+        }
+
+        function refreshList(params) {
+            fetch('/dashboard/orders/list?' + params.toString())
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(function(html) {
+                    ordersSections.innerHTML = html;
+                    history.pushState(null, '', '/dashboard/orders?' + params.toString());
+                    refreshStatusLabel();
+                    refreshFilterList();
+                    showMode(activeMode());
+                })
+                .catch(function() {
+                    window.location.href = '/dashboard/orders?' + params.toString();
+                });
+        }
+
+        function applyStatuses(statuses) {
+            selectedFilterId = null;
+            const params = new URLSearchParams();
+            statuses.forEach(status => params.append('statuses', status));
+            if (statuses.length === 0) {
+                params.append('showAll', 'true');
+            }
+            refreshList(params);
+        }
+
+        function applyFilter(filterId) {
+            selectedFilterId = filterId;
+            statusOptions().forEach(box => box.checked = false);
+            const params = new URLSearchParams();
+            if (filterId) {
+                params.append('filterId', filterId);
+            } else {
+                params.append('showAll', 'true');
+            }
+            refreshList(params);
+        }
+
+        function closeViewDropdown() {
+            viewDropdown.classList.remove('is-active');
+        }
+
+        showMode(activeMode());
+
+        document.getElementById('viewDropdownButton').addEventListener('click', function() {
+            viewDropdown.classList.toggle('is-active');
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!viewDropdown.contains(event.target) && !modeSwitch.contains(event.target)) {
+                closeViewDropdown();
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeViewDropdown();
+            }
+        });
+
+        Object.keys(modeButtons).forEach(function(mode) {
+            modeButtons[mode].addEventListener('click', function() {
+                showMode(mode);
             });
         });
 
-        // Clear filters button
-        document.getElementById('clearFilters').addEventListener('click', function() {
-            window.location.href = '/dashboard/orders?showAll=true';
+        document.addEventListener('change', function(event) {
+            if (event.target.classList.contains('status-option')) {
+                applyStatuses(checkedStatuses().map(checked => checked.value));
+            }
         });
+
+        document.addEventListener('click', function(event) {
+            if (event.target.closest('#clearStatuses')) {
+                statusOptions().forEach(box => box.checked = false);
+                applyStatuses([]);
+                return;
+            }
+
+            const option = event.target.closest('.filter-option');
+            if (option) {
+                event.preventDefault();
+                applyFilter(option.dataset.filterId === selectedFilterId ? null : option.dataset.filterId);
+            }
+        });
+
+        const filtersModal = document.getElementById('orderFiltersModal');
+        const savedFiltersPane = document.getElementById('savedFiltersPane');
+        const filterForm = document.getElementById('filterForm');
+        const filterIdField = document.getElementById('filterIdField');
+        const filterFormActions = document.getElementById('filterFormActions');
+
+        function toggleOrderFiltersModal(open) {
+            filtersModal.classList.toggle('is-active', open);
+            if (open) {
+                showSavedFiltersPane();
+            }
+        }
+
+        function showSavedFiltersPane() {
+            savedFiltersPane.style.display = 'block';
+            filterForm.style.display = 'none';
+            filterFormActions.style.display = 'none';
+        }
+
+        function showFilterForm(creating) {
+            filterForm.action = creating ? '/dashboard/orders/filters' : '/dashboard/orders/filters/update';
+            savedFiltersPane.style.display = 'none';
+            filterForm.style.display = 'block';
+            filterFormActions.style.display = 'flex';
+        }
+
+        function selectOption(select, value) {
+            const match = Array.from(select.options)
+                    .find(option => option.value.toUpperCase() === value.toUpperCase());
+            if (match) {
+                select.value = match.value;
+                return;
+            }
+            const missing = new Option(value, value, true, true);
+            select.add(missing);
+        }
+
+        function showFilterFormError(message) {
+            const box = document.getElementById('filterFormError');
+            box.textContent = message || '';
+            box.style.display = message ? '' : 'none';
+        }
+
+        function formatPostalCode(input, appendSeparator) {
+            const digits = input.value.replace(/\D/g, '').slice(0, 5);
+            if (digits.length > 2) {
+                input.value = digits.slice(0, 2) + '-' + digits.slice(2);
+            } else if (digits.length === 2 && appendSeparator) {
+                input.value = digits + '-';
+            } else {
+                input.value = digits;
+            }
+        }
+
+        document.addEventListener('input', function(event) {
+            const input = event.target;
+            if (input.name !== 'shippingPostalCode') {
+                return;
+            }
+            formatPostalCode(input, !(event.inputType || '').startsWith('delete'));
+            input.setSelectionRange(input.value.length, input.value.length);
+        });
+
+        function fillFilterForm(button) {
+            filterForm.reset();
+            filterIdField.value = button.getAttribute('data-filter-id');
+            filterForm.elements['label'].value = button.getAttribute('data-label');
+
+            const shared = filterForm.elements['sharedWithStore'];
+            if (shared) {
+                shared.checked = button.getAttribute('data-shared') === 'true';
+            }
+
+            ['status', 'shipmentType', 'paymentSource', 'sourceName', 'shippingPostalCode', 'shippingDue']
+                    .forEach(function(field) {
+                        const value = button.dataset[field];
+                        const input = filterForm.elements[field];
+                        if (!value || !input) {
+                            return;
+                        }
+                        if (input.tagName === 'SELECT') {
+                            selectOption(input, value);
+                        } else {
+                            input.value = value;
+                            formatPostalCode(input, false);
+                        }
+                    });
+        }
+
+        function rejectionIn(html) {
+            const messages = new DOMParser().parseFromString(html, 'text/html').getElementById('filterMessages');
+            const rejection = messages ? messages.querySelector('.is-danger') : null;
+            return rejection ? rejection.textContent.trim() : '';
+        }
+
+        function submitFilterChange(form) {
+            fetch(form.action, {
+                method: 'POST',
+                headers: {'X-Requested-With': 'fetch'},
+                body: new URLSearchParams(new FormData(form))
+            })
+                .then(function(response) {
+                    return response.text().then(function(body) {
+                        const rejection = response.ok ? rejectionIn(body) : body.trim();
+                        if (rejection) {
+                            showFilterFormError(rejection);
+                            return;
+                        }
+                        showFilterFormError('');
+                        showSavedFiltersPane();
+                        refreshFiltersFromServer();
+                    });
+                })
+                .catch(function() {
+                    form.submit();
+                });
+        }
+
+        document.addEventListener('click', function(event) {
+            if (event.target.closest('#newFilterButton')) {
+                showFilterFormError('');
+                filterForm.reset();
+                filterIdField.value = '';
+                showFilterForm(true);
+                return;
+            }
+
+            if (event.target.closest('#backToFiltersList')) {
+                showFilterFormError('');
+                showSavedFiltersPane();
+                return;
+            }
+
+            const editButton = event.target.closest('.edit-filter');
+            if (editButton) {
+                showFilterFormError('');
+                fillFilterForm(editButton);
+                showFilterForm(false);
+            }
+        });
+
+        document.addEventListener('submit', function(event) {
+            const form = event.target.closest('#filterForm, .delete-filter-form');
+            if (!form) {
+                return;
+            }
+            event.preventDefault();
+            submitFilterChange(form);
+        });
+
+        if (/*[[${openFilters}]]*/ false) {
+            toggleOrderFiltersModal(true);
+        }
     </script>
 
 </div>
