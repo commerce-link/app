@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -122,6 +123,8 @@ public class OrdersController extends BaseController {
     private DropshipItemLookup dropshipItemLookup;
     @Autowired
     private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
+    @Value("${app.domain}")
+    private String appDomain;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -329,6 +332,7 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::resolveTaxonomyName)));
 
         model.addAttribute("order", order);
+        model.addAttribute("clientOrderUrl", order.hasStatus(OrderStatus.Completed) ? null : order.createClientOrderUrl(appDomain));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);
@@ -884,7 +888,10 @@ public class OrdersController extends BaseController {
                     .filter(previous -> previous.hasTrackingNo(shipment.getTrackingNo()))
                     .findFirst()
                     .ifPresent(shipment::inheritTrackingSubscriptionFrom));
-            existingOrder.replaceShipments(shipments);
+            // The operator's edit is authoritative: replaceShipments would re-inherit the previous collection
+            // point and force the type back to PickupPoint, making a change of delivery type impossible.
+            shipments.forEach(shipment -> shipment.setCollectionPointCode(StringUtils.trimToNull(shipment.getCollectionPointCode())));
+            existingOrder.setShipments(shipments);
         }
         shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         String view = save(existingOrder);

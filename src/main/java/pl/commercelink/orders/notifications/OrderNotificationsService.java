@@ -1,6 +1,6 @@
 package pl.commercelink.orders.notifications;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.email.EmailClient;
@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 class OrderNotificationsService {
 
     private final OrdersRepository ordersRepository;
@@ -30,6 +29,22 @@ class OrderNotificationsService {
     private final EmailClient emailClient;
 
     private final CategoryLocalizer categoryLocalizer;
+
+    private final String appDomain;
+
+    OrderNotificationsService(OrdersRepository ordersRepository,
+                              OrderItemsRepository orderItemsRepository,
+                              OrderEventsRepository orderEventsRepository,
+                              EmailClient emailClient,
+                              CategoryLocalizer categoryLocalizer,
+                              @Value("${app.domain}") String appDomain) {
+        this.ordersRepository = ordersRepository;
+        this.orderItemsRepository = orderItemsRepository;
+        this.orderEventsRepository = orderEventsRepository;
+        this.emailClient = emailClient;
+        this.categoryLocalizer = categoryLocalizer;
+        this.appDomain = appDomain;
+    }
 
     void send(Order order) {
 
@@ -115,6 +130,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 order.getEstimatedAssemblyAt(),
                 order.getEstimatedShippingAt(),
                 order.isPersonalCollection()
@@ -133,6 +149,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 order.getEstimatedShippingAt()
         );
 
@@ -149,6 +166,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 order.getEstimatedShippingAt()
         );
 
@@ -171,6 +189,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 firstCollection.getShippedAt().toLocalDate()
         );
 
@@ -191,6 +210,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 !order.isB2B(),
                 order.isB2B()
         );
@@ -210,7 +230,8 @@ class OrderNotificationsService {
         EmailNotification msg = new OrderReviewEmailNotification(
                 getRecipientEmail(order),
                 getRecipientName(order),
-                order.getOrderId()
+                order.getOrderId(),
+                orderStatusLink(order)
         );
 
         return send(order.getStoreId(), msg, EmailNotificationType.ORDER_REVIEW);
@@ -225,6 +246,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 oldAssemblyDate,
                 order.getEstimatedAssemblyAt()
         );
@@ -259,6 +281,7 @@ class OrderNotificationsService {
                 getRecipientEmail(order),
                 getRecipientName(order),
                 order.getOrderId(),
+                orderStatusLink(order),
                 order.getTotalPrice(),
                 paymentMethod,
                 orderItems,
@@ -273,6 +296,10 @@ class OrderNotificationsService {
 
     private boolean qualifiesForNotification(Order order, OrderStatus orderStatus, EmailNotificationType emailNotificationType) {
         return order.getStatus() == orderStatus && !orderEventsRepository.hasEvent(order.getOrderId(), EventType.email, emailNotificationType.name());
+    }
+
+    private String orderStatusLink(Order order) {
+        return order.createClientOrderUrl(appDomain);
     }
 
     private String getRecipientEmail(Order order) {

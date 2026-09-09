@@ -112,6 +112,23 @@
             opacity: 1;
             visibility: visible;
         }
+        .cl-toast {
+            display: none;
+            position: fixed;
+            top: 32px;
+            right: 32px;
+            z-index: 9999;
+            padding: 16px 32px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            font-size: 1.1em;
+            color: #fff;
+            background: #48c774;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .cl-toast.is-danger { background: #f14668; }
+        .cl-toast.is-info { background: #3e8ed0; }
     </style>
 </head>
 <body>
@@ -323,6 +340,25 @@
             }
             return true;
         }
+    }
+</script>
+
+<div id="clToast" class="cl-toast" role="status" aria-live="polite"></div>
+<script th:inline="javascript">
+    const CL_TOAST_COPIED = /*[[#{general.copied}]]*/ 'Skopiowano';
+    let clToastTimer = null;
+
+    function showToast(message, type) {
+        const toast = document.getElementById('clToast');
+        toast.textContent = message;
+        toast.className = 'cl-toast' + (type ? ' is-' + type : '');
+        toast.style.display = 'block';
+        requestAnimationFrame(() => { toast.style.opacity = '1'; });
+        clearTimeout(clToastTimer);
+        clToastTimer = setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => { toast.style.display = 'none'; }, 300);
+        }, 2000);
     }
 </script>
 

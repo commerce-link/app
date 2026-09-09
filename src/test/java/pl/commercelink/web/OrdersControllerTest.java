@@ -214,6 +214,34 @@ class OrdersControllerTest {
     }
 
     @Test
+    @DisplayName("updateShipments lets the operator change a pickup-point shipment into a courier one and drop the point")
+    void updateShipmentsAppliesOperatorTypeChangeFromPickupPointToCourier() {
+        // given
+        Order existingOrder = orderBase();
+        Shipment locker = new Shipment(ShipmentType.PickupPoint);
+        locker.setCarrier("InPost");
+        locker.setCollectionPointCode("KRA01M");
+        existingOrder.setShipments(new ArrayList<>(List.of(locker)));
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setCarrier("DPD");
+        courier.setTrackingNo("TRACK-9");
+        courier.setShippedAt(LocalDateTime.now());
+        courier.setCollectionPointCode(" ");
+        Order updatedPayload = new Order(STORE_ID);
+        updatedPayload.setShipments(List.of(courier));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+
+        // when
+        ordersController.updateShipments(ORDER_ID, updatedPayload, null);
+
+        // then
+        Shipment saved = existingOrder.getShipments().get(0);
+        assertThat(saved.getType()).isEqualTo(ShipmentType.Courier);
+        assertThat(saved.getCollectionPointCode()).isNull();
+        assertThat(saved.getCarrier()).isEqualTo("DPD");
+    }
+
+    @Test
     @DisplayName("updateShipments does not publish ShipmentCreated when no shipment has shipping data")
     void updateShipmentsSkipsPublishWhenShippingDataAbsent() {
         // given

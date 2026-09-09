@@ -34,6 +34,7 @@ public class WebSecurityConfiguration {
                             "/Store/**",
                             "/store/*/individual/offer/**",
                             "/store/*/client/rma/**",
+                            "/store/*/client/order/**",
                             "/StoreLogo/**",
                             "/register",
                             "/register/password",
