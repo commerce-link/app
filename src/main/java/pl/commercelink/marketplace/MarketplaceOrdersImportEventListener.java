@@ -1,7 +1,8 @@
 package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
@@ -14,16 +15,13 @@ import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@Slf4j
+@RequiredArgsConstructor
 public class MarketplaceOrdersImportEventListener {
 
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private MarketplaceOrderImporter marketplaceOrderImporter;
-
-    @Autowired
-    private MarketplaceProviderFactory providerFactory;
+    private final StoresRepository storesRepository;
+    private final MarketplaceOrderImporter marketplaceOrderImporter;
+    private final MarketplaceProviderFactory providerFactory;
 
     @SqsListener(
             value = "marketplace-orders-import-queue",
@@ -54,6 +52,7 @@ public class MarketplaceOrdersImportEventListener {
         storesRepository.save(store);
     }
 
+    /** Scheduler payload: {"marketplace":"Allegro"}. */
     public static class MarketplaceOrderPayload {
 
         private String marketplace;
@@ -64,7 +63,6 @@ public class MarketplaceOrdersImportEventListener {
         public String getMarketplace() {
             return marketplace;
         }
-
     }
 
 }

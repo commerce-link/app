@@ -41,12 +41,18 @@ public class MarketplaceOrderImporter {
 
         BigDecimal commission = BigDecimal.ZERO;
         List<BasketItem> basketItems = new ArrayList<>();
+        // Basket.setBasketItems normalises mfn (uppercase, spaces stripped); the marketplace key must stay raw,
+        // so it is captured here, before the basket is built, and keyed by the basket item id.
+        Map<String, String> rawKeysByBasketItemId = new HashMap<>();
 
         for (MarketplaceProduct product : marketplaceOrder.products()) {
             commission = commission.add(product.commission());
 
+            String basketItemId = UUID.randomUUID().toString();
+            rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
+
             basketItems.add(new BasketItem(
-                    UUID.randomUUID().toString(),
+                    basketItemId,
                     product.name(),
                     product.manufacturerCode(),
                     resolveProductCategory(product.manufacturerCode()),
@@ -90,7 +96,13 @@ public class MarketplaceOrderImporter {
         Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
-                .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
+                .map(i -> {
+                    OrderItem orderItem = OrderItem.fromBasketItem(order.getOrderId(), i);
+                    if (!i.isService()) {
+                        orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
+                    }
+                    return orderItem;
+                })
                 .collect(Collectors.toList());
 
         ordersManager.saveWithFulfilment(order, orderItems);
