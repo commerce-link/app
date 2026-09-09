@@ -43,6 +43,13 @@
             <div class="box mb-5">
                 <h2 class="title is-6" th:text="#{store.marketplaces.exports.rows.title}"></h2>
 
+                <div class="field" th:if="${!rows.isEmpty()}">
+                    <div class="control">
+                        <input class="input is-small" type="text" id="exportRowsSearch"
+                               th:placeholder="#{store.marketplaces.exports.rows.search.placeholder}">
+                    </div>
+                </div>
+
                 <div class="table-container" th:if="${!rows.isEmpty()}">
                     <table class="table is-fullwidth is-narrow is-striped">
                         <thead>
@@ -57,8 +64,8 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="row : ${rows}">
-                            <td th:text="${row.pimId()}"></td>
+                        <tr class="export-row" th:each="row : ${rows}">
+                            <td class="export-row-pim-id" th:text="${row.pimId()}"></td>
                             <td th:text="${row.price()}"></td>
                             <td th:text="${row.quantity()}"></td>
                             <td th:text="${row.removalAttempts()}"></td>
@@ -85,6 +92,25 @@
                        th:text="#{store.marketplaces.exports.open.raw}"></a>
                 </div>
             </div>
+
+            <script th:inline="none">
+                document.addEventListener('DOMContentLoaded', function () {
+                    const search = document.getElementById('exportRowsSearch');
+                    if (!search) {
+                        return;
+                    }
+
+                    search.addEventListener('input', function () {
+                        const needle = search.value.toLowerCase();
+                        document.querySelectorAll('.export-row').forEach(function (row) {
+                            const pimId = row.querySelector('.export-row-pim-id');
+                            const matches = pimId !== null
+                                    && pimId.textContent.toLowerCase().indexOf(needle) !== -1;
+                            row.classList.toggle('is-hidden', !matches);
+                        });
+                    });
+                });
+            </script>
 
         </div>
     </section>

@@ -114,6 +114,26 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
+    void rendersTheProductIdSearchBoxAboveTheRowsTable() {
+        // given
+        WebContext context = runDetailsContext(rows(3), false);
+
+        // when
+        String html = templateEngine().process("store-marketplace-export-run", context);
+
+        // then
+        assertThat(html).contains("id=\"exportRowsSearch\"");
+        assertThat(html).contains("class=\"input is-small\"");
+        assertThat(html).contains("Szukaj po PIM ID produktu");
+        assertThat(html).contains("class=\"export-row\"");
+        assertThat(html).contains("class=\"export-row-pim-id\"");
+        assertThat(html).contains("getElementById('exportRowsSearch')");
+        assertThat(html).contains("is-hidden");
+        assertThat(html).doesNotContain("??");
+        assertThat(html.indexOf("exportRowsSearch")).isLessThan(html.indexOf("<table"));
+    }
+
+    @Test
     void showsTheExportHistoryLinkNextToTheDisconnectButtonOfTheMarketplacePanel() {
         // when
         String html = renderIntegrationPanel("marketplace");
