@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,11 +22,14 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +66,7 @@ class DeliveryCreationServiceTest {
         form.setExternalDeliveryId("EXT-9");
         form.setShippingCost(20.0);
         form.setPaymentCost(5.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
         DeliveryItem item = new DeliveryItem();
         item.setMfn("MFN-1");
         item.setRequestedQty(2);
@@ -81,6 +86,46 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    void completePendingStillCompletesTheDeliveryWhenDatePropagationFails() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setExternalDeliveryId("EXT-9");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
+        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of())).thenReturn(0.0);
+        doThrow(new IllegalStateException("dynamo down"))
+                .when(orderAllocationsManager).propagateEstimatedDeliveryAt(any(), any(), any());
+
+        // when
+        assertDoesNotThrow(() -> service.completePending(STORE_ID, delivery, form));
+
+        // then
+        assertThat(delivery.getOrderStatus()).isNull();
+        assertThat(delivery.getExternalDeliveryId()).isEqualTo("EXT-9");
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    void completePendingPropagatesAfterTheDeliveryIsSaved() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
+        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of())).thenReturn(0.0);
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
     }
 
     @Test
@@ -253,6 +298,7 @@ class DeliveryCreationServiceTest {
         assertEquals(3.0, delivery.getTotalCost());
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager, never()).propagateEstimatedDeliveryAt(any(), any(), any());
     }
 
     @Test

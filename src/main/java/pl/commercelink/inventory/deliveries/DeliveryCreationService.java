@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -10,6 +11,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class DeliveryCreationService {
 
     @Autowired
@@ -80,6 +83,8 @@ public class DeliveryCreationService {
 
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
+
+        propagateEstimatedDeliveryAt(storeId, delivery, form.getEstimatedDeliveryAt());
     }
 
     public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
@@ -87,6 +92,20 @@ public class DeliveryCreationService {
         delivery.setOrderStatus(null);
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
+    }
+
+    /**
+     * The delivery is already saved with the supplier's order number, so a failure here must not undo the
+     * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
+     * be lost. Log loudly and leave the dates for the operator to fix on the delivery instead.
+     */
+    private void propagateEstimatedDeliveryAt(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
+        try {
+            orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+        } catch (RuntimeException e) {
+            log.error("Estimated delivery date propagation failed: store={} delivery={} provider={} estimatedDeliveryAt={}",
+                    storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
+        }
     }
 
     private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {
