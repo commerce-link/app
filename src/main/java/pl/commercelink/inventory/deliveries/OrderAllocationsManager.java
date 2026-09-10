@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.*;
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 public class OrderAllocationsManager {
 
@@ -77,9 +79,14 @@ public class OrderAllocationsManager {
             return;
         }
         orderItemsRepository.findByDeliveryIdAndStatuses(deliveryId, List.of(FulfilmentStatus.Ordered))
-                .stream()
-                .distinct()
-                .forEach(orderId -> ordersManager.updateEstimatedDeliveryAt(storeId, orderId, estimatedDeliveryAt));
+                .forEach(orderId -> {
+                    try {
+                        ordersManager.updateEstimatedDeliveryAt(storeId, orderId, estimatedDeliveryAt);
+                    } catch (RuntimeException e) {
+                        log.error("Estimated delivery date not applied to order: store={} delivery={} order={} estimatedDeliveryAt={}",
+                                storeId, deliveryId, orderId, estimatedDeliveryAt, e);
+                    }
+                });
     }
 
     public void release(String storeId, String deliveryId, String provider) {
