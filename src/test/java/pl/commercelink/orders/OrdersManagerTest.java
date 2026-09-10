@@ -18,6 +18,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
+import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -77,6 +78,8 @@ class OrdersManagerTest {
     private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
     @Mock
     private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private OrderNotificationsEventPublisher notificationEventPublisher;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -798,6 +801,43 @@ class OrdersManagerTest {
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(later);
         verify(orderLifecycle).update(eq(order), any());
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt notifies the customer when an existing assembly date moves later")
+    void updateEstimatedDeliveryAtNotifiesWhenAnExistingAssemblyDateMovesLater() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 18));
+        verify(notificationEventPublisher).publishAssemblyDateChanged(order, LocalDate.of(2026, 9, 11));
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt does not notify when the date is set for the first time")
+    void updateEstimatedDeliveryAtDoesNotNotifyWhenTheDateIsSetForTheFirstTime() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18));
+
+        // then
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
     }
 
     @Test

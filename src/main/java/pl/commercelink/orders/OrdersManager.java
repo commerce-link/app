@@ -8,6 +8,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
+import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.Store;
@@ -20,6 +21,7 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -47,6 +49,8 @@ public class OrdersManager {
     private OrderLifecycle orderLifecycle;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private OrderNotificationsEventPublisher notificationEventPublisher;
 
     public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int qty, int position) {
         OrderItem orderItem;
@@ -161,8 +165,13 @@ public class OrdersManager {
             return;
         }
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
-        order.updateEstimatedAssemblyAt(estimatedDeliveryAt);
+        LocalDate previousAssemblyAt = order.getEstimatedAssemblyAt();
+        LocalDate assemblyAt = order.updateEstimatedAssemblyAt(estimatedDeliveryAt);
         orderLifecycle.update(order, orderItems);
+        if (previousAssemblyAt != null && !Objects.equals(previousAssemblyAt, assemblyAt)) {
+            // A date the customer already received moved later - same signal the operator's delivery edit sends.
+            notificationEventPublisher.publishAssemblyDateChanged(order, previousAssemblyAt);
+        }
     }
 
     public void returnOrderItemsToSupplierAllocation(String storeId, String orderId, String deliveryId,
