@@ -492,8 +492,11 @@ public class SupplierPurchaseService {
         if (delivery.getEstimatedDeliveryAt() != null) {
             return delivery.getEstimatedDeliveryAt();
         }
-        ShippingTerms terms = supplierRegistry.get(delivery.getProvider()).shippingTermsFor("PL");
-        return LocalDate.now().plusDays(terms.arrivalDays());
+        return shippingTermsDate(delivery.getProvider());
+    }
+
+    private LocalDate shippingTermsDate(String provider) {
+        return LocalDate.now().plusDays(supplierRegistry.get(provider).shippingTermsFor("PL").arrivalDays());
     }
 
     private boolean canRecoverFailedPurchase(Delivery delivery) {
@@ -640,7 +643,7 @@ public class SupplierPurchaseService {
         });
 
         ShippingTerms terms = supplierRegistry.get(form.getProvider()).shippingTermsFor("PL");
-        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(terms.arrivalDays()));
+        form.setEstimatedDeliveryAt(shippingTermsDate(form.getProvider()));
         double totalNetForShipping = orderResult.totalNet() > 0
                 ? orderResult.totalNet() * conversion.sellRate()
                 : validation.totalNet();
