@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 
-class ExternalSupplierBinding implements Predicate<FulfilmentItem> {
+public final class ExternalSupplierBinding implements Predicate<FulfilmentItem> {
 
     private final Map<String, String> externalSupplierIdByOrderId;
     private final Map<String, String> externalSupplierIdBySupplierName;
@@ -22,7 +22,7 @@ class ExternalSupplierBinding implements Predicate<FulfilmentItem> {
         this.externalSupplierIdBySupplierName = externalSupplierIdBySupplierName;
     }
 
-    static ExternalSupplierBinding of(Store store, Collection<Order> orders) {
+    public static ExternalSupplierBinding of(Store store, Collection<Order> orders) {
         Map<String, String> byOrderId = new HashMap<>();
         for (Order order : orders) {
             if (order.isBoundToExternalSupplier()) {
@@ -43,10 +43,14 @@ class ExternalSupplierBinding implements Predicate<FulfilmentItem> {
 
     @Override
     public boolean test(FulfilmentItem candidate) {
-        String required = externalSupplierIdByOrderId.get(candidate.getAllocation().getOrderId());
+        return permits(candidate.getAllocation().getOrderId(), candidate.getSource().getProvider());
+    }
+
+    public boolean permits(String orderId, String supplierName) {
+        String required = externalSupplierIdByOrderId.get(orderId);
         if (required == null) {
             return true;
         }
-        return required.equals(externalSupplierIdBySupplierName.get(candidate.getSource().getProvider()));
+        return supplierName != null && required.equals(externalSupplierIdBySupplierName.get(supplierName));
     }
 }

@@ -99,4 +99,29 @@ class ExternalSupplierBindingTest {
 
         assertThat(binding.test(candidate("order-1", "Acme"))).isFalse();
     }
+
+    @Test
+    @DisplayName("permits answers the same question as test(), by order id and supplier name")
+    void permitsMirrorsTheCandidateFilter() {
+        // given
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(
+                storeWith(connection("Acme", "2")), List.of(order("order-1", "2"), order("order-2", null)));
+
+        // when / then
+        assertThat(binding.permits("order-1", "Acme")).isTrue();
+        assertThat(binding.permits("order-1", "ACME")).isTrue();
+        assertThat(binding.permits("order-1", "Bravo")).isFalse();
+        assertThat(binding.permits("order-1", SupplierRegistry.WAREHOUSE)).isFalse();
+        assertThat(binding.permits("order-2", "Bravo")).isTrue();
+    }
+
+    @Test
+    @DisplayName("an order the binding was not built for is treated as unrouted")
+    void unknownOrderIsPermittedEverywhere() {
+        // given
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(storeWith(connection("Acme", "2")), List.of());
+
+        // when / then
+        assertThat(binding.permits("order-9", "Bravo")).isTrue();
+    }
 }
