@@ -32,6 +32,7 @@ import pl.commercelink.orders.filters.services.OrderFiltersService;
 
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
+import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -667,6 +668,13 @@ public class OrdersController extends BaseController {
         if (!orderItem.isReleasable()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        Store store = storesRepository.findById(getStoreId());
+        if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, supplier)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
 
