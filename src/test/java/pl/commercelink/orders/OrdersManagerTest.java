@@ -16,6 +16,7 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
@@ -765,6 +766,26 @@ class OrdersManagerTest {
         // two working days after Friday 2026-09-11 is Tuesday 2026-09-15
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 15));
         verify(orderLifecycle).update(order, items);
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt gives a direct-to-consumer order the same assembly and shipping date")
+    void updateEstimatedDeliveryAtGivesADirectToConsumerOrderTheSameAssemblyAndShippingDate() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        order.setOrderRealizationDays(5);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 13));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 13));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 13));
+        verify(orderLifecycle).update(eq(order), any());
     }
 
     @Test
