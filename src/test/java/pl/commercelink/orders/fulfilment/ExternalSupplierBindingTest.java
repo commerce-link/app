@@ -112,6 +112,7 @@ class ExternalSupplierBindingTest {
         assertThat(binding.permits("order-1", "ACME")).isTrue();
         assertThat(binding.permits("order-1", "Bravo")).isFalse();
         assertThat(binding.permits("order-1", SupplierRegistry.WAREHOUSE)).isFalse();
+        assertThat(binding.permits("order-1", null)).isFalse();
         assertThat(binding.permits("order-2", "Bravo")).isTrue();
     }
 
