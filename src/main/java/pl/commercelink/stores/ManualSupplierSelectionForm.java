@@ -8,6 +8,7 @@ public class ManualSupplierSelectionForm {
     private boolean includeInPricing;
     private boolean includeInFulfilment;
     private boolean hasFeed;
+    private String externalSupplierId;
 
     public String getIdentity() {
         return identity;
@@ -57,4 +58,11 @@ public class ManualSupplierSelectionForm {
         this.hasFeed = hasFeed;
     }
 
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
+    }
 }

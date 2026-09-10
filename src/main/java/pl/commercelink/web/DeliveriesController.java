@@ -14,6 +14,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
@@ -33,6 +34,8 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
+import pl.commercelink.web.dtos.RoutedOrderView;
+import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -820,21 +823,23 @@ public class DeliveriesController {
         }
         model.addAttribute("delivery", delivery);
         SupplierOrderOptionsContext optionsContext;
+        Order dropshipOrder = null;
         if (delivery.isDropship()) {
-            Order order = resolveDropshipOrder(storeId, delivery);
-            if (order != null && order.getShippingDetails() != null) {
-                model.addAttribute("consignee", order.getShippingDetails());
+            dropshipOrder = resolveDropshipOrder(storeId, delivery);
+            if (dropshipOrder != null && dropshipOrder.getShippingDetails() != null) {
+                model.addAttribute("consignee", dropshipOrder.getShippingDetails());
             }
             model.addAttribute("pickupShipment",
-                    order != null ? DropshipPurchaseService.pickupShipment(order).orElse(null) : null);
-            optionsContext = order != null
-                    ? DropshipPurchaseService.optionsContext(order)
+                    dropshipOrder != null ? DropshipPurchaseService.pickupShipment(dropshipOrder).orElse(null) : null);
+            optionsContext = dropshipOrder != null
+                    ? DropshipPurchaseService.optionsContext(dropshipOrder)
                     : SupplierOrderOptionsContext.dropship(null);
         } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(storeId, model);
             optionsContext = SupplierOrderOptionsContext.warehouse();
         }
+        model.addAttribute("routedOrders", routedOrdersOf(storeId, delivery, dropshipOrder));
         OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
                 optionsContext, delivery.getSupplierOrderChoices(), model);
         return "deliveryApproval";
@@ -1167,6 +1172,32 @@ public class DeliveriesController {
         } catch (IllegalStateException e) {
             return null;
         }
+    }
+
+    private List<RoutedOrderView> routedOrdersOf(String storeId, Delivery delivery, Order dropshipOrder) {
+        List<Order> orders;
+        if (delivery.isDropship()) {
+            orders = dropshipOrder != null ? List.of(dropshipOrder) : List.of();
+        } else {
+            orders = delivery.getAllocations().stream()
+                    .map(Allocation::getKey)
+                    .filter(Objects::nonNull)
+                    .map(AllocationKey::getOrderId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .map(orderId -> ordersRepository.findById(storeId, orderId))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        Store store = storesRepository.findById(storeId);
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(store, orders);
+        return orders.stream()
+                .filter(Order::isBoundToExternalSupplier)
+                .map(order -> new RoutedOrderView(
+                        order.getShortenedOrderId(),
+                        RoutedSupplierView.from(order, store, supplierRegistry),
+                        binding.permits(order.getOrderId(), delivery.getProvider())))
+                .toList();
     }
 
     private void addApprovalAddresses(String storeId, Delivery delivery, Model model) {

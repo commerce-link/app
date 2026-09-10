@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier.manual;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
@@ -44,11 +45,11 @@ public class ManualSupplierService {
     }
 
     public record ManualSupplierView(String identity, String label, boolean enabled, boolean includeInPricing,
-                                     boolean includeInFulfilment, boolean hasFeed) {
+                                     boolean includeInFulfilment, boolean hasFeed, String externalSupplierId) {
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment) {
+                                  boolean includeInFulfilment, String externalSupplierId) {
     }
 
     public Result create(String storeId, String label) {
@@ -114,6 +115,7 @@ public class ManualSupplierService {
                     connection.setEnabled(selection.enabled() && hasFeed);
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
+                    connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
                 }
             }
         }
@@ -135,7 +137,8 @@ public class ManualSupplierService {
                         connection.isEnabled(),
                         connection.isIncludeInPricing(),
                         connection.isIncludeInFulfilment(),
-                        storeFeedRepository.canRead(store.getStoreId(), identity, "csv")));
+                        storeFeedRepository.canRead(store.getStoreId(), identity, "csv"),
+                        connection.getExternalSupplierId()));
             }
         }
         return views;

@@ -155,6 +155,21 @@
                     <span th:if="${order.source?.type != null}" th:text="' (' + ${order.source.type} + ')'" class="is-size-6 has-text-grey"></span>
                 </p>
             </div>
+            <div class="column" th:if="${routedSupplier != null}">
+                <p class="heading" th:text="#{order.routed.supplier}"></p>
+                <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
+                    <span th:text="${routedSupplier.supplierName}"></span>
+                    <span class="is-size-6 has-text-grey" th:text="' (' + #{${routedSupplier.modeKey}} + ')'"></span>
+                </p>
+                <p class="title is-5 mb-1 has-text-danger" th:unless="${routedSupplier.matched}" th:text="#{order.routed.supplier.unmatched}"></p>
+                <p class="is-size-7 has-text-grey" th:text="'id: ' + ${routedSupplier.externalSupplierId}"></p>
+                <p class="is-size-7 has-text-grey" th:if="${routedSupplier.matched}">
+                    <span th:text="${routedSupplier.type}"></span>
+                    <span th:if="${routedSupplier.origin != null}" th:text="' · ' + ${routedSupplier.origin}"></span>
+                    <span th:unless="${routedSupplier.enabled and routedSupplier.includeInFulfilment}"
+                          class="has-text-danger" th:text="' · ' + #{order.routed.supplier.not.in.fulfilment}"></span>
+                </p>
+            </div>
         </div>
     </div>
 

@@ -424,6 +424,7 @@ public class StoreController {
             selection.setIncludeInPricing(view.includeInPricing());
             selection.setIncludeInFulfilment(view.includeInFulfilment());
             selection.setHasFeed(view.hasFeed());
+            selection.setExternalSupplierId(view.externalSupplierId());
             manualSelections.add(selection);
         }
         form.setManualSupplierSelections(manualSelections);
@@ -770,7 +771,8 @@ public class StoreController {
         for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
             manualSelections.add(new ManualSupplierService.ManualSelection(
                     selection.getIdentity(), selection.isEnabled(),
-                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
+                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment(),
+                    selection.getExternalSupplierId()));
         }
         manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
 

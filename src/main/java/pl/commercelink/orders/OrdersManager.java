@@ -106,6 +106,11 @@ public class OrdersManager {
     }
 
     public void assignFromWarehouse(String storeId, String orderId, String itemId, String warehouseItemId) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        if (order != null && order.isBoundToExternalSupplier()) {
+            throw new IllegalStateException("order.routed.warehouse.blocked");
+        }
+
         WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findById(storeId, warehouseItemId);
         if (warehouseItem == null || !(warehouseItem.isInStock() || warehouseItem.isInDelivery())) {
             throw new IllegalStateException("warehouse.item.not.available");

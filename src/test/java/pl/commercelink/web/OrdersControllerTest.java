@@ -30,6 +30,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
@@ -39,8 +40,13 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -91,6 +97,10 @@ class OrdersControllerTest {
     private DropshipItemLookup dropshipItemLookup;
     @Mock
     private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
+    @Mock
+    private TaxonomyCache taxonomyCache;
+    @Mock
+    private StoreCategories storeCategories;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -573,6 +583,43 @@ class OrdersControllerTest {
     }
 
     @Test
+    void savingItemRefusesADeliveryIdTheMarketplaceDidNotChoose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("Bravo");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(messageSource.getMessage(eq("order.item.assign.supplier.routed"), any(), any(Locale.class))).thenReturn("routed");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+
+        // then
+        assertThat(item.getDeliveryId()).isNull();
+        assertThat(model.getAttribute("errorMessage")).isEqualTo("routed");
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void savingItemAcceptsTheDeliveryIdTheMarketplaceChose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("Acme");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("Acme");
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
     @DisplayName("removeDocument removes the invoice and saves the order without triggering the lifecycle")
     void removeDocumentRemovesInvoiceAndSavesWithoutLifecycle() {
         // given
@@ -742,6 +789,69 @@ class OrdersControllerTest {
         assertThat(item.getClaimedDeliveryId()).isEqualTo("d-1");
         verify(orderItemsRepository, never()).save(any());
         verify(redirectAttributes).addFlashAttribute("errorMessage", "blocked");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    private static Store storeRouting(String supplierName, String externalSupplierId) {
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        connection.setExternalSupplierId(externalSupplierId);
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(new ArrayList<>(List.of(connection)));
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(config);
+        return store;
+    }
+
+    private static Order routedOrder(String externalSupplierId) {
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setExternalSupplierId(externalSupplierId);
+        return order;
+    }
+
+    @Test
+    void assignSupplierRefusesASupplierTheMarketplaceDidNotChoose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setManufacturerCode("MFN-1");
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(messageSource.getMessage(eq("order.item.assign.supplier.routed"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("routed");
+
+        // when
+        String view = ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-2", 50.0, "Bravo",
+                new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getManufacturerCode()).isEqualTo("MFN-1");
+        assertThat(item.getDeliveryId()).isNull();
+        verify(orderItemsRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "routed");
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void assignSupplierAcceptsTheSupplierTheMarketplaceChose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(taxonomyCache.findByMfn("MFN-2")).thenReturn(
+                new Taxonomy("5901234123457", "MFN-2", "Brand", "Name", "Laptopy", 5, null, null, "raw"));
+
+        // when
+        String view = ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-2", 50.0, "Acme",
+                new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("Acme");
+        assertThat(item.getEan()).isEqualTo("5901234123457");
+        verify(orderItemsRepository).save(item);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
     }
 

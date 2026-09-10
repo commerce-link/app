@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
@@ -55,12 +56,14 @@ public class StoreSupplierConnectionService {
                     .filter(c -> c.getSupplierName().equals(name))
                     .findFirst()
                     .orElse(null);
-            selections.add(new SupplierSelectionForm(
+            SupplierSelectionForm selection = new SupplierSelectionForm(
                     name,
                     connection != null,
                     connection != null ? connection.getMode() : ConnectionMode.GLOBAL,
                     connection == null || connection.isIncludeInPricing(),
-                    connection == null || connection.isIncludeInFulfilment()));
+                    connection == null || connection.isIncludeInFulfilment());
+            selection.setExternalSupplierId(connection != null ? connection.getExternalSupplierId() : null);
+            selections.add(selection);
         }
         return selections;
     }
@@ -128,9 +131,11 @@ public class StoreSupplierConnectionService {
                 ConnectionMode mode = canUseGlobal
                         ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
                         : ConnectionMode.OWN;
-                connections.add(new StoreSupplierConnection(
+                StoreSupplierConnection connection = new StoreSupplierConnection(
                         selection.getSupplierName(), mode,
-                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
+                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+                connection.setExternalSupplierId(StringUtils.trimToNull(selection.getExternalSupplierId()));
+                connections.add(connection);
             }
         }
         return connections;

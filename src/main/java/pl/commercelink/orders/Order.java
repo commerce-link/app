@@ -34,6 +34,8 @@ public class Order {
     @Getter
     @Setter
     private String splitFromOrderId;
+    @DynamoDBAttribute(attributeName = "externalSupplierId")
+    private String externalSupplierId;
 
     @DynamoDBAttribute(attributeName = "affiliateId")
     private String affiliateId;
@@ -372,6 +374,7 @@ public class Order {
         copy.addPayment(payment);
 
         copy.setSplitFromOrderId(this.orderId);
+        copy.setExternalSupplierId(this.externalSupplierId);
         return copy;
     }
 
@@ -608,6 +611,19 @@ public class Order {
         this.externalOrderId = externalOrderId;
     }
 
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
+    }
+
+    @DynamoDBIgnore
+    public boolean isBoundToExternalSupplier() {
+        return externalSupplierId != null && !externalSupplierId.isBlank();
+    }
+
     public String getGclid() {
         return gclid;
     }
@@ -766,6 +782,11 @@ public class Order {
 
         public Builder withExternalOrderId(String externalOrderId) {
             order.setExternalOrderId(externalOrderId);
+            return this;
+        }
+
+        public Builder withExternalSupplierId(String externalSupplierId) {
+            order.setExternalSupplierId(externalSupplierId);
             return this;
         }
 
