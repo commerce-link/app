@@ -98,7 +98,12 @@ public class FulfilmentGroupsGenerator {
 
     private List<FulfilmentItem> createFulfilmentBasedOnSku(OrderItem orderItem, String mfn) {
         Collection<InventoryItem> offers = inventory.findByProductCode(mfn).getInventoryItems();
-        return FulfilmentItem.fromInventory(orderItem, offers);
+        List<FulfilmentItem> candidates = FulfilmentItem.fromInventory(orderItem, offers);
+        if (!offers.isEmpty() && candidates.stream().noneMatch(candidateFilter)) {
+            // a routed order must not stall on warehouse stock it is not allowed to use
+            return FulfilmentItem.fromProviders(orderItem, offers);
+        }
+        return candidates;
     }
 
     public static Builder builder() {
