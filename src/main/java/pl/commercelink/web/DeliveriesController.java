@@ -1191,7 +1191,7 @@ public class DeliveriesController {
         return orders.stream()
                 .filter(Order::isBoundToExternalSupplier)
                 .map(order -> new RoutedOrderView(
-                        order.getOrderId(),
+                        order.getShortenedOrderId(),
                         RoutedSupplierView.from(order, store, supplierRegistry),
                         binding.permits(order.getOrderId(), delivery.getProvider())))
                 .toList();
