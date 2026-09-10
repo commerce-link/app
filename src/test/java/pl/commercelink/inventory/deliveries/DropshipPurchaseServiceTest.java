@@ -50,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -484,7 +485,6 @@ class DropshipPurchaseServiceTest {
         assertTrue(submitted.isDropship());
         assertTrue(manual.isDropship());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
-        assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());
         assertEquals(submitted.getPaymentCost(), manual.getPaymentCost());
         assertEquals(submitted.getPaymentTerms(), manual.getPaymentTerms());
@@ -502,6 +502,8 @@ class DropshipPurchaseServiceTest {
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-p")).thenReturn(Optional.empty());
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         form.setEstimatedDeliveryAt(LocalDate.now().plusDays(30));
+        doAnswer(inv -> { ((DeliveryCreationForm) inv.getArgument(0)).setEstimatedDeliveryAt(null); return null; })
+                .when(deliveryCreationService).prepareForSupplierPurchase(any());
 
         // when
         service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-p");
@@ -509,8 +511,12 @@ class DropshipPurchaseServiceTest {
         // then
         InOrder inOrder = inOrder(deliveryCreationService, deliveriesRepository);
         inOrder.verify(deliveryCreationService).prepareForSupplierPurchase(form);
-        inOrder.verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), same(form));
-        inOrder.verify(deliveriesRepository).save(any());
+        ArgumentCaptor<DeliveryCreationForm> claimedForm = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        inOrder.verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), claimedForm.capture());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        inOrder.verify(deliveriesRepository).save(saved.capture());
+        assertNull(saved.getValue().getEstimatedDeliveryAt());
+        assertNull(claimedForm.getValue().getEstimatedDeliveryAt());
     }
 
     @Test
