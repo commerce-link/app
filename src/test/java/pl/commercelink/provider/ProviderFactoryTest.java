@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -326,6 +327,24 @@ class ProviderFactoryTest {
         Map<String, String> headers = defaultHeadersOf((RestApiWithRetry) context.get("restApi"));
         assertEquals("application/vnd.allegro.public.v1+json", headers.get("Accept"));
         assertEquals("application/vnd.allegro.public.v1+json", headers.get("Content-Type"));
+    }
+
+    @Test
+    void buildContextWiresARenewerDistinctFromTheCachedTokenSupplier() throws Exception {
+        // given
+        OAuth2WithContentTypeDescriptor descriptor = new OAuth2WithContentTypeDescriptor();
+        ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
+        Map<String, Object> context = factory.buildContext(store, descriptor);
+        RestApiWithRetry restApi = (RestApiWithRetry) context.get("restApi");
+
+        // when
+        Field supplier = RestApiWithRetry.class.getDeclaredField("accessTokenSupplier");
+        Field renewer = RestApiWithRetry.class.getDeclaredField("accessTokenRenewer");
+        supplier.setAccessible(true);
+        renewer.setAccessible(true);
+
+        // then: the legacy wiring used one supplier for both roles, which retried 401 with the same cached token
+        assertNotSame(supplier.get(restApi), renewer.get(restApi));
     }
 
     private static Map<String, String> defaultHeadersOf(RestApiWithRetry restApiWithRetry) throws Exception {

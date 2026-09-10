@@ -142,4 +142,17 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
 
         return dynamoDBMapper.scan(RMA.class, scanExpression);
     }
+
+    public RMA findByExternalReturnId(String storeId, String marketplace, String externalReturnId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":marketplace", new AttributeValue().withS(marketplace));
+        eav.put(":externalReturnId", new AttributeValue().withS(externalReturnId));
+        DynamoDBQueryExpression<RMA> query = new DynamoDBQueryExpression<RMA>()
+                .withKeyConditionExpression("storeId = :storeId")
+                .withFilterExpression("externalReturnId = :externalReturnId AND marketplace = :marketplace")
+                .withExpressionAttributeValues(eav);
+        List<RMA> found = dynamoDBMapper.query(RMA.class, query);
+        return found.isEmpty() ? null : found.get(0);
+    }
 }

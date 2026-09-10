@@ -1,6 +1,8 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.documents.Document;
@@ -27,6 +29,11 @@ public class Order {
     @DynamoDBAttribute(attributeName = "externalOrderId")
     @DynamoDBIndexRangeKey(globalSecondaryIndexName = "ExternalOrderIdIndex", attributeName = "externalOrderId")
     private String externalOrderId;
+    // set on the child order created by createSplit(); externalOrderId stays unique to the parent
+    @DynamoDBAttribute(attributeName = "splitFromOrderId")
+    @Getter
+    @Setter
+    private String splitFromOrderId;
     @DynamoDBAttribute(attributeName = "externalSupplierId")
     private String externalSupplierId;
 
@@ -366,6 +373,7 @@ public class Order {
         payment.setSource(payments.isEmpty() ? PaymentSource.BankTransfer : payments.get(0).getSource());
         copy.addPayment(payment);
 
+        copy.setSplitFromOrderId(this.orderId);
         return copy;
     }
 
@@ -437,6 +445,11 @@ public class Order {
     @DynamoDBIgnore
     public String getShortenedOrderId() {
         return ConversionUtil.getShortenedId(orderId);
+    }
+
+    @DynamoDBIgnore
+    public String createClientOrderUrl(String domain) {
+        return domain + "/store/" + this.storeId + "/client/order/" + this.orderId;
     }
 
     public void setOrderId(String orderId) {
@@ -541,6 +554,12 @@ public class Order {
     @DynamoDBIgnore
     public Optional<Shipment> firstShipment() {
         return shipments.isEmpty() ? Optional.empty() : Optional.of(shipments.get(0));
+    }
+
+    /** True when at least one shipment was registered for carrier tracking (drives the tracking column on the order page). */
+    @DynamoDBIgnore
+    public boolean hasTrackedShipments() {
+        return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
     }
 
     public List<Document> getDocuments() {

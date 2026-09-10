@@ -29,6 +29,20 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("createClientOrderUrl builds the public status page link under the given domain")
+    void createClientOrderUrlBuildsPublicLink() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderId("order-1");
+
+        // when
+        String url = order.createClientOrderUrl("https://app.example.com");
+
+        // then
+        assertThat(url).isEqualTo("https://app.example.com/store/store-1/client/order/order-1");
+    }
+
+    @Test
     @DisplayName("getIssuableDocumentTypes returns empty for non-B2B order")
     void returnsEmptyForNonB2B() {
         Order order = b2cOrder();

@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +24,14 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.exceptions.OrderFilterException;
+
+import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.services.OrderFiltersService;
+
+import pl.commercelink.orders.filters.ShippingDue;
+import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -35,16 +44,22 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.OrderFilterForm;
+import pl.commercelink.web.dtos.OrderStatusSelection;
+import pl.commercelink.web.dtos.SavedOrderFilterView;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
@@ -55,6 +70,7 @@ import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Controller
@@ -124,85 +140,157 @@ public class OrdersController extends BaseController {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
+    @Value("${app.domain}")
+    private String appDomain;
+
+    @Autowired
+    private OrderFiltersService orderFilters;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam(required = false) List<String> statuses,
                         @RequestParam(required = false, defaultValue = "false") boolean showAll,
+                        @RequestParam(required = false) String filterId,
                         Model model) {
-        // Fetch all active orders once (excluding Completed and Cancelled)
-        List<Order> allActiveOrders = ordersRepository.findAllActiveOrders(getStoreId())
-                .stream()
-                .filter(order -> order.getStatus() != OrderStatus.Completed && order.getStatus() != OrderStatus.Cancelled)
-                .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .collect(Collectors.toList());
+        OpenOrdersSelection selection = selectOpenOrders(statuses, showAll, filterId);
+        ListOrderFiltersView savedFilters = selection.savedFilters();
+        OrderFilter selectedFilter = selection.selectedFilter();
+        List<Order> allOpenOrders = selection.allOpenOrders();
+        LocalDate today = selection.today();
+        List<Order> openOrders = selection.openOrders();
+        OrderStatusSelection statusSelection = selection.statusSelection();
+        List<Order> filteredOrders = selection.filteredOrders();
 
-        List<OrderStatus> statusEnums = null;
-        List<String> selectedStatusList;
-
-        if (showAll) {
-            // Show all orders regardless of status
-            statusEnums = null;
-            selectedStatusList = Collections.emptyList();
-        } else if (statuses != null && !statuses.isEmpty()) {
-            statusEnums = statuses.stream()
-                    .map(OrderStatus::valueOf)
-                    .collect(Collectors.toList());
-            selectedStatusList = statuses;
-        } else {
-            // Default to Assembled status, fall back to Assembly, then New
-            long assembledCount = allActiveOrders.stream().filter(o -> o.getStatus() == OrderStatus.Assembled).count();
-            long assemblyCount = allActiveOrders.stream().filter(o -> o.getStatus() == OrderStatus.Assembly).count();
-
-            if (assembledCount > 0) {
-                statusEnums = Collections.singletonList(OrderStatus.Assembled);
-                selectedStatusList = Arrays.asList(OrderStatus.Assembled.name());
-            } else if (assemblyCount > 0) {
-                statusEnums = Collections.singletonList(OrderStatus.Assembly);
-                selectedStatusList = Arrays.asList(OrderStatus.Assembly.name());
-            } else {
-                statusEnums = Collections.singletonList(OrderStatus.New);
-                selectedStatusList = Arrays.asList(OrderStatus.New.name());
-            }
-        }
-
-        // Filter by status if specified
-        List<Order> filteredOrders = allActiveOrders;
-        if (statusEnums != null && !statusEnums.isEmpty()) {
-            List<OrderStatus> finalStatusEnums = statusEnums;
-            filteredOrders = allActiveOrders.stream()
-                    .filter(order -> finalStatusEnums.contains(order.getStatus()))
-                    .collect(Collectors.toList());
-        }
-
-        // Group filtered orders by status
-        Map<OrderStatus, List<Order>> ordersByStatus = filteredOrders.stream()
-                .collect(Collectors.groupingBy(Order::getStatus));
-
-        // Calculate order counts for ALL statuses (for filter display)
-        Map<OrderStatus, Long> itemCountsByStatus = new HashMap<>();
-        Map<OrderStatus, List<Order>> allOrdersByStatus = allActiveOrders.stream()
-                .collect(Collectors.groupingBy(Order::getStatus));
-
-        for (Map.Entry<OrderStatus, List<Order>> entry : allOrdersByStatus.entrySet()) {
-            long orderCount = entry.getValue().size();
-            itemCountsByStatus.put(entry.getKey(), orderCount);
-        }
-
-        // Add each status enum value to model for template access
-        Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
-
-        // Exclude Completed and Cancelled statuses from filter options
-        List<OrderStatus> availableStatuses = Arrays.stream(OrderStatus.values())
-                .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
-                .collect(Collectors.toList());
+        addSectionsAttributes(model, filteredOrders);
 
         model.addAttribute("liveOrders", filteredOrders);
-        model.addAttribute("ordersByStatus", ordersByStatus);
-        model.addAttribute("itemCountsByStatus", itemCountsByStatus);
-        model.addAttribute("statuses", availableStatuses);
-        model.addAttribute("selectedStatuses", selectedStatusList);
+        model.addAttribute("itemCountsByStatus",
+                allOpenOrders.stream().collect(Collectors.groupingBy(Order::getStatus, Collectors.counting())));
+        model.addAttribute("statuses", Arrays.stream(OrderStatus.values())
+                .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
+                .toList());
+        model.addAttribute("selectedStatuses", statusSelection.selected());
+        model.addAttribute("savedFilters", Stream.concat(
+                        savedFilters.sharedWithStore().stream()
+                                .map(f -> SavedOrderFilterView.of(f, true, countMatching(allOpenOrders, f, today))),
+                        savedFilters.own().stream()
+                                .map(f -> SavedOrderFilterView.of(f, false, countMatching(allOpenOrders, f, today))))
+                .toList());
+        model.addAttribute("selectedFilterId", selectedFilter == null ? null : selectedFilter.getId());
+        model.addAttribute("selectedFilterLabel", selectedFilter == null ? null : selectedFilter.getLabel());
+        model.addAttribute("selectedStatusEnums", statusSelection.statuses());
+        model.addAttribute("openOrdersTotal", allOpenOrders.size());
+        model.addAttribute("canManageStoreFilters", isAdmin());
+        model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("shippingDueOptions", ShippingDue.values());
+        model.addAttribute("marketplaces", connectedMarketplaceNames());
         return "orders";
+    }
+
+    @GetMapping("/dashboard/orders/list")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String ordersList(@RequestParam(required = false) List<String> statuses,
+                             @RequestParam(required = false, defaultValue = "false") boolean showAll,
+                             @RequestParam(required = false) String filterId,
+                             Model model) {
+        addSectionsAttributes(model, selectOpenOrders(statuses, showAll, filterId).filteredOrders());
+        return "fragments/openOrdersSections :: sections";
+    }
+
+    @PostMapping("/dashboard/orders/filters")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String createOrderFilter(OrderFilterForm form, @RequestParam(required = false) String activeFilterId,
+                                    RedirectAttributes redirectAttributes) {
+        orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        return backToFilters(activeFilterId, redirectAttributes);
+    }
+
+    @PostMapping("/dashboard/orders/filters/update")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
+                                    @RequestParam(required = false) String activeFilterId,
+                                    RedirectAttributes redirectAttributes) {
+        orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+        return backToFilters(activeFilterId, redirectAttributes);
+    }
+
+    @PostMapping("/dashboard/orders/filters/delete")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String deleteOrderFilter(@RequestParam String filterId,
+                                    @RequestParam(required = false) String activeFilterId,
+                                    RedirectAttributes redirectAttributes) {
+        orderFilters.delete(actor(), filterId);
+        return backToFilters(filterId.equals(activeFilterId) ? null : activeFilterId, redirectAttributes);
+    }
+
+    @ExceptionHandler({OrderFilterException.class, OptimisticLockingExhaustedException.class})
+    public String orderFilterRejected(Exception e, Locale locale, RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("error", e instanceof OrderFilterException rejected
+                ? messageSource.getMessage(rejected.getMessageKey(), rejected.getMessageArguments(), locale)
+                : messageSource.getMessage("orders.filters.error.conflict", null, locale));
+        return backToFilters(null, redirectAttributes);
+    }
+
+    private String backToFilters(String activeFilterId, RedirectAttributes redirectAttributes) {
+        if (activeFilterId != null && !activeFilterId.isBlank()) {
+            redirectAttributes.addAttribute("filterId", activeFilterId);
+        }
+        redirectAttributes.addFlashAttribute("openFilters", true);
+        return "redirect:/dashboard/orders";
+    }
+
+    private FilterActor actor() {
+        return new FilterActor(getStoreId(), getUserId(), isAdmin());
+    }
+
+    private record OpenOrdersSelection(ListOrderFiltersView savedFilters, OrderFilter selectedFilter,
+                                       List<Order> allOpenOrders, List<Order> openOrders,
+                                       OrderStatusSelection statusSelection, List<Order> filteredOrders,
+                                       LocalDate today) {
+    }
+
+    private OpenOrdersSelection selectOpenOrders(List<String> statuses, boolean showAll, String filterId) {
+        ListOrderFiltersView savedFilters = orderFilters.list(actor());
+        OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
+
+        List<Order> allOpenOrders = ordersRepository.findOpenOrders(getStoreId());
+        LocalDate today = LocalDate.now();
+        List<Order> openOrders = matching(allOpenOrders, selectedFilter, today);
+
+        OrderStatusSelection statusSelection =
+                OrderStatusSelection.resolve(openOrders, statuses, showAll || selectedFilter != null);
+
+        return new OpenOrdersSelection(savedFilters, selectedFilter, allOpenOrders, openOrders,
+                statusSelection, statusSelection.narrow(openOrders), today);
+    }
+
+    private void addSectionsAttributes(Model model, List<Order> filteredOrders) {
+        Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
+        model.addAttribute("ordersByStatus", filteredOrders.stream().collect(Collectors.groupingBy(Order::getStatus)));
+    }
+
+    private List<Order> matching(List<Order> orders, OrderFilter filter, LocalDate today) {
+        return filter == null ? orders : orders.stream().filter(order -> filter.matches(order, today)).toList();
+    }
+
+    private long countMatching(List<Order> orders, OrderFilter filter, LocalDate today) {
+        return orders.stream().filter(order -> filter.matches(order, today)).count();
+    }
+
+    private List<String> connectedMarketplaceNames() {
+        Store store = storesRepository.findById(getStoreId());
+        if (store == null) {
+            return List.of();
+        }
+        return store.getMarketplaces().stream()
+                .map(MarketplaceIntegration::getName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     @GetMapping("/dashboard/orders/new/from-basket")
@@ -331,6 +419,7 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::resolveTaxonomyName)));
 
         model.addAttribute("order", order);
+        model.addAttribute("clientOrderUrl", order.hasStatus(OrderStatus.Completed) ? null : order.createClientOrderUrl(appDomain));
         model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store, supplierRegistry));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
@@ -357,11 +446,14 @@ public class OrdersController extends BaseController {
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
-        model.addAttribute("canSplitOrder", order.canBeSplit() && orderItems.size() > 1);
+        boolean canSplitOrder = order.canBeSplit() && orderItems.size() > 1;
+        model.addAttribute("canSplitOrder", canSplitOrder);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
         Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), orderItems);
-        model.addAttribute("hasDropshipItems", !dropshipItemIds.isEmpty());
+        boolean hasDropshipItems = !dropshipItemIds.isEmpty();
+        model.addAttribute("hasDropshipItems", hasDropshipItems);
+        model.addAttribute("hasAvailableItemActions", canSplitOrder || !hasDropshipItems);
         model.addAttribute("hasWarehouseItems", orderItems.stream()
                 .filter(OrderItem::isProduct)
                 .anyMatch(item -> !dropshipItemIds.contains(item.getItemId())));
@@ -879,8 +971,17 @@ public class OrdersController extends BaseController {
                 shipments.add(updatedOrder.getShipments().get(0));
             }
 
-            existingOrder.replaceShipments(shipments);
+            List<Shipment> previousShipments = existingOrder.getShipments();
+            shipments.forEach(shipment -> previousShipments.stream()
+                    .filter(previous -> previous.hasTrackingNo(shipment.getTrackingNo()))
+                    .findFirst()
+                    .ifPresent(shipment::inheritTrackingSubscriptionFrom));
+            // The operator's edit is authoritative: replaceShipments would re-inherit the previous collection
+            // point and force the type back to PickupPoint, making a change of delivery type impossible.
+            shipments.forEach(shipment -> shipment.setCollectionPointCode(StringUtils.trimToNull(shipment.getCollectionPointCode())));
+            existingOrder.setShipments(shipments);
         }
+        shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         String view = save(existingOrder);
         boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()
                 .anyMatch(s -> s.hasShippingData() || s.hasCollectionData());

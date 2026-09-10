@@ -205,7 +205,7 @@
                 <div class="field">
                     <div th:if="${!submitted}" class="box is-mobile-padding" style="padding: 2rem">
                         <input type="hidden" id="shipmentType" name="shipmentType" value="Courier">
-                        <form th:action="@{/store/{storeId}/individual/offer/{offerId}/submit(storeId=${store.storeId},offerId=${offer.basketId})}" th:object="${form}" enctype="multipart/form-data" method="post" onsubmit="copyBillingDetailsIfNeeded()">
+                        <form th:action="@{|${offerPath}/submit|}" th:object="${form}" enctype="multipart/form-data" method="post" onsubmit="copyBillingDetailsIfNeeded()">
                             <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
 
                             <div class="field" style="margin-top: 20px">
@@ -318,7 +318,7 @@
                 </div>
 
                 <div th:if="${submitted}" class="field" style="margin-top: 20px">
-                    <form th:action="@{/store/{storeId}/individual/offer/{offerId}/send-proforma-invoice(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
+                    <form th:action="@{|${offerPath}/send-proforma-invoice|}" method="post">
                         <button type="submit" class="button is-text">
                             <span th:text="#{offers.send.invoice.to.billing.address}"></span>
                         </button>
@@ -375,7 +375,7 @@
                 </div>
 
                 <div th:if="${!isSplitPaymentRequired}">
-                    <form th:action="@{/store/{storeId}/individual/offer/{offerId}/checkout(storeId=${store.storeId},offerId=${offer.basketId})}" method="post">
+                    <form th:action="@{|${offerPath}/checkout|}" method="post">
 
                         <div th:if="${#lists.size(paymentOptions) > 1}" class="box payment-method-box"
                              th:classappend="${!submitted} ? 'is-locked' : ''"

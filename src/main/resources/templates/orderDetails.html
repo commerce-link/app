@@ -134,8 +134,15 @@
         <div class="columns is-vcentered">
             <div class="column">
                 <p class="heading" th:text="#{order.order.id}"></p>
-                <p class="title is-5 mb-1" th:text="${order.orderId}"></p>
-                <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="'ext: ' + ${order.externalOrderId}"></p>
+                <p class="title is-5 mb-1">
+                    <span th:text="${order.orderId}"></span>
+                    <span th:if="${clientOrderUrl != null}" class="icon is-small has-text-grey copyable cl-tooltip ml-1"
+                          style="font-size: 0.7rem; vertical-align: middle;"
+                          th:attr="data-tooltip=#{client.order.link.copy}" th:data-copy="${clientOrderUrl}" onclick="copyClientOrderLink(this)">
+                        <i class="fas fa-link"></i>
+                    </span>
+                </p>
+                <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="#{order.external.order.id(${order.externalOrderId})}"></p>
             </div>
             <div class="column">
                 <p class="heading" th:text="#{order.ordered.at}"></p>
@@ -374,7 +381,7 @@
                             <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
                         </td>
                         <td>
-                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}" th:text="${item.shortenedDeliveryId}"></a>
                         </td>
                         <td>
                             <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
@@ -468,16 +475,16 @@
             <div class="field">
                 <div class="control">
                     <div class="select is-small">
-                        <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument}">
-                            <option value="moveSelectedItemsToAllocation" th:text="#{order.items.action.move.allocation}"></option>
+                        <select id="action-select" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}">
+                            <option value="moveSelectedItemsToAllocation" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" th:text="#{order.items.action.move.allocation}"></option>
                             <option value="moveSelectedItemsToTheWarehouse" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse}"></option>
                             <option value="moveSelectedItemsToTheWarehouseForRMA" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse.rma}"></option>
                             <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
-                            <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:text="#{order.items.action.remove.from.order}"></option>
+                            <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>
-                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
-                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced}" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
+                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
+                    <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or isNewOrder or #lists.isEmpty(serialUpdateItems)}" onclick="toggleSerialUpdateModal(true)" th:text="#{order.update.serial.no}"></button>
                 </div>
             </div>
@@ -1012,6 +1019,7 @@
                         <th th:text="#{order.shipment.carrier}"></th>
                         <th th:text="#{order.shipment.shipped.at}"></th>
                         <th th:text="#{order.shipment.delivered.at}"></th>
+                        <th th:if="${order.hasTrackedShipments()}" th:text="#{order.shipment.tracking.status}"></th>
                     </tr>
                     </thead>
 
@@ -1021,8 +1029,14 @@
                             <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank"></a></td>
                             <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
                             <td th:text="${shipment.carrier}"></td>
-                            <td th:text="${shipment.shippedAt}"></td>
-                            <td th:text="${shipment.deliveredAt}"></td>
+                            <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                            <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                            <td th:if="${order.hasTrackedShipments()}">
+                                <span th:if="${shipment.trackingSubscriptionStatus != null}"
+                                      class="tag"
+                                      th:classappend="${shipment.trackingSubscriptionStatus.name() == 'ACTIVE'} ? 'is-success is-light' : (${shipment.trackingSubscriptionStatus.name() == 'FAILED'} ? 'is-danger is-light' : 'is-light')"
+                                      th:text="#{'order.shipment.tracking.status.' + ${shipment.trackingSubscriptionStatus.name()}}"></span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1107,9 +1121,7 @@
                                         <input th:if="${carrierOptions.isEmpty()}" class="input"
                                                th:field="*{shipments[__${i.index}__].carrier}">
                                     </td>
-                                    <td><input class="input" data-collection-point
-                                               th:field="*{shipments[__${i.index}__].collectionPointCode}"
-                                               th:disabled="${shipment.type == null or shipment.type.name() != 'PickupPoint'}"></td>
+                                    <td><input class="input" th:field="*{shipments[__${i.index}__].collectionPointCode}"></td>
                                     <td><input class="input" th:field="*{shipments[__${i.index}__].trackingUrl}" type="url"></td>
                                     <td>
                                         <input class="input"
@@ -1457,6 +1469,10 @@
             navigator.clipboard.writeText(element.getAttribute('data-copy'));
         }
 
+        function copyClientOrderLink(element) {
+            navigator.clipboard.writeText(element.getAttribute('data-copy')).then(() => showToast(CL_TOAST_COPIED));
+        }
+
         function toggleEditShipmentsModal(show) {
             const modal = document.getElementById('editShipmentsModal');
             if (!modal) return;
@@ -1506,7 +1522,6 @@
 
         <td>
             <input class="input"
-                   data-collection-point
                    name="shipments[${index}].collectionPointCode"/>
         </td>
 
@@ -1530,26 +1545,7 @@
     `;
 
             tbody.appendChild(row);
-            syncCollectionPointCell(row);
         }
-
-        function syncCollectionPointCell(row) {
-            const type = row.querySelector('select[name$=".type"]');
-            const point = row.querySelector('[data-collection-point]');
-            if (!type || !point) return;
-            point.disabled = type.value !== 'PickupPoint';
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const tbody = document.getElementById('editShipmentsBody');
-            if (!tbody) return;
-            tbody.querySelectorAll('tr').forEach(syncCollectionPointCell);
-            tbody.addEventListener('change', function (event) {
-                if (event.target.matches('select[name$=".type"]')) {
-                    syncCollectionPointCell(event.target.closest('tr'));
-                }
-            });
-        });
 
         function addEmptyPaymentRow() {
             const tbody = document.getElementById('editPaymentsBody');

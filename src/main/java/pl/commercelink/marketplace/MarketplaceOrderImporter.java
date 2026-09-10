@@ -34,19 +34,26 @@ public class MarketplaceOrderImporter {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
-    public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+    /** @return false when the marketplace order is already in the store and nothing was saved. */
+    public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
 
         BigDecimal commission = BigDecimal.ZERO;
         List<BasketItem> basketItems = new ArrayList<>();
+        // Basket.setBasketItems normalises mfn (uppercase, spaces stripped); the marketplace key must stay raw,
+        // so it is captured here, before the basket is built, and keyed by the basket item id.
+        Map<String, String> rawKeysByBasketItemId = new HashMap<>();
 
         for (MarketplaceProduct product : marketplaceOrder.products()) {
             commission = commission.add(product.commission());
 
+            String basketItemId = UUID.randomUUID().toString();
+            rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
+
             basketItems.add(new BasketItem(
-                    UUID.randomUUID().toString(),
+                    basketItemId,
                     product.name(),
                     product.manufacturerCode(),
                     resolveProductCategory(product.manufacturerCode()),
@@ -91,10 +98,16 @@ public class MarketplaceOrderImporter {
         Order order = orderBuilder.build();
 
         List<OrderItem> orderItems = basket.getBasketItems().stream()
-                .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
+                .map(i -> {
+                    OrderItem orderItem = OrderItem.fromBasketItem(order.getOrderId(), i);
+                    if (!i.isService()) {
+                        orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
+                    }
+                    return orderItem;
+                })
                 .collect(Collectors.toList());
 
-        ordersManager.saveWithFulfilment(order, orderItems);
+        return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
     String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {

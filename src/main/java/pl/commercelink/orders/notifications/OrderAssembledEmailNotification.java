@@ -10,19 +10,26 @@ class OrderAssembledEmailNotification extends EmailNotification {
 
     @JsonProperty("orderId")
     private String orderId;
+    @JsonProperty("orderStatusLink")
+    private String orderStatusLink;
     @JsonProperty("estimatedShippingDate")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate estimatedShippingDate;
 
-    OrderAssembledEmailNotification(String recipientEmail, String recipientName, String orderId, LocalDate estimatedShippingDate) {
+    OrderAssembledEmailNotification(String recipientEmail, String recipientName, String orderId, String orderStatusLink, LocalDate estimatedShippingDate) {
         super(recipientEmail, recipientName);
 
         this.orderId = orderId;
+        this.orderStatusLink = orderStatusLink;
         this.estimatedShippingDate = estimatedShippingDate;
     }
 
     public String getOrderId() {
         return orderId;
+    }
+
+    public String getOrderStatusLink() {
+        return orderStatusLink;
     }
 
     public LocalDate getEstimatedShippingDate() {

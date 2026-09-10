@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="section">
+        <div class="container" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'">
+
+            <h1 class="title is-4" th:text="#{store.marketplaces.exports.run.title}"></h1>
+
+            <div class="box mb-5">
+                <div class="columns is-multiline">
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.date}"></p>
+                        <p class="title is-6" th:text="${runTimestamp}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.status}"></p>
+                        <p class="title is-6">
+                            <span class="tag is-success" th:unless="${failed}"
+                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                            <span class="tag is-danger" th:if="${failed}"
+                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
+                        </p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.marketplace}"></p>
+                        <p class="title is-6" th:text="${marketplace}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.column.catalog}"></p>
+                        <p class="title is-6" th:text="${catalogId}"></p>
+                    </div>
+                    <div class="column is-one-quarter">
+                        <p class="heading" th:text="#{store.marketplaces.exports.rows.count}"></p>
+                        <p class="title is-6" th:text="${rows.size()}"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box mb-5">
+                <h2 class="title is-6" th:text="#{store.marketplaces.exports.rows.title}"></h2>
+
+                <div class="field" th:if="${!rows.isEmpty()}">
+                    <div class="control">
+                        <input class="input is-small" type="text" id="exportRowsSearch"
+                               th:placeholder="#{store.marketplaces.exports.rows.search.placeholder}">
+                    </div>
+                </div>
+
+                <div class="table-container" th:if="${!rows.isEmpty()}">
+                    <table class="table is-fullwidth is-narrow is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{store.marketplaces.exports.column.pimId}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.price}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.quantity}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.removalAttempts}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.outcome}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.reasonCode}"></th>
+                            <th th:text="#{store.marketplaces.exports.column.message}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr class="export-row" th:each="row : ${rows}">
+                            <td class="export-row-pim-id" th:text="${row.pimId()}"></td>
+                            <td th:text="${row.price()}"></td>
+                            <td th:text="${row.quantity()}"></td>
+                            <td th:text="${row.removalAttempts()}"></td>
+                            <td th:text="${row.outcome()}"></td>
+                            <td th:text="${row.reasonCode()}"></td>
+                            <td th:text="${row.message()}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p th:if="${rows.isEmpty()}" class="has-text-grey"
+                   th:text="#{store.marketplaces.exports.rows.empty}"></p>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <a th:href="@{${basePath + '/marketplaces'}}" class="button is-light"
+                       th:text="#{general.back}"></a>
+                </div>
+                <div class="control">
+                    <a th:href="@{${basePath + '/marketplaces/exports/' + marketplace + '/' + catalogId + '/' + runId + '/file'}}"
+                       target="_blank" class="button is-light"
+                       th:text="#{store.marketplaces.exports.open.raw}"></a>
+                </div>
+            </div>
+
+            <script th:inline="none">
+                document.addEventListener('DOMContentLoaded', function () {
+                    const search = document.getElementById('exportRowsSearch');
+                    if (!search) {
+                        return;
+                    }
+
+                    search.addEventListener('input', function () {
+                        const needle = search.value.toLowerCase();
+                        document.querySelectorAll('.export-row').forEach(function (row) {
+                            const pimId = row.querySelector('.export-row-pim-id');
+                            const matches = pimId !== null
+                                    && pimId.textContent.toLowerCase().indexOf(needle) !== -1;
+                            row.classList.toggle('is-hidden', !matches);
+                        });
+                    });
+                });
+            </script>
+
+        </div>
+    </section>
+</div>
+</body>
+</html>

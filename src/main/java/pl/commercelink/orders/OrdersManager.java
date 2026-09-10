@@ -361,12 +361,13 @@ public class OrdersManager {
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
-    public void saveWithFulfilment(Order order, List<OrderItem> orderItems) {
+    /** @return false when an order with the same externalOrderId already exists and nothing was saved. */
+    public boolean saveWithFulfilment(Order order, List<OrderItem> orderItems) {
         // prevent duplicate orders based on externalOrderId
         if (StringUtils.isNotBlank(order.getExternalOrderId())) {
             Order existingOrder = ordersRepository.findByStoreIdAndExternalOrderId(order.getStoreId(), order.getExternalOrderId());
             if (existingOrder != null) {
-                return;
+                return false;
             }
         }
 
@@ -375,6 +376,7 @@ public class OrdersManager {
         orderLifecycle.update(order);
 
         orderFulfilmentEventPublisher.publish(order.getStoreId(), order.getOrderId());
+        return true;
     }
 
     public static class Result {
