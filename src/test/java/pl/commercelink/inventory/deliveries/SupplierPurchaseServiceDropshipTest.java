@@ -386,7 +386,7 @@ class SupplierPurchaseServiceDropshipTest {
         assertNull(delivery.getOrderErrorMessage());
         assertFalse(delivery.hasBeenReceived());
         assertEquals("ACME-PHONE-1", delivery.getExternalDeliveryId());
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(estimatedDeliveryAt), anyList());
+        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, DELIVERY_ID, estimatedDeliveryAt);
         verifyNoInteractions(supplierProvider, dropshipPurchaseService, supplierPurchaseEventPublisher);
     }
 

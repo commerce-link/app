@@ -488,11 +488,8 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
 
-        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
-        withAllocations.getItems().forEach(item -> item.getAllocations().stream()
-                .filter(allocation -> allocation.getType() == AllocationType.Order)
-                .forEach(allocation -> allocation.setSelected(true)));
-        orderAllocationsManager.commit(storeId, deliveryId, estimatedDeliveryAt, withAllocations.getItems());
+        // The items were claimed when the purchase was submitted; only the date is new here.
+        orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, deliveryId, estimatedDeliveryAt);
 
         log.info("Supplier order completed manually: store={} delivery={} provider={} ref={} externalOrderId={}",
                 storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());
