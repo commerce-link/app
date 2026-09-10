@@ -1938,8 +1938,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
     }
 
     @Test

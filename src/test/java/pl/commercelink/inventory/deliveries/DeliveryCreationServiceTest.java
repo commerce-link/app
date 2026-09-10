@@ -271,15 +271,20 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
-    void completeDropshipPendingSyncsPricesWithoutTouchingTheHeader() {
+    void completePendingForADropshipDeliverySetsTheDateAndKeepsTheCostHeaderUntouched() {
         // given
         Delivery delivery = new Delivery();
         delivery.setDeliveryId("delivery-1");
+        delivery.setType(DeliveryType.DROPSHIP);
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setShippingCost(15.0);
+        delivery.setPaymentTerms(30);
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setExternalDeliveryId("ACME-DS-1");
         form.setProvider("Acme");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 13));
+        form.setShippingCost(99.0);
+        form.setPaymentTerms(7);
         DeliveryItem item = new DeliveryItem();
         item.setMfn("MFN-1");
         item.setRequestedQty(2);
@@ -288,16 +293,39 @@ class DeliveryCreationServiceTest {
         when(deliveryCostSync.apply(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5))).thenReturn(3.0);
 
         // when
-        service.completeDropshipPending(STORE_ID, delivery, form);
+        service.completePending(STORE_ID, delivery, form);
 
         // then
         assertEquals("ACME-DS-1", delivery.getExternalDeliveryId());
+        assertEquals(LocalDate.of(2026, 9, 13), delivery.getEstimatedDeliveryAt());
         assertNull(delivery.getOrderStatus());
         assertEquals(15.0, delivery.getShippingCost());
+        assertEquals(30, delivery.getPaymentTerms());
         assertEquals(3.0, delivery.getTotalCost());
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager, never()).propagateEstimatedDeliveryAt(any(), any(), any());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13));
+    }
+
+    @Test
+    void completePendingForADropshipDeliveryPropagatesAfterTheSave() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId("delivery-1");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 13));
+        when(deliveryCostSync.apply(STORE_ID, "delivery-1", Map.of())).thenReturn(0.0);
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13));
     }
 
     @Test

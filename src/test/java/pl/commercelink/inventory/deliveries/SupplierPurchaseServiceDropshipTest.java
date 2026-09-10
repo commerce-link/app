@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -182,8 +183,9 @@ class SupplierPurchaseServiceDropshipTest {
         // then
         verify(dropshipPurchaseService).placeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
         verify(supplierProvider, never()).placeOrder(any());
-        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture());
+        assertEquals(LocalDate.now().plusDays(2), completed.getValue().getEstimatedDeliveryAt());   // ShippingTerms(2, …) stubbed above
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
     }
 
