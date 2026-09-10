@@ -6,6 +6,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -620,6 +621,17 @@ public class OrdersController extends BaseController {
             boolean wasService = orderItem.isService();
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
             boolean priceLocked = !order.getDocuments().isEmpty();
+
+            String postedDeliveryId = StringUtils.trimToNull(updatedItem.getDeliveryId());
+            boolean deliveryIdChanged = postedDeliveryId != null && !postedDeliveryId.equals(orderItem.getDeliveryId());
+            if (deliveryIdChanged) {
+                Store store = storesRepository.findById(getStoreId());
+                if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, postedDeliveryId)) {
+                    model.addAttribute("errorMessage",
+                            messageSource.getMessage("order.item.assign.supplier.routed", null, LocaleContextHolder.getLocale()));
+                    return showOrderItemDetails(order, orderItem, model);
+                }
+            }
 
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);

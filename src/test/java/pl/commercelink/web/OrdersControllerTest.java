@@ -30,6 +30,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
@@ -98,6 +99,8 @@ class OrdersControllerTest {
     private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
     @Mock
     private TaxonomyCache taxonomyCache;
+    @Mock
+    private StoreCategories storeCategories;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -577,6 +580,43 @@ class OrdersControllerTest {
 
         // then
         assertThat(item.getPrice()).isEqualTo(100.0);
+    }
+
+    @Test
+    void savingItemRefusesADeliveryIdTheMarketplaceDidNotChoose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("Bravo");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(messageSource.getMessage(eq("order.item.assign.supplier.routed"), any(), any(Locale.class))).thenReturn("routed");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+
+        // then
+        assertThat(item.getDeliveryId()).isNull();
+        assertThat(model.getAttribute("errorMessage")).isEqualTo("routed");
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void savingItemAcceptsTheDeliveryIdTheMarketplaceChose() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("Acme");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("Acme");
+        verify(orderItemsRepository).save(item);
     }
 
     @Test
