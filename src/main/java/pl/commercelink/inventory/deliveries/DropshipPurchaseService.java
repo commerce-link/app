@@ -112,6 +112,7 @@ public class DropshipPurchaseService {
                     new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
         }
 
+        deliveryCreationService.prepareForSupplierPurchase(form);
         Delivery delivery = newDropshipDelivery(storeId, store, order, form);
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL

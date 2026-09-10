@@ -204,6 +204,21 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
+    void prepareForSupplierPurchaseDropsTheDateTypedOnTheCreationScreen() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 10, 15));
+        form.setExternalDeliveryId("typed");
+
+        // when
+        service.prepareForSupplierPurchase(form);
+
+        // then
+        assertNull(form.getEstimatedDeliveryAt());
+        assertEquals("typed", form.getExternalDeliveryId());
+    }
+
+    @Test
     void releaseAllocationsHandsBothAllocationGroupsBackToTheSupplierAndTheWarehouse() {
         // given
         Delivery delivery = new Delivery();

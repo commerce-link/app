@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -49,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -489,6 +491,44 @@ class DropshipPurchaseServiceTest {
         assertEquals(submitted.getTax(), manual.getTax());
         assertTrue(submitResult.isSuccess());
         assertTrue(manualResult.isSuccess());
+    }
+
+    @Test
+    void submitDropshipPreparesTheFormForASupplierPurchaseBeforeBuildingTheDelivery() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-p")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(30));
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-p");
+
+        // then
+        InOrder inOrder = inOrder(deliveryCreationService, deliveriesRepository);
+        inOrder.verify(deliveryCreationService).prepareForSupplierPurchase(form);
+        inOrder.verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), same(form));
+        inOrder.verify(deliveriesRepository).save(any());
+    }
+
+    @Test
+    void createManualDropshipKeepsTheTypedDate() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
+
+        // when
+        service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(LocalDate.of(2026, 9, 25), saved.getValue().getEstimatedDeliveryAt());
+        verify(deliveryCreationService, never()).prepareForSupplierPurchase(any());
     }
 
     @Test

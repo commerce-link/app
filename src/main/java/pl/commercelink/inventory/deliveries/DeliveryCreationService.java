@@ -48,6 +48,15 @@ public class DeliveryCreationService {
         return null;
     }
 
+    /**
+     * The date comes from the supplier's shipping terms once the order is confirmed (see applyOrderResult). A date typed on
+     * the creation screen would stamp the orders at claim time while the delivery gets the terms date later, leaving the
+     * two out of step. Manual deliveries ("Save", manual completion) never go through here and keep the operator's date.
+     */
+    public void prepareForSupplierPurchase(DeliveryCreationForm form) {
+        form.setEstimatedDeliveryAt(null);
+    }
+
     public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
         if (delivery.isDropship()) {

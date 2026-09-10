@@ -1028,9 +1028,9 @@ class SupplierPurchaseServiceTest {
         service.submitPurchase(STORE_ID, form, "ref-1");
 
         // then
-        ArgumentCaptor<DeliveryCreationForm> claimed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
-        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), claimed.capture());
-        assertNull(claimed.getValue().getEstimatedDeliveryAt());
+        InOrder inOrder = inOrder(deliveryCreationService);
+        inOrder.verify(deliveryCreationService).prepareForSupplierPurchase(form);
+        inOrder.verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), same(form));
     }
 
     @Test
