@@ -17,6 +17,7 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -282,6 +283,33 @@ class OrderAllocationsManagerTest {
         // then
         assertThat(delta).isZero();
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("propagateEstimatedDeliveryAt updates every order with items ordered in the delivery, once per order")
+    void propagateEstimatedDeliveryAtUpdatesEveryOrderWithItemsOrderedInTheDelivery() {
+        // given
+        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 15);
+        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of("order-1", "order-1", "order-2"));
+
+        // when
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt);
+
+        // then
+        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt);
+        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt);
+    }
+
+    @Test
+    @DisplayName("propagateEstimatedDeliveryAt is a no-op without a date")
+    void propagateEstimatedDeliveryAtIsANoOpWithoutADate() {
+        // when
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", null);
+
+        // then
+        verify(orderItemsRepository, never()).findByDeliveryIdAndStatuses(any(), any());
+        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
     }
 
     private Order orderWithStatus(OrderStatus status) {

@@ -68,6 +68,20 @@ public class OrderAllocationsManager {
         }
     }
 
+    /**
+     * Pushes a delivery's estimated date to every order that has items ordered in it. Used when the date
+     * becomes known only after the allocations were claimed (supplier confirmation, manual completion).
+     */
+    public void propagateEstimatedDeliveryAt(String storeId, String deliveryId, LocalDate estimatedDeliveryAt) {
+        if (estimatedDeliveryAt == null) {
+            return;
+        }
+        orderItemsRepository.findByDeliveryIdAndStatuses(deliveryId, List.of(FulfilmentStatus.Ordered))
+                .stream()
+                .distinct()
+                .forEach(orderId -> ordersManager.updateEstimatedDeliveryAt(storeId, orderId, estimatedDeliveryAt));
+    }
+
     public void release(String storeId, String deliveryId, String provider) {
         Map<String, List<String>> itemIdsByOrderId = orderItemsRepository.findByDeliveryId(deliveryId)
                 .stream()
