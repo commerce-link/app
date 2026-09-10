@@ -374,6 +374,7 @@ public class Order {
         copy.addPayment(payment);
 
         copy.setSplitFromOrderId(this.orderId);
+        copy.setExternalSupplierId(this.externalSupplierId);
         return copy;
     }
 
