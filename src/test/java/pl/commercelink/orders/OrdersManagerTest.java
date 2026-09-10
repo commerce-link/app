@@ -28,6 +28,7 @@ import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -739,6 +740,75 @@ class OrdersManagerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("warehouse.item.not.available");
         verify(manualWarehouseItemFulfilment, never()).run(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt stamps assembly and shipping dates and runs the lifecycle")
+    void updateEstimatedDeliveryAtSetsAssemblyAndShippingDatesAndRunsTheLifecycle() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(2);
+        List<OrderItem> items = List.of(orderItem("item-1", 100.0));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(items);
+        LocalDate friday = LocalDate.of(2026, 9, 11);
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, friday);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(friday);
+        // two working days after Friday 2026-09-11 is Tuesday 2026-09-15
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 15));
+        verify(orderLifecycle).update(order, items);
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt leaves Completed and Cancelled orders untouched")
+    void updateEstimatedDeliveryAtSkipsCompletedAndCancelledOrders() {
+        // given
+        Order completed = orderWithTotalPrice(100.0);
+        completed.setStatus(OrderStatus.Completed);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(completed);
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11));
+
+        // then
+        assertThat(completed.getEstimatedAssemblyAt()).isNull();
+        verify(orderLifecycle, never()).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt never moves an existing date backwards")
+    void updateEstimatedDeliveryAtNeverMovesAnExistingDateBackwards() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        LocalDate later = LocalDate.of(2026, 9, 20);
+        order.updateEstimatedAssemblyAt(later);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(later);
+        verify(orderLifecycle).update(eq(order), any());
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt is a no-op without a date")
+    void updateEstimatedDeliveryAtIsANoOpWithoutADate() {
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, null);
+
+        // then
+        verify(ordersRepository, never()).findById(any(), any());
+        verify(orderLifecycle, never()).update(any(), any());
     }
 
     private Order orderWithTotalPrice(double totalPrice) {
