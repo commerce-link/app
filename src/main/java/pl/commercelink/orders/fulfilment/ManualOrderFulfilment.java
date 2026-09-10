@@ -9,6 +9,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -91,11 +92,17 @@ public class ManualOrderFulfilment extends OrderFulfilment {
 
     public void commit(String storeId, FulfilmentForm form) {
         Map<String, List<FulfilmentItem>> entriesByOrderId = form.getAcceptedFulfilmentItemsGroupedByOrderId();
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(
+                storesRepository.findById(storeId), ordersOf(storeId, new ArrayList<>(entriesByOrderId.keySet())));
 
         for (String orderId : entriesByOrderId.keySet()) {
+            List<FulfilmentItem> permitted = entriesByOrderId.get(orderId).stream().filter(binding).toList();
+            if (permitted.isEmpty()) {
+                continue;
+            }
             List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId)
                     .stream()
-                    .map(i -> accept(i, entriesByOrderId.get(orderId)))
+                    .map(i -> accept(i, permitted))
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collect(Collectors.toList());
