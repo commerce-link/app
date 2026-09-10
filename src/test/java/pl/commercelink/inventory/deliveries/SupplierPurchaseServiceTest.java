@@ -994,6 +994,22 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void submitPurchaseIgnoresAnEstimatedDeliveryDatePostedWithTheForm() {
+        // given
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
+
+        // when
+        service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> claimed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), claimed.capture());
+        assertNull(claimed.getValue().getEstimatedDeliveryAt());
+    }
+
+    @Test
     void submitPurchaseStoresDeliveryAddressIdOnDelivery() {
         // given
         when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.empty());
