@@ -11,6 +11,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public final class PollingSchedule {
 
     private static final int MINUTES_PER_HOUR = 60;
+    private static final int HOURS_PER_DAY = 24;
     private static final int[] NIGHT_HOURS = { 23, 0, 1, 2, 3, 4 };
 
     private static final String NUMBER = "\\d{1,4}";
@@ -38,12 +39,12 @@ public final class PollingSchedule {
         if (isBlank(expression)) {
             throw InvalidScheduleException.syntax(expression);
         }
-        String normalized = expression.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+        String normalized = normalizeOrNull(expression);
         String[] fields = normalized.split(" ");
         if (fields.length != 6) {
             throw InvalidScheduleException.syntax(expression);
         }
-        TreeSet<Integer> minutes = expandMinutes(fields[0], expression);
+        TreeSet<Integer> minutes = expand(fields[0], MINUTES_PER_HOUR, expression);
         requireMatch(HOURS, fields[1], expression);
         requireRange(fields[1], 0, 23, expression);
         requireMatch(DAY_OF_MONTH, fields[2], expression);
@@ -54,10 +55,12 @@ public final class PollingSchedule {
         requireRange(fields[4], 1, 7, expression);
         requireMatch(YEAR, fields[5], expression);
         requireRange(fields[5], 1970, 2199, expression);
-        if ("?".equals(fields[2]) == "?".equals(fields[4])) {
+        boolean exactlyOneDayFieldUnspecified = "?".equals(fields[2]) != "?".equals(fields[4]);
+        if (!exactlyOneDayFieldUnspecified) {
             throw InvalidScheduleException.syntax(expression);
         }
-        requireInterval(minutes, fields[1], expression, minIntervalMinutes);
+        TreeSet<Integer> hours = expand(fields[1], HOURS_PER_DAY, expression);
+        requireInterval(minutes, hours, expression, minIntervalMinutes);
         return new PollingSchedule(normalized);
     }
 
@@ -68,8 +71,13 @@ public final class PollingSchedule {
         return new PollingSchedule(String.format("%d %d * * ? *", minute, hour));
     }
 
+    public static PollingSchedule storedOrRandomNightly(String stored) {
+        String normalized = normalizeOrNull(stored);
+        return normalized == null ? randomNightly() : new PollingSchedule(normalized);
+    }
+
     public static String normalizeOrNull(String expression) {
-        return isBlank(expression) ? null : expression.trim().replaceAll("\\s+", " ");
+        return isBlank(expression) ? null : expression.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
     }
 
     public String expression() {
@@ -106,14 +114,14 @@ public final class PollingSchedule {
         }
     }
 
-    private static TreeSet<Integer> expandMinutes(String field, String expression) {
-        TreeSet<Integer> minutes = new TreeSet<>();
+    private static TreeSet<Integer> expand(String field, int limit, String expression) {
+        TreeSet<Integer> values = new TreeSet<>();
         for (String item : field.split(",")) {
             String[] stepParts = item.split("/", -1);
             if (stepParts.length > 2) {
                 throw InvalidScheduleException.syntax(expression);
             }
-            int step = stepParts.length == 2 ? parseMinute(stepParts[1], expression) : 1;
+            int step = stepParts.length == 2 ? parseValue(stepParts[1], limit, expression) : 1;
             if (step < 1) {
                 throw InvalidScheduleException.syntax(expression);
             }
@@ -121,38 +129,38 @@ public final class PollingSchedule {
             int to;
             if ("*".equals(stepParts[0])) {
                 from = 0;
-                to = MINUTES_PER_HOUR - 1;
+                to = limit - 1;
             } else {
                 String[] range = stepParts[0].split("-", -1);
                 if (range.length > 2) {
                     throw InvalidScheduleException.syntax(expression);
                 }
-                from = parseMinute(range[0], expression);
-                to = range.length == 2 ? parseMinute(range[1], expression)
-                        : (stepParts.length == 2 ? MINUTES_PER_HOUR - 1 : from);
+                from = parseValue(range[0], limit, expression);
+                to = range.length == 2 ? parseValue(range[1], limit, expression)
+                        : (stepParts.length == 2 ? limit - 1 : from);
                 if (from > to) {
                     throw InvalidScheduleException.syntax(expression);
                 }
             }
-            for (int minute = from; minute <= to; minute += step) {
-                minutes.add(minute);
+            for (int value = from; value <= to; value += step) {
+                values.add(value);
             }
         }
-        return minutes;
+        return values;
     }
 
-    private static int parseMinute(String value, String expression) {
+    private static int parseValue(String value, int limit, String expression) {
         if (!value.matches("\\d{1,2}")) {
             throw InvalidScheduleException.syntax(expression);
         }
-        int minute = Integer.parseInt(value);
-        if (minute >= MINUTES_PER_HOUR) {
+        int parsed = Integer.parseInt(value);
+        if (parsed >= limit) {
             throw InvalidScheduleException.syntax(expression);
         }
-        return minute;
+        return parsed;
     }
 
-    private static void requireInterval(TreeSet<Integer> minutes, String hoursField, String expression, int minIntervalMinutes) {
+    private static void requireInterval(TreeSet<Integer> minutes, TreeSet<Integer> hours, String expression, int minIntervalMinutes) {
         if (minIntervalMinutes <= 1) {
             return;
         }
@@ -164,12 +172,20 @@ public final class PollingSchedule {
             }
             previous = minute;
         }
-        boolean firesInConsecutiveHours = !hoursField.matches("\\d{1,2}");
-        if (firesInConsecutiveHours && minutes.size() > 1) {
+        if (hasAdjacentHours(hours)) {
             gap = Math.min(gap, minutes.first() + MINUTES_PER_HOUR - minutes.last());
         }
         if (gap < minIntervalMinutes) {
             throw InvalidScheduleException.tooFrequent(expression, minIntervalMinutes);
         }
+    }
+
+    private static boolean hasAdjacentHours(TreeSet<Integer> hours) {
+        for (int hour : hours) {
+            if (hours.contains((hour + 1) % HOURS_PER_DAY)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

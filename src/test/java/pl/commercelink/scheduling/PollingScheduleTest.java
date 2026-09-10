@@ -23,7 +23,9 @@ class PollingScheduleTest {
             "0 12 ? * 2#1 *",
             "0 7 1,15 JAN-JUN ? *",
             "0,30 9 * * ? *",
-            "5/20 * * * ? *"
+            "5/20 * * * ? *",
+            "0,58 9,14 * * ? *",
+            "0,58 23 * * ? *"
     })
     void acceptsValidEventBridgeCronExpressions(String expression) {
         // when
@@ -67,7 +69,11 @@ class PollingScheduleTest {
             "0,3 9 * * ? *",
             "0,58 * * * ? *",
             "0-59/4 * * * ? *",
-            "0-10 9 * * ? *"
+            "0-10 9 * * ? *",
+            "0,58 9,10 * * ? *",
+            "0,58 23,0 * * ? *",
+            "0,58 9-17 * * ? *",
+            "0,58 22-23 * * ? *"
     })
     void rejectsSchedulesRunningMoreOftenThanTheFloor(String expression) {
         // when / then
@@ -90,6 +96,25 @@ class PollingScheduleTest {
     }
 
     @Test
+    void countsHourWrapAroundOnlyBetweenAdjacentHours() {
+        // when
+        PollingSchedule apart = PollingSchedule.parse("0,58 9,14 * * ? *", 5);
+
+        // then
+        assertThat(apart.expression()).isEqualTo("0,58 9,14 * * ? *");
+        assertThatThrownBy(() -> PollingSchedule.parse("0,58 9,10 * * ? *", 5))
+                .isInstanceOf(InvalidScheduleException.class);
+    }
+
+    @Test
+    void storedOrRandomNightlyKeepsAStoredCronAndFallsBackWhenBlank() {
+        // when / then
+        assertThat(PollingSchedule.storedOrRandomNightly(" 0 5 * * ? * ").awsExpression()).isEqualTo("cron(0 5 * * ? *)");
+        assertThat(PollingSchedule.storedOrRandomNightly("  ").awsExpression()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
+        assertThat(PollingSchedule.storedOrRandomNightly(null).awsExpression()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
+    }
+
+    @Test
     void floorOfOneMinuteAcceptsEveryMinute() {
         // when
         PollingSchedule schedule = PollingSchedule.parse("* * * * ? *", 1);
@@ -108,9 +133,10 @@ class PollingScheduleTest {
     }
 
     @Test
-    void normalizeOrNullCollapsesWhitespaceAndTurnsBlankIntoNull() {
+    void normalizeOrNullCollapsesWhitespaceUpperCasesAndTurnsBlankIntoNull() {
         // when / then
         assertThat(PollingSchedule.normalizeOrNull("  0/30  * * * ?  * ")).isEqualTo("0/30 * * * ? *");
+        assertThat(PollingSchedule.normalizeOrNull("0 5 ? * mon-fri *")).isEqualTo("0 5 ? * MON-FRI *");
         assertThat(PollingSchedule.normalizeOrNull("   ")).isNull();
         assertThat(PollingSchedule.normalizeOrNull(null)).isNull();
     }
