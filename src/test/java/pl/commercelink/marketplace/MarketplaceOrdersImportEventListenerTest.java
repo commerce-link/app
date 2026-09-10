@@ -13,6 +13,8 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -57,5 +59,21 @@ class MarketplaceOrdersImportEventListenerTest {
         // then
         verify(marketplaceOrderImporter).importOrder(eq(store), eq(MARKETPLACE), any());
         verify(store).updateLastFetchedAt(MARKETPLACE);
+    }
+
+    @Test
+    void aFailedImportDoesNotMarkTheStoreAsFetched() throws Exception {
+        // given
+        stubActiveStore();
+        RuntimeException failure = new RuntimeException("marketplace API unavailable");
+        when(provider.fetchOrders()).thenThrow(failure);
+        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload = payload();
+
+        // when
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> listener.handleMessage(payload));
+
+        // then
+        assertSame(failure, thrown);
+        verify(store, never()).updateLastFetchedAt(MARKETPLACE);
     }
 }
