@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.checkout.Checkout;
@@ -19,6 +20,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
 
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +89,52 @@ class ClientOfferControllerTest {
         verify(basketsRepository).save(captor.capture());
         assertThat(captor.getValue().getBillingDetails()).isNull();
         assertThat(captor.getValue().getShippingDetails()).isNull();
+    }
+
+    @Test
+    @DisplayName("submitClientOfferForm redirects to the client offer path for an offer created after the cutoff date")
+    void submitClientOfferFormRedirectsToClientOfferPathForNewOffer() {
+        // given
+        Basket basket = basketBase();
+        basket.setCreatedAt(LocalDateTime.of(2026, 9, 10, 8, 0));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        String view = clientOfferController.submitClientOfferForm(STORE_ID, OFFER_ID, new ClientDataDto());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/store/store-1/client/offer/offer-1");
+    }
+
+    @Test
+    @DisplayName("submitClientOfferForm redirects to the individual offer path for an offer created before the cutoff date")
+    void submitClientOfferFormRedirectsToIndividualOfferPathForOldOffer() {
+        // given
+        Basket basket = basketBase();
+        basket.setCreatedAt(LocalDateTime.of(2026, 9, 9, 8, 0));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        String view = clientOfferController.submitClientOfferForm(STORE_ID, OFFER_ID, new ClientDataDto());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/store/store-1/individual/offer/offer-1");
+    }
+
+    @Test
+    @DisplayName("createProformaInvoice redirects back to the offer path matching the offer creation date")
+    void createProformaInvoiceRedirectsToOfferPathMatchingCreationDate() {
+        // given
+        Basket basket = basketBase();
+        basket.setCreatedAt(LocalDateTime.of(2026, 9, 12, 8, 0));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(invoicingService.createProforma(basket, Locale.ENGLISH, true)).thenReturn(new InvoicingService.OperationResult("inv-1", "PF/1", null, null));
+
+        // when
+        String view = clientOfferController.createProformaInvoice(STORE_ID, OFFER_ID, Locale.ENGLISH, new RedirectAttributesModelMap());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/store/store-1/client/offer/offer-1");
     }
 
     private Basket basketBase() {

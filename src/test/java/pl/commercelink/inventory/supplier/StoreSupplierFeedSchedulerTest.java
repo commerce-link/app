@@ -5,11 +5,9 @@ import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.scheduling.EventBridgeSchedules;
 
 import java.util.Map;
@@ -30,12 +28,11 @@ class StoreSupplierFeedSchedulerTest {
     @Mock
     private EventBridgeSchedules schedules;
 
-    @InjectMocks
     private StoreSupplierFeedScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(scheduler, "feedImportQueueArn", QUEUE_ARN);
+        scheduler = new StoreSupplierFeedScheduler(QUEUE_ARN, schedules, sqsTemplate);
     }
 
     @Test
@@ -89,6 +86,39 @@ class StoreSupplierFeedSchedulerTest {
 
         // then
         verify(schedules).put(eq("supplier-feed-store-1-acme"), eq("cron(0 5 * * ? *)"), eq(QUEUE_ARN), anyString());
+    }
+
+    @Test
+    void sendsTheStoredCronUpperCased() {
+        // when
+        scheduler.updateSchedule("store-1", "Acme", "0 5 ? * mon-fri *");
+
+        // then
+        verify(schedules).put(eq("supplier-feed-store-1-acme"), eq("cron(0 5 ? * MON-FRI *)"), eq(QUEUE_ARN), anyString());
+    }
+
+    @Test
+    void triggersImmediateImportOnlyWhenSchedulingIsEnabled() {
+        // given
+        when(schedules.isEnabled()).thenReturn(true);
+
+        // when
+        scheduler.triggerImmediateImport("store-1", "Acme");
+
+        // then
+        verify(sqsTemplate).send("supplier-feed-import-queue", Map.of("supplierName", "Acme", "storeId", "store-1"));
+    }
+
+    @Test
+    void skipsImmediateImportWhenSchedulingIsDisabled() {
+        // given
+        when(schedules.isEnabled()).thenReturn(false);
+
+        // when
+        scheduler.triggerImmediateImport("store-1", "Acme");
+
+        // then
+        verifyNoInteractions(sqsTemplate);
     }
 
     @Test

@@ -7,19 +7,25 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.starter.storage.TimeOrderedFileName;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,12 +39,15 @@ class PricelistRepositoryTest {
     private final String catalogId = "catalogId";
     private final String prefix = "uma2dqukxr/pricelists/catalogId/";
 
+    private final Instant now = Instant.parse("2025-03-04T05:06:07Z");
+    private final String timeOrderedPart = TimeOrderedFileName.of(now);
+
     private PricelistRepository pricelistRepository;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        pricelistRepository = new PricelistRepository(fileStorage, bucketName);
+        pricelistRepository = new PricelistRepository(fileStorage, bucketName, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     @Test
@@ -111,7 +120,7 @@ class PricelistRepositoryTest {
                 "catalogId;pim2;mfc2;brand2;label2;name2;PSU;200;20\n" +
                 "catalogId;pim3;mfc3;brand3;label3;name3;PSU;300;30";
         InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
-        when(fileStorage.findNewest(bucketName, prefix)).thenReturn(Pair.of("newestPricelistId", reader));
+        when(fileStorage.findNewestByLastModified(bucketName, prefix)).thenReturn(Pair.of("newestPricelistId", reader));
 
         Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
 
@@ -121,11 +130,105 @@ class PricelistRepositoryTest {
 
     @Test
     void findNewestReturnsNullWhenPrefixEmpty() {
-        when(fileStorage.findNewest(bucketName, prefix)).thenReturn(null);
+        when(fileStorage.findNewestByLastModified(bucketName, prefix)).thenReturn(null);
 
         Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
 
         assertNull(pricelist);
+    }
+
+    @Test
+    void savesUnderTimeOrderedFileName() throws IOException {
+        String pricelistId = pricelistRepository.save(storeId, catalogId, List.of());
+
+        assertTrue(pricelistId.startsWith(timeOrderedPart + "_"), "id should carry the time ordered part: " + pricelistId);
+        assertEquals(Optional.of(now), TimeOrderedFileName.instantOf(pricelistId));
+    }
+
+    @Test
+    void newerPricelistIdSortsBeforeOlderOne() throws IOException {
+        String older = pricelistRepository.save(storeId, catalogId, List.of());
+        PricelistRepository later = new PricelistRepository(fileStorage, bucketName,
+                Clock.fixed(now.plusSeconds(60), ZoneOffset.UTC));
+
+        String newer = later.save(storeId, catalogId, List.of());
+
+        assertTrue(newer.compareTo(older) < 0, newer + " should sort before " + older);
+    }
+
+    @Test
+    void findsNewestFileNameByKeyOrderWhenNewestNameIsTimeOrdered() {
+        when(fileStorage.findNewestFileNameByKeyOrder(bucketName, prefix))
+                .thenReturn(Optional.of(timeOrderedPart + "_abc.csv"));
+
+        String id = pricelistRepository.findNewestPricelistId(storeId, catalogId);
+
+        assertEquals(timeOrderedPart + "_abc", id);
+        verify(fileStorage, never()).findNewestFileNameByLastModified(bucketName, prefix);
+    }
+
+    @Test
+    void fallsBackToLastModifiedWhenNewestKeyIsLegacyUuid() {
+        when(fileStorage.findNewestFileNameByKeyOrder(bucketName, prefix))
+                .thenReturn(Optional.of("1cb4e2b6-4a2d-4c6e-9a0f-8b0f0f2b1d55.csv"));
+        when(fileStorage.findNewestFileNameByLastModified(bucketName, prefix))
+                .thenReturn(Optional.of(timeOrderedPart + "_abc.csv"));
+
+        String id = pricelistRepository.findNewestPricelistId(storeId, catalogId);
+
+        assertEquals(timeOrderedPart + "_abc", id);
+    }
+
+    @Test
+    void readsNewestPricelistByKeyOrderWhenNewestNameIsTimeOrdered() {
+        String csvData = "CatalogId;PimId;ManufacturerCode;Brand;Label;Name;Category;Price;Qty\n" +
+                "catalogId;pim2;mfc2;brand2;label2;name2;PSU;200;20";
+        InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(csvData.getBytes()));
+        when(fileStorage.findNewestFileNameByKeyOrder(bucketName, prefix))
+                .thenReturn(Optional.of(timeOrderedPart + "_abc.csv"));
+        when(fileStorage.findNewestByKeyOrder(bucketName, prefix))
+                .thenReturn(Pair.of(timeOrderedPart + "_abc.csv", reader));
+
+        Pricelist pricelist = pricelistRepository.findNewestPricelist(storeId, catalogId);
+
+        assertEquals(timeOrderedPart + "_abc", pricelist.getPricelistId());
+        verify(fileStorage, never()).findNewestByLastModified(bucketName, prefix);
+    }
+
+    @Test
+    void readsNewestBytesByKeyOrderWhenNewestNameIsTimeOrdered() {
+        when(fileStorage.findNewestFileNameByKeyOrder(bucketName, prefix))
+                .thenReturn(Optional.of(timeOrderedPart + "_abc.csv"));
+        when(fileStorage.findNewestAsBytesByKeyOrder(bucketName, prefix)).thenReturn("data".getBytes());
+
+        assertArrayEquals("data".getBytes(), pricelistRepository.findNewestPricelistAsBytes(storeId, catalogId));
+        verify(fileStorage, never()).findNewestAsBytesByLastModified(bucketName, prefix);
+    }
+
+    @Test
+    void topNUsesKeyOrderWhenEveryNameIsTimeOrdered() {
+        when(fileStorage.findTopNByKeyOrder(bucketName, prefix, 2)).thenReturn(List.of(
+                Pair.of(timeOrderedPart + "_newer.csv", "04 Mar 2025 05:06:07"),
+                Pair.of(TimeOrderedFileName.of(now.minusSeconds(60)) + "_older.csv", "04 Mar 2025 05:05:07")));
+
+        List<Pricelist> pricelists = pricelistRepository.findTopNPricelist(storeId, catalogId, 2);
+
+        assertEquals(List.of(timeOrderedPart + "_newer", TimeOrderedFileName.of(now.minusSeconds(60)) + "_older"),
+                pricelists.stream().map(Pricelist::getPricelistId).toList());
+        verify(fileStorage, never()).findTopNByLastModified(bucketName, prefix, 2);
+    }
+
+    @Test
+    void topNFallsBackToLastModifiedWhenAnyNameIsLegacyUuid() {
+        when(fileStorage.findTopNByKeyOrder(bucketName, prefix, 2)).thenReturn(List.of(
+                Pair.of(timeOrderedPart + "_newer.csv", "04 Mar 2025 05:06:07"),
+                Pair.of("1cb4e2b6-4a2d-4c6e-9a0f-8b0f0f2b1d55.csv", "01 Mar 2025 05:05:07")));
+        when(fileStorage.findTopNByLastModified(bucketName, prefix, 2)).thenReturn(List.of(
+                Pair.of(timeOrderedPart + "_newer.csv", "04 Mar 2025 05:06:07")));
+
+        List<Pricelist> pricelists = pricelistRepository.findTopNPricelist(storeId, catalogId, 2);
+
+        assertEquals(List.of(timeOrderedPart + "_newer"), pricelists.stream().map(Pricelist::getPricelistId).toList());
     }
 
     @Test
@@ -142,21 +245,21 @@ class PricelistRepositoryTest {
 
     @Test
     void findsNewestUsesStorePrefix() {
-        when(fileStorage.findNewestFileName(bucketName, prefix)).thenReturn(Optional.of("abc.csv"));
+        when(fileStorage.findNewestFileNameByLastModified(bucketName, prefix)).thenReturn(Optional.of("abc.csv"));
 
         String id = pricelistRepository.findNewestPricelistId(storeId, catalogId);
 
         assertEquals("abc", id);
-        verify(fileStorage).findNewestFileName(bucketName, prefix);
+        verify(fileStorage).findNewestFileNameByLastModified(bucketName, prefix);
     }
 
     @Test
     void topNUsesStorePrefix() {
-        when(fileStorage.findTopN(bucketName, prefix, 3)).thenReturn(List.of());
+        when(fileStorage.findTopNByKeyOrder(bucketName, prefix, 3)).thenReturn(List.of());
 
         pricelistRepository.findTopNPricelist(storeId, catalogId, 3);
 
-        verify(fileStorage).findTopN(bucketName, prefix, 3);
+        verify(fileStorage).findTopNByKeyOrder(bucketName, prefix, 3);
     }
 
     @Test

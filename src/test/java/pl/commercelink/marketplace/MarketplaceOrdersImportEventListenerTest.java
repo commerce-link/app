@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,6 +16,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -112,5 +114,24 @@ class MarketplaceOrdersImportEventListenerTest {
         verify(providerFactory, never()).get(loggedOut, "Allegro");
         verify(providerFactory, never()).get(otherMarketplace, "Allegro");
         verify(storesRepository, never()).findById(anyString());
+    }
+
+    @Test
+    void schedulerPayloadWithoutStoreIdImportsEveryActiveStoreAndAdvancesTheMarker() throws Exception {
+        // given
+        Store store = storeWithIntegration("store-1", "Allegro", true);
+        when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(providerFactory.get(store, "Allegro")).thenReturn(provider);
+        when(provider.fetchOrders()).thenReturn(List.of(order));
+        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload = new ObjectMapper().readValue(
+                "{\"marketplace\":\"Allegro\"}", MarketplaceOrdersImportEventListener.MarketplaceOrderPayload.class);
+
+        // when
+        listener.handleMessage(payload);
+
+        // then
+        verify(marketplaceOrderImporter).importOrder(store, "Allegro", order);
+        verify(storesRepository).save(store);
+        assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNotNull();
     }
 }

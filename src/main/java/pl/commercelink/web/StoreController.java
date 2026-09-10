@@ -15,7 +15,6 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
-import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.orders.ShipmentType;
@@ -51,9 +50,6 @@ public class StoreController {
 
     @Autowired
     private StoresRepository storesRepository;
-
-    @Autowired
-    private MarketplaceExportRunService marketplaceExportRunService;
 
     @Autowired
     private ShippingProviderFactory shippingProviderFactory;
@@ -582,7 +578,6 @@ public class StoreController {
         model.addAttribute("selectedProviderName", form.getMarketplace());
         model.addAttribute("connectedIntegrations", integrations);
         model.addAttribute("deviceAuthProviders", deviceAuthProviders);
-        model.addAttribute("exportRuns", marketplaceExportRunService.findRuns(storeId));
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("importSchedules", store.getMarketplaces().stream()
                 .collect(Collectors.toMap(MarketplaceIntegration::getName,

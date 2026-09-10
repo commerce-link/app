@@ -1,7 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
 import io.awspring.cloud.sqs.operations.SqsTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.scheduling.EventBridgeSchedules;
@@ -11,25 +10,23 @@ import pl.commercelink.starter.util.ConversionUtil;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
 @Component
 public class StoreSupplierFeedScheduler {
 
     private static final String FEED_IMPORT_QUEUE = "supplier-feed-import-queue";
     private static final int CONFIGURATION_RETRY_DELAY_SECONDS = 10;
 
-    @Value("${application.env}")
-    private String env;
+    private final String feedImportQueueArn;
+    private final EventBridgeSchedules schedules;
+    private final SqsTemplate sqsTemplate;
 
-    @Value("${sqs.feed-import.queue.arn}")
-    private String feedImportQueueArn;
-
-    @Autowired
-    private EventBridgeSchedules schedules;
-
-    @Autowired
-    private SqsTemplate sqsTemplate;
+    public StoreSupplierFeedScheduler(@Value("${sqs.feed-import.queue.arn}") String feedImportQueueArn,
+                                      EventBridgeSchedules schedules,
+                                      SqsTemplate sqsTemplate) {
+        this.feedImportQueueArn = feedImportQueueArn;
+        this.schedules = schedules;
+        this.sqsTemplate = sqsTemplate;
+    }
 
     public void createSchedule(String storeId, String supplierName, String feedSchedule) {
         putSchedule(storeId, supplierName, feedSchedule);
@@ -44,7 +41,7 @@ public class StoreSupplierFeedScheduler {
     }
 
     public void triggerImmediateImport(String storeId, String supplierName) {
-        if (!env.equals("prod")) {
+        if (!schedules.isEnabled()) {
             return;
         }
 
@@ -62,16 +59,9 @@ public class StoreSupplierFeedScheduler {
     private void putSchedule(String storeId, String supplierName, String feedSchedule) {
         schedules.put(
                 scheduleName(storeId, supplierName),
-                scheduleExpression(feedSchedule),
+                PollingSchedule.storedOrRandomNightly(feedSchedule).awsExpression(),
                 feedImportQueueArn,
                 ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
-    }
-
-    private String scheduleExpression(String feedSchedule) {
-        if (isBlank(feedSchedule)) {
-            return PollingSchedule.randomNightly().awsExpression();
-        }
-        return "cron(" + feedSchedule.trim() + ")";
     }
 
     private Map<String, String> feedImportRequest(String storeId, String supplierName) {

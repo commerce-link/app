@@ -31,13 +31,13 @@ public class TaxonomyRepository {
 
     public Pair<String, List<Taxonomy>> loadNewest() {
         try {
-            Optional<String> newestFileName = fileStorage.findNewestFileName(bucketName, "taxonomy/");
+            Optional<String> newestFileName = fileStorage.findNewestFileNameByLastModified(bucketName, "taxonomy/");
             if (newestFileName.isEmpty()) {
                 return Pair.of("N/A", new ArrayList<>());
             }
 
             String fileName = newestFileName.get();
-            byte[] rawBytes = fileStorage.findNewestAsBytes(bucketName, "taxonomy/");
+            byte[] rawBytes = fileStorage.findNewestAsBytesByLastModified(bucketName, "taxonomy/");
             byte[] purifiedBytes = new ProductFeedPurifier().purify(rawBytes);
             CSVLoader csvLoader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(purifiedBytes)));
 
