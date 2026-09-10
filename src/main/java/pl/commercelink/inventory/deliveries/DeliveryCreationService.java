@@ -109,9 +109,9 @@ public class DeliveryCreationService {
      * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
      * be lost. Log loudly and leave the dates for the operator to fix on the delivery instead.
      */
-    private void propagateEstimatedDeliveryAt(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
+    public void propagateEstimatedDeliveryAt(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
-            orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+            orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, delivery.getDeliveryId(), estimatedDeliveryAt, delivery.isDropship());
         } catch (RuntimeException e) {
             log.error("Estimated delivery date propagation failed: store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);

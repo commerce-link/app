@@ -61,7 +61,6 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
-    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -481,7 +480,7 @@ public class SupplierPurchaseService {
         deliveriesRepository.save(delivery);
 
         // The items were claimed when the purchase was submitted; only the date is new here.
-        orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, deliveryId, estimatedDeliveryAt);
+        deliveryCreationService.propagateEstimatedDeliveryAt(storeId, delivery, estimatedDeliveryAt);
 
         log.info("Supplier order completed manually: store={} delivery={} provider={} ref={} externalOrderId={}",
                 storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());

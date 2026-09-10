@@ -121,7 +121,8 @@ class BuiltInGoodsInHandler implements GoodsInHandler {
             }
         }
 
-        order.updateEstimatedAssemblyAt(LocalDate.now());
+        // Goods just arrived in the warehouse, so the realization days apply whatever the order's fulfilment type.
+        order.updateEstimatedAssemblyAt(LocalDate.now(), false);
         orderLifecycle.update(order, orderItems);
         return received;
     }

@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -85,7 +86,7 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15), false);
     }
 
     @Test
@@ -98,7 +99,7 @@ class DeliveryCreationServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
         when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of())).thenReturn(0.0);
         doThrow(new IllegalStateException("dynamo down"))
-                .when(orderAllocationsManager).propagateEstimatedDeliveryAt(any(), any(), any());
+                .when(orderAllocationsManager).propagateEstimatedDeliveryAt(any(), any(), any(), anyBoolean());
 
         // when
         service.completePending(STORE_ID, delivery, form);
@@ -124,7 +125,7 @@ class DeliveryCreationServiceTest {
         // then
         InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
         inOrder.verify(deliveriesRepository).save(delivery);
-        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15), false);
     }
 
     @Test
@@ -320,7 +321,7 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13));
+        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13), true);
     }
 
     @Test
@@ -340,7 +341,7 @@ class DeliveryCreationServiceTest {
         // then
         InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
         inOrder.verify(deliveriesRepository).save(delivery);
-        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13));
+        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", LocalDate.of(2026, 9, 13), true);
     }
 
     @Test

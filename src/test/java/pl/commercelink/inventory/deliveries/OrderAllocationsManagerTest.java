@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -295,11 +296,11 @@ class OrderAllocationsManagerTest {
                 .thenReturn(List.of("order-1", "order-2"));
 
         // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt);
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt, false);
 
         // then
-        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt);
-        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt);
+        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt, false);
+        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt, false);
     }
 
     @Test
@@ -310,24 +311,39 @@ class OrderAllocationsManagerTest {
         when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
                 .thenReturn(List.of("order-1", "order-2"));
         doThrow(new IllegalStateException("version conflict"))
-                .when(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt);
+                .when(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt, false);
 
         // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt);
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt, false);
 
         // then
-        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt);
+        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt, false);
     }
 
     @Test
     @DisplayName("propagateEstimatedDeliveryAt is a no-op without a date")
     void propagateEstimatedDeliveryAtIsANoOpWithoutADate() {
         // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", null);
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", null, false);
 
         // then
         verify(orderItemsRepository, never()).findByDeliveryIdAndStatuses(any(), any());
-        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
+        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("propagateEstimatedDeliveryAt passes the shipping route to every order")
+    void propagateEstimatedDeliveryAtPassesTheShippingRouteToEveryOrder() {
+        // given
+        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 15);
+        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of("order-1"));
+
+        // when
+        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt, true);
+
+        // then
+        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt, true);
     }
 
     private Order orderWithStatus(OrderStatus status) {

@@ -2131,7 +2131,7 @@ class SupplierPurchaseServiceTest {
         assertNull(delivery.getOrderStatus());
         assertNull(delivery.getOrderErrorMessage());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, DELIVERY_ID, ESTIMATED_DELIVERY_AT);
+        verify(deliveryCreationService).propagateEstimatedDeliveryAt(STORE_ID, delivery, ESTIMATED_DELIVERY_AT);
     }
 
     @Test
@@ -2152,7 +2152,8 @@ class SupplierPurchaseServiceTest {
         assertEquals(4.0, delivery.getPaymentCost());
         assertEquals(30, delivery.getPaymentTerms());
         assertEquals(1.0, delivery.getTax());
-        verifyNoInteractions(supplierRegistry, deliveryTaxResolver, deliveryCreationService);
+        verifyNoInteractions(supplierRegistry, deliveryTaxResolver);
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
     }
 
     @Test
@@ -2165,7 +2166,7 @@ class SupplierPurchaseServiceTest {
         service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
 
         // then
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, DELIVERY_ID, ESTIMATED_DELIVERY_AT);
+        verify(deliveryCreationService).propagateEstimatedDeliveryAt(STORE_ID, delivery, ESTIMATED_DELIVERY_AT);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(deliveriesQueryService, never()).fetchDeliveryWithAllocations(any(), any());
     }

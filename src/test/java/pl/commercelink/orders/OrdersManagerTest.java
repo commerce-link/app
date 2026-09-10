@@ -759,7 +759,7 @@ class OrdersManagerTest {
         LocalDate friday = LocalDate.of(2026, 9, 11);
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, friday);
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, friday, false);
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(friday);
@@ -780,12 +780,32 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 13));
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 13), true);
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 13));
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 13));
         verify(orderLifecycle).update(eq(order), any());
+    }
+
+    @Test
+    @DisplayName("updateEstimatedDeliveryAt adds realization days when goods ship from the warehouse even for a direct-to-consumer order")
+    void updateEstimatedDeliveryAtAddsRealizationDaysWhenGoodsShipFromTheWarehouseEvenForADirectToConsumerOrder() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        order.setOrderRealizationDays(2);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        LocalDate friday = LocalDate.of(2026, 9, 11);
+
+        // when
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, friday, false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(friday);
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 15));
     }
 
     @Test
@@ -797,7 +817,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(completed);
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11));
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11), false);
 
         // then
         assertThat(completed.getEstimatedAssemblyAt()).isNull();
@@ -817,7 +837,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11));
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 11), false);
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(later);
@@ -837,7 +857,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18));
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18), false);
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 18));
@@ -855,7 +875,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18));
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, LocalDate.of(2026, 9, 18), false);
 
         // then
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
@@ -865,7 +885,7 @@ class OrdersManagerTest {
     @DisplayName("updateEstimatedDeliveryAt is a no-op without a date")
     void updateEstimatedDeliveryAtIsANoOpWithoutADate() {
         // when
-        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, null);
+        ordersManager.updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, null, false);
 
         // then
         verify(ordersRepository, never()).findById(any(), any());

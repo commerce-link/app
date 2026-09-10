@@ -642,17 +642,23 @@ public class Order {
 
     @DynamoDBIgnore
     public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate) {
+        return updateEstimatedAssemblyAt(deliveryDate, fulfilmentType == FulfilmentType.DirectToConsumer);
+    }
+
+    /**
+     * shippedBySupplier: the goods go straight from the supplier to the customer, so there is no in-house handling to add.
+     * A direct-to-consumer order can still be fulfilled through a warehouse delivery, which is why the caller that knows the
+     * route passes it explicitly instead of trusting the order's fulfilment type.
+     */
+    @DynamoDBIgnore
+    public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate, boolean shippedBySupplier) {
         if (deliveryDate == null) {
             return estimatedAssemblyAt;
         }
-
         if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
             estimatedAssemblyAt = deliveryDate;
-            estimatedShippingAt = fulfilmentType == FulfilmentType.DirectToConsumer
-                    ? deliveryDate   // the supplier ships straight to the customer, there is no in-house handling to add
-                    : addWeekdayDays(deliveryDate, orderRealizationDays);
+            estimatedShippingAt = shippedBySupplier ? deliveryDate : addWeekdayDays(deliveryDate, orderRealizationDays);
         }
-
         return estimatedAssemblyAt;
     }
 

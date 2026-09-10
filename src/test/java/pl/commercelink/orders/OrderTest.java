@@ -295,4 +295,36 @@ class OrderTest {
         assertThat(result).isNull();
         assertThat(order.getEstimatedAssemblyAt()).isNull();
     }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt adds realization days when a direct-to-consumer order ships from the warehouse")
+    void updateEstimatedAssemblyAtAddsRealizationDaysWhenADirectToConsumerOrderShipsFromTheWarehouse() {
+        // given
+        Order order = new Order("store-1");
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        order.setOrderRealizationDays(2);
+
+        // when
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);   // Friday
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 15));   // Tuesday
+    }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt uses one date when the supplier ships to the customer")
+    void updateEstimatedAssemblyAtUsesOneDateWhenTheSupplierShipsToTheCustomer() {
+        // given
+        Order order = new Order("store-1");
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setOrderRealizationDays(2);
+
+        // when
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), true);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+    }
 }
