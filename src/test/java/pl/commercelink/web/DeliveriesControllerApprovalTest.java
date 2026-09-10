@@ -2029,4 +2029,20 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
     }
+
+    @Test
+    void approvalScreenShowsNoRoutingForADropshipDeliveryWhoseOrderCannotBeResolved() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor("Acme", "order-1");
+        delivery.setType(DeliveryType.DROPSHIP);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.empty());
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
+    }
 }

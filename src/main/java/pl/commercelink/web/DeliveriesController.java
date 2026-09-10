@@ -1175,17 +1175,20 @@ public class DeliveriesController {
     }
 
     private List<RoutedOrderView> routedOrdersOf(String storeId, Delivery delivery, Order dropshipOrder) {
-        List<Order> orders = dropshipOrder != null
-                ? List.of(dropshipOrder)
-                : delivery.getAllocations().stream()
-                        .map(Allocation::getKey)
-                        .filter(Objects::nonNull)
-                        .map(AllocationKey::getOrderId)
-                        .filter(Objects::nonNull)
-                        .distinct()
-                        .map(orderId -> ordersRepository.findById(storeId, orderId))
-                        .filter(Objects::nonNull)
-                        .toList();
+        List<Order> orders;
+        if (delivery.isDropship()) {
+            orders = dropshipOrder != null ? List.of(dropshipOrder) : List.of();
+        } else {
+            orders = delivery.getAllocations().stream()
+                    .map(Allocation::getKey)
+                    .filter(Objects::nonNull)
+                    .map(AllocationKey::getOrderId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .map(orderId -> ordersRepository.findById(storeId, orderId))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
         Store store = storesRepository.findById(storeId);
         ExternalSupplierBinding binding = ExternalSupplierBinding.of(store, orders);
         return orders.stream()
