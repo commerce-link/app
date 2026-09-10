@@ -4,6 +4,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
+
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -229,5 +232,67 @@ class OrderTest {
         order.setBillingDetails(new BillingDetails());
         order.setStatus(OrderStatus.New);
         return order;
+    }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt adds the realization working days for warehouse orders")
+    void updateEstimatedAssemblyAtAddsRealizationWorkingDaysForWarehouseOrders() {
+        // given
+        Order order = new Order("store-1");
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setOrderRealizationDays(2);
+
+        // when
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));   // Friday
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 15));   // Tuesday
+    }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt uses the same date for shipping on direct-to-consumer orders")
+    void updateEstimatedAssemblyAtUsesTheSameDateForShippingOnDirectToConsumerOrders() {
+        // given
+        Order order = new Order("store-1");
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        order.setOrderRealizationDays(2);
+
+        // when
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+    }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt never moves an existing date backwards")
+    void updateEstimatedAssemblyAtNeverMovesBackwards() {
+        // given
+        Order order = new Order("store-1");
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 20));
+
+        // when
+        LocalDate result = order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+
+        // then
+        assertThat(result).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+    }
+
+    @Test
+    @DisplayName("updateEstimatedAssemblyAt ignores a null date")
+    void updateEstimatedAssemblyAtIgnoresNull() {
+        // given
+        Order order = new Order("store-1");
+
+        // when
+        LocalDate result = order.updateEstimatedAssemblyAt(null);
+
+        // then
+        assertThat(result).isNull();
+        assertThat(order.getEstimatedAssemblyAt()).isNull();
     }
 }

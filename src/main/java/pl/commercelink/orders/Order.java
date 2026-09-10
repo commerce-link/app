@@ -648,7 +648,9 @@ public class Order {
 
         if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
             estimatedAssemblyAt = deliveryDate;
-            estimatedShippingAt = addWeekdayDays(deliveryDate, orderRealizationDays);
+            estimatedShippingAt = fulfilmentType == FulfilmentType.DirectToConsumer
+                    ? deliveryDate   // the supplier ships straight to the customer, there is no in-house handling to add
+                    : addWeekdayDays(deliveryDate, orderRealizationDays);
         }
 
         return estimatedAssemblyAt;
