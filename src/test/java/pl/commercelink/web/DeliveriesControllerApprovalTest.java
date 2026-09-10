@@ -27,10 +27,13 @@ import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
@@ -39,12 +42,15 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
+import pl.commercelink.web.dtos.RoutedOrderView;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -114,6 +120,9 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private DropshipOrderLocator dropshipOrderLocator;
+
+    @Mock
+    private SupplierRegistry supplierRegistry;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -1921,5 +1930,103 @@ class DeliveriesControllerApprovalTest {
         assertThat(context.getValue().pickupPoint()).isNotNull();
         assertThat(context.getValue().pickupPoint().carrier()).isEqualTo("InPost");
         assertThat(context.getValue().pickupPoint().code()).isEqualTo("WAW04A");
+    }
+
+    private static Store storeRouting(String supplierName, String externalSupplierId) {
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        connection.setExternalSupplierId(externalSupplierId);
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(new ArrayList<>(List.of(connection)));
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(config);
+        return store;
+    }
+
+    private static Order routedOrder(String orderId, String externalSupplierId) {
+        Order order = new Order(STORE_ID);
+        order.setOrderId(orderId);
+        order.setExternalSupplierId(externalSupplierId);
+        return order;
+    }
+
+    private static Delivery awaitingWarehouseDeliveryFor(String provider, String... orderIds) {
+        Delivery delivery = new Delivery();
+        delivery.setStoreId(STORE_ID);
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setProvider(provider);
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        List<Allocation> allocations = new ArrayList<>();
+        for (String orderId : orderIds) {
+            Allocation allocation = new Allocation();
+            allocation.setKey(new AllocationKey(orderId, orderId + "-item", "client@example.com"));
+            allocations.add(allocation);
+        }
+        delivery.setAllocations(allocations);
+        return delivery;
+    }
+
+    @Test
+    void approvalScreenTellsTheSuperAdminWhichOrdersTheMarketplaceRouted() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor("Acme", "order-1", "order-2");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", "2"));
+        when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(routedOrder("order-2", null));
+        when(supplierRegistry.get("Acme")).thenReturn(
+                new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL", null, null));
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<RoutedOrderView> routed = (List<RoutedOrderView>) model.getAttribute("routedOrders");
+        assertThat(routed).hasSize(1);
+        assertThat(routed.get(0).orderId()).isEqualTo("order-1");
+        assertThat(routed.get(0).supplier().supplierName()).isEqualTo("Acme");
+        assertThat(routed.get(0).deliveryMatches()).isTrue();
+    }
+
+    @Test
+    void approvalScreenFlagsADeliveryAtADifferentSupplierThanTheMarketplaceChose() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor("Bravo", "order-1");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", "2"));
+        when(supplierRegistry.get("Acme")).thenReturn(
+                new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL", null, null));
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<RoutedOrderView> routed = (List<RoutedOrderView>) model.getAttribute("routedOrders");
+        assertThat(routed).hasSize(1);
+        assertThat(routed.get(0).deliveryMatches()).isFalse();
+    }
+
+    @Test
+    void approvalScreenHasNoRoutingNoteWhenNoOrderWasRouted() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor("Acme", "order-1");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", null));
+        Model model = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+
+        // then
+        assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
     }
 }
