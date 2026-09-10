@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -102,7 +101,7 @@ class DeliveryCreationServiceTest {
                 .when(orderAllocationsManager).propagateEstimatedDeliveryAt(any(), any(), any());
 
         // when
-        assertDoesNotThrow(() -> service.completePending(STORE_ID, delivery, form));
+        service.completePending(STORE_ID, delivery, form);
 
         // then
         assertThat(delivery.getOrderStatus()).isNull();
