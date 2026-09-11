@@ -175,9 +175,56 @@ class StoreFulfilmentTemplateTest {
         // the modal only closes once that refresh has actually landed; a dropped connection on the
         // upload call itself still reports an error rather than falling through to a refresh
         assertThat(normalized).contains(
-                "if (!res.ok) { showError(addError, res.body.message); return; } "
-                        + "refreshManualSection().then(function () { addModal.classList.remove('is-active'); }); }) "
-                        + ".catch(function () { showError(addError); });");
+                "if (!res.ok) { endAddInFlight(); showError(addError, res.body.message); return; } "
+                        + "refreshManualSection() "
+                        + ".then(function () { endAddInFlight(); addModal.classList.remove('is-active'); }) "
+                        + ".catch(function () { "
+                        + "endAddInFlight(); "
+                        + "addModal.classList.remove('is-active'); "
+                        + "alert(genericError); "
+                        + "}); }) "
+                        + ".catch(function () { endAddInFlight(); showError(addError); });");
+    }
+
+    @Test
+    void refreshingTheManualSectionRejectsOnANon2xxInsteadOfSwappingInAnErrorPage() throws Exception {
+        // a failed refresh must not overwrite the table/Add button/empty state with an error
+        // page's HTML -- every call site below closes its own modal in a .catch instead
+        String html = template();
+        assertThat(html).contains(
+                "function refreshManualSection() {\n"
+                        + "                        return fetch(basePath + '/fulfilment/manual-supplier/section')\n"
+                        + "                            .then(function (r) {\n"
+                        + "                                if (!r.ok) { throw new Error('Failed to refresh the manual supplier section'); }\n"
+                        + "                                return r.text();\n"
+                        + "                            })\n"
+                        + "                            .then(function (html) { applySectionSwap(manualSection, html); });\n"
+                        + "                    }");
+    }
+
+    @Test
+    void closingTheAddModalAfterAFailedRefreshStillClosesItInsteadOfTrappingTheOperator() throws Exception {
+        // Cancel, the x and the backdrop all route through closeAddModal(); if createdIdentity is
+        // set and the refresh rejects, the modal must still close (with an alert) instead of
+        // silently staying open and re-firing the same failing request on every further attempt
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains("function closeAddModal() { if (createdIdentity) {");
+        assertThat(normalized).contains(
+                "refreshManualSection() "
+                        + ".then(function () { addModal.classList.remove('is-active'); }) "
+                        + ".catch(function () {");
+        // both the success and the failure path close the modal -- unreachable code after an
+        // unconditional close in the .then would make this fail, same as an unconditional close
+        // missing from the .catch would
+        assertThat(normalized).contains("alert(genericError); }); return; } addModal.classList.remove('is-active'); }");
+    }
+
+    @Test
+    void guardsAgainstTwoFastClicksSendingTwoManualCreates() throws Exception {
+        String html = template();
+        assertThat(html).contains("if (addInFlight) { return; }");
+        assertThat(html).contains("addInFlight = true;");
+        assertThat(html).contains("addConfirmButton.disabled = true;");
     }
 
     @Test
@@ -202,8 +249,23 @@ class StoreFulfilmentTemplateTest {
         assertThat(html).contains("applySectionSwap(externalSection, result.html);");
         assertThat(html).contains("refreshAvailableOptions();");
         // failure: a non-2xx response shows the fragment inside the modal instead, leaving the
-        // operator's own input in the form untouched
-        assertThat(html).contains("if (!result.ok) { showFormError(result.html); return; }");
+        // operator's own input in the form untouched -- the status travels along so showFormError
+        // can refuse to inject anything but the trusted 400 validation fragment
+        assertThat(html).contains("if (!result.ok) { showFormError(result.html, result.status); return; }");
+    }
+
+    @Test
+    void onlyInjectsTheResponseBodyIntoTheSupplierModalWhenItIsTheTrusted400ValidationFragment() throws Exception {
+        String html = template();
+        // a 500 or a login redirect must not have its whole body written into the modal -- only
+        // the small sectionError fragment the server renders for a 400 (see
+        // SupplierSectionModel.renderErrorFragment) is trusted raw
+        assertThat(html).contains(
+                "function showFormError(html, status) {\n"
+                        + "                        supplierFormError.innerHTML = (status === 400 && html)\n"
+                        + "                                ? html\n"
+                        + "                                : ('<div class=\"notification is-danger\">' + genericError + '</div>');\n"
+                        + "                    }");
     }
 
     @Test

@@ -267,8 +267,14 @@
                         supplierFormError.innerHTML = '';
                     }
 
-                    function showFormError(html) {
-                        supplierFormError.innerHTML = html || ('<div class="notification is-danger">' + genericError + '</div>');
+                    // html is only trusted when it is the small sectionError fragment the server
+                    // renders for a 400 (see SupplierSectionModel.renderErrorFragment); on any
+                    // other status the body could be a whole error or login-redirect page, so it
+                    // falls back to the generic notification instead of being written in raw.
+                    function showFormError(html, status) {
+                        supplierFormError.innerHTML = (status === 400 && html)
+                                ? html
+                                : ('<div class="notification is-danger">' + genericError + '</div>');
                     }
 
                     // The full provider list is rendered once (data-all-suppliers, set at page
@@ -279,9 +285,12 @@
                         var all = (externalSection.dataset.allSuppliers || '').split(';').filter(function (s) { return s.length > 0; });
                         var connected = [];
                         externalSection.querySelectorAll('[data-configure-supplier]').forEach(function (button) {
-                            connected.push(button.getAttribute('data-configure-supplier'));
+                            // the server's "already connected" set is case-insensitive (TreeSet with
+                            // CASE_INSENSITIVE_ORDER), so this comparison must be too, or a supplier
+                            // whose case differs from data-all-suppliers would show up twice
+                            connected.push(button.getAttribute('data-configure-supplier').toLowerCase());
                         });
-                        var available = all.filter(function (name) { return connected.indexOf(name) === -1; });
+                        var available = all.filter(function (name) { return connected.indexOf(name.toLowerCase()) === -1; });
                         select.innerHTML = '';
                         var placeholder = document.createElement('option');
                         placeholder.value = '';
@@ -371,12 +380,14 @@
                         clearFormError();
                         fetch(supplierForm.action, { method: 'POST', body: new URLSearchParams(new FormData(supplierForm)) })
                             .then(function (response) {
-                                return response.text().then(function (html) { return { ok: response.ok, html: html }; });
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
                             })
                             .then(function (result) {
                                 submitInFlight = false;
                                 supplierSubmitButton.disabled = false;
-                                if (!result.ok) { showFormError(result.html); return; }
+                                if (!result.ok) { showFormError(result.html, result.status); return; }
                                 applySectionSwap(externalSection, result.html);
                                 refreshAvailableOptions();
                                 close();
@@ -384,7 +395,7 @@
                             .catch(function () {
                                 submitInFlight = false;
                                 supplierSubmitButton.disabled = false;
-                                showFormError(null);
+                                showFormError(null, null);
                             });
                     });
                 })();
@@ -507,6 +518,7 @@
                     var feedMissingLabel = /*[[#{store.manual.feed.missing}]]*/ 'No file';
 
                     var addModal = document.getElementById('manualAddModal');
+                    var addConfirmButton = document.getElementById('manual-add-confirm');
                     var nameInput = document.getElementById('manual-new-name');
                     var addFile = document.getElementById('manual-add-file');
                     var addFilename = document.getElementById('manual-add-filename');
@@ -514,6 +526,10 @@
                     // set once the create call has succeeded; from then on the supplier already
                     // exists, so a retry must only ever re-attempt the file upload, never the create
                     var createdIdentity = null;
+                    // guards the create/upload/refresh chain the same way supplierForm and
+                    // configForm guard their own submits, so two fast clicks on Add cannot fire
+                    // two creates
+                    var addInFlight = false;
 
                     var configModal = document.getElementById('manualConfigModal');
                     var configForm = document.getElementById('manual-config-form');
@@ -558,18 +574,38 @@
                         element.classList.remove('is-hidden');
                     }
 
+                    function endAddInFlight() {
+                        addInFlight = false;
+                        addConfirmButton.disabled = false;
+                    }
+
                     // The manual create call and the follow-up file upload are two separate JSON
                     // requests; after either succeeds the manual section is re-fetched and swapped
                     // in (rather than a page reload) so the new/updated row shows up right away.
+                    //
+                    // A non-2xx here (or a network failure) must not be allowed to wipe the section
+                    // -- writing an error page's HTML straight into #manual-supplier-section would
+                    // destroy the table, the Add button and the empty state, leaving nothing left to
+                    // click but a page reload. Every caller below closes its own modal in a .catch
+                    // instead of leaving it stuck open re-firing the same failing request.
                     function refreshManualSection() {
                         return fetch(basePath + '/fulfilment/manual-supplier/section')
-                            .then(function (r) { return r.text(); })
+                            .then(function (r) {
+                                if (!r.ok) { throw new Error('Failed to refresh the manual supplier section'); }
+                                return r.text();
+                            })
                             .then(function (html) { applySectionSwap(manualSection, html); });
                     }
 
                     function attemptAddFile(identity) {
                         if (!addFile.files.length) {
-                            refreshManualSection().then(function () { addModal.classList.remove('is-active'); });
+                            refreshManualSection()
+                                .then(function () { endAddInFlight(); addModal.classList.remove('is-active'); })
+                                .catch(function () {
+                                    endAddInFlight();
+                                    addModal.classList.remove('is-active');
+                                    alert(genericError);
+                                });
                             return;
                         }
                         var data = new FormData();
@@ -581,13 +617,24 @@
                                 // the supplier was already created; a rejected file (empty, unparseable
                                 // rows) must be reported honestly instead of refreshing as if it worked,
                                 // leaving the operator with an inactive supplier and no explanation
-                                if (!res.ok) { showError(addError, res.body.message); return; }
-                                refreshManualSection().then(function () { addModal.classList.remove('is-active'); });
+                                if (!res.ok) { endAddInFlight(); showError(addError, res.body.message); return; }
+                                refreshManualSection()
+                                    .then(function () { endAddInFlight(); addModal.classList.remove('is-active'); })
+                                    .catch(function () {
+                                        endAddInFlight();
+                                        addModal.classList.remove('is-active');
+                                        alert(genericError);
+                                    });
                             })
-                            .catch(function () { showError(addError); });
+                            .catch(function () { endAddInFlight(); showError(addError); });
                     }
 
                     function addManual() {
+                        // mirrors the guard supplierForm/configForm already use on submit, so two
+                        // fast clicks cannot send two creates
+                        if (addInFlight) { return; }
+                        addInFlight = true;
+                        addConfirmButton.disabled = true;
                         addError.classList.add('is-hidden');
                         if (createdIdentity) {
                             // the create already succeeded in an earlier attempt; only the file
@@ -596,17 +643,17 @@
                             return;
                         }
                         var name = nameInput.value.trim();
-                        if (!name) { showError(addError, noNameMessage); return; }
+                        if (!name) { endAddInFlight(); showError(addError, noNameMessage); return; }
                         var body = new URLSearchParams();
                         body.append('name', name);
                         fetch(basePath + '/manual-supplier', { method: 'POST', body: body })
                             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                             .then(function (res) {
-                                if (!res.ok) { showError(addError, res.body.message); return; }
+                                if (!res.ok) { endAddInFlight(); showError(addError, res.body.message); return; }
                                 createdIdentity = res.body.identity;
                                 attemptAddFile(createdIdentity);
                             })
-                            .catch(function () { showError(addError); });
+                            .catch(function () { endAddInFlight(); showError(addError); });
                     }
 
                     function closeAddModal() {
@@ -614,7 +661,15 @@
                             // the supplier already exists on the server; closing without a
                             // successful upload must still reveal it (correctly shown as inactive,
                             // no file) rather than pretend the modal session never happened
-                            refreshManualSection().then(function () { addModal.classList.remove('is-active'); });
+                            refreshManualSection()
+                                .then(function () { addModal.classList.remove('is-active'); })
+                                .catch(function () {
+                                    // a failed refresh must not trap the operator behind a modal that
+                                    // keeps re-firing the same request: Cancel, the x and the backdrop
+                                    // all route through here, so it always has to close
+                                    addModal.classList.remove('is-active');
+                                    alert(genericError);
+                                });
                             return;
                         }
                         addModal.classList.remove('is-active');
@@ -629,7 +684,12 @@
                             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                             .then(function (res) {
                                 if (!res.ok) { showError(configError, res.body.message); return; }
-                                refreshManualSection().then(function () { configModal.classList.remove('is-active'); });
+                                refreshManualSection()
+                                    .then(function () { configModal.classList.remove('is-active'); })
+                                    .catch(function () {
+                                        configModal.classList.remove('is-active');
+                                        alert(genericError);
+                                    });
                             })
                             .catch(function () { showError(configError); });
                     }
@@ -666,6 +726,7 @@
                     manualSection.addEventListener('click', function (event) {
                         if (event.target.closest('#manual-add-button')) {
                             createdIdentity = null;
+                            endAddInFlight();
                             nameInput.value = '';
                             addFile.value = '';
                             addFilename.textContent = '';
@@ -712,14 +773,20 @@
                         configSaveError.innerHTML = '';
                         fetch(configForm.action, { method: 'POST', body: new URLSearchParams(new FormData(configForm)) })
                             .then(function (response) {
-                                return response.text().then(function (html) { return { ok: response.ok, html: html }; });
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
                             })
                             .then(function (result) {
                                 submitInFlight = false;
                                 submitButton.disabled = false;
                                 if (!result.ok) {
-                                    configSaveError.innerHTML = result.html
-                                        || ('<div class="notification is-danger">' + genericError + '</div>');
+                                    // only the trusted 400 sectionError fragment is injected raw;
+                                    // any other status (500, a login redirect) falls back to the
+                                    // generic notification instead of writing a whole page in here
+                                    configSaveError.innerHTML = (result.status === 400 && result.html)
+                                        ? result.html
+                                        : ('<div class="notification is-danger">' + genericError + '</div>');
                                     return;
                                 }
                                 applySectionSwap(manualSection, result.html);
