@@ -109,22 +109,27 @@ public class DeliveryCreationService {
     /**
      * The delivery is already saved with the supplier's order number, so a failure here must not undo the
      * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
-     * be lost. Log loudly instead - the affected items stay claimed to this delivery (excluded from the
-     * allocation pool) and need a manual release before the operator can move them onto another delivery.
-     * Each side gets its own try/catch so a failure on one does not also skip the other.
+     * be lost. Log loudly instead. The delivery itself is complete, but the affected items are stuck in
+     * allocation, still claimed to it - neither ordered nor visible on the allocation screen - and there is
+     * no in-application remedy for that state by this point (the delivery is no longer AWAITING_APPROVAL,
+     * which is the only state release goes through). Recovery needs an engineer to intervene directly:
+     * clear the claim on the affected items or re-run the marking. Each side gets its own try/catch so a
+     * failure on one does not also skip the other.
      */
     public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
             orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
         } catch (RuntimeException e) {
-            log.error("Claimed order allocations not marked as ordered, items remain claimed and need a manual release: " +
+            log.error("Claimed order allocations not marked as ordered - items remain claimed and stuck in " +
+                            "allocation with no in-application remedy, needs an engineer to intervene directly: " +
                             "store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }
         try {
             warehouseAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId());
         } catch (RuntimeException e) {
-            log.error("Claimed warehouse allocations not marked as ordered, items remain claimed and need a manual release: " +
+            log.error("Claimed warehouse allocations not marked as ordered - items remain claimed and stuck in " +
+                            "allocation with no in-application remedy, needs an engineer to intervene directly: " +
                             "store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }
