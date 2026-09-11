@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -342,6 +343,76 @@ class OrderAllocationsManagerTest {
         // then
         verify(ordersManager).claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
         verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered orders every claimed item of the delivery with the confirmed date")
+    void markClaimedAsOrderedOrdersEveryClaimedItemOfTheDeliveryWithTheConfirmedDate() {
+        // given
+        LocalDate confirmed = LocalDate.of(2026, 9, 25);
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.setCost(42.0);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
+        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of());
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+
+        // then
+        verify(ordersManager).markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), confirmed);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered continues with the other orders when one fails")
+    void markClaimedAsOrderedContinuesWithTheOtherOrdersWhenOneFails() {
+        // given
+        LocalDate confirmed = LocalDate.of(2026, 9, 25);
+        OrderItem first = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        first.markAsClaimed("delivery-1");
+        OrderItem second = orderItemInStatus("item-2", FulfilmentStatus.Allocation);
+        second.setOrderId("order-2");
+        second.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
+        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of());
+        doThrow(new RuntimeException("boom")).when(ordersManager)
+                .markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), any(), any(), any());
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+
+        // then
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq("order-2"), eq("delivery-1"), any(), eq(confirmed));
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered only applies the date to orders whose items were already ordered before the deploy")
+    void markClaimedAsOrderedOnlyAppliesTheDateToOrdersWhoseItemsWereAlreadyOrderedBeforeTheDeploy() {
+        // given
+        LocalDate confirmed = LocalDate.of(2026, 9, 25);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of());
+        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
+                .thenReturn(List.of(ORDER_ID));
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+
+        // then
+        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, confirmed);
+        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered is a no-op without a date")
+    void markClaimedAsOrderedIsANoOpWithoutADate() {
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", null);
+
+        // then
+        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
     }
 
     private DeliveryItem deliveryItemWithSelectedOrderAllocation(String itemId, double unitCost) {

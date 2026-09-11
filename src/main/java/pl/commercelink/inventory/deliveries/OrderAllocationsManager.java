@@ -76,6 +76,46 @@ public class OrderAllocationsManager {
     }
 
     /**
+     * The supplier confirmed the purchase: every item claimed by this delivery becomes ordered and the
+     * orders receive the confirmed date. Deliveries created before this change carry items that are
+     * already Ordered - those orders only receive the date.
+     */
+    public void markClaimedAsOrdered(String storeId, String deliveryId, LocalDate estimatedDeliveryAt) {
+        if (estimatedDeliveryAt == null) {
+            return;
+        }
+
+        Map<String, Map<String, Double>> claimedByOrderId = new HashMap<>();
+        for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
+            if (item.isClaimed()) {
+                claimedByOrderId
+                        .computeIfAbsent(item.getOrderId(), k -> new HashMap<>())
+                        .put(item.getItemId(), item.getCost());
+            }
+        }
+
+        claimedByOrderId.forEach((orderId, costs) -> {
+            try {
+                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt);
+            } catch (RuntimeException e) {
+                log.error("Claimed items not marked as ordered: store={} delivery={} order={} estimatedDeliveryAt={}",
+                        storeId, deliveryId, orderId, estimatedDeliveryAt, e);
+            }
+        });
+
+        orderItemsRepository.findByDeliveryIdAndStatuses(deliveryId, List.of(FulfilmentStatus.Ordered)).stream()
+                .filter(orderId -> !claimedByOrderId.containsKey(orderId))
+                .forEach(orderId -> {
+                    try {
+                        ordersManager.updateEstimatedDeliveryAt(storeId, orderId, estimatedDeliveryAt);
+                    } catch (RuntimeException e) {
+                        log.error("Estimated delivery date not applied to order: store={} delivery={} order={} estimatedDeliveryAt={}",
+                                storeId, deliveryId, orderId, estimatedDeliveryAt, e);
+                    }
+                });
+    }
+
+    /**
      * Pushes a delivery's estimated date to every order that has items ordered in it. Used when the date
      * becomes known only after the allocations were claimed (supplier confirmation, manual completion).
      */
