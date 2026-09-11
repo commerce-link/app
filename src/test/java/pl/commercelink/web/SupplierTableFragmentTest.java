@@ -38,7 +38,19 @@ class SupplierTableFragmentTest {
         String html = fragment();
         assertThat(html).contains("#{store.supplier.feed.global}");
         assertThat(html).contains("#{store.supplier.feed.missing}");
-        assertThat(html).contains("${row.feedLastModified}");
+        // the record accessor is called as a method, and the value must be run through the
+        // temporals formatter rather than bound raw, or a future edit could render a
+        // LocalDateTime#toString() instead of a formatted timestamp
+        assertThat(html).contains("row.feedLastModified()");
+        assertThat(html).contains("#temporals.format(row.feedLastModified(), 'dd.MM.yyyy HH:mm')");
+    }
+
+    @Test
+    void neverAccessesRecordAccessorsPropertyStyle() throws Exception {
+        // SupplierConnectionView is a record; property-style access happens to resolve for
+        // canonical components like feedLastModified but not for derived accessors such as
+        // hasFeed() or isGlobal() - calling everything as a method avoids that trap
+        assertThat(fragment()).doesNotContain("row.feedLastModified}");
     }
 
     @Test
