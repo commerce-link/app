@@ -1,5 +1,6 @@
 package pl.commercelink.orders;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +54,14 @@ class OrderLifecycleTest {
     @InjectMocks
     private OrderLifecycle orderLifecycle;
 
+    @BeforeEach
+    void emptyRouteByDefault() {
+        // Promotion to Assembly always asks for the route now; tests that are not about dates say so by
+        // leaving this empty answer in place rather than by never being asked.
+        when(dropshipItemLookup.routeOf(any(), any()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(), false));
+    }
+
     @Test
     void publishesOrderAcceptedWhenNewOrderMovesToAssembly() {
         // given
@@ -75,7 +84,7 @@ class OrderLifecycleTest {
         Order order = new Order("store-1");
         order.setStatus(OrderStatus.Assembly);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(true);
         when(item.isDelivered()).thenReturn(false);
@@ -307,12 +316,11 @@ class OrderLifecycleTest {
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(true);
         when(item.isDelivered()).thenReturn(false);
-        when(item.getDeliveryId()).thenReturn("d1");
 
         Delivery dropshipDelivery = mock(Delivery.class);
         when(dropshipDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
-        when(dropshipItemLookup.deliveriesOf(eq("store-1"), any())).thenReturn(List.of(dropshipDelivery));
-        when(dropshipItemLookup.isEntirelyDropship(List.of(dropshipDelivery))).thenReturn(true);
+        when(dropshipItemLookup.routeOf(eq("store-1"), any()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(dropshipDelivery), true));
 
         // when
         orderLifecycle.update(order, List.of(item));
@@ -332,24 +340,55 @@ class OrderLifecycleTest {
         OrderItem dropshipItem = mock(OrderItem.class);
         when(dropshipItem.isOrdered()).thenReturn(true);
         when(dropshipItem.isDelivered()).thenReturn(false);
-        when(dropshipItem.getDeliveryId()).thenReturn("d1");
         OrderItem warehouseItem = mock(OrderItem.class);
         when(warehouseItem.isOrdered()).thenReturn(true);
         when(warehouseItem.isDelivered()).thenReturn(false);
-        when(warehouseItem.getDeliveryId()).thenReturn("d2");
 
         Delivery dropshipDelivery = mock(Delivery.class);
         when(dropshipDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
         Delivery warehouseDelivery = mock(Delivery.class);
         when(warehouseDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
-        when(dropshipItemLookup.deliveriesOf(eq("store-1"), any()))
-                .thenReturn(List.of(dropshipDelivery, warehouseDelivery));
-        when(dropshipItemLookup.isEntirelyDropship(List.of(dropshipDelivery, warehouseDelivery))).thenReturn(false);
+        when(dropshipItemLookup.routeOf(eq("store-1"), any()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(dropshipDelivery, warehouseDelivery), false));
 
         // when
         orderLifecycle.update(order, List.of(dropshipItem, warehouseItem));
 
         // then
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("an order that already has dates still has its shipping date re-derived when it is promoted")
+    void promotionReDerivesTheShippingDateOfAnOrderThatAlreadyHasOne() {
+        // given: an earlier, dropship-only leg already stamped the order, so both dates are the same day.
+        // The warehouse leg that completes the order arrives through fulfilment, not through a supplier
+        // confirmation, so this promotion is the only place left that can put the handling time back.
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 14));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 14));
+        OrderItem dropshipItem = mock(OrderItem.class);
+        when(dropshipItem.isOrdered()).thenReturn(true);
+        when(dropshipItem.isDelivered()).thenReturn(false);
+        OrderItem warehouseItem = mock(OrderItem.class);
+        when(warehouseItem.isOrdered()).thenReturn(true);
+        when(warehouseItem.isDelivered()).thenReturn(false);
+
+        Delivery dropshipDelivery = mock(Delivery.class);
+        when(dropshipDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
+        Delivery warehouseDelivery = mock(Delivery.class);
+        when(warehouseDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
+        when(dropshipItemLookup.routeOf(eq("store-1"), any()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(dropshipDelivery, warehouseDelivery), false));
+
+        // when
+        orderLifecycle.update(order, List.of(dropshipItem, warehouseItem));
+
+        // then
+        assertEquals(OrderStatus.Assembly, order.getStatus());
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
     }
 

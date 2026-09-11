@@ -75,11 +75,16 @@ public class OrderLifecycle {
                 order.updateEstimatedAssemblyAt(LocalDate.now(),
                         dropshipItemLookup.isEntirelyDropship(order.getStoreId(), orderItems));
             } else if (hasAllOrderItemsOrdered) {
+                boolean justCompleted = order.getStatus() != OrderStatus.Assembly;
                 order.setStatus(OrderStatus.Assembly);
-                if (order.getEstimatedAssemblyAt() == null) {
-                    List<Delivery> deliveries = dropshipItemLookup.deliveriesOf(order.getStoreId(), orderItems);
-                    order.updateEstimatedAssemblyAt(latestDeliveryDate(deliveries),
-                            dropshipItemLookup.isEntirelyDropship(deliveries));
+                // Asked whenever the order has just become complete, not only when it still has no date: the
+                // last leg to land is often the one that adds a warehouse stop, and it does not always arrive
+                // through the supplier confirmation that would otherwise recompute the dates - fulfilment
+                // from stock gets here carrying the dates an earlier, dropship-only leg already stamped.
+                // An order that was already complete has a settled route, so it does not pay for the reads.
+                if (justCompleted || order.getEstimatedAssemblyAt() == null) {
+                    DropshipItemLookup.GoodsRoute route = dropshipItemLookup.routeOf(order.getStoreId(), orderItems);
+                    order.updateEstimatedAssemblyAt(latestDeliveryDate(route.deliveries()), route.entirelyDropship());
                 }
             }
         }

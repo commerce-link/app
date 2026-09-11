@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
@@ -191,6 +192,45 @@ class DeliveriesManagerTest {
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(NEW_DELIVERY_DATE);
         assertThat(order.getEstimatedShippingAt()).isEqualTo(NEW_DELIVERY_DATE.plusDays(3));
+    }
+
+    @Test
+    @DisplayName("a delayed dropship delivery on a mixed order still leaves the realization days in place")
+    void updateDeliveryKeepsRealizationDaysWhenTheOrderAlsoTravelsThroughTheWarehouse() {
+        // given: the delivery whose date moved is a dropship one, but the order it feeds also has a leg
+        // through our warehouse. Asking the delivery would answer "dropship" and drop the handling time;
+        // only asking the order gets it right.
+        Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        existing.setType(DeliveryType.DROPSHIP);
+        Delivery updated = deliveryWith(NEW_DELIVERY_DATE);
+        updated.setType(DeliveryType.DROPSHIP);
+        Order order = orderWithAssemblyDate("order-1", ORIGINAL_DELIVERY_DATE, OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        OrderItem dropshipItem = orderItem("item-1", DELIVERY_ID);
+        OrderItem warehouseItem = orderItem("item-2", "warehouse-delivery");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+        when(orderItemsRepository.findByDeliveryIdAndStatuses(eq(DELIVERY_ID),
+                eq(Collections.singletonList(FulfilmentStatus.Ordered)))).thenReturn(List.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of(dropshipItem, warehouseItem));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then: 2026-05-10 is a Sunday, so +3 working days lands on Wednesday 2026-05-13
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(NEW_DELIVERY_DATE);
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 5, 13));
+        ArgumentCaptor<List<OrderItem>> askedWith = ArgumentCaptor.forClass(List.class);
+        verify(dropshipItemLookup).isEntirelyDropship(eq(STORE_ID), askedWith.capture());
+        assertThat(askedWith.getValue()).containsExactly(dropshipItem, warehouseItem);
+    }
+
+    private static OrderItem orderItem(String itemId, String deliveryId) {
+        OrderItem item = new OrderItem("order-1", "Category", "Product " + itemId, 1, 100.0, "MFN-" + itemId, false);
+        item.setItemId(itemId);
+        item.setDeliveryId(deliveryId);
+        return item;
     }
 
     @Test
@@ -387,7 +427,7 @@ class DeliveriesManagerTest {
         order.setOrderId(orderId);
         order.setStatus(status);
         order.setOrderRealizationDays(2);
-        order.updateEstimatedAssemblyAt(assemblyAt);
+        order.updateEstimatedAssemblyAt(assemblyAt, false);
         return order;
     }
 }

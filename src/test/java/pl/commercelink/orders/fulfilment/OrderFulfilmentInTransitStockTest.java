@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.invoicing.api.Price;
@@ -96,8 +97,8 @@ class OrderFulfilmentInTransitStockTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(item));
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
-        when(dropshipItemLookup.deliveriesOf(eq(STORE_ID), anyList())).thenReturn(List.of(delivery));
-        when(dropshipItemLookup.isEntirelyDropship(anyList())).thenReturn(false);
+        when(dropshipItemLookup.routeOf(eq(STORE_ID), anyList()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(delivery), false));
 
         // when
         fulfilment().commit(STORE_ID, List.of(item));
@@ -124,8 +125,8 @@ class OrderFulfilmentInTransitStockTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(item));
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
-        when(dropshipItemLookup.deliveriesOf(eq(STORE_ID), anyList())).thenReturn(List.of(delivery));
-        when(dropshipItemLookup.isEntirelyDropship(anyList())).thenReturn(false);
+        when(dropshipItemLookup.routeOf(eq(STORE_ID), anyList()))
+                .thenReturn(new DropshipItemLookup.GoodsRoute(List.of(delivery), false));
 
         // when
         fulfilment().commit(STORE_ID, List.of(item));
@@ -162,6 +163,41 @@ class OrderFulfilmentInTransitStockTest {
         // then
         verify(orderItemsRepository).findByOrderId(ORDER_ID);
         assertEquals(OrderStatus.New, order.getStatus());
+    }
+
+    @Test
+    void aMixedOrderGetsItsHandlingTimeBackWhenTheWarehouseLegCompletesIt() {
+        // given: the dropship leg was confirmed while the second item was not on any delivery yet, so the
+        // order was stamped with the dropship rule - assembly and shipping on the same day. The warehouse
+        // leg now completes the order through fulfilment, which never calls the supplier-confirmation path.
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 10));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 10));
+
+        OrderItem dropshipItem = new OrderItem(ORDER_ID, Categories.UNCATEGORIZED, "Widget", 1, 199.0, MFN, false);
+        dropshipItem.copyFulfilmentFrom(new ReservationConfirmation(
+                "dropship-1", EAN, MFN, Price.fromNet(20.0), 1, false, null, ItemCondition.Sealed));
+        OrderItem warehouseItem = inTransitItem();
+        Delivery dropshipDelivery = new Delivery(STORE_ID, "ext-1", "Acme", LocalDate.of(2026, 9, 10), 0, 0, 0, 0);
+        dropshipDelivery.setType(DeliveryType.DROPSHIP);
+        Delivery warehouseDelivery = new Delivery(STORE_ID, "ext-2", "Acme", LocalDate.of(2026, 9, 10), 0, 0, 0, 0);
+
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(warehouseItem));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipItem, warehouseItem));
+        when(dropshipItemLookup.routeOf(eq(STORE_ID), anyList())).thenReturn(
+                new DropshipItemLookup.GoodsRoute(List.of(dropshipDelivery, warehouseDelivery), false));
+
+        // when
+        fulfilment().commit(STORE_ID, List.of(warehouseItem));
+
+        // then: 2026-09-10 is a Thursday, so +3 working days lands on Tuesday 2026-09-15. Leaving the
+        // shipping date on the assembly day would promise the customer a dispatch with no time to pack.
+        assertEquals(OrderStatus.Assembly, order.getStatus());
+        assertEquals(LocalDate.of(2026, 9, 10), order.getEstimatedAssemblyAt());
+        assertEquals(LocalDate.of(2026, 9, 15), order.getEstimatedShippingAt());
     }
 
     @Test
