@@ -1,0 +1,87 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Wraps the fulfilment settings section - heading, Edit button and the read-only field list - so
+  a single swap refreshes all of it, the same shape as fragments/supplier-section.html.
+
+  Used two ways:
+    - store-fulfilment.html replaces the static #fulfilment-settings-section box with this
+      fragment on the initial page load, via th:replace with explicit positional arguments;
+    - StoreFulfilmentSettingsController returns the no-argument "section" wrapper fragment below
+      as the response body of an async save. A view name returned from a controller is resolved by
+      Spring's ThymeleafView, which (unlike th:replace/th:insert) rejects positional fragment
+      parameters, so the wrapper takes none and instead reads the same values off the model
+      (populated fresh after the mutation) before delegating to this fragment via th:replace.
+
+  successMessage (nullable) and refreshExternalSuppliers travel back as data attributes on the
+  fragment root rather than a flash attribute or a second response body -- there is no redirect
+  left to flash a message through, and only one fragment can travel back per request. The page
+  script reads data-success-message once after the swap to show a toast, and reads
+  data-refresh-external-suppliers to decide whether canUseGlobalSuppliers actually changed and the
+  external suppliers section (its mode column, and the supplier modal's mode selector) needs
+  refreshing too.
+
+  Every editable field is also republished as its own data attribute so the edit modal can read
+  the current values fresh when it opens, instead of a page-load snapshot that would go stale
+  after a save -- the same pattern the supplier/manual modals use when reading a table row's
+  dataset in the JS below.
+
+  data-can-use-global-suppliers and data-inventory-cache-ttl-minutes are withheld entirely for a
+  non-super-admin, matching the table rows just below (also gated by isSuperAdmin): nothing here
+  is editable by a non-super-admin either way, but a non-super-admin genuinely never receives
+  these two fields in the markup, not just an ungated row hidden by CSS.
+-->
+<div th:fragment="fulfilmentSettingsSection(settings, isSuperAdmin, successMessage, refreshExternalSuppliers)"
+     th:attr="data-success-message=${successMessage},
+              data-refresh-external-suppliers=${refreshExternalSuppliers},
+              data-order-assembly-days=${settings.orderAssemblyDays},
+              data-order-realization-days=${settings.orderRealizationDays},
+              data-automated-fulfilment=${settings.automatedFulfilment},
+              data-default-fulfilment-type=${settings.defaultFulfilmentType},
+              data-can-use-global-suppliers=${isSuperAdmin} ? ${settings.canUseGlobalSuppliers} : null,
+              data-inventory-cache-ttl-minutes=${isSuperAdmin} ? ${settings.inventoryCacheTtlMinutes} : null">
+    <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+        <h2 class="subtitle mb-0" th:text="#{store.fulfilment.settings}"></h2>
+        <button type="button" class="button is-primary is-small" id="fulfilment-settings-edit-button"
+                th:text="#{general.edit}"></button>
+    </div>
+    <table class="table is-fullwidth">
+        <tbody>
+            <tr>
+                <th th:text="#{store.order.assembly.days}"></th>
+                <td th:text="${settings.orderAssemblyDays}"></td>
+            </tr>
+            <tr>
+                <th th:text="#{store.order.realization.days}"></th>
+                <td th:text="${settings.orderRealizationDays}"></td>
+            </tr>
+            <tr>
+                <th th:text="#{store.enable.automated.fulfilment}"></th>
+                <td th:text="${settings.automatedFulfilment} ? #{store.supplier.flag.yes} : #{store.supplier.flag.no}"></td>
+            </tr>
+            <tr>
+                <th th:text="#{store.fulfilment.default.type}"></th>
+                <td th:text="${settings.defaultFulfilmentType}"></td>
+            </tr>
+            <tr th:if="${isSuperAdmin}">
+                <th th:text="#{store.use.global.suppliers}"></th>
+                <td th:text="${settings.canUseGlobalSuppliers} ? #{store.supplier.flag.yes} : #{store.supplier.flag.no}"></td>
+            </tr>
+            <tr th:if="${isSuperAdmin}">
+                <th th:text="#{store.inventory.cache.ttl}"></th>
+                <td th:text="${settings.inventoryCacheTtlMinutes} ?: '-'"></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- No-argument selector for StoreFulfilmentSettingsController's async save endpoint: sectionSettings,
+     sectionIsSuperAdmin, sectionSuccessMessage and sectionRefreshExternalSuppliers are model
+     attributes set by FulfilmentSettingsSectionModel.renderSection. -->
+<div th:fragment="section"
+     th:replace="~{fragments/fulfilment-settings-section :: fulfilmentSettingsSection(${sectionSettings}, ${sectionIsSuperAdmin}, ${sectionSuccessMessage}, ${sectionRefreshExternalSuppliers})}"></div>
+
+</body>
+</html>

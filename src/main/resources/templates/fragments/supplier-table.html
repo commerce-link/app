@@ -1,0 +1,85 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="supplierTable(rows, manual, showMode)">
+
+    <table class="table is-fullwidth is-striped" th:if="${!rows.isEmpty()}">
+        <thead>
+            <tr>
+                <th th:text="#{store.supplier.column.name}"></th>
+                <th th:if="${showMode}" th:text="#{store.supplier.column.mode}"></th>
+                <th th:if="${manual}" th:text="#{store.supplier.column.enabled}"></th>
+                <th th:text="#{store.supplier.column.pricing}"></th>
+                <th th:text="#{store.supplier.column.fulfilment}"></th>
+                <th th:text="${manual} ? #{store.supplier.column.file} : #{store.supplier.column.feed}"></th>
+                <th th:text="#{general.actions}"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row : ${rows}"
+                th:attr="data-mode=${row.mode()},data-include-pricing=${row.includeInPricing()},
+                         data-include-fulfilment=${row.includeInFulfilment()},data-label=${row.label()},
+                         data-enabled=${row.enabled()},data-feed-last-modified=${row.feedLastModified()}">
+                <td>
+                    <span th:text="${row.label()}">name</span>
+                    <span class="tag is-warning is-light ml-2" th:if="${!row.knownProvider()}"
+                          th:text="#{store.supplier.provider.unknown}"></span>
+                </td>
+                <td th:if="${showMode}">
+                    <span class="tag is-light"
+                          th:text="#{'store.supplier.mode.' + ${row.mode()}}"></span>
+                </td>
+                <td th:if="${manual}">
+                    <span class="tag is-success is-light" th:if="${row.enabled()}"
+                          th:text="#{store.supplier.flag.yes}"></span>
+                    <span class="tag is-light" th:unless="${row.enabled()}"
+                          th:text="${row.hasFeed()} ? #{store.supplier.flag.no} : #{store.supplier.feed.missing}"></span>
+                </td>
+                <td>
+                    <span class="tag is-success is-light" th:if="${row.includeInPricing()}"
+                          th:text="#{store.supplier.flag.yes}"></span>
+                    <span class="tag is-light" th:unless="${row.includeInPricing()}"
+                          th:text="#{store.supplier.flag.no}"></span>
+                </td>
+                <td>
+                    <span class="tag is-success is-light" th:if="${row.includeInFulfilment()}"
+                          th:text="#{store.supplier.flag.yes}"></span>
+                    <span class="tag is-light" th:unless="${row.includeInFulfilment()}"
+                          th:text="#{store.supplier.flag.no}"></span>
+                </td>
+                <td>
+                    <span th:if="${row.hasFeed()}"
+                          th:text="${#temporals.format(row.feedLastModified(), 'dd.MM.yyyy HH:mm')}"></span>
+                    <span th:unless="${row.hasFeed()}" class="has-text-grey"
+                          th:text="#{store.supplier.feed.missing}"></span>
+                </td>
+                <td>
+                    <button type="button" class="button is-small is-link is-outlined mr-2"
+                            th:attr="data-configure-supplier=${row.identity()}"
+                            th:text="#{store.supplier.action.edit}"></button>
+                    <button type="button" th:if="${manual}"
+                            class="button is-small is-danger is-outlined manual-delete-button"
+                            th:attr="data-identity=${row.identity()},data-confirm-message=#{store.manual.delete.confirm}"
+                            th:text="#{store.supplier.action.delete}"></button>
+                    <!-- Disconnecting no longer redirects (it returns the re-rendered section like
+                         every other mutation here), so a plain <form> submit would navigate the
+                         whole page to raw fragment HTML; a button carrying the identity, wired up
+                         the same way as the manual delete button above, lets the page script fetch
+                         it instead. -->
+                    <button type="button" th:unless="${manual}"
+                            class="button is-small is-danger is-outlined external-disconnect-button"
+                            th:attr="data-identity=${row.identity()},data-confirm-message=#{store.supplier.disconnect.confirm}"
+                            th:text="#{store.supplier.action.disconnect}"></button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="has-text-grey" th:if="${rows.isEmpty()}"
+       th:text="${manual} ? #{store.supplier.empty.manual} : #{store.supplier.empty.external}"></p>
+
+</div>
+
+</body>
+</html>

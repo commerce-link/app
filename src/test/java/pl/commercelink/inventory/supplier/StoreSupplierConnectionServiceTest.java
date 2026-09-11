@@ -2,11 +2,14 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -36,8 +39,6 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class StoreSupplierConnectionServiceTest {
 
-    @Mock
-    private SupplierRegistry supplierRegistry;
     @Mock
     private SupplierProviderFactory supplierProviderFactory;
     @Mock
@@ -88,165 +89,6 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
-    void buildsConnectionsForcingOwnWhenGlobalNotAllowed() {
-        // given
-        List<SupplierSelectionForm> selections = List.of(
-                new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL),
-                new SupplierSelectionForm("Wortmann", false, ConnectionMode.OWN));
-
-        // when
-        List<StoreSupplierConnection> result = service.buildConnections(selections, false);
-
-        // then
-        assertEquals(1, result.size());
-        assertEquals("Acme", result.get(0).getSupplierName());
-        assertEquals(ConnectionMode.OWN, result.get(0).getMode());
-    }
-
-    @Test
-    void buildsConnectionsHonouringSelectedModeWhenGlobalAllowed() {
-        // given
-        List<SupplierSelectionForm> selections = List.of(
-                new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL),
-                new SupplierSelectionForm("Wortmann", true, ConnectionMode.OWN));
-
-        // when
-        List<StoreSupplierConnection> result = service.buildConnections(selections, true);
-
-        // then
-        assertEquals(2, result.size());
-        assertEquals(ConnectionMode.GLOBAL, result.get(0).getMode());
-        assertEquals(ConnectionMode.OWN, result.get(1).getMode());
-    }
-
-    @Test
-    void applyReturnsValidationErrorsWithoutDelegatingToPersister() {
-        // given
-        Store existing = storeWith(true);
-        FulfilmentConfiguration submitted = configWith(true);
-        List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any()))
-                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Acme", "Feed URL")));
-
-        // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result =
-                service.apply(existing, submitted, selections, Map.of(), true);
-
-        // then
-        assertTrue(result.hasErrors());
-        verify(persister, never()).persist(any(), any(), any());
-    }
-
-    @Test
-    void applyDelegatesToPersisterAndSucceeds() {
-        // given
-        Store existing = storeWith(true);
-        FulfilmentConfiguration submitted = configWith(true);
-        List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
-
-        // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result =
-                service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
-
-        // then
-        assertFalse(result.hasErrors());
-        verify(persister).persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
-    }
-
-    @Test
-    void applyCarriesOverLegacyEnabledProductGroupsIntoSubmittedConfiguration() {
-        // given
-        Store existing = storeWith(true);
-        existing.getFulfilmentConfiguration().setEnabledProductGroups(List.of("Computers"));
-        FulfilmentConfiguration submitted = configWith(true);
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
-
-        // when
-        service.apply(existing, submitted, List.of(), Map.of(), true);
-
-        // then
-        assertThat(submitted.getEnabledProductGroups()).containsExactly("Computers");
-    }
-
-    @Test
-    void applyCarriesOverEnabledCategoriesWhenFormDidNotSubmitAny() {
-        // given
-        Store existing = storeWith(true);
-        existing.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom", "Biuro"));
-        FulfilmentConfiguration submitted = configWith(true);
-        submitted.setEnabledCategories(null);
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
-
-        // when
-        service.apply(existing, submitted, List.of(), Map.of(), true);
-
-        // then
-        assertThat(submitted.getEnabledCategories()).containsExactly("Dom", "Biuro");
-    }
-
-    @Test
-    void applyKeepsExplicitlyEmptiedEnabledCategories() {
-        // given
-        Store existing = storeWith(true);
-        existing.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom"));
-        FulfilmentConfiguration submitted = configWith(true);
-        submitted.setEnabledCategories(new ArrayList<>());
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of()));
-
-        // when
-        service.apply(existing, submitted, List.of(), Map.of(), true);
-
-        // then
-        assertThat(submitted.getEnabledCategories()).isEmpty();
-    }
-
-    @Test
-    void applyReturnsFailureWhenPersisterFails() {
-        // given
-        Store existing = storeWith(true);
-        FulfilmentConfiguration submitted = configWith(true);
-        List<SupplierSelectionForm> selections = List.of(new SupplierSelectionForm("Acme", true, ConnectionMode.OWN));
-        when(validator.validate(anyBoolean(), anyList(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(false, Set.of(), Set.of()));
-
-        // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result =
-                service.apply(existing, submitted, selections, Map.of("Acme", Map.of("url", "https://feed")), true);
-
-        // then
-        assertTrue(result.hasErrors());
-    }
-
-    @Test
-    void applyReturnsAddedAndRemovedOnSuccess() {
-        // given
-        Store store = new Store();
-        FulfilmentConfiguration submitted = new FulfilmentConfiguration();
-        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of("B"), Set.of()));
-
-        // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result =
-                service.apply(store, submitted, List.of(), Map.of(), true);
-
-        // then
-        assertThat(result.hasErrors()).isFalse();
-        assertThat(result.added()).containsExactly("B");
-        assertThat(result.removed()).isEmpty();
-    }
-
-    @Test
     void superAdminCanSetInventoryCacheTtl() {
         // given
         Store store = new Store();
@@ -290,58 +132,318 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
-    void selectionsForReadsStoredFlagsAndDefaultsTrueForUnconnected() {
+    void connectOrUpdateKeepsEveryOtherConnectionIncludingManualOnes() {
         // given
-        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of("Acme", "Bravo"));
         Store store = storeWith(true,
-                new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL, false, true));
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of()));
 
         // when
-        List<SupplierSelectionForm> selections = service.selectionsFor(store);
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Kosatec", ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
 
         // then
-        SupplierSelectionForm acme = selections.stream()
-                .filter(s -> "Acme".equals(s.getSupplierName())).findFirst().orElseThrow();
-        assertThat(acme.isEnabled()).isTrue();
-        assertThat(acme.isIncludeInPricing()).isFalse();
-        assertThat(acme.isIncludeInFulfilment()).isTrue();
-
-        SupplierSelectionForm bravo = selections.stream()
-                .filter(s -> "Bravo".equals(s.getSupplierName())).findFirst().orElseThrow();
-        assertThat(bravo.isEnabled()).isFalse();
-        assertThat(bravo.isIncludeInPricing()).isTrue();
-        assertThat(bravo.isIncludeInFulfilment()).isTrue();
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Elko", "manual:Hurtownia X", "Kosatec");
     }
 
     @Test
-    void buildConnectionsForcesOwnButPreservesFlags() {
+    void connectOrUpdateReplacesTheEntryOfAnAlreadyConnectedSupplier() {
         // given
-        List<SupplierSelectionForm> selections = List.of(
-                new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL, false, true));
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
 
         // when
-        List<StoreSupplierConnection> result = service.buildConnections(selections, false);
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, false, true),
+                Map.of());
 
         // then
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getMode()).isEqualTo(ConnectionMode.OWN);
-        assertThat(result.get(0).isIncludeInPricing()).isFalse();
-        assertThat(result.get(0).isIncludeInFulfilment()).isTrue();
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(1, captor.getValue().getSupplierConnections().size());
+        assertFalse(captor.getValue().getSupplierConnections().get(0).isIncludeInPricing());
     }
 
     @Test
-    void buildConnectionsCarriesIncludeFlags() {
+    void connectOrUpdateForcesOwnModeWhenTheStoreCannotUseGlobalSuppliers() {
         // given
-        List<SupplierSelectionForm> selections = List.of(
-                new SupplierSelectionForm("AbGroup", true, ConnectionMode.GLOBAL, false, true));
+        Store store = storeWith(false);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
 
         // when
-        List<StoreSupplierConnection> connections = service.buildConnections(selections, true);
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
+                Map.of("login", "u"));
 
         // then
-        assertThat(connections).hasSize(1);
-        assertThat(connections.get(0).getSupplierName()).isEqualTo("AbGroup");
-        assertThat(connections.get(0).isIncludeInPricing()).isFalse();
-        assertThat(connections.get(0).isIncludeInFulfilment()).isTrue();
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(ConnectionMode.OWN, captor.getValue().getSupplierConnections().get(0).getMode());
+    }
+
+    @Test
+    void connectOrUpdateValidatesOnlyTheEditedSupplier() {
+        // given a second supplier whose stored credentials are broken must not block this edit
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Broken", ConnectionMode.OWN, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
+
+        // then
+        ArgumentCaptor<List<StoreSupplierConnection>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validate(anyBoolean(), captor.capture(), anyMap(), anyMap(), anySet());
+        assertThat(captor.getValue())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactly("Elko");
+    }
+
+    @Test
+    void connectOrUpdateReturnsValidationErrorsWithoutPersisting() {
+        // given
+        Store store = storeWith(true);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet()))
+                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
+                Map.of());
+
+        // then
+        assertTrue(result.hasErrors());
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void connectOrUpdateSucceedsWhenStoreHasNoFulfilmentConfigurationYet() {
+        // given: connecting the very first supplier on a store that never had a fulfilment
+        // configuration saved before must not throw a NullPointerException.
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
+
+        // then
+        assertFalse(result.hasErrors());
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactly("Elko");
+    }
+
+    @Test
+    void connectOrUpdateReportsTheSupplierAsHavingStoredConfigurationWhenEditingAnOwnConnection() {
+        // given: an OWN connection whose provider already saved configuration -- the contract
+        // that a blank password on edit means "keep the current secret" depends on the validator
+        // being told this supplier has one
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
+        when(configurationManager.loadConfiguration(store, "Elko")).thenReturn(Map.of("login", "u"));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when: re-saving with a blank password, as the "leave blank to keep the current value" field does
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
+                Map.of("password", ""));
+
+        // then
+        ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(validator).validate(anyBoolean(), anyList(), anyMap(), anyMap(), storedConfigCaptor.capture());
+        assertThat(storedConfigCaptor.getValue()).contains("Elko");
+    }
+
+    @Test
+    void connectOrUpdateReportsNoStoredConfigurationWhenEditingAGlobalConnection() {
+        // given: GLOBAL mode never keeps its own stored credentials, regardless of what the
+        // provider's configuration manager holds for this supplier
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.GLOBAL, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
+                Map.of("password", ""));
+
+        // then
+        ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(validator).validate(anyBoolean(), anyList(), anyMap(), anyMap(), storedConfigCaptor.capture());
+        assertThat(storedConfigCaptor.getValue()).isEmpty();
+    }
+
+    @Test
+    void suppliersWithStoredConfigurationReportsOnlyProvidersThatHaveASecretSaved() {
+        // given: two registered providers, only one of them with a saved configuration -- the
+        // template uses this to decide whether a blank required password field means "missing"
+        // or "keep the current value", so it must reflect the secret's existence, not the
+        // connection mode or whether the supplier is even connected
+        when(supplierProviderFactory.availableProviders())
+                .thenReturn(List.of(new StubSupplierDescriptor(), new OtherStubSupplierDescriptor()));
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(configurationManager.loadConfiguration(store, "Stub")).thenReturn(Map.of("login", "u"));
+        when(configurationManager.loadConfiguration(store, "Other")).thenReturn(Map.of());
+
+        // when
+        Set<String> result = service.suppliersWithStoredConfiguration(store);
+
+        // then
+        assertThat(result).containsExactly("Stub");
+    }
+
+    private static class OtherStubSupplierDescriptor extends StubSupplierDescriptor {
+        @Override
+        public SupplierInfo supplierInfo() {
+            return new SupplierInfo("Other", SupplierType.Distributor, 1, "PL",
+                    StubSupplierDescriptor.INFO.shippingPolicy());
+        }
+    }
+
+    @Test
+    void disconnectRemovesOnlyTheNamedSupplier() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Kosatec", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of("Elko")));
+
+        // when
+        service.disconnect(store, "Elko");
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Kosatec", "manual:Hurtownia X");
+    }
+
+    @Test
+    void applyStoreSettingsKeepsTheExistingConnectionListUntouched() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setOrderAssemblyDays(7);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(7, captor.getValue().getOrderAssemblyDays());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Elko", "manual:Hurtownia X");
+    }
+
+    @Test
+    void applyStoreSettingsIgnoresGlobalSupplierFlagForNonSuperAdmins() {
+        // given
+        Store store = storeWith(false);
+        FulfilmentConfiguration submitted = configWith(true);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, false);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertFalse(captor.getValue().isCanUseGlobalSuppliers());
+    }
+
+    @Test
+    void applyStoreSettingsAlwaysOverwritesEnabledProductGroupsFromTheExistingConfiguration() {
+        // given: enabledProductGroups is a legacy field with no form control of its own on this
+        // screen, so whatever the submitted form happens to carry must never win over storage.
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledProductGroups(List.of("Computers"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledProductGroups(List.of("Ignored"));
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledProductGroups()).containsExactly("Computers");
+    }
+
+    @Test
+    void applyStoreSettingsCarriesOverEnabledCategoriesWhenSubmittedDidNotProvideAny() {
+        // given
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom", "Biuro"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(null);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledCategories()).containsExactly("Dom", "Biuro");
+    }
+
+    @Test
+    void applyStoreSettingsKeepsSubmittedEnabledCategoriesWhenTheFormProvidedThem() {
+        // given: unlike enabledProductGroups, enabledCategories is only defaulted from storage
+        // when the submitted configuration carries no value at all (null) — a non-null value,
+        // even an emptied-out list, must not be clobbered by whatever is stored.
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(new ArrayList<>());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledCategories()).isEmpty();
     }
 }

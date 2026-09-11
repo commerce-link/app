@@ -1,22 +1,17 @@
-package pl.commercelink.stores;
+package pl.commercelink.web.dtos;
 
-public class SupplierSelectionForm {
+import pl.commercelink.stores.ConnectionMode;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class SupplierConnectionForm {
 
     private String supplierName;
-    private ConnectionMode mode = ConnectionMode.GLOBAL;
-    private boolean includeInPricing = true;
-    private boolean includeInFulfilment = true;
-
-    public SupplierSelectionForm() {
-    }
-
-    public SupplierSelectionForm(String supplierName, ConnectionMode mode,
-                                 boolean includeInPricing, boolean includeInFulfilment) {
-        this.supplierName = supplierName;
-        this.mode = mode;
-        this.includeInPricing = includeInPricing;
-        this.includeInFulfilment = includeInFulfilment;
-    }
+    private ConnectionMode mode = ConnectionMode.OWN;
+    private boolean includeInPricing;
+    private boolean includeInFulfilment;
+    private Map<String, String> configuration = new HashMap<>();
 
     public String getSupplierName() {
         return supplierName;
@@ -48,5 +43,13 @@ public class SupplierSelectionForm {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public Map<String, String> getConfiguration() {
+        return configuration;
+    }
+
+    public void setConfiguration(Map<String, String> configuration) {
+        this.configuration = configuration;
     }
 }

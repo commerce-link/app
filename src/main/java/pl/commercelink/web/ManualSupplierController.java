@@ -1,20 +1,27 @@
 package pl.commercelink.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -23,6 +30,8 @@ import java.util.Map;
 public class ManualSupplierController {
 
     private final ManualSupplierService manualSupplierService;
+    private final StoresRepository storesRepository;
+    private final SupplierConnectionViewFactory supplierConnectionViewFactory;
     private final MessageSource messageSource;
 
     @PostMapping("/dashboard/store/manual-supplier")
@@ -60,16 +69,15 @@ public class ManualSupplierController {
 
     @PostMapping("/dashboard/store/manual-supplier/{identity}/delete")
     @PreAuthorize("hasRole('ADMIN')")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> delete(@PathVariable String identity, Locale locale) {
-        return doDelete(currentStoreId(), identity, locale);
+    public String delete(@PathVariable String identity, Locale locale, Model model, HttpServletResponse response) {
+        return doDelete(currentStoreId(), identity, locale, model, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/manual-supplier/{identity}/delete")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> deleteForStore(@PathVariable String storeId, @PathVariable String identity, Locale locale) {
-        return doDelete(storeId, identity, locale);
+    public String deleteForStore(@PathVariable String storeId, @PathVariable String identity, Locale locale,
+                                 Model model, HttpServletResponse response) {
+        return doDelete(storeId, identity, locale, model, response);
     }
 
     private ResponseEntity<Map<String, Object>> doCreate(String storeId, String name, Locale locale) {
@@ -95,12 +103,83 @@ public class ManualSupplierController {
         return ResponseEntity.ok(Map.of("ok", true, "fileName", fileName));
     }
 
-    private ResponseEntity<Map<String, Object>> doDelete(String storeId, String identity, Locale locale) {
+    private String doDelete(String storeId, String identity, Locale locale, Model model, HttpServletResponse response) {
         ManualSupplierService.Result result = manualSupplierService.delete(storeId, identity);
         if (!result.ok()) {
-            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage(result.messageCode(), null, locale), model, response);
         }
-        return ResponseEntity.ok(Map.of("ok", true));
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
+        String successMessage = messageSource.getMessage(
+                "store.manual.deleted", new Object[]{ManualSupplierInfos.label(identity)}, locale);
+        return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, store, successMessage, model);
+    }
+
+    @PostMapping("/dashboard/store/fulfilment/manual-supplier/{identity}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String saveSelection(@PathVariable String identity,
+                                @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
+                                @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
+                                @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                Locale locale, Model model, HttpServletResponse response) {
+        return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment, locale,
+                model, response);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/{identity}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String saveSelectionForStore(@PathVariable String storeId, @PathVariable String identity,
+                                        @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
+                                        @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
+                                        @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                        Locale locale, Model model, HttpServletResponse response) {
+        return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, locale, model,
+                response);
+    }
+
+    private String doSaveSelection(String storeId, String identity, boolean enabled,
+                                   boolean includeInPricing, boolean includeInFulfilment,
+                                   Locale locale, Model model, HttpServletResponse response) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
+        manualSupplierService.applySelections(storeId, List.of(
+                new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment)));
+        Store updated = storesRepository.findById(storeId);
+        String successMessage = messageSource.getMessage(
+                "store.fulfilment.supplier.saved", new Object[]{ManualSupplierInfos.label(identity)}, locale);
+        return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, updated, successMessage, model);
+    }
+
+    @GetMapping("/dashboard/store/fulfilment/manual-supplier/section")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String section(Locale locale, Model model, HttpServletResponse response) {
+        return doRenderSection(currentStoreId(), locale, model, response);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/section")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String sectionForStore(@PathVariable String storeId, Locale locale, Model model,
+                                  HttpServletResponse response) {
+        return doRenderSection(storeId, locale, model, response);
+    }
+
+    // Used only to refresh the manual section after the create/upload-feed JSON endpoints below
+    // succeed: those stay JSON (they are already fetch-driven), so this is what lets the page
+    // show the new/updated row without a full reload.
+    private String doRenderSection(String storeId, Locale locale, Model model, HttpServletResponse response) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
+        return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, store, null, model);
     }
 
     private String currentStoreId() {

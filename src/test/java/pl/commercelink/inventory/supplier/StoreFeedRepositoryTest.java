@@ -8,6 +8,8 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,5 +87,34 @@ class StoreFeedRepositoryTest {
 
         // when / then
         assertThrows(NoSuchKeyException.class, () -> repository.read("store-1", "Acme", "csv"));
+    }
+
+    @Test
+    void feedLastModifiedByIdentityStripsThePrefixAndTheFeedSuffix() {
+        // given
+        when(fileStorage.getAllObjectLastModified("commercelink-stores", "oh4d5y15it/supplier-feeds/"))
+                .thenReturn(Map.of(
+                        "oh4d5y15it/supplier-feeds/elko-feed.csv", LocalDateTime.of(2026, 9, 11, 6, 0),
+                        "oh4d5y15it/supplier-feeds/manual:hurtownia x-feed.csv", LocalDateTime.of(2026, 9, 9, 14, 22)));
+
+        // when
+        Map<String, LocalDateTime> result = repository.feedLastModifiedByIdentity("oh4d5y15it");
+
+        // then
+        assertEquals(LocalDateTime.of(2026, 9, 11, 6, 0), result.get("elko"));
+        assertEquals(LocalDateTime.of(2026, 9, 9, 14, 22), result.get("manual:hurtownia x"));
+    }
+
+    @Test
+    void feedLastModifiedByIdentitySkipsKeysThatAreNotFeeds() {
+        // given
+        when(fileStorage.getAllObjectLastModified("commercelink-stores", "oh4d5y15it/supplier-feeds/"))
+                .thenReturn(Map.of("oh4d5y15it/supplier-feeds/readme.txt", LocalDateTime.of(2026, 9, 11, 6, 0)));
+
+        // when
+        Map<String, LocalDateTime> result = repository.feedLastModifiedByIdentity("oh4d5y15it");
+
+        // then
+        assertTrue(result.isEmpty());
     }
 }

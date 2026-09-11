@@ -11,441 +11,633 @@
 
             <h1 class="title" th:text="#{store.fulfilment.settings}"></h1>
 
-            <form th:action="@{/dashboard/store/fulfilment}" th:object="${form}" method="post">
+            <div class="box" id="fulfilment-settings-section">
+                <div th:replace="~{fragments/fulfilment-settings-section :: fulfilmentSettingsSection(${settings}, ${isSuperAdmin}, null, false)}"></div>
+            </div>
 
-                <input type="hidden" th:field="*{store.storeId}"/>
+            <div id="fulfilmentSettingsModal" class="modal">
+                <div class="modal-background"></div>
+                <div class="modal-content">
+                    <form th:action="@{${basePath} + '/fulfilment/settings'}" method="post" id="fulfilment-settings-form">
+                        <div class="box">
+                            <h2 class="subtitle" th:text="#{store.fulfilment.settings}"></h2>
 
-                <div class="box">
+                            <div id="fulfilment-settings-form-error"></div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.order.assembly.days}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfilmentConfiguration.orderAssemblyDays}"
-                                   th:placeholder="#{store.order.assembly.days}" />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.order.realization.days}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfilmentConfiguration.orderRealizationDays}"
-                                   th:placeholder="#{store.order.realization.days}" />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="checkbox">
-                            <input type="checkbox" th:field="*{store.fulfilmentConfiguration.automatedFulfilment}">
-                            <strong th:text="#{store.enable.automated.fulfilment}"></strong>
-                        </label>
-                        <p th:text="#{store.enable.automated.fulfilment.description}"></p>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.fulfilment.default.type}"></label>
-                        <div class="control">
-                            <div class="select">
-                                <select th:field="*{store.fulfilmentConfiguration.defaultFulfilmentType}">
-                                    <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
-                                </select>
+                            <div class="field">
+                                <label class="label" th:text="#{store.order.assembly.days}"></label>
+                                <div class="control">
+                                    <input class="input" type="number" min="0" required name="orderAssemblyDays"
+                                           id="fulfilment-settings-assembly-days"
+                                           th:placeholder="#{store.order.assembly.days}" />
+                                </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="field" th:if="${isSuperAdmin}">
-                        <label class="checkbox">
-                            <input type="checkbox" class="global-suppliers-toggle"
-                                   th:field="*{store.fulfilmentConfiguration.canUseGlobalSuppliers}">
-                            <strong th:text="#{store.use.global.suppliers}"></strong>
-                        </label>
-                        <p th:text="#{store.use.global.suppliers.description}"></p>
-                    </div>
+                            <div class="field">
+                                <label class="label" th:text="#{store.order.realization.days}"></label>
+                                <div class="control">
+                                    <input class="input" type="number" min="0" required name="orderRealizationDays"
+                                           id="fulfilment-settings-realization-days"
+                                           th:placeholder="#{store.order.realization.days}" />
+                                </div>
+                            </div>
 
-                    <div class="field" th:if="${isSuperAdmin}">
-                        <label class="label" th:text="#{store.inventory.cache.ttl}"></label>
-                        <input class="input" type="number" min="1"
-                               th:field="*{store.fulfilmentConfiguration.inventoryCacheTtlMinutes}">
-                        <p th:text="#{store.inventory.cache.ttl.description}"></p>
-                    </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="automatedFulfilment" value="true"
+                                           id="fulfilment-settings-automated-fulfilment">
+                                    <strong th:text="#{store.enable.automated.fulfilment}"></strong>
+                                </label>
+                                <p th:text="#{store.enable.automated.fulfilment.description}"></p>
+                            </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.enabled.providers}"></label>
-                        <div th:each="sel, stat : *{supplierSelections}" class="field supplier-item">
-                            <input type="hidden" th:field="*{supplierSelections[__${stat.index}__].supplierName}" />
-                            <label class="checkbox">
-                                <input type="checkbox" class="supplier-enabled"
-                                       th:field="*{supplierSelections[__${stat.index}__].enabled}" />
-                                <span th:text="${sel.supplierName}"></span>
-                            </label>
-                            <div class="supplier-detail ml-5 mt-2">
-                                <div class="field supplier-mode-wrap">
-                                    <label class="label" th:text="#{store.supplier.connection.mode}"></label>
-                                    <div class="control">
-                                        <div class="select">
-                                            <select class="supplier-mode" th:field="*{supplierSelections[__${stat.index}__].mode}">
-                                                <option th:each="m : ${connectionModes}"
-                                                        th:value="${m}"
-                                                        th:text="#{'store.supplier.mode.' + ${m}}"></option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox"
-                                               th:field="*{supplierSelections[__${stat.index}__].includeInPricing}" />
-                                        <span th:text="#{store.supplier.include.pricing}"></span>
-                                    </label>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox"
-                                               th:field="*{supplierSelections[__${stat.index}__].includeInFulfilment}" />
-                                        <span th:text="#{store.supplier.include.fulfilment}"></span>
-                                    </label>
-                                </div>
-                                <div class="supplier-own-fields"
-                                     th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
-                                    <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">
-                                        <label class="label" th:text="${cf.label()}"></label>
-                                        <div class="control">
-                                            <input class="input"
-                                                   th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
-                                                   th:name="'supplierConfiguration[' + ${sel.supplierName} + '][' + ${cf.key()} + ']'"
-                                                   th:value="${form.supplierConfiguration.get(sel.supplierName) != null ? form.supplierConfiguration.get(sel.supplierName).get(cf.key()) : ''}"
-                                                   th:placeholder="${cf.placeholder()}" />
-                                        </div>
+                            <div class="field">
+                                <label class="label" th:text="#{store.fulfilment.default.type}"></label>
+                                <div class="control">
+                                    <div class="select">
+                                        <select name="defaultFulfilmentType" id="fulfilment-settings-default-type">
+                                            <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="field">
-                        <div class="is-flex is-align-items-center mb-2">
-                            <label class="label mb-0" th:text="#{store.manual.section.title}">Manualni dostawcy</label>
-                            <button type="button" class="button is-success is-light is-small ml-2" id="manual-add-button"
-                                    th:title="#{store.manual.add.button}" th:aria-label="#{store.manual.add.button}">
-                                <span class="icon"><i class="fas fa-plus"></i></span>
-                            </button>
-                        </div>
+                            <div class="field" th:if="${isSuperAdmin}">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="canUseGlobalSuppliers" value="true"
+                                           id="fulfilment-settings-can-use-global-suppliers">
+                                    <strong th:text="#{store.use.global.suppliers}"></strong>
+                                </label>
+                                <p th:text="#{store.use.global.suppliers.description}"></p>
+                            </div>
 
-                        <div id="manual-supplier-list">
-                            <div th:each="ms, mstat : *{manualSupplierSelections}" class="field manual-item"
-                                 th:attr="data-identity=${ms.identity},data-hasfeed=${ms.hasFeed}">
-                                <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].identity}" />
-                                <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].label}" />
-                                <div class="is-flex is-align-items-center">
-                                    <label class="checkbox">
-                                        <input type="checkbox" class="manual-enabled"
-                                               th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
-                                        <span th:text="${ms.label}">label</span>
-                                    </label>
-                                    <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
-                                            th:data-identity="${ms.identity}" th:title="#{store.manual.delete.button}">
-                                        <span class="icon"><i class="fas fa-trash"></i></span>
-                                    </button>
+                            <div class="field" th:if="${isSuperAdmin}">
+                                <label class="label" th:text="#{store.inventory.cache.ttl}"></label>
+                                <input class="input" type="number" min="1" name="inventoryCacheTtlMinutes"
+                                       id="fulfilment-settings-cache-ttl">
+                                <p th:text="#{store.inventory.cache.ttl.description}"></p>
+                            </div>
+
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
                                 </div>
-                                <div class="manual-detail ml-5 mt-2">
-                                    <div class="field is-flex is-align-items-center">
-                                        <button type="button" class="button is-link is-light is-small manual-upload-open"
-                                                th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                                        <span class="icon has-text-grey ml-2 cl-tooltip"
-                                              th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                            <i class="fas fa-info-circle"></i>
-                                        </span>
-                                        <span class="tag manual-file-tag ml-3"
-                                              th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
-                                              th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
-                                    </div>
-                                    <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
-                                    <div class="field">
-                                        <label class="checkbox">
-                                            <input type="checkbox"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].includeInPricing}" />
-                                            <span th:text="#{store.supplier.include.pricing}"></span>
-                                        </label>
-                                    </div>
-                                    <div class="field">
-                                        <label class="checkbox">
-                                            <input type="checkbox"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].includeInFulfilment}" />
-                                            <span th:text="#{store.supplier.include.fulfilment}"></span>
-                                        </label>
-                                    </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="fulfilment-settings-modal-cancel"
+                                            th:text="#{general.cancel}"></button>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
+                <button class="modal-close is-large" aria-label="close" id="fulfilment-settings-modal-close"></button>
+            </div>
 
-                <script th:inline="javascript">
-                    (function() {
-                        var globalToggle = document.querySelector('.global-suppliers-toggle');
-                        var storeGlobalAllowed = /*[[${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}]]*/ true;
-                        var panels = document.querySelectorAll('.supplier-item');
-                        function globalAllowed() {
-                            return globalToggle ? globalToggle.checked : storeGlobalAllowed;
-                        }
-                        function refreshAll() {
-                            var allowed = globalAllowed();
-                            panels.forEach(function(panel) {
-                                var isEnabled = panel.querySelector('.supplier-enabled').checked;
-                                var detail = panel.querySelector('.supplier-detail');
-                                var modeWrap = panel.querySelector('.supplier-mode-wrap');
-                                var mode = panel.querySelector('.supplier-mode');
-                                var ownFields = panel.querySelector('.supplier-own-fields');
-                                if (detail) detail.style.display = isEnabled ? '' : 'none';
-                                if (modeWrap) modeWrap.style.display = allowed ? '' : 'none';
-                                if (mode) mode.disabled = !isEnabled || !allowed;
-                                var effectiveOwn = !allowed || (mode && mode.value === 'OWN');
-                                if (ownFields) {
-                                    ownFields.style.display = (isEnabled && effectiveOwn) ? '' : 'none';
-                                }
-                            });
-                        }
-                        panels.forEach(function(panel) {
-                            panel.querySelector('.supplier-enabled').addEventListener('change', refreshAll);
-                            var mode = panel.querySelector('.supplier-mode');
-                            if (mode) mode.addEventListener('change', refreshAll);
-                        });
-                        if (globalToggle) globalToggle.addEventListener('change', refreshAll);
-                        refreshAll();
-                    })();
-                </script>
+            <script th:inline="javascript">
+                // Shared by every section script below: a successful async mutation returns the
+                // freshly-rendered section fragment, whose root element carries the localized
+                // success message (if any) as a data attribute -- there is no redirect left to
+                // flash it through, so it travels in the response body instead, the same way the
+                // dropship validation fragment carries data-fully-available.
+                var genericError = /*[[#{general.error}]]*/ 'Error';
+                // Shown when refreshExternalSupplierSection below cannot trust the response it got
+                // back and leaves the section untouched instead of swapping it in.
+                var supplierSectionStaleWarning = /*[[#{store.supplier.section.refresh.stale}]]*/
+                        'The supplier list may be out of date. Reload the page to see it refreshed.';
 
-                <script th:inline="javascript">
-                    document.addEventListener('DOMContentLoaded', function () {
-                        var list = document.getElementById('manual-supplier-list');
-                        var nextIndex = list.querySelectorAll('.manual-item').length;
-                        var storeId = /*[[${form.store.storeId}]]*/ '';
-                        var isSuperAdmin = /*[[${isSuperAdmin}]]*/ false;
-                        var manualBase = isSuperAdmin
-                            ? '/dashboard/store/' + encodeURIComponent(storeId) + '/manual-supplier'
-                            : '/dashboard/store/manual-supplier';
+                function applySectionSwap(container, html) {
+                    var temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    var message = temp.firstElementChild ? temp.firstElementChild.getAttribute('data-success-message') : null;
+                    container.innerHTML = temp.innerHTML;
+                    if (message) { showToast(message, 'success'); }
+                }
 
-                        var presentLabel = /*[[#{store.manual.feed.present}]]*/ 'Plik wgrany';
-                        var noFileMessage = /*[[#{store.manual.error.csv.empty}]]*/ 'Nie wybrano pliku.';
-                        var genericError = /*[[#{general.error}]]*/ 'Błąd';
+                function extractErrorMessage(html, fallback) {
+                    if (!html) { return fallback; }
+                    var temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    var text = temp.textContent.trim();
+                    return text || fallback;
+                }
 
-                        function showError(el) { el.textContent = genericError; el.classList.remove('is-hidden'); }
+                // A rejected save's response body is trusted as our own small sectionError fragment
+                // only when the status is 400 AND the body actually looks like that fragment: a
+                // form bound with @ModelAttribute and no BindingResult (e.g. FulfilmentSettingsForm's
+                // int day fields, left blank or given text) makes Spring itself return 400 with the
+                // whole framework error page as the body, which must fall back to the generic
+                // notification instead of being written into the modal raw. Shared by every section
+                // script below instead of duplicating the same check a third time.
+                function looksLikeSectionErrorFragment(html) {
+                    return !!html && html.indexOf('notification is-danger') !== -1 && html.indexOf('<html') === -1;
+                }
 
-                        var addButton = document.getElementById('manual-add-button');
-                        var addModal = document.getElementById('manualAddModal');
-                        var nameInput = document.getElementById('manual-new-name');
-                        var addError = document.getElementById('manual-add-error');
+                function applyFormError(target, html, status) {
+                    target.innerHTML = (status === 400 && looksLikeSectionErrorFragment(html))
+                            ? html
+                            : ('<div class="notification is-danger">' + genericError + '</div>');
+                }
 
-                        var uploadModal = document.getElementById('manualUploadModal');
-                        var uploadInput = document.getElementById('manual-upload-input');
-                        var uploadFilename = document.getElementById('manual-upload-filename');
-                        var uploadError = document.getElementById('manual-upload-error');
-                        var uploadRow = null;
-
-                        function openAddModal() {
-                            nameInput.value = '';
-                            addError.classList.add('is-hidden');
-                            addModal.classList.add('is-active');
-                            nameInput.focus();
-                        }
-                        function closeAddModal() { addModal.classList.remove('is-active'); }
-
-                        function openUploadModal(row) {
-                            uploadRow = row;
-                            uploadInput.value = '';
-                            uploadFilename.textContent = '';
-                            uploadError.classList.add('is-hidden');
-                            uploadModal.classList.add('is-active');
-                        }
-                        function closeUploadModal() { uploadModal.classList.remove('is-active'); uploadRow = null; }
-
-                        function markRowHasFeed(row, fileName) {
-                            row.setAttribute('data-hasfeed', 'true');
-                            var tag = row.querySelector('.manual-file-tag');
-                            tag.textContent = presentLabel + (fileName ? ': ' + fileName : '');
-                            tag.classList.add('is-success');
-                            var hint = row.querySelector('.manual-enable-hint');
-                            if (hint) { hint.classList.add('is-hidden'); }
-                        }
-
-                        function wireRow(row) {
-                            var enabled = row.querySelector('.manual-enabled');
-                            var detail = row.querySelector('.manual-detail');
-                            var openBtn = row.querySelector('.manual-upload-open');
-                            var hint = row.querySelector('.manual-enable-hint');
-                            var hasFeed = row.getAttribute('data-hasfeed') === 'true';
-                            function refresh() { detail.style.display = enabled.checked ? '' : 'none'; }
-                            enabled.addEventListener('change', refresh);
-                            refresh();
-                            if (hint) {
-                                if (hasFeed) { hint.classList.add('is-hidden'); }
-                                else { hint.classList.remove('is-hidden'); }
+                // Used by the fulfilment settings save below when it flips canUseGlobalSuppliers:
+                // that flag also governs the external suppliers section's mode column and the
+                // supplier modal's mode selector, so this fetches and swaps that section in too,
+                // the same way refreshManualSection() does further down for the manual section.
+                // Best-effort: the settings save itself already succeeded and already has its own
+                // toast, so a failure here is not surfaced as an error -- but a session expiry
+                // returns 200 with a same-origin login page instead of the section fragment, and
+                // swapping that in would silently replace the suppliers table with a login form, so
+                // the response is only trusted once its root actually looks like the section (it
+                // carries data-show-mode, which every real render of this fragment sets). A failed
+                // refresh still has a real, visible consequence -- e.g. canUseGlobalSuppliers just
+                // turned on but the stale section still hides the mode selector -- so it is not left
+                // completely silent, just non-blocking.
+                function refreshExternalSupplierSection(basePath, container) {
+                    return fetch(basePath + '/fulfilment/supplier/section')
+                        .then(function (r) {
+                            if (!r.ok) { throw new Error('Failed to refresh the external supplier section'); }
+                            return r.text();
+                        })
+                        .then(function (html) {
+                            var temp = document.createElement('div');
+                            temp.innerHTML = html;
+                            var root = temp.firstElementChild;
+                            if (!root || !root.hasAttribute('data-show-mode')) {
+                                throw new Error('Refreshed body did not look like the external supplier section');
                             }
-                            openBtn.addEventListener('click', function () { openUploadModal(row); });
-                            row.querySelector('.manual-delete').addEventListener('click', function (e) {
-                                var identity = e.currentTarget.getAttribute('data-identity');
-                                confirmDelete(e.currentTarget, function () { deleteManual(identity, row); });
-                            });
-                        }
+                            applySectionSwap(container, html);
+                        })
+                        .catch(function () { showToast(supplierSectionStaleWarning, 'warning'); });
+                }
+            </script>
 
-                        function deleteManual(identity, row) {
-                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/delete',
-                                  { method: 'POST' })
-                                .then(function (r) { if (r.ok) { row.remove(); } })
-                                .catch(function () {});
-                        }
+            <script th:inline="javascript">
+                (function () {
+                    var basePath = /*[[${basePath}]]*/ '';
+                    var settingsSection = document.getElementById('fulfilment-settings-section');
+                    var externalSection = document.getElementById('external-supplier-section');
+                    var modal = document.getElementById('fulfilmentSettingsModal');
+                    var form = document.getElementById('fulfilment-settings-form');
+                    var submitButton = form.querySelector('button[type="submit"]');
+                    var formError = document.getElementById('fulfilment-settings-form-error');
+                    var assemblyDays = document.getElementById('fulfilment-settings-assembly-days');
+                    var realizationDays = document.getElementById('fulfilment-settings-realization-days');
+                    var automatedFulfilment = document.getElementById('fulfilment-settings-automated-fulfilment');
+                    var defaultType = document.getElementById('fulfilment-settings-default-type');
+                    var canUseGlobalSuppliers = document.getElementById('fulfilment-settings-can-use-global-suppliers');
+                    var cacheTtl = document.getElementById('fulfilment-settings-cache-ttl');
+                    var submitInFlight = false;
 
-                        function addManual() {
-                            var name = nameInput.value.trim();
-                            addError.classList.add('is-hidden');
-                            if (!name) { return; }
-                            var body = new URLSearchParams(); body.append('name', name);
-                            fetch(manualBase, { method: 'POST', body: body })
-                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                                .then(function (res) {
-                                    if (!res.ok) {
-                                        addError.textContent = res.body.message || 'error';
-                                        addError.classList.remove('is-hidden');
-                                        return;
-                                    }
-                                    var template = document.getElementById('manual-row-template');
-                                    var html = template.innerHTML.replace(/__INDEX__/g, nextIndex++);
-                                    var wrap = document.createElement('div');
-                                    wrap.innerHTML = html.trim();
-                                    var row = wrap.firstElementChild;
-                                    row.setAttribute('data-identity', res.body.identity);
-                                    row.querySelector('input[name$=".identity"]').value = res.body.identity;
-                                    row.querySelector('input[name$=".label"]').value = res.body.label;
-                                    row.querySelector('.manual-label').textContent = res.body.label;
-                                    row.querySelector('.manual-delete').setAttribute('data-identity', res.body.identity);
-                                    list.appendChild(row);
-                                    wireRow(row);
-                                    closeAddModal();
-                                })
-                                .catch(function () { showError(addError); });
-                        }
+                    // Reads the current values straight off the (possibly just-swapped) section's
+                    // data attributes instead of a page-load snapshot, which would show stale
+                    // values after a save -- the same reason the supplier/manual modals read a
+                    // table row's dataset fresh on every open instead of a JS array from page load.
+                    function open() {
+                        var current = settingsSection.firstElementChild.dataset;
+                        formError.innerHTML = '';
+                        assemblyDays.value = current.orderAssemblyDays;
+                        realizationDays.value = current.orderRealizationDays;
+                        automatedFulfilment.checked = current.automatedFulfilment === 'true';
+                        if (current.defaultFulfilmentType) { defaultType.value = current.defaultFulfilmentType; }
+                        if (canUseGlobalSuppliers) { canUseGlobalSuppliers.checked = current.canUseGlobalSuppliers === 'true'; }
+                        if (cacheTtl) { cacheTtl.value = current.inventoryCacheTtlMinutes || ''; }
+                        modal.classList.add('is-active');
+                    }
 
-                        function uploadFeed() {
-                            if (!uploadRow) { return; }
-                            uploadError.classList.add('is-hidden');
-                            if (!uploadInput.files.length) {
-                                uploadError.textContent = noFileMessage;
-                                uploadError.classList.remove('is-hidden');
-                                return;
-                            }
-                            var identity = uploadRow.getAttribute('data-identity');
-                            var row = uploadRow;
-                            var pickedName = uploadInput.files[0].name;
-                            var fd = new FormData();
-                            fd.append('file', uploadInput.files[0]);
-                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/feed',
-                                  { method: 'POST', body: fd })
-                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                                .then(function (res) {
-                                    if (!res.ok) {
-                                        uploadError.textContent = res.body.message || 'error';
-                                        uploadError.classList.remove('is-hidden');
-                                        return;
-                                    }
-                                    markRowHasFeed(row, res.body.fileName || pickedName);
-                                    closeUploadModal();
-                                })
-                                .catch(function () { showError(uploadError); });
-                        }
+                    function close() { modal.classList.remove('is-active'); }
 
-                        addButton.addEventListener('click', openAddModal);
-                        document.getElementById('manual-add-confirm').addEventListener('click', addManual);
-                        document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
-                        document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
-                        addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
-                        nameInput.addEventListener('keydown', function (e) {
-                            if (e.key === 'Enter') { e.preventDefault(); addManual(); }
-                        });
-
-                        uploadInput.addEventListener('change', function () {
-                            uploadFilename.textContent = uploadInput.files.length ? uploadInput.files[0].name : '';
-                        });
-                        document.getElementById('manual-upload-save').addEventListener('click', uploadFeed);
-                        document.getElementById('manual-upload-cancel').addEventListener('click', closeUploadModal);
-                        document.getElementById('manual-upload-close').addEventListener('click', closeUploadModal);
-                        uploadModal.querySelector('.modal-background').addEventListener('click', closeUploadModal);
-
-                        list.querySelectorAll('.manual-item').forEach(wireRow);
+                    settingsSection.addEventListener('click', function (event) {
+                        if (event.target.closest('#fulfilment-settings-edit-button')) { open(); }
                     });
-                </script>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-                    </div>
-                </div>
-            </form>
+                    document.getElementById('fulfilment-settings-modal-cancel').addEventListener('click', close);
+                    document.getElementById('fulfilment-settings-modal-close').addEventListener('click', close);
+                    modal.querySelector('.modal-background').addEventListener('click', close);
 
-            <template id="manual-row-template">
-                <div class="field manual-item" data-identity="" data-hasfeed="false">
-                    <input type="hidden" name="manualSupplierSelections[__INDEX__].identity" />
-                    <input type="hidden" name="manualSupplierSelections[__INDEX__].label" />
-                    <div class="is-flex is-align-items-center">
-                        <label class="checkbox">
-                            <input type="checkbox" class="manual-enabled"
-                                   name="manualSupplierSelections[__INDEX__].enabled" value="true" />
-                            <span class="manual-label"></span>
-                        </label>
-                        <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
-                                data-identity="" th:title="#{store.manual.delete.button}">
-                            <span class="icon"><i class="fas fa-trash"></i></span>
-                        </button>
-                    </div>
-                    <div class="manual-detail ml-5 mt-2" style="display:none">
-                        <div class="field is-flex is-align-items-center">
-                            <button type="button" class="button is-link is-light is-small manual-upload-open"
-                                    th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                            <span class="icon has-text-grey ml-2 cl-tooltip"
-                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                <i class="fas fa-info-circle"></i>
-                            </span>
-                            <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
+                    form.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        if (submitInFlight) { return; }
+                        submitInFlight = true;
+                        submitButton.disabled = true;
+                        formError.innerHTML = '';
+                        fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) })
+                            .then(function (response) {
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
+                            })
+                            .then(function (result) {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                if (!result.ok) {
+                                    applyFormError(formError, result.html, result.status);
+                                    return;
+                                }
+                                applySectionSwap(settingsSection, result.html);
+                                close();
+                                // canUseGlobalSuppliers changed as a result of this save: the
+                                // external suppliers section (its mode column and the supplier
+                                // modal's mode selector) is stale until it is refreshed too.
+                                var refreshed = settingsSection.firstElementChild;
+                                if (refreshed && refreshed.getAttribute('data-refresh-external-suppliers') === 'true') {
+                                    refreshExternalSupplierSection(basePath, externalSection);
+                                }
+                            })
+                            .catch(function () {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                formError.innerHTML = '<div class="notification is-danger">' + genericError + '</div>';
+                            });
+                    });
+                })();
+            </script>
+
+            <div class="box" id="external-supplier-section"
+                 th:attr="data-all-suppliers=${#strings.listJoin(allSupplierNames, ';')}">
+                <div th:replace="~{fragments/supplier-section :: supplierSection(${externalConnections}, false,
+                                   ${settings.canUseGlobalSuppliers},
+                                   'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button',
+                                   ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null,
+                                   ${suppliersWithStoredConfigJoined})}"></div>
+            </div>
+
+            <div id="supplierModal" class="modal">
+                <div class="modal-background"></div>
+                <div class="modal-content">
+                    <form th:action="@{${basePath} + '/fulfilment/supplier'}" method="post" id="supplier-form">
+                        <div class="box">
+                            <h2 class="subtitle" id="supplier-modal-title"></h2>
+
+                            <div id="supplier-form-error"></div>
+
+                            <div class="field" id="supplier-select-wrap">
+                                <label class="label" th:text="#{store.supplier.add.select}"></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select name="supplierName" id="supplier-select">
+                                            <option value="" th:text="#{general.select}"></option>
+                                            <option th:each="name : ${availableSuppliers}"
+                                                    th:value="${name}" th:text="${name}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="supplierName" id="supplier-name-hidden" disabled />
+
+                            <!-- Always rendered (not gated by a page-load th:if any more): the
+                                 fulfilment settings modal can flip canUseGlobalSuppliers from a
+                                 different section, so visibility is instead toggled by JS reading
+                                 the external section's fresh data-show-mode attribute on every
+                                 open -- a server-rendered condition here would go stale after such
+                                 a save until a full page reload. -->
+                            <div class="field supplier-mode-wrap" id="supplier-mode-wrap">
+                                <label class="label" th:text="#{store.supplier.connection.mode}"></label>
+                                <div class="control">
+                                    <div class="select">
+                                        <select class="supplier-mode" name="mode" id="supplier-mode">
+                                            <option th:each="m : ${connectionModes}" th:value="${m}"
+                                                    th:text="#{'store.supplier.mode.' + ${m}}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="notification is-warning is-light mt-2 is-hidden"
+                                     id="supplier-mode-warning" th:text="#{store.supplier.mode.warning}"></div>
+                            </div>
+
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInPricing" value="true" id="supplier-pricing" />
+                                    <span th:text="#{store.supplier.include.pricing}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInFulfilment" value="true" id="supplier-fulfilment" />
+                                    <span th:text="#{store.supplier.include.fulfilment}"></span>
+                                </label>
+                            </div>
+
+                            <div th:each="entry : ${supplierFields}"
+                                 th:id="'supplier-fields-' + ${entry.key}" class="supplier-fields">
+                                <div class="field" th:each="cf : ${entry.value}">
+                                    <label class="label">
+                                        <span th:text="${cf.label()}"></span>
+                                        <!-- Shown for every required field regardless of type or connection state:
+                                             a blank required password on an already-connected supplier is still a
+                                             mandatory field, it just does not need retyping (see the HTML required
+                                             attribute below, which is withheld only in that one case). -->
+                                        <span th:if="${cf.required()}" class="has-text-danger ml-1"
+                                              th:title="#{store.supplier.field.required.tooltip}"
+                                              th:text="#{store.supplier.field.required.marker}"></span>
+                                    </label>
+                                    <div class="control">
+                                        <input class="input"
+                                               th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                                               th:name="'configuration[' + ${cf.key()} + ']'"
+                                               th:value="${cf.type().name() == 'PASSWORD'
+                                                          ? ''
+                                                          : (form.supplierConfiguration.get(entry.key) != null
+                                                             ? form.supplierConfiguration.get(entry.key).get(cf.key()) : '')}"
+                                               th:placeholder="${cf.placeholder()}"
+                                               th:required="${cf.required() and !(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig.contains(entry.key))}"
+                                               th:attr="data-required=${cf.required()}"
+                                               disabled />
+                                    </div>
+                                    <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
+                                       th:text="#{store.supplier.password.keep}"></p>
+                                </div>
+                            </div>
+
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="supplier-modal-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
+                            </div>
                         </div>
-                        <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
-                        <div class="field">
-                            <label class="checkbox">
-                                <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInPricing" value="true" checked />
-                                <span th:text="#{store.supplier.include.pricing}"></span>
-                            </label>
-                        </div>
-                        <div class="field">
-                            <label class="checkbox">
-                                <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInFulfilment" value="true" checked />
-                                <span th:text="#{store.supplier.include.fulfilment}"></span>
-                            </label>
-                        </div>
-                    </div>
+                    </form>
                 </div>
-            </template>
+                <button class="modal-close is-large" aria-label="close" id="supplier-modal-close"></button>
+            </div>
+
+            <script th:inline="javascript">
+                (function () {
+                    var externalSection = document.getElementById('external-supplier-section');
+                    var basePath = /*[[${basePath}]]*/ '';
+                    var modal = document.getElementById('supplierModal');
+                    var supplierForm = document.getElementById('supplier-form');
+                    var supplierSubmitButton = supplierForm.querySelector('button[type="submit"]');
+                    var supplierFormError = document.getElementById('supplier-form-error');
+                    var select = document.getElementById('supplier-select');
+                    var selectWrap = document.getElementById('supplier-select-wrap');
+                    var hiddenName = document.getElementById('supplier-name-hidden');
+                    var mode = document.getElementById('supplier-mode');
+                    var modeWrap = document.getElementById('supplier-mode-wrap');
+                    var warning = document.getElementById('supplier-mode-warning');
+                    var title = document.getElementById('supplier-modal-title');
+                    var pricing = document.getElementById('supplier-pricing');
+                    var fulfilment = document.getElementById('supplier-fulfilment');
+                    var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
+                    var editTitle = /*[[#{store.supplier.edit.modal.title}]]*/ '';
+                    var selectPlaceholder = /*[[#{general.select}]]*/ '';
+                    var submitInFlight = false;
+
+                    // Reads the row data straight out of the (possibly just-swapped) table instead
+                    // of a JS array snapshotted at page load, which would go stale after any swap.
+                    function findConfigureButton(identity) {
+                        var buttons = externalSection.querySelectorAll('[data-configure-supplier]');
+                        for (var i = 0; i < buttons.length; i++) {
+                            if (buttons[i].getAttribute('data-configure-supplier') === identity) {
+                                return buttons[i];
+                            }
+                        }
+                        return null;
+                    }
+
+                    function rowFor(identity) {
+                        var button = findConfigureButton(identity);
+                        if (!button) { return null; }
+                        var tr = button.closest('tr');
+                        return {
+                            identity: identity,
+                            mode: tr.dataset.mode,
+                            includeInPricing: tr.dataset.includePricing === 'true',
+                            includeInFulfilment: tr.dataset.includeFulfilment === 'true'
+                        };
+                    }
+
+                    function activeName() {
+                        return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
+                    }
+
+                    // Reads canUseGlobalSuppliers fresh off the (possibly just-swapped) section
+                    // root instead of a page-load snapshot: the fulfilment settings modal can flip
+                    // this flag from a different section, and this is what keeps the mode selector
+                    // in sync with it without a page reload.
+                    function refreshModeVisibility() {
+                        var root = externalSection.firstElementChild;
+                        var showMode = !!(root && root.getAttribute('data-show-mode') === 'true');
+                        modeWrap.classList.toggle('is-hidden', !showMode);
+                    }
+
+                    function refreshFields() {
+                        var name = activeName();
+                        var isOwn = mode.value === 'OWN';
+                        // Read fresh off the (possibly just-swapped) section root, the same idiom as
+                        // refreshModeVisibility above: a save can be the very thing that puts this
+                        // supplier's identity into this list, and the modal is never re-rendered by
+                        // that save, so the server-rendered `required` attribute on the password
+                        // input below is frozen at page load and must not be trusted any more.
+                        var root = externalSection.firstElementChild;
+                        var storedConfigSuppliers = (root && root.getAttribute('data-suppliers-with-stored-config') || '')
+                                .split(';').filter(function (s) { return s.length > 0; });
+                        var hasStoredConfig = storedConfigSuppliers.indexOf(name) !== -1;
+                        document.querySelectorAll('.supplier-fields').forEach(function (group) {
+                            var active = group.id === 'supplier-fields-' + name && isOwn;
+                            group.style.display = active ? '' : 'none';
+                            group.querySelectorAll('input').forEach(function (input) {
+                                input.disabled = !active;
+                                // data-required carries cf.required() alone (never entangled with
+                                // stored-config status, unlike the server-rendered `required`
+                                // attribute), so this is the only piece that needs to survive from
+                                // page load; whether a password may stay blank is re-derived here.
+                                var baseRequired = input.dataset.required === 'true';
+                                input.required = baseRequired && !(input.type === 'password' && hasStoredConfig);
+                            });
+                        });
+                        var row = rowFor(name);
+                        var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
+                        warning.classList.toggle('is-hidden', !leavingOwn);
+                    }
+
+                    function clearFormError() {
+                        supplierFormError.innerHTML = '';
+                    }
+
+                    // html is only trusted when it is the small sectionError fragment the server
+                    // renders for a 400 (see SupplierSectionModel.renderErrorFragment); on any
+                    // other status -- or a 400 whose body doesn't actually look like that fragment
+                    // -- it falls back to the generic notification instead of being written in raw.
+                    // Delegates to the shared applyFormError helper (see the first script block)
+                    // instead of duplicating the guard here.
+                    function showFormError(html, status) {
+                        applyFormError(supplierFormError, html, status);
+                    }
+
+                    // The full provider list is rendered once (data-all-suppliers, set at page
+                    // load and never touched by a swap); only the connected identities need to be
+                    // re-read after each swap, straight from the freshly-rendered table -- no
+                    // second request for the option list.
+                    function refreshAvailableOptions() {
+                        var all = (externalSection.dataset.allSuppliers || '').split(';').filter(function (s) { return s.length > 0; });
+                        var connected = [];
+                        externalSection.querySelectorAll('[data-configure-supplier]').forEach(function (button) {
+                            // the server's "already connected" set is case-insensitive (TreeSet with
+                            // CASE_INSENSITIVE_ORDER), so this comparison must be too, or a supplier
+                            // whose case differs from data-all-suppliers would show up twice
+                            connected.push(button.getAttribute('data-configure-supplier').toLowerCase());
+                        });
+                        var available = all.filter(function (name) { return connected.indexOf(name.toLowerCase()) === -1; });
+                        select.innerHTML = '';
+                        var placeholder = document.createElement('option');
+                        placeholder.value = '';
+                        placeholder.textContent = selectPlaceholder;
+                        select.appendChild(placeholder);
+                        available.forEach(function (name) {
+                            var option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name;
+                            select.appendChild(option);
+                        });
+                    }
+
+                    function open(identity) {
+                        var row = identity ? rowFor(identity) : null;
+                        title.textContent = row ? editTitle : addTitle;
+                        selectWrap.classList.toggle('is-hidden', !!row);
+                        select.disabled = !!row;
+                        hiddenName.disabled = !row;
+                        clearFormError();
+                        if (row) {
+                            hiddenName.value = row.identity;
+                            mode.value = row.mode;
+                            pricing.checked = row.includeInPricing;
+                            fulfilment.checked = row.includeInFulfilment;
+                        } else {
+                            select.value = identity || '';
+                            mode.value = 'OWN';
+                            pricing.checked = true;
+                            fulfilment.checked = true;
+                        }
+                        refreshModeVisibility();
+                        refreshFields();
+                        modal.classList.add('is-active');
+                    }
+
+                    function close() { modal.classList.remove('is-active'); }
+
+                    function disconnectSupplier(identity, button) {
+                        button.disabled = true;
+                        fetch(basePath + '/fulfilment/supplier/' + encodeURIComponent(identity) + '/disconnect',
+                              { method: 'POST' })
+                            .then(function (response) {
+                                return response.text().then(function (html) { return { ok: response.ok, html: html }; });
+                            })
+                            .then(function (result) {
+                                if (!result.ok) {
+                                    button.disabled = false;
+                                    alert(extractErrorMessage(result.html, genericError));
+                                    return;
+                                }
+                                applySectionSwap(externalSection, result.html);
+                                refreshAvailableOptions();
+                            })
+                            .catch(function () {
+                                button.disabled = false;
+                                alert(genericError);
+                            });
+                    }
+
+                    // Event delegation from the stable #external-supplier-section container: the
+                    // Add button, every row's Edit button and every row's Disconnect button all
+                    // live inside content that gets replaced wholesale on each swap, so binding to
+                    // the container once (rather than re-running a per-button binding loop after
+                    // every swap) is what keeps them working afterwards.
+                    externalSection.addEventListener('click', function (event) {
+                        if (event.target.closest('#supplier-add-button')) { open(null); return; }
+                        var configureButton = event.target.closest('[data-configure-supplier]');
+                        if (configureButton) { open(configureButton.getAttribute('data-configure-supplier')); return; }
+                        var disconnectButton = event.target.closest('.external-disconnect-button');
+                        if (disconnectButton) {
+                            var identity = disconnectButton.getAttribute('data-identity');
+                            confirmDelete(disconnectButton, function () { disconnectSupplier(identity, disconnectButton); });
+                        }
+                    });
+
+                    select.addEventListener('change', refreshFields);
+                    mode.addEventListener('change', refreshFields);
+                    document.getElementById('supplier-modal-cancel').addEventListener('click', close);
+                    document.getElementById('supplier-modal-close').addEventListener('click', close);
+                    modal.querySelector('.modal-background').addEventListener('click', close);
+
+                    supplierForm.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        if (submitInFlight) { return; }
+                        submitInFlight = true;
+                        supplierSubmitButton.disabled = true;
+                        clearFormError();
+                        fetch(supplierForm.action, { method: 'POST', body: new URLSearchParams(new FormData(supplierForm)) })
+                            .then(function (response) {
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
+                            })
+                            .then(function (result) {
+                                submitInFlight = false;
+                                supplierSubmitButton.disabled = false;
+                                if (!result.ok) { showFormError(result.html, result.status); return; }
+                                applySectionSwap(externalSection, result.html);
+                                refreshAvailableOptions();
+                                close();
+                            })
+                            .catch(function () {
+                                submitInFlight = false;
+                                supplierSubmitButton.disabled = false;
+                                showFormError(null, null);
+                            });
+                    });
+                })();
+            </script>
+
+            <div class="box" id="manual-supplier-section">
+                <div th:replace="~{fragments/supplier-section :: supplierSection(${manualConnections}, true, false,
+                                   'store.manual.section.title', 'manual-add-button',
+                                   'store.manual.add.button', false, null, null, '')}"></div>
+            </div>
 
             <div id="manualAddModal" class="modal">
                 <div class="modal-background"></div>
                 <div class="modal-content">
                     <div class="box">
-                        <h2 class="subtitle" th:text="#{store.manual.add.modal.title}">Dodaj manualnego dostawcę</h2>
+                        <h2 class="subtitle" th:text="#{store.manual.add.modal.title}"></h2>
                         <div class="field">
+                            <label class="label" th:text="#{store.manual.add.label}"></label>
                             <div class="control">
                                 <input class="input" type="text" id="manual-new-name"
                                        th:placeholder="#{store.manual.add.label}" />
                             </div>
                         </div>
+                        <div class="field">
+                            <label class="label">
+                                <span th:text="#{store.manual.upload.open}"></span>
+                                <span class="icon has-text-grey ml-1 cl-tooltip"
+                                      th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                    <i class="fas fa-info-circle"></i>
+                                </span>
+                            </label>
+                            <div class="file has-name">
+                                <label class="file-label">
+                                    <input class="file-input" type="file" accept=".csv" id="manual-add-file" />
+                                    <span class="file-cta">
+                                        <span class="file-icon"><i class="fas fa-upload"></i></span>
+                                        <span class="file-label" th:text="#{store.manual.file.choose}"></span>
+                                    </span>
+                                    <span class="file-name" id="manual-add-filename"></span>
+                                </label>
+                            </div>
+                            <p class="help" th:text="#{store.manual.add.file.optional}"></p>
+                        </div>
                         <p class="help is-danger is-hidden" id="manual-add-error"></p>
                         <div class="field is-grouped mt-3">
                             <div class="control">
                                 <button type="button" class="button is-primary" id="manual-add-confirm"
-                                        th:text="#{store.manual.add.button}">Dodaj</button>
+                                        th:text="#{store.manual.add.button}"></button>
                             </div>
                             <div class="control">
                                 <button type="button" class="button" id="manual-add-cancel"
-                                        th:text="#{general.cancel}">Anuluj</button>
+                                        th:text="#{general.cancel}"></button>
                             </div>
                         </div>
                     </div>
@@ -453,42 +645,373 @@
                 <button class="modal-close is-large" aria-label="close" id="manual-add-close"></button>
             </div>
 
-            <div id="manualUploadModal" class="modal">
+            <div id="manualConfigModal" class="modal">
                 <div class="modal-background"></div>
                 <div class="modal-content">
-                    <div class="box">
-                        <h2 class="subtitle">
-                            <span th:text="#{store.manual.upload.modal.title}">Wgraj plik CSV</span>
-                            <span class="icon has-text-grey ml-1 cl-tooltip"
-                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                <i class="fas fa-info-circle"></i>
-                            </span>
-                        </h2>
-                        <div class="file has-name">
-                            <label class="file-label">
-                                <input class="file-input" type="file" accept=".csv" id="manual-upload-input" />
-                                <span class="file-cta">
-                                    <span class="file-icon"><i class="fas fa-upload"></i></span>
-                                    <span class="file-label" th:text="#{store.manual.file.choose}">Wybierz plik</span>
+                    <form method="post" id="manual-config-form">
+                        <div class="box">
+                            <h2 class="subtitle" id="manual-config-title"></h2>
+                            <div id="manual-config-save-error"></div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="enabled" value="true"
+                                           class="manual-enabled" id="manual-config-enabled" />
+                                    <span th:text="#{store.supplier.column.enabled}"></span>
+                                </label>
+                                <p class="help is-hidden" id="manual-config-hint"
+                                   th:text="#{store.manual.enable.needsfeed}"></p>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInPricing" value="true" id="manual-config-pricing" />
+                                    <span th:text="#{store.supplier.include.pricing}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInFulfilment" value="true" id="manual-config-fulfilment" />
+                                    <span th:text="#{store.supplier.include.fulfilment}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <button type="button" class="button is-link is-light is-small"
+                                        id="manual-config-upload" th:text="#{store.manual.upload.open}"></button>
+                                <span class="icon has-text-grey ml-1 cl-tooltip"
+                                      th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                    <i class="fas fa-info-circle"></i>
                                 </span>
-                                <span class="file-name" id="manual-upload-filename"></span>
-                            </label>
-                        </div>
-                        <p class="help is-danger is-hidden mt-2" id="manual-upload-error"></p>
-                        <div class="field is-grouped mt-3">
-                            <div class="control">
-                                <button type="button" class="button is-primary" id="manual-upload-save"
-                                        th:text="#{general.save}">Zapisz</button>
+                                <span class="tag is-light ml-2" id="manual-config-file"></span>
+                                <input class="is-hidden" type="file" accept=".csv" id="manual-config-file-input" />
                             </div>
-                            <div class="control">
-                                <button type="button" class="button" id="manual-upload-cancel"
-                                        th:text="#{general.cancel}">Anuluj</button>
+                            <p class="help is-danger is-hidden" id="manual-config-error"></p>
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="manual-config-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
-                <button class="modal-close is-large" aria-label="close" id="manual-upload-close"></button>
+                <button class="modal-close is-large" aria-label="close" id="manual-config-close"></button>
             </div>
+
+            <script th:inline="javascript">
+                (function () {
+                    var basePath = /*[[${basePath}]]*/ '';
+                    var manualSection = document.getElementById('manual-supplier-section');
+                    var noNameMessage = /*[[#{store.manual.error.name.invalid}]]*/ 'Invalid name';
+                    var feedPresentLabel = /*[[#{store.manual.feed.present}]]*/ 'File uploaded';
+                    var feedMissingLabel = /*[[#{store.manual.feed.missing}]]*/ 'No file';
+
+                    var addModal = document.getElementById('manualAddModal');
+                    var addConfirmButton = document.getElementById('manual-add-confirm');
+                    var nameInput = document.getElementById('manual-new-name');
+                    var addFile = document.getElementById('manual-add-file');
+                    var addFilename = document.getElementById('manual-add-filename');
+                    var addError = document.getElementById('manual-add-error');
+                    // set once the create call has succeeded; from then on the supplier already
+                    // exists, so a retry must only ever re-attempt the file upload, never the create
+                    var createdIdentity = null;
+                    // guards the create/upload/refresh chain the same way supplierForm and
+                    // configForm guard their own submits, so two fast clicks on Add cannot fire
+                    // two creates
+                    var addInFlight = false;
+
+                    var configModal = document.getElementById('manualConfigModal');
+                    var configForm = document.getElementById('manual-config-form');
+                    var configTitle = document.getElementById('manual-config-title');
+                    var configSaveError = document.getElementById('manual-config-save-error');
+                    var configEnabled = document.getElementById('manual-config-enabled');
+                    var configHint = document.getElementById('manual-config-hint');
+                    var configPricing = document.getElementById('manual-config-pricing');
+                    var configFulfilment = document.getElementById('manual-config-fulfilment');
+                    var configUpload = document.getElementById('manual-config-upload');
+                    var configFile = document.getElementById('manual-config-file');
+                    var configFileInput = document.getElementById('manual-config-file-input');
+                    var configError = document.getElementById('manual-config-error');
+                    var submitInFlight = false;
+                    var current = null;
+
+                    function findConfigureButton(identity) {
+                        var buttons = manualSection.querySelectorAll('[data-configure-supplier]');
+                        for (var i = 0; i < buttons.length; i++) {
+                            if (buttons[i].getAttribute('data-configure-supplier') === identity) {
+                                return buttons[i];
+                            }
+                        }
+                        return null;
+                    }
+
+                    function rowFor(identity) {
+                        var button = findConfigureButton(identity);
+                        if (!button) { return null; }
+                        var tr = button.closest('tr');
+                        return {
+                            label: tr.dataset.label,
+                            enabled: tr.dataset.enabled === 'true',
+                            includeInPricing: tr.dataset.includePricing === 'true',
+                            includeInFulfilment: tr.dataset.includeFulfilment === 'true',
+                            feedLastModified: tr.dataset.feedLastModified || null
+                        };
+                    }
+
+                    function showError(element, message) {
+                        element.textContent = message || genericError;
+                        element.classList.remove('is-hidden');
+                    }
+
+                    function endAddInFlight() {
+                        addInFlight = false;
+                        addConfirmButton.disabled = false;
+                    }
+
+                    // The manual create call and the follow-up file upload are two separate JSON
+                    // requests; after either succeeds the manual section is re-fetched and swapped
+                    // in (rather than a page reload) so the new/updated row shows up right away.
+                    //
+                    // A non-2xx here (or a network failure) must not be allowed to wipe the section
+                    // -- writing an error page's HTML straight into #manual-supplier-section would
+                    // destroy the table, the Add button and the empty state, leaving nothing left to
+                    // click but a page reload. Every caller below closes its own modal in a .catch
+                    // instead of leaving it stuck open re-firing the same failing request.
+                    function refreshManualSection() {
+                        return fetch(basePath + '/fulfilment/manual-supplier/section')
+                            .then(function (r) {
+                                if (!r.ok) { throw new Error('Failed to refresh the manual supplier section'); }
+                                return r.text();
+                            })
+                            .then(function (html) { applySectionSwap(manualSection, html); });
+                    }
+
+                    function attemptAddFile(identity) {
+                        if (!addFile.files.length) {
+                            refreshManualSection()
+                                .then(function () { endAddInFlight(); addModal.classList.remove('is-active'); })
+                                .catch(function () {
+                                    endAddInFlight();
+                                    addModal.classList.remove('is-active');
+                                    alert(genericError);
+                                });
+                            return;
+                        }
+                        var data = new FormData();
+                        data.append('file', addFile.files[0]);
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/feed',
+                              { method: 'POST', body: data })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                // the supplier was already created; a rejected file (empty, unparseable
+                                // rows) must be reported honestly instead of refreshing as if it worked,
+                                // leaving the operator with an inactive supplier and no explanation
+                                if (!res.ok) { endAddInFlight(); showError(addError, res.body.message); return; }
+                                refreshManualSection()
+                                    .then(function () { endAddInFlight(); addModal.classList.remove('is-active'); })
+                                    .catch(function () {
+                                        endAddInFlight();
+                                        addModal.classList.remove('is-active');
+                                        alert(genericError);
+                                    });
+                            })
+                            .catch(function () { endAddInFlight(); showError(addError); });
+                    }
+
+                    function addManual() {
+                        // mirrors the guard supplierForm/configForm already use on submit, so two
+                        // fast clicks cannot send two creates
+                        if (addInFlight) { return; }
+                        addInFlight = true;
+                        addConfirmButton.disabled = true;
+                        addError.classList.add('is-hidden');
+                        if (createdIdentity) {
+                            // the create already succeeded in an earlier attempt; only the file
+                            // upload can be retried, never the create itself
+                            attemptAddFile(createdIdentity);
+                            return;
+                        }
+                        var name = nameInput.value.trim();
+                        if (!name) { endAddInFlight(); showError(addError, noNameMessage); return; }
+                        var body = new URLSearchParams();
+                        body.append('name', name);
+                        fetch(basePath + '/manual-supplier', { method: 'POST', body: body })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) { endAddInFlight(); showError(addError, res.body.message); return; }
+                                createdIdentity = res.body.identity;
+                                attemptAddFile(createdIdentity);
+                            })
+                            .catch(function () { endAddInFlight(); showError(addError); });
+                    }
+
+                    function closeAddModal() {
+                        if (createdIdentity) {
+                            // the supplier already exists on the server; closing without a
+                            // successful upload must still reveal it (correctly shown as inactive,
+                            // no file) rather than pretend the modal session never happened
+                            refreshManualSection()
+                                .then(function () { addModal.classList.remove('is-active'); })
+                                .catch(function () {
+                                    // a failed refresh must not trap the operator behind a modal that
+                                    // keeps re-firing the same request: Cancel, the x and the backdrop
+                                    // all route through here, so it always has to close
+                                    addModal.classList.remove('is-active');
+                                    alert(genericError);
+                                });
+                            return;
+                        }
+                        addModal.classList.remove('is-active');
+                    }
+
+                    function uploadForCurrent() {
+                        if (!current || !configFileInput.files.length) { return; }
+                        var data = new FormData();
+                        data.append('file', configFileInput.files[0]);
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(current) + '/feed',
+                              { method: 'POST', body: data })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) { showError(configError, res.body.message); return; }
+                                refreshManualSection()
+                                    .then(function () { configModal.classList.remove('is-active'); })
+                                    .catch(function () {
+                                        configModal.classList.remove('is-active');
+                                        alert(genericError);
+                                    });
+                            })
+                            .catch(function () { showError(configError); });
+                    }
+
+                    function openConfig(identity) {
+                        var row = rowFor(identity);
+                        if (!row) { return; }
+                        current = identity;
+                        // hasFeed() is a derived accessor, not a record component, so it does not
+                        // survive Jackson serialisation onto this row; feedLastModified is the
+                        // field that actually reaches this script, so presence of a feed is
+                        // judged from it instead.
+                        var fileUploaded = !!row.feedLastModified;
+                        configTitle.textContent = row.label;
+                        configForm.action = basePath + '/fulfilment/manual-supplier/' + encodeURIComponent(identity);
+                        configSaveError.innerHTML = '';
+                        configEnabled.checked = row.enabled;
+                        // applySelections forces enabled back to false without a feed, so the
+                        // checkbox must not let the operator tick something the server undoes
+                        configEnabled.disabled = !fileUploaded;
+                        configHint.classList.toggle('is-hidden', fileUploaded);
+                        configPricing.checked = row.includeInPricing;
+                        configFulfilment.checked = row.includeInFulfilment;
+                        configFile.textContent = fileUploaded ? feedPresentLabel : feedMissingLabel;
+                        configFileInput.value = '';
+                        configError.classList.add('is-hidden');
+                        configModal.classList.add('is-active');
+                    }
+
+                    // Event delegation from the stable #manual-supplier-section container: the Add
+                    // button and every row's Edit/Delete buttons live inside content that gets
+                    // replaced wholesale on each swap, so binding once here (rather than re-running
+                    // a per-button binding loop after every swap) is what keeps them working.
+                    manualSection.addEventListener('click', function (event) {
+                        if (event.target.closest('#manual-add-button')) {
+                            createdIdentity = null;
+                            endAddInFlight();
+                            nameInput.value = '';
+                            addFile.value = '';
+                            addFilename.textContent = '';
+                            addError.classList.add('is-hidden');
+                            addModal.classList.add('is-active');
+                            nameInput.focus();
+                            return;
+                        }
+                        var configureButton = event.target.closest('[data-configure-supplier]');
+                        if (configureButton) { openConfig(configureButton.getAttribute('data-configure-supplier')); return; }
+                        var deleteButton = event.target.closest('.manual-delete-button');
+                        if (deleteButton) {
+                            var identity = deleteButton.getAttribute('data-identity');
+                            confirmDelete(deleteButton, function () { deleteManual(identity, deleteButton); });
+                        }
+                    });
+
+                    addFile.addEventListener('change', function () {
+                        addFilename.textContent = addFile.files.length ? addFile.files[0].name : '';
+                    });
+                    document.getElementById('manual-add-confirm').addEventListener('click', addManual);
+                    document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
+                    document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
+                    addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
+
+                    configUpload.addEventListener('click', function () { configFileInput.click(); });
+                    configFileInput.addEventListener('change', uploadForCurrent);
+                    document.getElementById('manual-config-cancel').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+                    document.getElementById('manual-config-close').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+                    configModal.querySelector('.modal-background').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+
+                    configForm.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        if (submitInFlight) { return; }
+                        submitInFlight = true;
+                        var submitButton = configForm.querySelector('button[type="submit"]');
+                        submitButton.disabled = true;
+                        configSaveError.innerHTML = '';
+                        fetch(configForm.action, { method: 'POST', body: new URLSearchParams(new FormData(configForm)) })
+                            .then(function (response) {
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
+                            })
+                            .then(function (result) {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                if (!result.ok) {
+                                    // only the trusted 400 sectionError fragment is injected raw;
+                                    // any other status (500, a login redirect) falls back to the
+                                    // generic notification instead of writing a whole page in here
+                                    applyFormError(configSaveError, result.html, result.status);
+                                    return;
+                                }
+                                applySectionSwap(manualSection, result.html);
+                                configModal.classList.remove('is-active');
+                            })
+                            .catch(function () {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                configSaveError.innerHTML = '<div class="notification is-danger">' + genericError + '</div>';
+                            });
+                    });
+
+                    // the delete endpoint returns the re-rendered manual section on success (like
+                    // every other mutation here), so its response is swapped in directly instead
+                    // of being parsed as JSON and followed by a reload
+                    function deleteManual(identity, button) {
+                        button.disabled = true;
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/delete',
+                              { method: 'POST' })
+                            .then(function (response) {
+                                return response.text().then(function (html) { return { ok: response.ok, html: html }; });
+                            })
+                            .then(function (result) {
+                                if (!result.ok) {
+                                    button.disabled = false;
+                                    alert(extractErrorMessage(result.html, genericError));
+                                    return;
+                                }
+                                applySectionSwap(manualSection, result.html);
+                            })
+                            .catch(function () {
+                                button.disabled = false;
+                                alert(genericError);
+                            });
+                    }
+                })();
+            </script>
 
         </div>
     </section>

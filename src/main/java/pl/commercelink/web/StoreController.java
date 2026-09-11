@@ -11,8 +11,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
+import pl.commercelink.inventory.supplier.SupplierConnectionView;
+import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
@@ -29,6 +30,7 @@ import pl.commercelink.stores.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
+import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 import pl.commercelink.web.dtos.ParcelForm;
 import pl.commercelink.web.dtos.PrinterForm;
 
@@ -60,6 +62,9 @@ public class StoreController {
     @Autowired
     private StoreSupplierConnectionService storeSupplierConnectionService;
 
+    @Autowired
+    private SupplierConnectionViewFactory supplierConnectionViewFactory;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -71,9 +76,6 @@ public class StoreController {
 
     @Autowired
     private PrintProviderRegistry printProviderRegistry;
-
-    @Autowired
-    private ManualSupplierService manualSupplierService;
 
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
@@ -414,28 +416,43 @@ public class StoreController {
 
         StoreForm form = new StoreForm(store);
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
-        form.setSupplierSelections(storeSupplierConnectionService.selectionsFor(store));
-        List<ManualSupplierSelectionForm> manualSelections = new ArrayList<>();
-        for (ManualSupplierService.ManualSupplierView view : manualSupplierService.list(store)) {
-            ManualSupplierSelectionForm selection = new ManualSupplierSelectionForm();
-            selection.setIdentity(view.identity());
-            selection.setLabel(view.label());
-            selection.setEnabled(view.enabled());
-            selection.setIncludeInPricing(view.includeInPricing());
-            selection.setIncludeInFulfilment(view.includeInFulfilment());
-            selection.setHasFeed(view.hasFeed());
-            manualSelections.add(selection);
-        }
-        form.setManualSupplierSelections(manualSelections);
 
         model.addAttribute("form", form);
+        model.addAttribute("settings", FulfilmentSettingsForm.from(store));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
+        // Lets the modal render the HTML required attribute only where blank genuinely means
+        // missing: a required password field already has a stored secret for suppliers in this
+        // set, so a blank submission there is a deliberate "keep the current value", not an error.
+        Set<String> suppliersWithStoredConfig = storeSupplierConnectionService.suppliersWithStoredConfiguration(store);
+        model.addAttribute("suppliersWithStoredConfig", suppliersWithStoredConfig);
+        // Republished on the external section's root as data-suppliers-with-stored-config (see
+        // fragments/supplier-section.html) so the modal's JS can re-derive password requiredness
+        // fresh on every open instead of trusting the required attribute above, which is frozen at
+        // this page load and never touched by an async section swap.
+        model.addAttribute("suppliersWithStoredConfigJoined", String.join(";", suppliersWithStoredConfig));
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+
+        SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
+        model.addAttribute("externalConnections", views.external());
+        model.addAttribute("manualConnections", views.manual());
+        model.addAttribute("basePath", isSuperAdmin()
+                ? "/dashboard/store/" + storeId
+                : "/dashboard/store");
+
+        List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
+        Set<String> connected = views.external().stream()
+                .map(SupplierConnectionView::identity)
+                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+        model.addAttribute("availableSuppliers", allSupplierNames.stream()
+                .filter(name -> !connected.contains(name))
+                .toList());
+        // Rendered once as a data attribute on the stable section container so the page script can
+        // recompute the Add dropdown after an async swap without a second request.
+        model.addAttribute("allSupplierNames", allSupplierNames);
 
         return "store-fulfilment";
     }
@@ -744,49 +761,6 @@ public class StoreController {
                 : "redirect:/dashboard/store/notification";
     }
 
-    @PostMapping("/dashboard/store/fulfilment")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreFulfilmentConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        if (existingStore == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Store not found.");
-            return redirectToFulfilment(form.getStore().getStoreId());
-        }
-        FulfilmentConfiguration submitted = form.getStore().getFulfilmentConfiguration() != null
-                ? form.getStore().getFulfilmentConfiguration()
-                : new FulfilmentConfiguration();
-
-        StoreSupplierConnectionService.ConnectionUpdateResult result = storeSupplierConnectionService.apply(
-                existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
-        if (result.hasErrors()) {
-            String errorMessage = result.errors().stream()
-                    .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
-                    .collect(Collectors.joining(" "));
-            redirectAttributes.addFlashAttribute("errorMessage", errorMessage);
-            return redirectToFulfilment(form.getStore().getStoreId());
-        }
-
-        List<ManualSupplierService.ManualSelection> manualSelections = new ArrayList<>();
-        for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
-            manualSelections.add(new ManualSupplierService.ManualSelection(
-                    selection.getIdentity(), selection.isEnabled(),
-                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
-        }
-        manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
-
-        List<String> messages = new ArrayList<>();
-        messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
-        for (String supplier : result.added()) {
-            messages.add(messageSource.getMessage("store.fulfilment.supplier.connect.queued", new Object[]{supplier}, locale));
-        }
-        for (String supplier : result.removed()) {
-            messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
-        }
-        redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
-
-        return redirectToFulfilment(form.getStore().getStoreId());
-    }
-
     @PostMapping("/dashboard/store/payments/checkout/edit")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreCheckoutConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
@@ -1014,12 +988,6 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/report", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/report";
-    }
-
-    private String redirectToFulfilment(String storeId) {
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/fulfilment", storeId)
-                : "redirect:/dashboard/store/fulfilment";
     }
 
     private Branding createOrUpdateBranding(StoreForm form, Store store) throws IOException {
