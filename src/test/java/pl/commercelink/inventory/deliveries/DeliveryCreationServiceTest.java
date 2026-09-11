@@ -138,6 +138,34 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
+    @DisplayName("a dropship purchase claims exactly what the allocations need, whatever the form asks for")
+    void claimAllocationsForPurchaseClampsDropshipQuantities() {
+        // given: a tampered form asks for more than the selected order allocation covers
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        Allocation selected = new Allocation();
+        selected.setType(AllocationType.Order);
+        selected.setQty(1);
+        selected.setSelected(true);
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(9);
+        item.setUnitCost(8.5);
+        item.setAllocations(List.of(selected));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.getItems().add(item);
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        assertEquals(1, item.getRequestedQty());
+        assertEquals(8.5, delivery.getTotalCost());
+        verify(warehouseAllocationsManager, never()).claim(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("completePending orders the claimed allocations after saving the delivery")
     void completePendingOrdersTheClaimedAllocationsAfterSavingTheDelivery() {
         // given

@@ -50,11 +50,7 @@ public class DeliveryCreationService {
 
     public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
-        if (delivery.isDropship()) {
-            // dropship goods never reach the warehouse: claim and price exactly the selected order allocations,
-            // whatever quantity a stale or tampered form asked for
-            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
-        }
+        clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
         orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems(), delivery.isDropship());
         if (!delivery.isDropship()) {
@@ -69,11 +65,20 @@ public class DeliveryCreationService {
      */
     public void claimAllocationsForPurchase(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
+        clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
         orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
         if (!delivery.isDropship()) {
             // dropship goods never reach the warehouse, so they must not leave a reserved row behind
             warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        }
+    }
+
+    private void clampDropshipQuantities(Delivery delivery, DeliveryCreationForm form) {
+        if (delivery.isDropship()) {
+            // dropship goods never reach the warehouse: claim and price exactly the selected order allocations,
+            // whatever quantity a stale or tampered form asked for
+            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
         }
     }
 

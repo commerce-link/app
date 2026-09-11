@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -232,6 +233,40 @@ class DropshipPurchaseServiceTest {
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
         verify(supplierPurchaseEventPublisher).publish(event.capture());
         assertEquals(ORDER_ID, event.getValue().getOrderId());
+    }
+
+    @Test
+    @DisplayName("submitting a dropship purchase claims the allocations instead of ordering them")
+    void submitDropshipClaimsInsteadOfOrdering() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), any(Delivery.class), eq(form));
+        verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a date typed on the dropship form never reaches the order at submit time")
+    void submitDropshipDropsTheTypedDate() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 12, 24));
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertNull(form.getEstimatedDeliveryAt());
     }
 
     @Test
