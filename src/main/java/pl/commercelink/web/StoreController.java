@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
+import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
@@ -454,6 +455,13 @@ public class StoreController {
                 : "/dashboard/store");
         model.addAttribute("editSupplier", edit);
         model.addAttribute("addSupplier", add);
+
+        Set<String> connected = views.external().stream()
+                .map(SupplierConnectionView::identity)
+                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+        model.addAttribute("availableSuppliers", supplierRegistry.getExternalSupplierNames().stream()
+                .filter(name -> !connected.contains(name))
+                .toList());
 
         return "store-fulfilment";
     }

@@ -85,11 +85,181 @@
                 <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
                     <h2 class="subtitle mb-0" th:text="#{store.supplier.section.title}"></h2>
                     <button type="button" class="button is-primary is-small" id="supplier-add-button"
-                            th:text="#{store.supplier.add.button}"></button>
+                            th:text="#{store.supplier.add.button}"
+                            th:disabled="${availableSuppliers.isEmpty()}"
+                            th:title="${availableSuppliers.isEmpty()} ? #{store.supplier.add.none} : ''"></button>
                 </div>
                 <div th:replace="~{fragments/supplier-table :: supplierTable(${externalConnections}, false,
                                    ${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}, ${basePath})}"></div>
             </div>
+
+            <div id="supplierModal" class="modal">
+                <div class="modal-background"></div>
+                <div class="modal-content">
+                    <form th:action="@{${basePath} + '/fulfilment/supplier'}" method="post">
+                        <div class="box">
+                            <h2 class="subtitle" id="supplier-modal-title"></h2>
+
+                            <div class="field" id="supplier-select-wrap">
+                                <label class="label" th:text="#{store.supplier.add.select}"></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select name="supplierName" id="supplier-select">
+                                            <option value="" th:text="#{general.select}"></option>
+                                            <option th:each="name : ${availableSuppliers}"
+                                                    th:value="${name}" th:text="${name}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="supplierName" id="supplier-name-hidden" disabled />
+
+                            <div class="field supplier-mode-wrap"
+                                 th:if="${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}">
+                                <label class="label" th:text="#{store.supplier.connection.mode}"></label>
+                                <div class="control">
+                                    <div class="select">
+                                        <select class="supplier-mode" name="mode" id="supplier-mode">
+                                            <option th:each="m : ${connectionModes}" th:value="${m}"
+                                                    th:text="#{'store.supplier.mode.' + ${m}}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="notification is-warning is-light mt-2 is-hidden"
+                                     id="supplier-mode-warning" th:text="#{store.supplier.mode.warning}"></div>
+                            </div>
+
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInPricing" value="true" id="supplier-pricing" />
+                                    <span th:text="#{store.supplier.include.pricing}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInFulfilment" value="true" id="supplier-fulfilment" />
+                                    <span th:text="#{store.supplier.include.fulfilment}"></span>
+                                </label>
+                            </div>
+
+                            <div th:each="entry : ${supplierFields}"
+                                 th:id="'supplier-fields-' + ${entry.key}" class="supplier-fields">
+                                <div class="field" th:each="cf : ${entry.value}">
+                                    <label class="label" th:text="${cf.label()}"></label>
+                                    <div class="control">
+                                        <input class="input"
+                                               th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                                               th:name="'configuration[' + ${cf.key()} + ']'"
+                                               th:value="${form.supplierConfiguration.get(entry.key) != null
+                                                          ? form.supplierConfiguration.get(entry.key).get(cf.key()) : ''}"
+                                               th:placeholder="${cf.placeholder()}" disabled />
+                                    </div>
+                                    <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
+                                       th:text="#{store.supplier.password.keep}"></p>
+                                </div>
+                            </div>
+
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="supplier-modal-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <button class="modal-close is-large" aria-label="close" id="supplier-modal-close"></button>
+            </div>
+
+            <script th:inline="javascript">
+                (function () {
+                    var modal = document.getElementById('supplierModal');
+                    var select = document.getElementById('supplier-select');
+                    var selectWrap = document.getElementById('supplier-select-wrap');
+                    var hiddenName = document.getElementById('supplier-name-hidden');
+                    var mode = document.getElementById('supplier-mode');
+                    var warning = document.getElementById('supplier-mode-warning');
+                    var title = document.getElementById('supplier-modal-title');
+                    var pricing = document.getElementById('supplier-pricing');
+                    var fulfilment = document.getElementById('supplier-fulfilment');
+
+                    var rows = /*[[${externalConnections}]]*/ [];
+                    var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
+                    var editTitle = /*[[#{store.supplier.edit.modal.title}]]*/ '';
+                    var editSupplier = /*[[${editSupplier}]]*/ null;
+                    var addSupplier = /*[[${addSupplier}]]*/ null;
+
+                    function rowFor(identity) {
+                        for (var i = 0; i < rows.length; i++) {
+                            if (rows[i].identity === identity) { return rows[i]; }
+                        }
+                        return null;
+                    }
+
+                    function activeName() {
+                        return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
+                    }
+
+                    function refreshFields() {
+                        var name = activeName();
+                        var isOwn = !mode || mode.value === 'OWN';
+                        document.querySelectorAll('.supplier-fields').forEach(function (group) {
+                            var active = group.id === 'supplier-fields-' + name && isOwn;
+                            group.style.display = active ? '' : 'none';
+                            group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });
+                        });
+                        if (warning) {
+                            var row = rowFor(name);
+                            var leavingOwn = row && row.mode === 'OWN' && mode && mode.value === 'GLOBAL';
+                            warning.classList.toggle('is-hidden', !leavingOwn);
+                        }
+                    }
+
+                    function open(identity) {
+                        var row = identity ? rowFor(identity) : null;
+                        title.textContent = row ? editTitle : addTitle;
+                        selectWrap.classList.toggle('is-hidden', !!row);
+                        select.disabled = !!row;
+                        hiddenName.disabled = !row;
+                        if (row) {
+                            hiddenName.value = row.identity;
+                            if (mode) { mode.value = row.mode; }
+                            pricing.checked = row.includeInPricing;
+                            fulfilment.checked = row.includeInFulfilment;
+                        } else {
+                            select.value = identity || '';
+                            if (mode) { mode.value = 'OWN'; }
+                            pricing.checked = true;
+                            fulfilment.checked = true;
+                        }
+                        refreshFields();
+                        modal.classList.add('is-active');
+                    }
+
+                    function close() { modal.classList.remove('is-active'); }
+
+                    var addButton = document.getElementById('supplier-add-button');
+                    if (addButton && !addButton.disabled) {
+                        addButton.addEventListener('click', function () { open(null); });
+                    }
+                    document.querySelectorAll('#external-supplier-section [data-configure-supplier]').forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            open(button.getAttribute('data-configure-supplier'));
+                        });
+                    });
+                    select.addEventListener('change', refreshFields);
+                    if (mode) { mode.addEventListener('change', refreshFields); }
+                    document.getElementById('supplier-modal-cancel').addEventListener('click', close);
+                    document.getElementById('supplier-modal-close').addEventListener('click', close);
+                    modal.querySelector('.modal-background').addEventListener('click', close);
+
+                    if (editSupplier) { open(editSupplier); }
+                    else if (addSupplier) { open(addSupplier); }
+                })();
+            </script>
 
             <div class="box" id="manual-supplier-section">
                 <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
