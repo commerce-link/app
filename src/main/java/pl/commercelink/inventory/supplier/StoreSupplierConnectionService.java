@@ -113,7 +113,7 @@ public class StoreSupplierConnectionService {
 
     private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
                                            Map<String, Map<String, String>> config) {
-        FulfilmentConfiguration submitted = existingStore.getFulfilmentConfiguration().withConnections(connections);
+        FulfilmentConfiguration submitted = existingConfiguration(existingStore).withConnections(connections);
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, config);
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
@@ -123,12 +123,19 @@ public class StoreSupplierConnectionService {
 
     private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String supplierName) {
         List<StoreSupplierConnection> connections = new ArrayList<>();
-        for (StoreSupplierConnection connection : existingStore.getFulfilmentConfiguration().getSupplierConnections()) {
+        for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {
             if (!connection.getSupplierName().equalsIgnoreCase(supplierName)) {
                 connections.add(connection);
             }
         }
         return connections;
+    }
+
+    // A store without any fulfilment configuration yet (e.g. connecting its first supplier)
+    // legitimately has a null getFulfilmentConfiguration(), same as existingManualConnections guards for.
+    private FulfilmentConfiguration existingConfiguration(Store existingStore) {
+        FulfilmentConfiguration config = existingStore.getFulfilmentConfiguration();
+        return config != null ? config : new FulfilmentConfiguration();
     }
 
     private Set<String> storedConfigFor(Store existingStore, StoreSupplierConnection connection) {

@@ -113,7 +113,8 @@ public class StoreSupplierConnectionPersister {
 
         for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
             String name = descriptor.supplierInfo().name();
-            if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()) {
+            if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()
+                    && submittedConfig.containsKey(name)) {
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
                 configurationManager.saveConfiguration(existingStore, name, descriptor, config);
             }

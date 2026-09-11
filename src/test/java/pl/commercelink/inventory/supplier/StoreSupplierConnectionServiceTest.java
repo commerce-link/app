@@ -448,6 +448,30 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void connectOrUpdateSucceedsWhenStoreHasNoFulfilmentConfigurationYet() {
+        // given: connecting the very first supplier on a store that never had a fulfilment
+        // configuration saved before must not throw a NullPointerException.
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
+
+        // then
+        assertFalse(result.hasErrors());
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactly("Elko");
+    }
+
+    @Test
     void disconnectRemovesOnlyTheNamedSupplier() {
         // given
         Store store = storeWith(true,

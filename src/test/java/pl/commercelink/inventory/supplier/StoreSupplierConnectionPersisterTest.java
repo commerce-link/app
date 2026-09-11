@@ -168,6 +168,30 @@ class StoreSupplierConnectionPersisterTest {
     }
 
     @Test
+    void persistConfigurationsSkipsOwnSuppliersMissingFromTheSubmittedConfig() {
+        // given: a single-supplier save submits only one own supplier's configuration; the other
+        // own supplier's stored configuration (feed URL, host, etc.) must not be overwritten with blanks.
+        Store existing = storeWith(true,
+                new StoreSupplierConnection("Acme", ConnectionMode.OWN),
+                new StoreSupplierConnection("Kosatec", ConnectionMode.OWN));
+        FulfilmentConfiguration submitted = configWith(true,
+                new StoreSupplierConnection("Acme", ConnectionMode.OWN),
+                new StoreSupplierConnection("Kosatec", ConnectionMode.OWN));
+        SupplierProviderDescriptor acme = descriptor("Acme", true);
+        SupplierProviderDescriptor kosatec = descriptor("Kosatec", true);
+        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme, kosatec));
+        Map<String, Map<String, String>> submittedConfig = Map.of("Acme", Map.of("url", "https://feed"));
+
+        // when
+        persister.persistConfigurations(existing, submitted, submittedConfig);
+
+        // then
+        verify(configurationManager).saveConfiguration(eq(existing), eq("Acme"), eq(acme), eq(Map.of("url", "https://feed")));
+        verify(configurationManager, never()).saveConfiguration(eq(existing), eq("Kosatec"), any(SupplierProviderDescriptor.class), any());
+        verify(configurationManager, never()).deleteConfiguration(any(), anyString());
+    }
+
+    @Test
     void persistConfigurationsDeletesOrphanedSecretWhenSupplierLeavesOwnMode() {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
