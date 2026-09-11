@@ -59,14 +59,12 @@ public class StoreSupplierFeedScheduler {
             return;
         }
 
-        sqsTemplate.send(FEED_IMPORT_QUEUE, feedImportRequest(storeId, supplierName));
+        sqsTemplate.send(FEED_IMPORT_QUEUE, new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId, 0));
     }
 
     public void scheduleConfigurationRetry(String storeId, String supplierName, int attempt) {
-        Map<String, String> request = feedImportRequest(storeId, supplierName);
-        request.put("attempt", String.valueOf(attempt));
         sqsTemplate.send(to -> to.queue(FEED_IMPORT_QUEUE)
-                .payload(request)
+                .payload(new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId, attempt))
                 .delaySeconds(CONFIGURATION_RETRY_DELAY_SECONDS));
     }
 
