@@ -391,20 +391,17 @@ public class StoreController {
 
     @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeFulfilmentConfiguration(@RequestParam(required = false) String edit,
-                                                Model model) {
-        return renderStoreFulfilmentConfiguration(getStoreId(), edit, model);
+    public String storeFulfilmentConfiguration(Model model) {
+        return renderStoreFulfilmentConfiguration(getStoreId(), model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId,
-                                                          @RequestParam(required = false) String edit,
-                                                          Model model) {
-        return renderStoreFulfilmentConfiguration(storeId, edit, model);
+    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId, Model model) {
+        return renderStoreFulfilmentConfiguration(storeId, model);
     }
 
-    private String renderStoreFulfilmentConfiguration(String storeId, String edit, Model model) {
+    private String renderStoreFulfilmentConfiguration(String storeId, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
@@ -433,14 +430,17 @@ public class StoreController {
         model.addAttribute("basePath", isSuperAdmin()
                 ? "/dashboard/store/" + storeId
                 : "/dashboard/store");
-        model.addAttribute("editSupplier", edit);
 
+        List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
         Set<String> connected = views.external().stream()
                 .map(SupplierConnectionView::identity)
                 .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-        model.addAttribute("availableSuppliers", supplierRegistry.getExternalSupplierNames().stream()
+        model.addAttribute("availableSuppliers", allSupplierNames.stream()
                 .filter(name -> !connected.contains(name))
                 .toList());
+        // Rendered once as a data attribute on the stable section container so the page script can
+        // recompute the Add dropdown after an async swap without a second request.
+        model.addAttribute("allSupplierNames", allSupplierNames);
 
         return "store-fulfilment";
     }

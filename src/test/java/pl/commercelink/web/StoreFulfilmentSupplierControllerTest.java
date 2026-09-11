@@ -7,9 +7,12 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.ui.ConcurrentModel;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
+import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
@@ -40,6 +43,10 @@ class StoreFulfilmentSupplierControllerTest {
     @Mock
     private StoreSupplierConnectionService storeSupplierConnectionService;
     @Mock
+    private SupplierConnectionViewFactory supplierConnectionViewFactory;
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
     private MessageSource messageSource;
 
     @InjectMocks
@@ -61,30 +68,40 @@ class StoreFulfilmentSupplierControllerTest {
         return form;
     }
 
+    private void stubEmptyViews() {
+        when(supplierConnectionViewFactory.views(any())).thenReturn(
+                new SupplierConnectionViewFactory.SupplierConnectionViews(List.of(), List.of()));
+        when(supplierRegistry.getExternalSupplierNames()).thenReturn(List.of());
+    }
+
     @Test
-    void savingASupplierDelegatesToTheServiceAndRedirectsToTheStoreScreen() {
+    void savingASupplierDelegatesToTheServiceAndReturnsTheExternalSectionFragment() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.save(form(), Locale.ENGLISH, attributes);
+            String view = controller.save(form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment");
+            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
         }
     }
 
     @Test
-    void aFailedValidationRedirectsBackWithTheEditParameterSoTheModalReopens() {
+    void aFailedValidationReturnsTheSmallErrorFragmentWithANon2xxStatus() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
@@ -92,66 +109,43 @@ class StoreFulfilmentSupplierControllerTest {
                         List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")),
                         Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("missing field");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.save(form(), Locale.ENGLISH, attributes);
+            String view = controller.save(form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment?edit=Elko");
-            assertThat(attributes.getFlashAttributes()).containsKey("errorMessage");
-            assertThat(attributes.getFlashAttributes()).containsKey("submittedSupplierConfiguration");
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(model.getAttribute("errorMessage")).isEqualTo("missing field");
         }
     }
 
     @Test
-    void aFailedValidationCarriesBackTheSubmittedPricingAndFulfilmentFlags() {
-        // given
-        when(storesRepository.findById(STORE_ID)).thenReturn(store());
-        when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
-                        List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")),
-                        Set.of(), Set.of()));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("missing field");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
-        SupplierConnectionForm form = form();
-        form.setIncludeInPricing(false);
-        form.setIncludeInFulfilment(true);
-
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
-
-            // when
-            controller.save(form, Locale.ENGLISH, attributes);
-
-            // then the operator's actual choices travel back, not just any flag at all
-            assertThat(attributes.getFlashAttributes().get("submittedIncludeInPricing")).isEqualTo(false);
-            assertThat(attributes.getFlashAttributes().get("submittedIncludeInFulfilment")).isEqualTo(true);
-        }
-    }
-
-    @Test
-    void theSuperAdminVariantRedirectsToTheStoreScopedPath() {
+    void theSuperAdminVariantRendersTheSectionForTheStoreFromThePath() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            String view = controller.disconnectForStore(STORE_ID, "Elko", Locale.ENGLISH, attributes);
+            String view = controller.disconnectForStore(STORE_ID, "Elko", Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/fulfilment");
+            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
             verify(storeSupplierConnectionService).disconnect(any(), eq("Elko"));
         }
     }
@@ -163,7 +157,9 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
@@ -172,10 +168,11 @@ class StoreFulfilmentSupplierControllerTest {
             // and this test would fail rather than pass silently.
 
             // when
-            String view = controller.saveForStore(STORE_ID, form(), Locale.ENGLISH, attributes);
+            String view = controller.saveForStore(STORE_ID, form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/fulfilment");
+            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
             verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
         }
     }
@@ -187,37 +184,42 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.disconnect("Elko", Locale.ENGLISH, attributes);
+            String view = controller.disconnect("Elko", Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment");
+            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
             verify(storeSupplierConnectionService).disconnect(any(), eq("Elko"));
         }
     }
 
     @Test
-    void aMissingStoreRedirectsBackWithAnError() {
+    void aMissingStoreReturnsTheSmallErrorFragmentInsteadOfThrowing() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(null);
-        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Store not found.");
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
         try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
             context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.save(form(), Locale.ENGLISH, attributes);
+            String view = controller.save(form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment");
-            assertThat(attributes.getFlashAttributes()).containsKey("errorMessage");
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(model.getAttribute("errorMessage")).isEqualTo("Store not found.");
         }
     }
 }
