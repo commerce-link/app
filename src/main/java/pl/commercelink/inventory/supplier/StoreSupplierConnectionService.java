@@ -111,6 +111,27 @@ public class StoreSupplierConnectionService {
         return persist(existingStore, connectionsWithout(existingStore, supplierName), Map.of());
     }
 
+    public ConnectionUpdateResult applyStoreSettings(Store existingStore, FulfilmentConfiguration submitted,
+                                                     boolean isSuperAdmin) {
+        FulfilmentConfiguration existing = existingConfiguration(existingStore);
+        submitted.setEnabledProductGroups(existing.getEnabledProductGroups());
+        if (submitted.getEnabledCategories() == null) {
+            submitted.setEnabledCategories(existing.getEnabledCategories());
+        }
+        submitted.setCanUseGlobalSuppliers(
+                resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin));
+        submitted.setInventoryCacheTtlMinutes(
+                resolveInventoryCacheTtlMinutes(existingStore, submitted.getInventoryCacheTtlMinutes(), isSuperAdmin));
+        // Connections have their own per-supplier endpoints; this path must leave them alone.
+        submitted.setSupplierConnections(new ArrayList<>(existing.getSupplierConnections()));
+
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, Map.of());
+        if (!outcome.success()) {
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+    }
+
     private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
                                            Map<String, Map<String, String>> config) {
         FulfilmentConfiguration submitted = existingConfiguration(existingStore).withConnections(connections);

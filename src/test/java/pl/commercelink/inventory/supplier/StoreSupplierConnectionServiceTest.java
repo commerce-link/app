@@ -491,4 +491,44 @@ class StoreSupplierConnectionServiceTest {
                 .extracting(StoreSupplierConnection::getSupplierName)
                 .containsExactlyInAnyOrder("Kosatec", "manual:Hurtownia X");
     }
+
+    @Test
+    void applyStoreSettingsKeepsTheExistingConnectionListUntouched() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setOrderAssemblyDays(7);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(7, captor.getValue().getOrderAssemblyDays());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Elko", "manual:Hurtownia X");
+    }
+
+    @Test
+    void applyStoreSettingsIgnoresGlobalSupplierFlagForNonSuperAdmins() {
+        // given
+        Store store = storeWith(false);
+        FulfilmentConfiguration submitted = configWith(true);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, false);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertFalse(captor.getValue().isCanUseGlobalSuppliers());
+    }
 }

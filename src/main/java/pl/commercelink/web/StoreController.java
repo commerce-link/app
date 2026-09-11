@@ -756,8 +756,8 @@ public class StoreController {
                 ? form.getStore().getFulfilmentConfiguration()
                 : new FulfilmentConfiguration();
 
-        StoreSupplierConnectionService.ConnectionUpdateResult result = storeSupplierConnectionService.apply(
-                existingStore, submitted, form.getSupplierSelections(), form.getSupplierConfiguration(), isSuperAdmin());
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                storeSupplierConnectionService.applyStoreSettings(existingStore, submitted, isSuperAdmin());
         if (result.hasErrors()) {
             String errorMessage = result.errors().stream()
                     .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
@@ -766,23 +766,8 @@ public class StoreController {
             return redirectToFulfilment(form.getStore().getStoreId());
         }
 
-        List<ManualSupplierService.ManualSelection> manualSelections = new ArrayList<>();
-        for (ManualSupplierSelectionForm selection : form.getManualSupplierSelections()) {
-            manualSelections.add(new ManualSupplierService.ManualSelection(
-                    selection.getIdentity(), selection.isEnabled(),
-                    selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
-        }
-        manualSupplierService.applySelections(existingStore.getStoreId(), manualSelections);
-
-        List<String> messages = new ArrayList<>();
-        messages.add(messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
-        for (String supplier : result.added()) {
-            messages.add(messageSource.getMessage("store.fulfilment.supplier.connect.queued", new Object[]{supplier}, locale));
-        }
-        for (String supplier : result.removed()) {
-            messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
-        }
-        redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
 
         return redirectToFulfilment(form.getStore().getStoreId());
     }
