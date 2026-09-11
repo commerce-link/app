@@ -144,7 +144,8 @@ public class OrdersManager {
 
     public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
         execute(storeId, orderId, orderItemId2Costs.keySet(), (order, orderItem) -> {
-            if (orderItem.isInAllocation()) {
+            // an item claimed by another pending delivery is already being bought there - do not steal it
+            if (orderItem.isInAllocation() && (!orderItem.isClaimed() || deliveryId.equals(orderItem.getClaimedDeliveryId()))) {
                 orderItem.markAsOrdered(deliveryId, orderItemId2Costs.get(orderItem.getItemId()));
                 orderItemsRepository.save(orderItem);
             }

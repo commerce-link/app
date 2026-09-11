@@ -164,6 +164,12 @@ public class OrderAllocationsManager {
         return delta;
     }
 
+    /** Whether the item is currently reserved by a pending delivery's supplier purchase. */
+    public boolean isClaimed(String orderId, String itemId) {
+        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        return orderItem != null && orderItem.isClaimed();
+    }
+
     public boolean updateFulfilment(String storeId, String provider, String orderId, String itemId, String ean, String mfn, double unitCost) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null) {
@@ -197,7 +203,8 @@ public class OrderAllocationsManager {
 
         for (String orderItemId : orderItemIds) {
             OrderItem orderItem = orderItemsRepository.findById(orderId, orderItemId);
-            if (orderItem.isInAllocationOrOrdered()) {
+            // an item claimed by a pending delivery is already being bought at the supplier
+            if (orderItem.isInAllocationOrOrdered() && !orderItem.isClaimed()) {
                 orderItem.removeFulfilment();
                 orderItemsRepository.save(orderItem);
                 removed = true;

@@ -913,6 +913,47 @@ class OrdersManagerTest {
         verify(orderItemsRepository, never()).save(item);
     }
 
+    @Test
+    @DisplayName("markOrderItemsAsOrdered leaves an item claimed by another delivery untouched")
+    void markOrderItemsAsOrderedLeavesAnItemClaimedByAnotherDeliveryUntouched() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-other");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(item);
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered still orders an item claimed by this same delivery")
+    void markOrderItemsAsOrderedStillOrdersAnItemClaimedByThisSameDelivery() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getCost()).isEqualTo(42.0);
+        verify(orderItemsRepository).save(item);
+    }
+
     private OrderItem orderItemInAllocation(String itemId) {
         OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
         item.setItemId(itemId);

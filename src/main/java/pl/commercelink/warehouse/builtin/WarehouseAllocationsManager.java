@@ -79,6 +79,12 @@ public class WarehouseAllocationsManager {
         }
     }
 
+    /** Whether the item is currently reserved by a pending delivery's supplier purchase. */
+    public boolean isClaimed(String storeId, String itemId) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        return warehouseItem != null && warehouseItem.isClaimed();
+    }
+
     public boolean updateFulfilment(String storeId, String provider, String itemId, String ean, String mfn, double unitCost) {
         WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
         if (warehouseItem == null || !warehouseItem.updateFulfilment(provider, ean, mfn, unitCost)) {
@@ -186,6 +192,10 @@ public class WarehouseAllocationsManager {
     private void updateExistingWarehouseItem(String storeId, String deliveryId, Allocation allocation, double unitCost, int qtyAdjustment) {
         WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
         if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
+            return;
+        }
+        // an item claimed by another pending delivery is already being bought there - do not steal it
+        if (warehouseItem.isClaimed() && !deliveryId.equals(warehouseItem.getClaimedDeliveryId())) {
             return;
         }
         warehouseItem.markAsOrdered(deliveryId, unitCost);

@@ -87,6 +87,23 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("remove leaves an allocation claimed by a pending delivery untouched")
+    void removeLeavesAnAllocationClaimedByAPendingDeliveryUntouched() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when
+        orderAllocationsManager.remove(STORE_ID, ORDER_ID, List.of("item-1"));
+
+        // then
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        verify(orderItemsRepository, never()).save(claimed);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("remove only clears items that are in Allocation/Ordered state and ignores others")
     void removeOnlyClearsItemsThatAreInAllocationOrOrderedStateAndIgnoresRest() {
         // given
@@ -207,6 +224,29 @@ class OrderAllocationsManagerTest {
         // then
         assertThat(updated).isFalse();
         verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("isClaimed reports true for an item claimed by a pending delivery")
+    void isClaimedReportsTrueForAClaimedItem() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when / then
+        assertThat(orderAllocationsManager.isClaimed(ORDER_ID, "item-1")).isTrue();
+    }
+
+    @Test
+    @DisplayName("isClaimed reports false for an unclaimed item")
+    void isClaimedReportsFalseForAnUnclaimedItem() {
+        // given
+        OrderItem free = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(free);
+
+        // when / then
+        assertThat(orderAllocationsManager.isClaimed(ORDER_ID, "item-1")).isFalse();
     }
 
     @Test
