@@ -110,6 +110,10 @@ public class ManualSupplierController {
                     messageSource.getMessage(result.messageCode(), null, locale), model, response);
         }
         Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
         String successMessage = messageSource.getMessage(
                 "store.manual.deleted", new Object[]{ManualSupplierInfos.label(identity)}, locale);
         return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, store, successMessage, model);
@@ -155,21 +159,26 @@ public class ManualSupplierController {
 
     @GetMapping("/dashboard/store/fulfilment/manual-supplier/section")
     @PreAuthorize("hasRole('ADMIN')")
-    public String section(Model model) {
-        return doRenderSection(currentStoreId(), model);
+    public String section(Locale locale, Model model, HttpServletResponse response) {
+        return doRenderSection(currentStoreId(), locale, model, response);
     }
 
     @GetMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/section")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String sectionForStore(@PathVariable String storeId, Model model) {
-        return doRenderSection(storeId, model);
+    public String sectionForStore(@PathVariable String storeId, Locale locale, Model model,
+                                  HttpServletResponse response) {
+        return doRenderSection(storeId, locale, model, response);
     }
 
     // Used only to refresh the manual section after the create/upload-feed JSON endpoints below
     // succeed: those stay JSON (they are already fetch-driven), so this is what lets the page
     // show the new/updated row without a full reload.
-    private String doRenderSection(String storeId, Model model) {
+    private String doRenderSection(String storeId, Locale locale, Model model, HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
         return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, store, null, model);
     }
 

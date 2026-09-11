@@ -71,8 +71,10 @@ class ManualSupplierControllerTest {
             // when
             String view = controller.saveSelection(IDENTITY, true, true, false, Locale.ENGLISH, model, response);
 
-            // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            // then -- a no-argument view name: ThymeleafView rejects a view name carrying
+            // positional fragment parameters, so a regression back to that shape is caught here
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
@@ -97,8 +99,8 @@ class ManualSupplierControllerTest {
                     Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
-            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
                     eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true))));
         }
@@ -143,7 +145,8 @@ class ManualSupplierControllerTest {
             String view = controller.delete(IDENTITY, Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("deleted");
         }
@@ -184,10 +187,11 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.section(model);
+            String view = controller.section(Locale.ENGLISH, model, new MockHttpServletResponse());
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
             assertThat(model.getAttribute("sectionSuccessMessage")).isNull();
         }
     }
@@ -203,11 +207,59 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            String view = controller.sectionForStore(STORE_ID, model);
+            String view = controller.sectionForStore(STORE_ID, Locale.ENGLISH, model, new MockHttpServletResponse());
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
-            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
+            verify(storesRepository).findById(STORE_ID);
+        }
+    }
+
+    @Test
+    void deletingWithAStoreThatVanishedMeanwhileReturnsTheSmallErrorFragmentInsteadOfThrowing() {
+        // given -- the delete itself succeeds, but the store is gone by the time the section is
+        // re-rendered; SupplierConnectionViewFactory would otherwise be handed a null store and
+        // dereference it directly, turning a rare race into a 500 instead of the error fragment
+        when(manualSupplierService.delete(STORE_ID, IDENTITY)).thenReturn(ManualSupplierService.Result.success());
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Store not found.");
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.delete(IDENTITY, Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(model.getAttribute("errorMessage")).isEqualTo("Store not found.");
+        }
+    }
+
+    @Test
+    void renderingTheSectionForAMissingStoreReturnsTheSmallErrorFragmentInsteadOfThrowing() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Store not found.");
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.section(Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(model.getAttribute("errorMessage")).isEqualTo("Store not found.");
         }
     }
 }
