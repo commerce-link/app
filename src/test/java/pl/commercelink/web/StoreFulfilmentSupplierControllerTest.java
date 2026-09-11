@@ -130,6 +130,52 @@ class StoreFulfilmentSupplierControllerTest {
     }
 
     @Test
+    void theSuperAdminSaveVariantUsesTheStoreFromThePathNotTheSecurityContext() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+            // getStoreId() is intentionally not stubbed: a regression that read the store from
+            // the security context instead of the path variable would look up a different store
+            // and this test would fail rather than pass silently.
+
+            // when
+            String view = controller.saveForStore(STORE_ID, form(), Locale.ENGLISH, attributes);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/fulfilment");
+            verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
+        }
+    }
+
+    @Test
+    void theAdminDisconnectVariantDisconnectsTheSupplierNamedInThePath() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.disconnect("Elko", Locale.ENGLISH, attributes);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment");
+            verify(storeSupplierConnectionService).disconnect(any(), eq("Elko"));
+        }
+    }
+
+    @Test
     void aMissingStoreRedirectsBackWithAnError() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(null);
