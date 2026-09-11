@@ -57,13 +57,17 @@
                     <button type="button" class="button is-small is-link is-outlined mr-2"
                             th:attr="data-configure-supplier=${row.identity()}"
                             th:text="#{store.supplier.action.configure}"></button>
-                    <form th:action="@{${basePath} + (${manual}
-                                      ? '/manual-supplier/' + ${row.identity()} + '/delete'
-                                      : '/fulfilment/supplier/' + ${row.identity()} + '/disconnect')}"
+                    <button type="button" th:if="${manual}"
+                            class="button is-small is-danger is-outlined manual-delete-button"
+                            th:attr="data-identity=${row.identity()},data-confirm-message=#{store.manual.delete.confirm}"
+                            th:text="#{store.supplier.action.delete}"></button>
+                    <form th:unless="${manual}"
+                          th:action="@{${basePath} + '/fulfilment/supplier/' + ${row.identity()} + '/disconnect'}"
                           method="post" style="display:inline;">
                         <button type="button" class="button is-small is-danger is-outlined"
                                 onclick="confirmDelete(this)"
-                                th:text="${manual} ? #{store.supplier.action.delete} : #{store.supplier.action.disconnect}"></button>
+                                th:attr="data-confirm-message=#{store.supplier.disconnect.confirm}"
+                                th:text="#{store.supplier.action.disconnect}"></button>
                     </form>
                 </td>
             </tr>

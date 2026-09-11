@@ -554,6 +554,28 @@
                             openConfig(button.getAttribute('data-configure-supplier'));
                         });
                     });
+
+                    function deleteManual(identity) {
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/delete',
+                              { method: 'POST' })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) { alert(res.body.message || genericError); return; }
+                                window.location.reload();
+                            })
+                            .catch(function () { alert(genericError); });
+                    }
+
+                    // the delete endpoint is @ResponseBody/JSON, not a redirect -- a plain form
+                    // submit would strand the operator on the raw JSON response, so this button
+                    // carries its identity as a data attribute and is wired through confirmDelete's
+                    // callback instead of a <form>
+                    document.querySelectorAll('#manual-supplier-section .manual-delete-button').forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            var identity = button.getAttribute('data-identity');
+                            confirmDelete(button, function () { deleteManual(identity); });
+                        });
+                    });
                 })();
             </script>
 

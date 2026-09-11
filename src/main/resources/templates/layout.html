@@ -231,7 +231,7 @@
     <div class="modal-background"></div>
     <div class="modal-content">
         <div class="box">
-            <p th:text="#{confirm.delete}"></p>
+            <p id="deleteModalMessage" th:text="#{confirm.delete}"></p>
             <button class="button is-danger" id="confirmDeleteButton" th:text="#{confirm.yes.delete}">
             </button>
             <button class="button" onclick="closeDelete()" th:text="#{confirm.no}"></button>
@@ -256,6 +256,10 @@
 <script>
     let formToSubmit;
     let onConfirmCallback;
+    // Captured once from the server-rendered default so confirmDelete can restore it for any
+    // caller that does not supply a data-confirm-message of its own -- every existing screen
+    // using confirmDelete(this) must keep showing exactly this text.
+    const defaultDeleteMessage = document.getElementById('deleteModalMessage').textContent;
 
     document.addEventListener('DOMContentLoaded', function () {
         const burger = document.querySelector('.navbar-burger');
@@ -276,6 +280,11 @@
     function confirmDelete(button, callback = null) {
         onConfirmCallback = callback;
         formToSubmit = button.closest('form');
+        // Optional per-row override: a button can carry data-confirm-message to name exactly
+        // what this particular delete/disconnect destroys. Absent that, every other screen keeps
+        // seeing the same generic confirmation it always has.
+        document.getElementById('deleteModalMessage').textContent =
+            button.dataset.confirmMessage || defaultDeleteMessage;
         document.getElementById('deleteModal').classList.add('is-active');
     }
 
