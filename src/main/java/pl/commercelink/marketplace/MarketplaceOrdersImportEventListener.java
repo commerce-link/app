@@ -7,12 +7,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
-import pl.commercelink.stores.Store;
 import pl.commercelink.starter.util.ElapsedTime;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -32,16 +33,27 @@ public class MarketplaceOrdersImportEventListener {
     )
     public void handleMessage(MarketplaceOrderPayload payload) {
         String marketplace = payload.getMarketplace();
-        List<Store> stores = storesRepository.findAll()
-                .stream()
-                .filter(s -> s.hasActiveMarketplaceIntegration(marketplace))
-                .toList();
+        List<Store> stores = isNotBlank(payload.getStoreId())
+                ? addressedStore(payload.getStoreId(), marketplace)
+                : storesRepository.findAll()
+                        .stream()
+                        .filter(s -> s.hasActiveMarketplaceIntegration(marketplace))
+                        .toList();
 
         log.info("Marketplace {} orders import started: stores={}", marketplace, stores.size());
         ElapsedTime elapsed = ElapsedTime.started();
         stores.forEach(s -> importOrders(s, marketplace));
         log.info("Marketplace {} orders import finished: stores={} importDurationInMs={}",
                 marketplace, stores.size(), elapsed.inMillis());
+    }
+
+    private List<Store> addressedStore(String storeId, String marketplace) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
+            log.warn("Marketplace {} orders import skipped store {}: no active integration", marketplace, storeId);
+            return List.of();
+        }
+        return List.of(store);
     }
 
     private void importOrders(Store store, String marketplace) {
@@ -72,16 +84,26 @@ public class MarketplaceOrdersImportEventListener {
                 fetchDurationInMs, elapsed.inMillis());
     }
 
-    /** Scheduler payload: {"marketplace":"Allegro"}. */
+    /** Scheduler payload: {"marketplace":"Allegro"} from the global schedule, plus "storeId" from a per-store one. */
     public static class MarketplaceOrderPayload {
 
         private String marketplace;
+        private String storeId;
 
         public MarketplaceOrderPayload() {
         }
 
+        public MarketplaceOrderPayload(String marketplace, String storeId) {
+            this.marketplace = marketplace;
+            this.storeId = storeId;
+        }
+
         public String getMarketplace() {
             return marketplace;
+        }
+
+        public String getStoreId() {
+            return storeId;
         }
     }
 

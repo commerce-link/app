@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -60,7 +61,8 @@ public class StoreSupplierConnectionService {
                     connection != null,
                     connection != null ? connection.getMode() : ConnectionMode.GLOBAL,
                     connection == null || connection.isIncludeInPricing(),
-                    connection == null || connection.isIncludeInFulfilment()));
+                    connection == null || connection.isIncludeInFulfilment(),
+                    connection != null ? connection.getFeedSchedule() : null));
         }
         return selections;
     }
@@ -80,16 +82,17 @@ public class StoreSupplierConnectionService {
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
-    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {
+    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed,
+                                         Set<String> rescheduled) {
         static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
-            return new ConnectionUpdateResult(errors, Set.of(), Set.of());
+            return new ConnectionUpdateResult(errors, Set.of(), Set.of(), Set.of());
         }
 
-        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed) {
-            return new ConnectionUpdateResult(List.of(), added, removed);
+        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed, Set<String> rescheduled) {
+            return new ConnectionUpdateResult(List.of(), added, removed, rescheduled);
         }
 
         public boolean hasErrors() {
@@ -128,9 +131,13 @@ public class StoreSupplierConnectionService {
                 ConnectionMode mode = canUseGlobal
                         ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
                         : ConnectionMode.OWN;
-                connections.add(new StoreSupplierConnection(
+                StoreSupplierConnection connection = new StoreSupplierConnection(
                         selection.getSupplierName(), mode,
-                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment()));
+                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+                if (mode == ConnectionMode.OWN) {
+                    connection.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
+                }
+                connections.add(connection);
             }
         }
         return connections;

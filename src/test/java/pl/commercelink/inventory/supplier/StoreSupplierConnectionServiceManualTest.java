@@ -45,7 +45,7 @@ class StoreSupplierConnectionServiceManualTest {
                 new SupplierSelectionForm("Acme", true, ConnectionMode.GLOBAL, true, true));
 
         when(validator.validate(anyBoolean(), any(), any(), any(), any())).thenReturn(List.of());
-        when(persister.persist(any(), any(), any())).thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(java.util.Set.of(), java.util.Set.of()));
+        when(persister.persist(any(), any(), any())).thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(java.util.Set.of(), java.util.Set.of(), java.util.Set.of()));
 
         // when
         service.apply(existing, submitted, selections, java.util.Map.of(), true);

@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
+import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
@@ -45,6 +46,8 @@ class StoreIntegrationsControllerTest {
 
     @Mock
     private MarketplaceProviderFactory marketplaceProviderFactory;
+    @Mock
+    private MarketplaceOrdersImportScheduler ordersImportScheduler;
 
     @Mock
     private MessageSource messageSource;
@@ -64,7 +67,7 @@ class StoreIntegrationsControllerTest {
         lenient().when(store.getStoreId()).thenReturn("store-1");
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         controller = new StoreIntegrationsController(storesRepository, shippingProviderFactory,
-                invoicingProviderFactory, paymentProviderFactory, marketplaceProviderFactory, messageSource);
+                invoicingProviderFactory, paymentProviderFactory, marketplaceProviderFactory, ordersImportScheduler, messageSource);
     }
 
     @AfterEach
@@ -137,5 +140,21 @@ class StoreIntegrationsControllerTest {
 
         // then
         verify(store).markConnectionAsRestored("Morele");
+    }
+
+    @Test
+    void disconnectingMarketplaceRemovesItsOrdersImportSchedule() {
+        // given
+        IntegrationCredentialsForm form = new IntegrationCredentialsForm();
+        form.setProviderType("marketplace");
+        form.setProviderName("Allegro");
+
+        // when
+        controller.disconnectIntegration(form, Locale.getDefault(), new RedirectAttributesModelMap());
+
+        // then
+        verify(store).removeMarketplaceIntegration("Allegro");
+        verify(ordersImportScheduler).delete("store-1", "Allegro");
+        verify(storesRepository).save(store);
     }
 }
