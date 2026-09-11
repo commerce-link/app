@@ -46,11 +46,9 @@
                           th:text="#{store.supplier.flag.no}"></span>
                 </td>
                 <td>
-                    <span th:if="${row.isGlobal()}" class="has-text-grey"
-                          th:text="#{store.supplier.feed.global}"></span>
-                    <span th:if="${!row.isGlobal() and row.hasFeed()}"
+                    <span th:if="${row.hasFeed()}"
                           th:text="${#temporals.format(row.feedLastModified(), 'dd.MM.yyyy HH:mm')}"></span>
-                    <span th:if="${!row.isGlobal() and !row.hasFeed()}" class="has-text-grey"
+                    <span th:unless="${row.hasFeed()}" class="has-text-grey"
                           th:text="#{store.supplier.feed.missing}"></span>
                 </td>
                 <td>

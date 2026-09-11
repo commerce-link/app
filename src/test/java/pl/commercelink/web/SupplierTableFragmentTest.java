@@ -34,10 +34,14 @@ class SupplierTableFragmentTest {
     }
 
     @Test
-    void showsTheFeedTimestampAndDistinguishesGlobalConnectionsFromMissingFiles() throws Exception {
+    void showsTheFeedTimestampForEveryModeAndTheMissingStateOtherwise() throws Exception {
         String html = fragment();
-        assertThat(html).contains("#{store.supplier.feed.global}");
+        // a global connection's feed lives in the platform-wide bucket rather than the store's
+        // own namespace, but the row no longer distinguishes it from own/manual - hasFeed() is
+        // the single source of truth for whether a timestamp exists at all
         assertThat(html).contains("#{store.supplier.feed.missing}");
+        assertThat(html).doesNotContain("store.supplier.feed.global");
+        assertThat(html).doesNotContain("row.isGlobal()");
         // the record accessor is called as a method, and the value must be run through the
         // temporals formatter rather than bound raw, or a future edit could render a
         // LocalDateTime#toString() instead of a formatted timestamp
