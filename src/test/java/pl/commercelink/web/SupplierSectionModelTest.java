@@ -75,11 +75,13 @@ class SupplierSectionModelTest {
             // when
             String view = SupplierSectionModel.renderExternalSection(viewFactory, registry, store(), "Saved.", model);
 
-            // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            // then -- a no-argument view name: ThymeleafView rejects positional fragment parameters
+            // in a view specification, so a regression back to the parameterized selector (with or
+            // without a stray "(") is caught here rather than only at runtime
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
             assertThat(model.getAttribute("sectionRows")).isEqualTo(List.of(elko));
             assertThat(model.getAttribute("sectionShowMode")).isEqualTo(true);
-            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store");
             // Elko is already connected, so only Acme is left to offer in the Add dropdown
             assertThat(model.getAttribute("sectionAvailableSuppliers")).isEqualTo(List.of("Acme"));
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("Saved.");
@@ -103,7 +105,8 @@ class SupplierSectionModelTest {
             String view = SupplierSectionModel.renderManualSection(viewFactory, store(), null, model);
 
             // then
-            assertThat(view).contains("${sectionRows}, true, false,");
+            assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
+            assertThat(view).doesNotContain("(");
             assertThat(model.getAttribute("sectionRows")).isEqualTo(List.of(manual));
             assertThat(model.getAttribute("sectionSuccessMessage")).isNull();
         }

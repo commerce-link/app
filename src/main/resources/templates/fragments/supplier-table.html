@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="supplierTable(rows, manual, showMode, basePath)">
+<div th:fragment="supplierTable(rows, manual, showMode)">
 
     <table class="table is-fullwidth is-striped" th:if="${!rows.isEmpty()}">
         <thead>

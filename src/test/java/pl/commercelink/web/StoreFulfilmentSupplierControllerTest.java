@@ -93,7 +93,8 @@ class StoreFulfilmentSupplierControllerTest {
             String view = controller.save(form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
@@ -144,8 +145,8 @@ class StoreFulfilmentSupplierControllerTest {
             String view = controller.disconnectForStore(STORE_ID, "Elko", Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
-            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
             verify(storeSupplierConnectionService).disconnect(any(), eq("Elko"));
         }
     }
@@ -171,8 +172,8 @@ class StoreFulfilmentSupplierControllerTest {
             String view = controller.saveForStore(STORE_ID, form(), Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
-            assertThat(model.getAttribute("sectionBasePath")).isEqualTo("/dashboard/store/" + STORE_ID);
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
             verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
         }
     }
@@ -196,7 +197,8 @@ class StoreFulfilmentSupplierControllerTest {
             String view = controller.disconnect("Elko", Locale.ENGLISH, model, response);
 
             // then
-            assertThat(view).startsWith("fragments/supplier-section :: supplierSection(");
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
             verify(storeSupplierConnectionService).disconnect(any(), eq("Elko"));
         }
     }

@@ -18,7 +18,7 @@ class SupplierTableFragmentTest {
 
     @Test
     void declaresTheSupplierTableFragmentWithTheExpectedSignature() throws Exception {
-        assertThat(fragment()).contains("th:fragment=\"supplierTable(rows, manual, showMode, basePath)\"");
+        assertThat(fragment()).contains("th:fragment=\"supplierTable(rows, manual, showMode)\"");
     }
 
     @Test

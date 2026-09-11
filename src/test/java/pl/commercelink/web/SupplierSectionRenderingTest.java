@@ -22,11 +22,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Renders fragments/supplier-section.html through a real Thymeleaf engine (same technique as
- * CategoryPickerFragmentTest) instead of only asserting on the raw file text. This is what proves
- * the fragment actually compiles and produces the expected markup for the exact argument shapes
- * SupplierSectionModel passes -- the controller returns the same "template :: fragment(args)"
- * selector syntax as a view name, which Spring's ThymeleafView resolves with the identical
- * fragment-expression parser used by th:replace/th:insert here.
+ * CategoryPickerFragmentTest) instead of only asserting on the raw file text. This proves the
+ * fragment's own markup compiles and renders as expected for the exact argument shapes
+ * SupplierSectionModel populates on the model -- nothing more.
+ *
+ * <p>It does <b>not</b> prove that the controller's returned view name resolves: every render
+ * here goes through {@code th:replace}, which (unlike a view name handled by Spring's
+ * {@code ThymeleafView}) happily accepts positional fragment parameters. A controller returning
+ * {@code "fragments/supplier-section :: supplierSection(${a}, false, ...)"} as a view name fails
+ * at runtime with {@code IllegalArgumentException: Parameters in a view specification must be
+ * named (non-synthetic)} even though the exact same selector renders fine through th:replace, as
+ * it does in this test. SupplierSectionModel avoids that trap by returning the no-argument
+ * {@code externalSection}/{@code manualSection} selectors instead (see the two tests below); the
+ * two tests that still call {@code supplierSection(...)} directly with explicit arguments below
+ * are only pinning that fragment's own markup, the same way store-fulfilment.html's initial
+ * page render does via th:replace, not the controller's view-name path.
  */
 class SupplierSectionRenderingTest {
 
@@ -92,11 +102,10 @@ class SupplierSectionRenderingTest {
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
-        context.setVariable("sectionBasePath", "/dashboard/store");
         context.setVariable("sectionAvailableSuppliers", List.of("Acme"));
         context.setVariable("sectionSuccessMessage", "Supplier Elko saved.");
 
-        String args = "${sectionRows}, false, ${sectionShowMode}, ${sectionBasePath}, "
+        String args = "${sectionRows}, false, ${sectionShowMode}, "
                 + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
                 + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}";
 
@@ -121,10 +130,9 @@ class SupplierSectionRenderingTest {
                 "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
-        context.setVariable("sectionBasePath", "/dashboard/store");
         context.setVariable("sectionSuccessMessage", null);
 
-        String args = "${sectionRows}, true, false, ${sectionBasePath}, 'store.manual.section.title', "
+        String args = "${sectionRows}, true, false, 'store.manual.section.title', "
                 + "'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}";
 
         // when
@@ -136,6 +144,53 @@ class SupplierSectionRenderingTest {
         assertThat(html).contains("id=\"manual-add-button\"");
         assertThat(html).contains("Hurtownia X");
         // no successMessage was supplied, so the toast attribute must be absent, not "null"
+        assertThat(html).doesNotContain("data-success-message");
+    }
+
+    @Test
+    void theExternalSectionWrapperRendersTheSameMarkupAsTheParameterizedFragment() {
+        // given -- exactly the model attributes SupplierSectionModel.renderExternalSection sets,
+        // and the no-argument selector it now returns as the view name
+        SupplierConnectionView elko = new SupplierConnectionView(
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(elko));
+        context.setVariable("sectionShowMode", true);
+        context.setVariable("sectionAvailableSuppliers", List.of("Acme"));
+        context.setVariable("sectionSuccessMessage", "Supplier Elko saved.");
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: externalSection}\"></div>", context);
+
+        // then -- proves the wrapper actually forwards to supplierSection with the right rows/
+        // showMode/availableSuppliers/successMessage, not just that it parses
+        assertThat(html).doesNotContain("??store.supplier");
+        assertThat(html).contains("Suppliers");
+        assertThat(html).contains("id=\"supplier-add-button\"");
+        assertThat(html).contains("Elko");
+        assertThat(html).contains("data-success-message=\"Supplier Elko saved.\"");
+        assertThat(html).doesNotContain("disabled=\"disabled\"");
+    }
+
+    @Test
+    void theManualSectionWrapperRendersTheSameMarkupAsTheParameterizedFragment() {
+        // given -- exactly the model attributes SupplierSectionModel.renderManualSection sets
+        SupplierConnectionView manual = new SupplierConnectionView(
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(manual));
+        context.setVariable("sectionSuccessMessage", null);
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: manualSection}\"></div>", context);
+
+        // then
+        assertThat(html).doesNotContain("??store.manual");
+        assertThat(html).contains("Manual suppliers");
+        assertThat(html).contains("id=\"manual-add-button\"");
+        assertThat(html).contains("Hurtownia X");
         assertThat(html).doesNotContain("data-success-message");
     }
 

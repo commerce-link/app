@@ -109,7 +109,7 @@
             <div class="box" id="external-supplier-section"
                  th:attr="data-all-suppliers=${#strings.listJoin(allSupplierNames, ';')}">
                 <div th:replace="~{fragments/supplier-section :: supplierSection(${externalConnections}, false,
-                                   ${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}, ${basePath},
+                                   ${form.store.fulfilmentConfiguration.canUseGlobalSuppliers},
                                    'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button',
                                    ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null)}"></div>
             </div>
@@ -392,7 +392,7 @@
 
             <div class="box" id="manual-supplier-section">
                 <div th:replace="~{fragments/supplier-section :: supplierSection(${manualConnections}, true, false,
-                                   ${basePath}, 'store.manual.section.title', 'manual-add-button',
+                                   'store.manual.section.title', 'manual-add-button',
                                    'store.manual.add.button', false, null, null)}"></div>
             </div>
 

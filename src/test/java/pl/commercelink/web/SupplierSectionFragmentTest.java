@@ -19,7 +19,7 @@ class SupplierSectionFragmentTest {
     @Test
     void declaresTheSupplierSectionFragmentWithTheExpectedSignature() throws Exception {
         assertThat(fragment()).contains(
-                "th:fragment=\"supplierSection(rows, manual, showMode, basePath, titleKey, addButtonId, "
+                "th:fragment=\"supplierSection(rows, manual, showMode, titleKey, addButtonId, "
                         + "addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage)\"");
     }
 
@@ -33,7 +33,37 @@ class SupplierSectionFragmentTest {
         assertThat(html).contains("th:id=\"${addButtonId}\"");
         assertThat(html).contains("#{${addButtonLabelKey}}");
         assertThat(html).contains(
-                "th:replace=\"~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode}, ${basePath})}\"");
+                "th:replace=\"~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode})}\"");
+    }
+
+    @Test
+    void declaresNoArgumentWrapperFragmentsForTheAsyncEndpointsToReturnAsViewNames() throws Exception {
+        // Spring's ThymeleafView rejects a controller-returned view name that carries positional
+        // fragment parameters (only th:replace/th:insert may use them), so the async endpoints
+        // return these no-argument selectors instead, with every value the fragment needs already
+        // published on the model by SupplierSectionModel
+        String html = fragment();
+        assertThat(html).contains("th:fragment=\"externalSection\"");
+        assertThat(html).contains("th:fragment=\"manualSection\"");
+    }
+
+    @Test
+    void theWrapperFragmentsDelegateToTheParameterizedFragmentByReplacingThemselves() throws Exception {
+        String html = fragment();
+        // th:replace (not th:insert) so the rendered output IS the supplierSection div itself,
+        // carrying data-success-message on its root -- the same shape the page script's
+        // applySectionSwap expects to find on temp.firstElementChild
+        assertThat(html).contains(
+                "th:fragment=\"externalSection\"\n"
+                        + "     th:replace=\"~{fragments/supplier-section :: supplierSection(${sectionRows}, false, "
+                        + "${sectionShowMode}, 'store.supplier.section.title', 'supplier-add-button', "
+                        + "'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, "
+                        + "'store.supplier.add.none', ${sectionSuccessMessage})}\">");
+        assertThat(html).contains(
+                "th:fragment=\"manualSection\"\n"
+                        + "     th:replace=\"~{fragments/supplier-section :: supplierSection(${sectionRows}, true, "
+                        + "false, 'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', "
+                        + "false, null, ${sectionSuccessMessage})}\">");
     }
 
     @Test

@@ -20,6 +20,12 @@ import java.util.stream.Collectors;
  * ({@link StoreController}) and the async mutating endpoints ({@link StoreFulfilmentSupplierController},
  * {@link ManualSupplierController}) that swap just one section back in after a connect, edit,
  * disconnect, save or delete instead of redirecting and reloading the whole page.
+ *
+ * <p>The async endpoints return no-argument view names ({@code externalSection} / {@code
+ * manualSection}) rather than the parameterized {@code supplierSection(...)} selector: Spring's
+ * {@code ThymeleafView} rejects a view name carrying positional fragment parameters (they are only
+ * legal inside a {@code th:replace}/{@code th:insert} expression), so every value the fragment
+ * needs is published as a model attribute instead and the wrapper fragments read it from there.
  */
 public final class SupplierSectionModel {
 
@@ -42,24 +48,20 @@ public final class SupplierSectionModel {
                 .toList();
         model.addAttribute("sectionRows", views.external());
         model.addAttribute("sectionShowMode", store.canUseGlobalSuppliers());
-        model.addAttribute("sectionBasePath", basePath(store.getStoreId()));
         model.addAttribute("sectionAvailableSuppliers", availableSuppliers);
         model.addAttribute("sectionSuccessMessage", successMessage);
-        return "fragments/supplier-section :: supplierSection(${sectionRows}, false, ${sectionShowMode}, "
-                + "${sectionBasePath}, 'store.supplier.section.title', 'supplier-add-button', "
-                + "'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, "
-                + "'store.supplier.add.none', ${sectionSuccessMessage})";
+        // No-argument view name: ThymeleafView (unlike th:replace/th:insert) rejects a view name
+        // carrying positional fragment parameters, so everything the fragment needs travels as a
+        // model attribute and the controller selects a wrapper fragment that has none.
+        return "fragments/supplier-section :: externalSection";
     }
 
     public static String renderManualSection(SupplierConnectionViewFactory supplierConnectionViewFactory,
                                              Store store, String successMessage, Model model) {
         SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
         model.addAttribute("sectionRows", views.manual());
-        model.addAttribute("sectionBasePath", basePath(store.getStoreId()));
         model.addAttribute("sectionSuccessMessage", successMessage);
-        return "fragments/supplier-section :: supplierSection(${sectionRows}, true, false, ${sectionBasePath}, "
-                + "'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', "
-                + "false, null, ${sectionSuccessMessage})";
+        return "fragments/supplier-section :: manualSection";
     }
 
     public static String renderErrorFragment(String message, Model model, HttpServletResponse response) {
