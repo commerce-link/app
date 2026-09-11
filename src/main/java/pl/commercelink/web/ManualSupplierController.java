@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -101,6 +103,39 @@ public class ManualSupplierController {
             return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
         }
         return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @PostMapping("/dashboard/store/fulfilment/manual-supplier/{identity}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String saveSelection(@PathVariable String identity,
+                                @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
+                                @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
+                                @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                Locale locale, RedirectAttributes attributes) {
+        return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment, locale, attributes);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/{identity}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String saveSelectionForStore(@PathVariable String storeId, @PathVariable String identity,
+                                        @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
+                                        @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
+                                        @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                        Locale locale, RedirectAttributes attributes) {
+        return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, locale, attributes);
+    }
+
+    private String doSaveSelection(String storeId, String identity, boolean enabled,
+                                   boolean includeInPricing, boolean includeInFulfilment,
+                                   Locale locale, RedirectAttributes attributes) {
+        manualSupplierService.applySelections(storeId, List.of(
+                new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment)));
+        attributes.addFlashAttribute("successMessage",
+                messageSource.getMessage("store.fulfilment.supplier.saved",
+                        new Object[]{ManualSupplierInfos.label(identity)}, locale));
+        return CustomSecurityContext.hasRole("SUPER_ADMIN")
+                ? String.format("redirect:/dashboard/store/%s/fulfilment", storeId)
+                : "redirect:/dashboard/store/fulfilment";
     }
 
     private String currentStoreId() {
