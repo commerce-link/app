@@ -195,6 +195,9 @@
                     var editTitle = /*[[#{store.supplier.edit.modal.title}]]*/ '';
                     var editSupplier = /*[[${editSupplier}]]*/ null;
                     var addSupplier = /*[[${addSupplier}]]*/ null;
+                    var submittedIncludeInPricing = /*[[${submittedIncludeInPricing}]]*/ null;
+                    var submittedIncludeInFulfilment = /*[[${submittedIncludeInFulfilment}]]*/ null;
+                    var reopenTarget = editSupplier || addSupplier;
 
                     function rowFor(identity) {
                         for (var i = 0; i < rows.length; i++) {
@@ -224,6 +227,11 @@
 
                     function open(identity) {
                         var row = identity ? rowFor(identity) : null;
+                        // Flash values only apply when reopening for the very supplier whose
+                        // save was just rejected -- opening any other supplier's modal must not
+                        // pick up a stale submission left over from that redirect.
+                        var useSubmittedFlags = !!identity && identity === reopenTarget
+                            && (submittedIncludeInPricing !== null || submittedIncludeInFulfilment !== null);
                         title.textContent = row ? editTitle : addTitle;
                         selectWrap.classList.toggle('is-hidden', !!row);
                         select.disabled = !!row;
@@ -231,13 +239,13 @@
                         if (row) {
                             hiddenName.value = row.identity;
                             if (mode) { mode.value = row.mode; }
-                            pricing.checked = row.includeInPricing;
-                            fulfilment.checked = row.includeInFulfilment;
+                            pricing.checked = useSubmittedFlags ? !!submittedIncludeInPricing : row.includeInPricing;
+                            fulfilment.checked = useSubmittedFlags ? !!submittedIncludeInFulfilment : row.includeInFulfilment;
                         } else {
                             select.value = identity || '';
                             if (mode) { mode.value = 'OWN'; }
-                            pricing.checked = true;
-                            fulfilment.checked = true;
+                            pricing.checked = useSubmittedFlags ? !!submittedIncludeInPricing : true;
+                            fulfilment.checked = useSubmittedFlags ? !!submittedIncludeInFulfilment : true;
                         }
                         refreshFields();
                         modal.classList.add('is-active');

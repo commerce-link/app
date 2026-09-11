@@ -109,6 +109,33 @@ class StoreFulfilmentSupplierControllerTest {
     }
 
     @Test
+    void aFailedValidationCarriesBackTheSubmittedPricingAndFulfilmentFlags() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
+                        List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")),
+                        Set.of(), Set.of()));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("missing field");
+        RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+        SupplierConnectionForm form = form();
+        form.setIncludeInPricing(false);
+        form.setIncludeInFulfilment(true);
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.save(form, Locale.ENGLISH, attributes);
+
+            // then the operator's actual choices travel back, not just any flag at all
+            assertThat(attributes.getFlashAttributes().get("submittedIncludeInPricing")).isEqualTo(false);
+            assertThat(attributes.getFlashAttributes().get("submittedIncludeInFulfilment")).isEqualTo(true);
+        }
+    }
+
+    @Test
     void theSuperAdminVariantRedirectsToTheStoreScopedPath() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());

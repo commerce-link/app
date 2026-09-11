@@ -73,6 +73,8 @@ public class StoreFulfilmentSupplierController {
                     .collect(Collectors.joining(" ")));
             // Carried back so the reopened modal can restore what the operator typed.
             attributes.addFlashAttribute("submittedSupplierConfiguration", form.getConfiguration());
+            attributes.addFlashAttribute("submittedIncludeInPricing", form.isIncludeInPricing());
+            attributes.addFlashAttribute("submittedIncludeInFulfilment", form.isIncludeInFulfilment());
             return redirect(storeId, form.getSupplierName());
         }
         attributes.addFlashAttribute("successMessage",
