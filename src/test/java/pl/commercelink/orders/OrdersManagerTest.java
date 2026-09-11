@@ -589,6 +589,27 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("returnOrderItemsToSupplierAllocation releases a claimed item back to the supplier pool")
+    void returnOrderItemsToSupplierAllocationReleasesAClaimedItemBackToTheSupplierPool() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.returnOrderItemsToSupplierAllocation(STORE_ID, ORDER_ID, "delivery-1", "Elko", List.of("item-1"));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getDeliveryId()).isEqualTo("Elko");
+        assertThat(item.getClaimedDeliveryId()).isNull();
+        assertThat(item.isClaimed()).isFalse();
+    }
+
+    @Test
     @DisplayName("splitOrder moves a pre-claim Allocation item to the new order with its allocation intact")
     void splitOrderMovesAnAllocatedItemWithItsAllocation() {
         // given

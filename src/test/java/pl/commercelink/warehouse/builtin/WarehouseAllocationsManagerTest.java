@@ -130,8 +130,7 @@ class WarehouseAllocationsManagerTest {
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(4);
         claimed.setPurchaseClaimQty(0);
-        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
@@ -153,8 +152,7 @@ class WarehouseAllocationsManagerTest {
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(3);
         claimed.setPurchaseClaimQty(3);
-        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
@@ -173,8 +171,7 @@ class WarehouseAllocationsManagerTest {
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(5);
         claimed.setPurchaseClaimQty(2);
-        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
@@ -197,8 +194,7 @@ class WarehouseAllocationsManagerTest {
         claimed.setDeliveryId("delivery-1");
         claimed.setQty(3);
         claimed.setPurchaseClaimQty(-2);
-        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of(claimed));
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
@@ -220,8 +216,7 @@ class WarehouseAllocationsManagerTest {
         delivered.setStatus(FulfilmentStatus.Delivered);
         delivered.setDeliveryId("delivery-1");
         delivered.setQty(4);
-        when(warehouseRepository.findByDeliveryIdAndStatuses(STORE_ID, "delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of());
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(delivered));
 
         // when
         warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
@@ -230,6 +225,27 @@ class WarehouseAllocationsManagerTest {
         assertThat(delivered.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(delivered.getDeliveryId()).isEqualTo("delivery-1");
         verify(warehouseRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("release gives back the quantity claimed by a pending delivery")
+    void releaseGivesBackTheQuantityClaimedByAPendingDelivery() {
+        // given
+        WarehouseItem claimed = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        claimed.setQty(4);
+        claimed.setPurchaseClaimQty(3);
+        claimed.markAsClaimed("delivery-1");
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
+
+        // when
+        warehouseAllocationsManager.release(STORE_ID, "delivery-1", PROVIDER);
+
+        // then
+        assertThat(claimed.getQty()).isEqualTo(1);
+        assertThat(claimed.getPurchaseClaimQty()).isEqualTo(0);
+        assertThat(claimed.getDeliveryId()).isEqualTo(PROVIDER);
+        assertThat(claimed.getClaimedDeliveryId()).isNull();
+        verify(warehouseRepository).save(claimed);
     }
 
     @Test

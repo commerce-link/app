@@ -128,8 +128,10 @@ public class WarehouseAllocationsManager {
     }
 
     public void release(String storeId, String deliveryId, String provider) {
-        for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
-                List.of(FulfilmentStatus.Ordered))) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            if (!item.hasOneOfTheStatuses(FulfilmentStatus.Ordered) && !item.isClaimed()) {
+                continue;
+            }
             int delta = item.getPurchaseClaimQty();
             if (delta > 0 && delta >= item.getQty()) {
                 warehouseRepository.delete(item);

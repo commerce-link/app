@@ -192,7 +192,7 @@ public class OrdersManager {
                                                     String provider, Collection<String> orderItemIds) {
         execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
             if (deliveryId.equals(orderItem.getDeliveryId())
-                    && orderItem.hasOneOfTheStatuses(FulfilmentStatus.Ordered)) {
+                    && (orderItem.hasOneOfTheStatuses(FulfilmentStatus.Ordered) || orderItem.isClaimed())) {
                 orderItem.setDeliveryId(provider);
                 orderItem.markAsInAllocation();
                 orderItemsRepository.save(orderItem);
