@@ -13,6 +13,7 @@ import pl.commercelink.stores.SupplierSelectionForm;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +44,21 @@ public class StoreSupplierConnectionService {
             configs.put(name, configurationManager.getConfigurationForUI(store, name, descriptor));
         }
         return configs;
+    }
+
+    // The template needs to tell "no stored configuration" apart from "stored configuration whose
+    // password is masked to blank" -- getConfigurationForUI() makes both look identical, so this
+    // publishes the same notion connectOrUpdate()/storedConfigFor() already use to decide
+    // preservedPassword, without exposing the configuration values themselves.
+    public Set<String> suppliersWithStoredConfiguration(Store store) {
+        Set<String> stored = new LinkedHashSet<>();
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+            String name = descriptor.supplierInfo().name();
+            if (hasStoredConfiguration(store, name)) {
+                stored.add(name);
+            }
+        }
+        return stored;
     }
 
     public ConnectionUpdateResult connectOrUpdate(Store existingStore, SupplierSelectionForm selection,
@@ -128,10 +144,14 @@ public class StoreSupplierConnectionService {
 
     private Set<String> storedConfigFor(Store existingStore, StoreSupplierConnection connection) {
         if (connection.getMode() != ConnectionMode.OWN
-                || configurationManager.loadConfiguration(existingStore, connection.getSupplierName()).isEmpty()) {
+                || !hasStoredConfiguration(existingStore, connection.getSupplierName())) {
             return Set.of();
         }
         return Set.of(connection.getSupplierName());
+    }
+
+    private boolean hasStoredConfiguration(Store existingStore, String supplierName) {
+        return !configurationManager.loadConfiguration(existingStore, supplierName).isEmpty();
     }
 
     public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {

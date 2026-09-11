@@ -421,6 +421,10 @@ public class StoreController {
         model.addAttribute("settings", FulfilmentSettingsForm.from(store));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("supplierFields", supplierFields);
+        // Lets the modal render the HTML required attribute only where blank genuinely means
+        // missing: a required password field already has a stored secret for suppliers in this
+        // set, so a blank submission there is a deliberate "keep the current value", not an error.
+        model.addAttribute("suppliersWithStoredConfig", storeSupplierConnectionService.suppliersWithStoredConfiguration(store));
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());

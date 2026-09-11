@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -294,6 +296,34 @@ class StoreSupplierConnectionServiceTest {
         ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
         verify(validator).validate(anyBoolean(), anyList(), anyMap(), anyMap(), storedConfigCaptor.capture());
         assertThat(storedConfigCaptor.getValue()).isEmpty();
+    }
+
+    @Test
+    void suppliersWithStoredConfigurationReportsOnlyProvidersThatHaveASecretSaved() {
+        // given: two registered providers, only one of them with a saved configuration -- the
+        // template uses this to decide whether a blank required password field means "missing"
+        // or "keep the current value", so it must reflect the secret's existence, not the
+        // connection mode or whether the supplier is even connected
+        when(supplierProviderFactory.availableProviders())
+                .thenReturn(List.of(new StubSupplierDescriptor(), new OtherStubSupplierDescriptor()));
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(configurationManager.loadConfiguration(store, "Stub")).thenReturn(Map.of("login", "u"));
+        when(configurationManager.loadConfiguration(store, "Other")).thenReturn(Map.of());
+
+        // when
+        Set<String> result = service.suppliersWithStoredConfiguration(store);
+
+        // then
+        assertThat(result).containsExactly("Stub");
+    }
+
+    private static class OtherStubSupplierDescriptor extends StubSupplierDescriptor {
+        @Override
+        public SupplierInfo supplierInfo() {
+            return new SupplierInfo("Other", SupplierType.Distributor, 1, "PL",
+                    StubSupplierDescriptor.INFO.shippingPolicy());
+        }
     }
 
     @Test
