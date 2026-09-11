@@ -142,7 +142,7 @@ public class OrdersManager {
         return new Result(order, orderItems);
     }
 
-    public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
+    public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt, boolean shippedBySupplier) {
         // captured inside the lifecycle action so the order is read once, by execute
         LocalDate[] previousAssemblyAtHolder = new LocalDate[1];
         OrderStatus[] previousStatusHolder = new OrderStatus[1];
@@ -156,7 +156,7 @@ public class OrdersManager {
         }, o -> {
             previousAssemblyAtHolder[0] = o.getEstimatedAssemblyAt();
             previousStatusHolder[0] = o.getStatus();
-            o.updateEstimatedAssemblyAt(estimatedDeliveryAt);
+            o.updateEstimatedAssemblyAt(estimatedDeliveryAt, shippedBySupplier);
         });
 
         LocalDate previousAssemblyAt = previousAssemblyAtHolder[0];

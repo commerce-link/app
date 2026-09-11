@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -86,9 +87,9 @@ class DeliveryCreationServiceTest {
         assertThat(delivery.getOrderStatus()).isNull();
         assertThat(delivery.getExternalDeliveryId()).isEqualTo("EXT-9");
         verify(deliveriesRepository).save(delivery);
-        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any(), anyBoolean());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15), false);
     }
 
     @Test
@@ -110,7 +111,7 @@ class DeliveryCreationServiceTest {
         // then
         verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
         verify(warehouseAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), "Acme", form.getItems());
-        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any(), anyBoolean());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
     }
 
@@ -158,7 +159,7 @@ class DeliveryCreationServiceTest {
         InOrder inOrder = inOrder(deliveryCostSync, deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
         inOrder.verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
         inOrder.verify(deliveriesRepository).save(delivery);
-        inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25));
+        inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25), false);
         inOrder.verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
     }
 
@@ -172,7 +173,7 @@ class DeliveryCreationServiceTest {
         form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
         form.setItems(List.of());
         doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
-                .markClaimedAsOrdered(any(), any(), any());
+                .markClaimedAsOrdered(any(), any(), any(), anyBoolean());
 
         // when / then
         assertThatNoException().isThrownBy(() -> service.completePending(STORE_ID, delivery, form));
@@ -186,7 +187,7 @@ class DeliveryCreationServiceTest {
         Delivery delivery = new Delivery(STORE_ID, null, "Acme");
         LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 25);
         doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
-                .markClaimedAsOrdered(any(), any(), any());
+                .markClaimedAsOrdered(any(), any(), any(), anyBoolean());
 
         // when
         assertThatNoException().isThrownBy(() ->
@@ -246,7 +247,7 @@ class DeliveryCreationServiceTest {
 
         // then
         verify(orderAllocationsManager).remove(STORE_ID, "order-1", List.of("item-1"));
-        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any(), anyBoolean());
         verify(deliveriesRepository, never()).save(any());
     }
 
@@ -268,7 +269,7 @@ class DeliveryCreationServiceTest {
 
         // then
         assertEquals(180.0, delivery.getTotalCost());
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq("delivery-1"), any(), eq(form.getItems()));
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq("delivery-1"), any(), eq(form.getItems()), eq(false));
         verify(warehouseAllocationsManager).commit(STORE_ID, "delivery-1", PROVIDER, form.getItems());
     }
 
@@ -312,7 +313,7 @@ class DeliveryCreationServiceTest {
         assertEquals(deliveryId, saved.getDeliveryId());
         assertEquals("ELKO-2", saved.getExternalDeliveryId());
         assertEquals(165.0, saved.getTotalCost());
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(deliveryId), any(), eq(form.getItems()));
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(deliveryId), any(), eq(form.getItems()), eq(false));
         verify(warehouseAllocationsManager).commit(STORE_ID, deliveryId, form.getProvider(), form.getItems());
     }
 
@@ -399,7 +400,22 @@ class DeliveryCreationServiceTest {
         // then: only the selected order allocation is claimed and priced, nothing goes to the warehouse
         assertEquals(1, item.getRequestedQty());
         assertEquals(90.0, delivery.getTotalCost());
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), eq(form.getItems()));
+        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), eq(form.getItems()), eq(true));
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("the route flag handed to the ordering step comes from the delivery itself")
+    void passesTheDeliveryRouteWhenMarkingClaimedItemsAsOrdered() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+
+        // when
+        service.markClaimedAsOrdered(STORE_ID, delivery, LocalDate.of(2026, 9, 14));
+
+        // then
+        verify(orderAllocationsManager)
+                .markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 14), true);
     }
 }

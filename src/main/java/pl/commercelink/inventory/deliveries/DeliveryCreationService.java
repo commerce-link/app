@@ -56,7 +56,7 @@ public class DeliveryCreationService {
             form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
         }
         delivery.increaseTotalCost(allocationsCost(form));
-        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems(), delivery.isDropship());
         if (!delivery.isDropship()) {
             warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
         }
@@ -122,7 +122,7 @@ public class DeliveryCreationService {
      */
     public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
-            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt, delivery.isDropship());
         } catch (RuntimeException e) {
             log.error("Claimed order allocations not marked as ordered - items remain claimed and stuck in " +
                             "allocation, needs an engineer to re-run the marking: " +
@@ -173,7 +173,7 @@ public class DeliveryCreationService {
 
         deliveriesRepository.save(delivery);
 
-        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems(), delivery.isDropship());
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 

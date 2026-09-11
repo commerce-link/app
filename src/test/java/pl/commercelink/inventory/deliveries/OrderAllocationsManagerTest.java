@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -380,7 +381,7 @@ class OrderAllocationsManagerTest {
 
         // then
         verify(ordersManager).claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
-        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -394,10 +395,10 @@ class OrderAllocationsManagerTest {
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed, false);
 
         // then
-        verify(ordersManager).markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), confirmed);
+        verify(ordersManager).markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), confirmed, false);
     }
 
     @Test
@@ -412,13 +413,13 @@ class OrderAllocationsManagerTest {
         second.markAsClaimed("delivery-1");
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
         doThrow(new RuntimeException("boom")).when(ordersManager)
-                .markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), any(), any(), any());
+                .markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), any(), any(), any(), anyBoolean());
 
         // when
-        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed, false);
 
         // then
-        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq("order-2"), eq("delivery-1"), any(), eq(confirmed));
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq("order-2"), eq("delivery-1"), any(), eq(confirmed), eq(false));
     }
 
     @Test
@@ -430,10 +431,10 @@ class OrderAllocationsManagerTest {
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", null);
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", null, false);
 
         // then
-        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), eq("delivery-1"), any(), eq(null));
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), eq("delivery-1"), any(), eq(null), eq(false));
     }
 
     @Test
