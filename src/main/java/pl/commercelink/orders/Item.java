@@ -173,7 +173,7 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public boolean isReleasable() {
-        return isNew() || hasOneOfTheStatuses(FulfilmentStatus.Allocation);
+        return (isNew() || hasOneOfTheStatuses(FulfilmentStatus.Allocation)) && !isClaimed();
     }
 
     @DynamoDBIgnore
@@ -264,7 +264,7 @@ public abstract class Item implements Delivered {
 
     @DynamoDBIgnore
     public boolean updateFulfilment(String provider, String ean, String mfn, double cost) {
-        if (!isInAllocation() || !provider.equals(this.deliveryId)) {
+        if (!isInAllocation() || isClaimed() || !provider.equals(this.deliveryId)) {
             return false;
         }
 
@@ -288,6 +288,18 @@ public abstract class Item implements Delivered {
     public void markAsInAllocation() {
         this.setStatus(FulfilmentStatus.Allocation);
         this.claimedDeliveryId = null;
+    }
+
+    @DynamoDBIgnore
+    public void markAsClaimed(String deliveryId) {
+        this.status = FulfilmentStatus.Allocation;
+        this.deliveryId = deliveryId;
+        this.claimedDeliveryId = deliveryId;
+    }
+
+    @DynamoDBIgnore
+    public boolean isClaimed() {
+        return hasOneOfTheStatuses(FulfilmentStatus.Allocation) && claimedDeliveryId != null;
     }
 
     @DynamoDBIgnore
