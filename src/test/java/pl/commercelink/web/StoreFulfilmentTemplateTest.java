@@ -83,15 +83,35 @@ class StoreFulfilmentTemplateTest {
     @Test
     void scopesTheConfigureButtonLookupToItsOwnSection() throws Exception {
         String html = template();
+        String selector = "querySelectorAll('[data-configure-supplier]')";
 
         // each modal script looks up [data-configure-supplier] only within its own stable section
         // container (read fresh on every open/refresh, never from a document-wide query or a JS
         // array snapshotted at page load that would go stale after an async swap)
-        assertThat(html).contains("externalSection.querySelectorAll('[data-configure-supplier]')");
-        assertThat(html).contains("manualSection.querySelectorAll('[data-configure-supplier]')");
+        String externalScoped = "externalSection." + selector;
+        String manualScoped = "manualSection." + selector;
+        assertThat(html).contains(externalScoped);
+        assertThat(html).contains(manualScoped);
 
-        // guards against the scope being widened back to the whole document
-        assertThat(html).doesNotContain("document.querySelectorAll('[data-configure-supplier]')");
+        // Every occurrence of the raw selector must be one of the two scoped forms above --
+        // comparing the total count to the sum of the scoped counts catches a widened scope even
+        // when the widened variant still contains "querySelectorAll('[data-configure-supplier]')"
+        // as a substring (e.g. "document.querySelectorAll(...)"), which doesNotContain on the old,
+        // narrower "document." + selector string would miss.
+        int totalOccurrences = countOccurrences(html, selector);
+        int scopedOccurrences = countOccurrences(html, externalScoped) + countOccurrences(html, manualScoped);
+        assertThat(totalOccurrences).isGreaterThan(0);
+        assertThat(totalOccurrences).isEqualTo(scopedOccurrences);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = haystack.indexOf(needle, index)) != -1) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     @Test
