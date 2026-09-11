@@ -58,10 +58,14 @@ class SupplierTableFragmentTest {
     }
 
     @Test
-    void offersConfigureAndRemoveActionsPerRow() throws Exception {
+    void offersEditAndRemoveActionsPerRow() throws Exception {
         String html = fragment();
         assertThat(html).contains("data-configure-supplier");
-        assertThat(html).contains("confirmDelete(this)");
+        // neither destructive action submits inline any more (a plain onclick="confirmDelete(this)"
+        // cannot be intercepted for a fetch call) -- both carry their identity on a data attribute
+        // instead, and store-fulfilment.html wires them up with confirmDelete(button, callback)
+        assertThat(html).contains("data-identity=${row.identity()}");
+        assertThat(html).doesNotContain("confirmDelete(this)");
     }
 
     @Test
@@ -90,15 +94,23 @@ class SupplierTableFragmentTest {
     }
 
     @Test
-    void externalRowKeepsFormAndConfirmDeleteThisShape() throws Exception {
+    void externalRowRendersDisconnectControlAsAButtonNotAForm() throws Exception {
         String html = fragment();
 
-        // the external/global disconnect endpoint redirects, so this row may legitimately stay a
-        // plain form submitted through the callback-less confirmDelete(this) -- a future change
-        // must not quietly convert it to the manual row's data-attribute/button style too
-        assertThat(html).contains("<form th:unless=\"${manual}\"");
-        assertThat(html).contains("'/fulfilment/supplier/' + ${row.identity()} + '/disconnect'");
-        assertThat(html).contains("onclick=\"confirmDelete(this)\"");
+        // disconnecting no longer redirects -- it returns the re-rendered section, like every
+        // other mutation on this screen -- so a plain <form> submit would navigate the whole page
+        // to raw fragment HTML; this row now carries its identity on a plain button, the same
+        // shape the manual row already used, wired up by store-fulfilment.html with a fetch call
+        assertThat(html).contains("<button type=\"button\" th:unless=\"${manual}\"");
+        assertThat(html).contains("class=\"button is-small is-danger is-outlined external-disconnect-button\"");
+        assertThat(html).contains(
+                "data-identity=${row.identity()},data-confirm-message=#{store.supplier.disconnect.confirm}");
+
+        // guards against the old shape reappearing: a <form> whose action posts straight to the
+        // redirecting disconnect endpoint, submitted via the callback-less confirmDelete(this)
+        assertThat(html).doesNotContain("<form th:unless=\"${manual}\"");
+        assertThat(html).doesNotContain("'/fulfilment/supplier/' + ${row.identity()} + '/disconnect'");
+        assertThat(html).doesNotContain("onclick=\"confirmDelete(this)\"");
     }
 
     @Test
@@ -109,5 +121,28 @@ class SupplierTableFragmentTest {
         // generic default text
         assertThat(html).contains("data-confirm-message=#{store.manual.delete.confirm}");
         assertThat(html).contains("data-confirm-message=#{store.supplier.disconnect.confirm}");
+    }
+
+    @Test
+    void labelsTheRowActionEditRatherThanConfigure() throws Exception {
+        // the button edits an existing connection, never both add and edit any more, so the key
+        // (and its wording) was renamed to match
+        String html = fragment();
+        assertThat(html).contains("#{store.supplier.action.edit}");
+        assertThat(html).doesNotContain("store.supplier.action.configure");
+    }
+
+    @Test
+    void carriesEachRowsFieldsAsDataAttributesForTheModalScripts() throws Exception {
+        // store-fulfilment.html's modal scripts used to read a JS array snapshotted at page load
+        // (stale after any async swap); reading these straight off the (possibly just-swapped)
+        // <tr> keeps the Edit/config modals correct without a second request
+        String html = fragment();
+        assertThat(html).contains("data-mode=${row.mode()}");
+        assertThat(html).contains("data-include-pricing=${row.includeInPricing()}");
+        assertThat(html).contains("data-include-fulfilment=${row.includeInFulfilment()}");
+        assertThat(html).contains("data-label=${row.label()}");
+        assertThat(html).contains("data-enabled=${row.enabled()}");
+        assertThat(html).contains("data-feed-last-modified=${row.feedLastModified()}");
     }
 }
