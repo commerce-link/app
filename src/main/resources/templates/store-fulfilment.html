@@ -11,78 +11,90 @@
 
             <h1 class="title" th:text="#{store.fulfilment.settings}"></h1>
 
-            <form th:action="@{/dashboard/store/fulfilment}" th:object="${form}" method="post">
+            <div class="box" id="fulfilment-settings-section">
+                <div th:replace="~{fragments/fulfilment-settings-section :: fulfilmentSettingsSection(${settings}, ${isSuperAdmin}, null, false)}"></div>
+            </div>
 
-                <input type="hidden" th:field="*{store.storeId}"/>
+            <div id="fulfilmentSettingsModal" class="modal">
+                <div class="modal-background"></div>
+                <div class="modal-content">
+                    <form th:action="@{${basePath} + '/fulfilment/settings'}" method="post" id="fulfilment-settings-form">
+                        <div class="box">
+                            <h2 class="subtitle" th:text="#{store.fulfilment.settings}"></h2>
 
-                <div class="box">
+                            <div id="fulfilment-settings-form-error"></div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.order.assembly.days}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfilmentConfiguration.orderAssemblyDays}"
-                                   th:placeholder="#{store.order.assembly.days}" />
-                        </div>
-                    </div>
+                            <div class="field">
+                                <label class="label" th:text="#{store.order.assembly.days}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="orderAssemblyDays"
+                                           id="fulfilment-settings-assembly-days"
+                                           th:placeholder="#{store.order.assembly.days}" />
+                                </div>
+                            </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.order.realization.days}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.fulfilmentConfiguration.orderRealizationDays}"
-                                   th:placeholder="#{store.order.realization.days}" />
-                        </div>
-                    </div>
+                            <div class="field">
+                                <label class="label" th:text="#{store.order.realization.days}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="orderRealizationDays"
+                                           id="fulfilment-settings-realization-days"
+                                           th:placeholder="#{store.order.realization.days}" />
+                                </div>
+                            </div>
 
-                    <div class="field">
-                        <label class="checkbox">
-                            <input type="checkbox" th:field="*{store.fulfilmentConfiguration.automatedFulfilment}">
-                            <strong th:text="#{store.enable.automated.fulfilment}"></strong>
-                        </label>
-                        <p th:text="#{store.enable.automated.fulfilment.description}"></p>
-                    </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="automatedFulfilment" value="true"
+                                           id="fulfilment-settings-automated-fulfilment">
+                                    <strong th:text="#{store.enable.automated.fulfilment}"></strong>
+                                </label>
+                                <p th:text="#{store.enable.automated.fulfilment.description}"></p>
+                            </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.fulfilment.default.type}"></label>
-                        <div class="control">
-                            <div class="select">
-                                <select th:field="*{store.fulfilmentConfiguration.defaultFulfilmentType}">
-                                    <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
-                                </select>
+                            <div class="field">
+                                <label class="label" th:text="#{store.fulfilment.default.type}"></label>
+                                <div class="control">
+                                    <div class="select">
+                                        <select name="defaultFulfilmentType" id="fulfilment-settings-default-type">
+                                            <option th:each="type : ${fulfilmentTypes}" th:value="${type}" th:text="${type}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="field" th:if="${isSuperAdmin}">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="canUseGlobalSuppliers" value="true"
+                                           id="fulfilment-settings-can-use-global-suppliers">
+                                    <strong th:text="#{store.use.global.suppliers}"></strong>
+                                </label>
+                                <p th:text="#{store.use.global.suppliers.description}"></p>
+                            </div>
+
+                            <div class="field" th:if="${isSuperAdmin}">
+                                <label class="label" th:text="#{store.inventory.cache.ttl}"></label>
+                                <input class="input" type="number" min="1" name="inventoryCacheTtlMinutes"
+                                       id="fulfilment-settings-cache-ttl">
+                                <p th:text="#{store.inventory.cache.ttl.description}"></p>
+                            </div>
+
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="fulfilment-settings-modal-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="field" th:if="${isSuperAdmin}">
-                        <label class="checkbox">
-                            <input type="checkbox"
-                                   th:field="*{store.fulfilmentConfiguration.canUseGlobalSuppliers}">
-                            <strong th:text="#{store.use.global.suppliers}"></strong>
-                        </label>
-                        <p th:text="#{store.use.global.suppliers.description}"></p>
-                    </div>
-
-                    <div class="field" th:if="${isSuperAdmin}">
-                        <label class="label" th:text="#{store.inventory.cache.ttl}"></label>
-                        <input class="input" type="number" min="1"
-                               th:field="*{store.fulfilmentConfiguration.inventoryCacheTtlMinutes}">
-                        <p th:text="#{store.inventory.cache.ttl.description}"></p>
-                    </div>
-
+                    </form>
                 </div>
-
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-                    </div>
-                </div>
-            </form>
+                <button class="modal-close is-large" aria-label="close" id="fulfilment-settings-modal-close"></button>
+            </div>
 
             <script th:inline="javascript">
-                // Shared by both section scripts below: a successful async mutation returns the
+                // Shared by every section script below: a successful async mutation returns the
                 // freshly-rendered section fragment, whose root element carries the localized
                 // success message (if any) as a data attribute -- there is no redirect left to
                 // flash it through, so it travels in the response body instead, the same way the
@@ -104,12 +116,112 @@
                     var text = temp.textContent.trim();
                     return text || fallback;
                 }
+
+                // Used by the fulfilment settings save below when it flips canUseGlobalSuppliers:
+                // that flag also governs the external suppliers section's mode column and the
+                // supplier modal's mode selector, so this fetches and swaps that section in too,
+                // the same way refreshManualSection() does further down for the manual section.
+                // Best-effort: the settings save itself already succeeded and already has its own
+                // toast, so a failure here is not surfaced -- the next supplier action (or a page
+                // reload) will show the current state anyway.
+                function refreshExternalSupplierSection(basePath, container) {
+                    return fetch(basePath + '/fulfilment/supplier/section')
+                        .then(function (r) {
+                            if (!r.ok) { throw new Error('Failed to refresh the external supplier section'); }
+                            return r.text();
+                        })
+                        .then(function (html) { applySectionSwap(container, html); })
+                        .catch(function () { /* best-effort, see comment above */ });
+                }
+            </script>
+
+            <script th:inline="javascript">
+                (function () {
+                    var basePath = /*[[${basePath}]]*/ '';
+                    var settingsSection = document.getElementById('fulfilment-settings-section');
+                    var externalSection = document.getElementById('external-supplier-section');
+                    var modal = document.getElementById('fulfilmentSettingsModal');
+                    var form = document.getElementById('fulfilment-settings-form');
+                    var submitButton = form.querySelector('button[type="submit"]');
+                    var formError = document.getElementById('fulfilment-settings-form-error');
+                    var assemblyDays = document.getElementById('fulfilment-settings-assembly-days');
+                    var realizationDays = document.getElementById('fulfilment-settings-realization-days');
+                    var automatedFulfilment = document.getElementById('fulfilment-settings-automated-fulfilment');
+                    var defaultType = document.getElementById('fulfilment-settings-default-type');
+                    var canUseGlobalSuppliers = document.getElementById('fulfilment-settings-can-use-global-suppliers');
+                    var cacheTtl = document.getElementById('fulfilment-settings-cache-ttl');
+                    var submitInFlight = false;
+
+                    // Reads the current values straight off the (possibly just-swapped) section's
+                    // data attributes instead of a page-load snapshot, which would show stale
+                    // values after a save -- the same reason the supplier/manual modals read a
+                    // table row's dataset fresh on every open instead of a JS array from page load.
+                    function open() {
+                        var current = settingsSection.firstElementChild.dataset;
+                        formError.innerHTML = '';
+                        assemblyDays.value = current.orderAssemblyDays;
+                        realizationDays.value = current.orderRealizationDays;
+                        automatedFulfilment.checked = current.automatedFulfilment === 'true';
+                        if (current.defaultFulfilmentType) { defaultType.value = current.defaultFulfilmentType; }
+                        if (canUseGlobalSuppliers) { canUseGlobalSuppliers.checked = current.canUseGlobalSuppliers === 'true'; }
+                        if (cacheTtl) { cacheTtl.value = current.inventoryCacheTtlMinutes || ''; }
+                        modal.classList.add('is-active');
+                    }
+
+                    function close() { modal.classList.remove('is-active'); }
+
+                    settingsSection.addEventListener('click', function (event) {
+                        if (event.target.closest('#fulfilment-settings-edit-button')) { open(); }
+                    });
+
+                    document.getElementById('fulfilment-settings-modal-cancel').addEventListener('click', close);
+                    document.getElementById('fulfilment-settings-modal-close').addEventListener('click', close);
+                    modal.querySelector('.modal-background').addEventListener('click', close);
+
+                    form.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        if (submitInFlight) { return; }
+                        submitInFlight = true;
+                        submitButton.disabled = true;
+                        formError.innerHTML = '';
+                        fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) })
+                            .then(function (response) {
+                                return response.text().then(function (html) {
+                                    return { ok: response.ok, status: response.status, html: html };
+                                });
+                            })
+                            .then(function (result) {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                if (!result.ok) {
+                                    formError.innerHTML = (result.status === 400 && result.html)
+                                            ? result.html
+                                            : ('<div class="notification is-danger">' + genericError + '</div>');
+                                    return;
+                                }
+                                applySectionSwap(settingsSection, result.html);
+                                close();
+                                // canUseGlobalSuppliers changed as a result of this save: the
+                                // external suppliers section (its mode column and the supplier
+                                // modal's mode selector) is stale until it is refreshed too.
+                                var refreshed = settingsSection.firstElementChild;
+                                if (refreshed && refreshed.getAttribute('data-refresh-external-suppliers') === 'true') {
+                                    refreshExternalSupplierSection(basePath, externalSection);
+                                }
+                            })
+                            .catch(function () {
+                                submitInFlight = false;
+                                submitButton.disabled = false;
+                                formError.innerHTML = '<div class="notification is-danger">' + genericError + '</div>';
+                            });
+                    });
+                })();
             </script>
 
             <div class="box" id="external-supplier-section"
                  th:attr="data-all-suppliers=${#strings.listJoin(allSupplierNames, ';')}">
                 <div th:replace="~{fragments/supplier-section :: supplierSection(${externalConnections}, false,
-                                   ${form.store.fulfilmentConfiguration.canUseGlobalSuppliers},
+                                   ${settings.canUseGlobalSuppliers},
                                    'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button',
                                    ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null)}"></div>
             </div>
@@ -137,8 +249,13 @@
                             </div>
                             <input type="hidden" name="supplierName" id="supplier-name-hidden" disabled />
 
-                            <div class="field supplier-mode-wrap"
-                                 th:if="${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}">
+                            <!-- Always rendered (not gated by a page-load th:if any more): the
+                                 fulfilment settings modal can flip canUseGlobalSuppliers from a
+                                 different section, so visibility is instead toggled by JS reading
+                                 the external section's fresh data-show-mode attribute on every
+                                 open -- a server-rendered condition here would go stale after such
+                                 a save until a full page reload. -->
+                            <div class="field supplier-mode-wrap" id="supplier-mode-wrap">
                                 <label class="label" th:text="#{store.supplier.connection.mode}"></label>
                                 <div class="control">
                                     <div class="select">
@@ -211,6 +328,7 @@
                     var selectWrap = document.getElementById('supplier-select-wrap');
                     var hiddenName = document.getElementById('supplier-name-hidden');
                     var mode = document.getElementById('supplier-mode');
+                    var modeWrap = document.getElementById('supplier-mode-wrap');
                     var warning = document.getElementById('supplier-mode-warning');
                     var title = document.getElementById('supplier-modal-title');
                     var pricing = document.getElementById('supplier-pricing');
@@ -248,19 +366,27 @@
                         return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
                     }
 
+                    // Reads canUseGlobalSuppliers fresh off the (possibly just-swapped) section
+                    // root instead of a page-load snapshot: the fulfilment settings modal can flip
+                    // this flag from a different section, and this is what keeps the mode selector
+                    // in sync with it without a page reload.
+                    function refreshModeVisibility() {
+                        var root = externalSection.firstElementChild;
+                        var showMode = !!(root && root.getAttribute('data-show-mode') === 'true');
+                        modeWrap.classList.toggle('is-hidden', !showMode);
+                    }
+
                     function refreshFields() {
                         var name = activeName();
-                        var isOwn = !mode || mode.value === 'OWN';
+                        var isOwn = mode.value === 'OWN';
                         document.querySelectorAll('.supplier-fields').forEach(function (group) {
                             var active = group.id === 'supplier-fields-' + name && isOwn;
                             group.style.display = active ? '' : 'none';
                             group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });
                         });
-                        if (warning) {
-                            var row = rowFor(name);
-                            var leavingOwn = row && row.mode === 'OWN' && mode && mode.value === 'GLOBAL';
-                            warning.classList.toggle('is-hidden', !leavingOwn);
-                        }
+                        var row = rowFor(name);
+                        var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
+                        warning.classList.toggle('is-hidden', !leavingOwn);
                     }
 
                     function clearFormError() {
@@ -313,15 +439,16 @@
                         clearFormError();
                         if (row) {
                             hiddenName.value = row.identity;
-                            if (mode) { mode.value = row.mode; }
+                            mode.value = row.mode;
                             pricing.checked = row.includeInPricing;
                             fulfilment.checked = row.includeInFulfilment;
                         } else {
                             select.value = identity || '';
-                            if (mode) { mode.value = 'OWN'; }
+                            mode.value = 'OWN';
                             pricing.checked = true;
                             fulfilment.checked = true;
                         }
+                        refreshModeVisibility();
                         refreshFields();
                         modal.classList.add('is-active');
                     }
@@ -367,7 +494,7 @@
                     });
 
                     select.addEventListener('change', refreshFields);
-                    if (mode) { mode.addEventListener('change', refreshFields); }
+                    mode.addEventListener('change', refreshFields);
                     document.getElementById('supplier-modal-cancel').addEventListener('click', close);
                     document.getElementById('supplier-modal-close').addEventListener('click', close);
                     modal.querySelector('.modal-background').addEventListener('click', close);

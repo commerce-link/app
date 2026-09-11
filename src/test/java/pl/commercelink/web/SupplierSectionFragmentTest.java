@@ -84,7 +84,15 @@ class SupplierSectionFragmentTest {
         // response body instead -- the page script reads it once after swapping the section in and
         // shows it as a toast, the same way the dropship validation fragment carries
         // data-fully-available
-        assertThat(fragment()).contains("th:attr=\"data-success-message=${successMessage}\"");
+        assertThat(fragment()).contains("th:attr=\"data-success-message=${successMessage},data-show-mode=${showMode}\"");
+    }
+
+    @Test
+    void carriesShowModeAsADataAttributeSoASettingsSaveElsewhereCanBeReadFreshOnTheNextOpen() throws Exception {
+        // canUseGlobalSuppliers can now change from the fulfilment settings section, not just here;
+        // the supplier modal (rendered once, outside this fragment) reads this attribute fresh on
+        // every open instead of relying on a page-load snapshot that such a save would leave stale
+        assertThat(fragment()).contains("data-show-mode=${showMode}");
     }
 
     @Test

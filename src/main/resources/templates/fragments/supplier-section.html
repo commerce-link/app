@@ -20,9 +20,15 @@
   successMessage (nullable) is carried back as a data attribute on the fragment root rather than
   a flash attribute, since there is no redirect left to flash it through; the page script reads
   it once after the swap and shows it as a toast.
+
+  showMode is carried back the same way (data-show-mode) so the external section's stable
+  container always has a fresh reading of it after any swap: the fulfilment settings modal can
+  flip canUseGlobalSuppliers from a different section entirely, and the supplier modal's own mode
+  selector (rendered once, outside this fragment) reads this attribute on every open instead of a
+  page-load snapshot that a settings save would leave stale.
 -->
 <div th:fragment="supplierSection(rows, manual, showMode, titleKey, addButtonId, addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage)"
-     th:attr="data-success-message=${successMessage}">
+     th:attr="data-success-message=${successMessage},data-show-mode=${showMode}">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
         <h2 class="subtitle mb-0" th:text="#{${titleKey}}"></h2>
         <button type="button" class="button is-primary is-small" th:id="${addButtonId}"

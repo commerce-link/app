@@ -27,6 +27,83 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
+    void noLongerRendersAPageLevelSettingsFormOrSaveCancelButtons() throws Exception {
+        // the settings section now saves through its own modal, asynchronously, like every other
+        // section on this screen -- a page-level Save/Cancel pair (and the form wrapper that only
+        // existed for them) would misleadingly suggest it also applied to the supplier sections
+        String html = template();
+        assertThat(html).doesNotContain("confirmSave");
+        assertThat(html).doesNotContain("th:object=\"${form}\"");
+        assertThat(html).doesNotContain("*{store.storeId}");
+        assertThat(html).doesNotContain("*{store.fulfilmentConfiguration");
+    }
+
+    @Test
+    void rendersTheFulfilmentSettingsSectionViaTheSharedFragmentOnInitialPageLoad() throws Exception {
+        // the read-only display and the Edit button both live in fragments/fulfilment-settings-
+        // section.html (pinned by FulfilmentSettingsSectionFragmentTest); this only pins that the
+        // page wires it in with the initial settings/isSuperAdmin, no success message and no
+        // pending external-suppliers refresh
+        assertThat(template()).contains(
+                "th:replace=\"~{fragments/fulfilment-settings-section :: fulfilmentSettingsSection("
+                        + "${settings}, ${isSuperAdmin}, null, false)}\"");
+    }
+
+    @Test
+    void postsTheFulfilmentSettingsModalToItsOwnAsyncEndpoint() throws Exception {
+        assertThat(template()).contains("th:action=\"@{${basePath} + '/fulfilment/settings'}\"");
+    }
+
+    @Test
+    void prefillsTheSettingsModalFreshFromTheSectionsDataAttributesRatherThanAPageLoadSnapshot() throws Exception {
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "function open() { var current = settingsSection.firstElementChild.dataset;");
+        assertThat(normalized).contains("assemblyDays.value = current.orderAssemblyDays;");
+        assertThat(normalized).contains("automatedFulfilment.checked = current.automatedFulfilment === 'true';");
+    }
+
+    @Test
+    void savingSettingsSwapsTheSectionAndClosesTheModalOnSuccessOrKeepsItOpenWithTheOperatorsInputOnFailure() throws Exception {
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains("applySectionSwap(settingsSection, result.html); close();");
+        assertThat(normalized).contains(
+                "formError.innerHTML = (result.status === 400 && result.html) ? result.html "
+                        + ": ('<div class=\"notification is-danger\">' + genericError + '</div>'); return;");
+    }
+
+    @Test
+    void refreshesTheExternalSuppliersSectionOnlyWhenTheSettingsSaveFlippedCanUseGlobalSuppliers() throws Exception {
+        // the external section's mode column and the supplier modal's mode selector both depend on
+        // canUseGlobalSuppliers, but a save that only touched e.g. the day counts must not refresh
+        // (and flicker) the suppliers table -- data-refresh-external-suppliers is what tells the two
+        // cases apart
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "var refreshed = settingsSection.firstElementChild; "
+                        + "if (refreshed && refreshed.getAttribute('data-refresh-external-suppliers') === 'true') { "
+                        + "refreshExternalSupplierSection(basePath, externalSection); }");
+    }
+
+    @Test
+    void alwaysRendersTheSupplierModesModeWrapAndTogglesItFromTheFreshShowModeDataAttribute() throws Exception {
+        // canUseGlobalSuppliers can now change from the settings section; a server-rendered th:if
+        // here would leave the mode selector stale until a full page reload, so it is always
+        // rendered and toggled by JS instead
+        String html = template();
+        assertThat(html).doesNotContain("th:if=\"${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}\"");
+        assertThat(html).contains("id=\"supplier-mode-wrap\"");
+
+        String normalized = html.replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "function refreshModeVisibility() { var root = externalSection.firstElementChild; "
+                        + "var showMode = !!(root && root.getAttribute('data-show-mode') === 'true'); "
+                        + "modeWrap.classList.toggle('is-hidden', !showMode); }");
+        // called on every open, not just once at page load
+        assertThat(normalized).contains("refreshModeVisibility(); refreshFields(); modal.classList.add('is-active'); }");
+    }
+
+    @Test
     void offersOnlySuppliersThatAreNotConnectedYet() throws Exception {
         // pins the dropdown actually iterating the list to produce options, not just
         // referencing availableSuppliers somewhere else (e.g. the add-button's disabled check)
