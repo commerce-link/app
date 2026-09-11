@@ -1,0 +1,39 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Wraps one whole supplier section - heading, Add button and the table (with its own empty
+  state) - so a single swap refreshes all of it, not just the table rows.
+
+  Used two ways:
+    - store-fulfilment.html replaces the static #external-supplier-section /
+      #manual-supplier-section boxes with this fragment on the initial page load;
+    - StoreFulfilmentSupplierController and ManualSupplierController return this same fragment
+      (selected with explicit arguments, model attributes populated fresh after the mutation)
+      as the response body of an async connect/edit/disconnect/save/delete, so the client can
+      swap #external-supplier-section / #manual-supplier-section's innerHTML with it directly.
+
+  successMessage (nullable) is carried back as a data attribute on the fragment root rather than
+  a flash attribute, since there is no redirect left to flash it through; the page script reads
+  it once after the swap and shows it as a toast.
+-->
+<div th:fragment="supplierSection(rows, manual, showMode, basePath, titleKey, addButtonId, addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage)"
+     th:attr="data-success-message=${successMessage}">
+    <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+        <h2 class="subtitle mb-0" th:text="#{${titleKey}}"></h2>
+        <button type="button" class="button is-primary is-small" th:id="${addButtonId}"
+                th:text="#{${addButtonLabelKey}}"
+                th:disabled="${addDisabled}"
+                th:title="${addDisabled} ? #{${addDisabledTitleKey}} : ''"></button>
+    </div>
+    <div th:replace="~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode}, ${basePath})}"></div>
+</div>
+
+<!-- Small error carrier for a rejected connect/edit/save: a non-2xx status lets the page script
+     tell this apart from a successful section swap, so the modal stays open with the operator's
+     input untouched instead of being replaced by this notification. -->
+<div th:fragment="sectionError" class="notification is-danger" th:text="${errorMessage}"></div>
+
+</body>
+</html>
