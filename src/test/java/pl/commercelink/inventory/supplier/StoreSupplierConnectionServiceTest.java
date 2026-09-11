@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -343,5 +344,127 @@ class StoreSupplierConnectionServiceTest {
         assertThat(connections.get(0).getSupplierName()).isEqualTo("AbGroup");
         assertThat(connections.get(0).isIncludeInPricing()).isFalse();
         assertThat(connections.get(0).isIncludeInFulfilment()).isTrue();
+    }
+
+    @Test
+    void connectOrUpdateKeepsEveryOtherConnectionIncludingManualOnes() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Kosatec", true, ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Elko", "manual:Hurtownia X", "Kosatec");
+    }
+
+    @Test
+    void connectOrUpdateReplacesTheEntryOfAnAlreadyConnectedSupplier() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, false, true),
+                Map.of());
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(1, captor.getValue().getSupplierConnections().size());
+        assertFalse(captor.getValue().getSupplierConnections().get(0).isIncludeInPricing());
+    }
+
+    @Test
+    void connectOrUpdateForcesOwnModeWhenTheStoreCannotUseGlobalSuppliers() {
+        // given
+        Store store = storeWith(false);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", true, ConnectionMode.GLOBAL, true, true),
+                Map.of("login", "u"));
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertEquals(ConnectionMode.OWN, captor.getValue().getSupplierConnections().get(0).getMode());
+    }
+
+    @Test
+    void connectOrUpdateValidatesOnlyTheEditedSupplier() {
+        // given a second supplier whose stored credentials are broken must not block this edit
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Broken", ConnectionMode.OWN, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                Map.of("login", "u"));
+
+        // then
+        ArgumentCaptor<List<StoreSupplierConnection>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validate(anyBoolean(), captor.capture(), anyMap(), anyMap(), anySet());
+        assertThat(captor.getValue())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactly("Elko");
+    }
+
+    @Test
+    void connectOrUpdateReturnsValidationErrorsWithoutPersisting() {
+        // given
+        Store store = storeWith(true);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet()))
+                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                Map.of());
+
+        // then
+        assertTrue(result.hasErrors());
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void disconnectRemovesOnlyTheNamedSupplier() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Kosatec", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of("Elko")));
+
+        // when
+        service.disconnect(store, "Elko");
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getSupplierConnections())
+                .extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Kosatec", "manual:Hurtownia X");
     }
 }

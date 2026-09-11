@@ -83,6 +83,62 @@ public class StoreSupplierConnectionService {
         return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
     }
 
+    public ConnectionUpdateResult connectOrUpdate(Store existingStore, SupplierSelectionForm selection,
+                                                  Map<String, String> submittedConfig) {
+        boolean canUseGlobal = existingStore.canUseGlobalSuppliers();
+        ConnectionMode mode = canUseGlobal
+                ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
+                : ConnectionMode.OWN;
+        StoreSupplierConnection edited = new StoreSupplierConnection(
+                selection.getSupplierName(), mode,
+                selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+
+        List<StoreSupplierConnection> connections = connectionsWithout(existingStore, selection.getSupplierName());
+        connections.add(edited);
+
+        Map<String, Map<String, String>> config = Map.of(selection.getSupplierName(), submittedConfig);
+        // Only the edited connection is validated: a broken entry belonging to another supplier
+        // must not block this one.
+        List<ErrorMessage> errors = validator.validate(
+                canUseGlobal, List.of(edited), configurationFields(), config, storedConfigFor(existingStore, edited));
+        if (!errors.isEmpty()) {
+            return ConnectionUpdateResult.errors(errors);
+        }
+        return persist(existingStore, connections, config);
+    }
+
+    public ConnectionUpdateResult disconnect(Store existingStore, String supplierName) {
+        return persist(existingStore, connectionsWithout(existingStore, supplierName), Map.of());
+    }
+
+    private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
+                                           Map<String, Map<String, String>> config) {
+        FulfilmentConfiguration submitted = existingStore.getFulfilmentConfiguration().withConnections(connections);
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, config);
+        if (!outcome.success()) {
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+    }
+
+    private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String supplierName) {
+        List<StoreSupplierConnection> connections = new ArrayList<>();
+        for (StoreSupplierConnection connection : existingStore.getFulfilmentConfiguration().getSupplierConnections()) {
+            if (!connection.getSupplierName().equalsIgnoreCase(supplierName)) {
+                connections.add(connection);
+            }
+        }
+        return connections;
+    }
+
+    private Set<String> storedConfigFor(Store existingStore, StoreSupplierConnection connection) {
+        if (connection.getMode() != ConnectionMode.OWN
+                || configurationManager.loadConfiguration(existingStore, connection.getSupplierName()).isEmpty()) {
+            return Set.of();
+        }
+        return Set.of(connection.getSupplierName());
+    }
+
     public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {
         static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
             return new ConnectionUpdateResult(errors, Set.of(), Set.of());
