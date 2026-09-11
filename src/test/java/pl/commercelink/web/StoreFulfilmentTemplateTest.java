@@ -53,11 +53,6 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
-    void reopensTheSupplierModalAfterAFailedValidation() throws Exception {
-        assertThat(template()).contains("${editSupplier}");
-    }
-
-    @Test
     void keepsPasswordFieldsEmptyAndExplainsThatBlankMeansUnchanged() throws Exception {
         assertThat(template()).contains("#{store.supplier.password.keep}");
     }
@@ -70,52 +65,33 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
-    void restoresSubmittedCredentialsOnlyForTheProviderBeingReopened() throws Exception {
-        String normalized = template().replaceAll("\\s+", " ");
+    void doesNotRestoreASubmittedConfigurationAnyMore() throws Exception {
+        // the modal no longer closes (or reloads) on a rejected save, so the operator's own input
+        // is simply still sitting in the form; the flash-restore machinery this used to need is gone
+        String html = template();
+        assertThat(html).doesNotContain("submittedSupplierConfiguration");
+        assertThat(html).doesNotContain("submittedIncludeInPricing");
+        assertThat(html).doesNotContain("submittedIncludeInFulfilment");
+        assertThat(html).doesNotContain("editSupplier");
 
-        // the value expression actually reads from the flash map of what was just submitted
-        assertThat(normalized).contains("submittedSupplierConfiguration.get(cf.key())");
-
-        // ...but only when the provider block being rendered is the one being reopened,
-        // so a rejected submission for one provider can never leak into another provider's field
-        assertThat(normalized).contains(
-                "submittedSupplierConfiguration != null and entry.key == editSupplier");
-
-        // password fields short-circuit to '' before ever consulting the submitted map
-        assertThat(normalized).contains(
-                "${cf.type().name() == 'PASSWORD' ? '' : (submittedSupplierConfiguration");
+        // credential inputs fall back to the stored configuration directly, as before the
+        // restore machinery existed -- password fields still always render empty
+        assertThat(html.replaceAll("\\s+", " ")).contains(
+                "${cf.type().name() == 'PASSWORD' ? '' : (form.supplierConfiguration.get(entry.key) != null");
     }
 
     @Test
-    void restoresSubmittedPricingAndFulfilmentFlagsOnlyForTheProviderBeingReopened() throws Exception {
+    void scopesTheConfigureButtonLookupToItsOwnSection() throws Exception {
         String html = template();
 
-        // sourced from the flash values the save endpoint carries back, never from a DOM read
-        assertThat(html).contains("var submittedIncludeInPricing = /*[[${submittedIncludeInPricing}]]*/ null;");
-        assertThat(html).contains("var submittedIncludeInFulfilment = /*[[${submittedIncludeInFulfilment}]]*/ null;");
+        // each modal script looks up [data-configure-supplier] only within its own stable section
+        // container (read fresh on every open/refresh, never from a document-wide query or a JS
+        // array snapshotted at page load that would go stale after an async swap)
+        assertThat(html).contains("externalSection.querySelectorAll('[data-configure-supplier]')");
+        assertThat(html).contains("manualSection.querySelectorAll('[data-configure-supplier]')");
 
-        // only applied when reopening for the exact supplier the flash values belong to
-        assertThat(html).contains("var reopenTarget = editSupplier;");
-        assertThat(html).contains("identity === reopenTarget");
-
-        // the checkbox state itself is set from the submitted flag, not the connection row,
-        // whenever useSubmittedFlags applies
-        assertThat(html).contains(
-                "pricing.checked = useSubmittedFlags ? !!submittedIncludeInPricing : row.includeInPricing;");
-        assertThat(html).contains(
-                "fulfilment.checked = useSubmittedFlags ? !!submittedIncludeInFulfilment : row.includeInFulfilment;");
-    }
-
-    @Test
-    void scopesTheConfigureButtonListenerToTheExternalSupplierSection() throws Exception {
-        String html = template();
-
-        // the ruling: only the external-supplier table's Configure buttons open this modal
-        assertThat(html).contains("querySelectorAll('#external-supplier-section [data-configure-supplier]')");
-
-        // guards against the scope being accidentally widened back (e.g. by the next task,
-        // which wires up the manual table's own Configure buttons in this same file)
-        assertThat(html).doesNotContain("querySelectorAll('[data-configure-supplier]')");
+        // guards against the scope being widened back to the whole document
+        assertThat(html).doesNotContain("document.querySelectorAll('[data-configure-supplier]')");
     }
 
     @Test
@@ -159,14 +135,14 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
-    void surfacesAnUploadFailureDuringCreationInsteadOfReloadingAsIfItSucceeded() throws Exception {
+    void surfacesAnUploadFailureDuringCreationInsteadOfRefreshingAsIfItSucceeded() throws Exception {
         // the supplier create call and the follow-up file upload are two separate requests; a
         // server-rejected file (empty, unparseable rows) must not be swallowed by an unconditional
-        // reload that would leave the operator believing the upload worked
+        // section refresh that would leave the operator believing the upload worked
         String normalized = template().replaceAll("\\s+", " ");
 
         // the response is parsed and gated on res.ok before anything else happens, exactly like
-        // uploadForCurrent's proven pattern -- a plain ".then(function () { window.location.reload(); })"
+        // uploadForCurrent's proven pattern -- a plain ".then(function () { refreshManualSection()...; })"
         // right after the fetch, with no such gate, would not match this
         assertThat(normalized).contains(
                 "fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/feed', "
@@ -174,20 +150,82 @@ class StoreFulfilmentTemplateTest {
                         + ".then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }) "
                         + ".then(function (res) {");
 
-        // the reload happens only after the ok-check passes, and a dropped connection on this same
-        // call reports an error rather than falling through to a reload
+        // create/uploadFeed stay JSON endpoints (they are already fetch-driven), so success is
+        // followed by a GET that refreshes just the manual section instead of a page reload, and
+        // the modal only closes once that refresh has actually landed; a dropped connection on the
+        // upload call itself still reports an error rather than falling through to a refresh
         assertThat(normalized).contains(
                 "if (!res.ok) { showError(addError, res.body.message); return; } "
-                        + "window.location.reload(); }) "
+                        + "refreshManualSection().then(function () { addModal.classList.remove('is-active'); }); }) "
                         + ".catch(function () { showError(addError); });");
+    }
+
+    @Test
+    void neverReloadsThePageAnyMoreOnAnyMutation() throws Exception {
+        // the whole point of this change: every connect/edit/disconnect/save/delete swaps its
+        // section back in instead of a full page round trip
+        assertThat(template()).doesNotContain("window.location.reload");
+    }
+
+    @Test
+    void disablesTheSubmitButtonWhileARequestIsInFlightSoADoubleClickCannotSubmitTwice() throws Exception {
+        String html = template();
+        assertThat(html).contains("if (submitInFlight) { return; }");
+        assertThat(html).contains("submitInFlight = true;");
+        assertThat(html).contains("supplierSubmitButton.disabled = true;");
+    }
+
+    @Test
+    void swapsTheExternalSectionInPlaceAndKeepsTheModalOpenOnAValidationFailure() throws Exception {
+        String html = template();
+        // success: the section is replaced and the modal closes
+        assertThat(html).contains("applySectionSwap(externalSection, result.html);");
+        assertThat(html).contains("refreshAvailableOptions();");
+        // failure: a non-2xx response shows the fragment inside the modal instead, leaving the
+        // operator's own input in the form untouched
+        assertThat(html).contains("if (!result.ok) { showFormError(result.html); return; }");
+    }
+
+    @Test
+    void recomputesTheAddDropdownFromTheFullSupplierListDataAttributeWithoutASecondRequest() throws Exception {
+        String html = template();
+        // the full provider list (connected or not) is rendered once as a data attribute on the
+        // stable container, never touched by a section swap
+        assertThat(html).contains("data-all-suppliers=${#strings.listJoin(allSupplierNames, ';')}");
+        // and the connected identities are re-read from the freshly-swapped table instead of a
+        // second fetch for the option list
+        assertThat(html).contains("var all = (externalSection.dataset.allSuppliers || '').split(';')");
+        assertThat(html).doesNotContain("/available-suppliers");
+    }
+
+    @Test
+    void bindsTheAddButtonsThroughSectionDelegationSinceTheyAreInsideTheSwappedContent() throws Exception {
+        // #supplier-add-button and #manual-add-button are rendered inside the section fragment
+        // itself, so a direct addEventListener on the button (bound once at page load) would stop
+        // working after the very first swap; delegating the click from the stable container instead
+        // keeps working because the container itself is never replaced
+        String html = template();
+        assertThat(html).contains("event.target.closest('#supplier-add-button')");
+        assertThat(html).contains("event.target.closest('#manual-add-button')");
+        assertThat(html).doesNotContain("document.getElementById('supplier-add-button').addEventListener");
+        assertThat(html).doesNotContain("document.getElementById('manual-add-button').addEventListener");
+    }
+
+    @Test
+    void disconnectAndDeleteReportAFailureWithAnAlertRatherThanSwappingTheErrorFragmentIn() throws Exception {
+        // unlike the modals (which have a slot to show the error inline), disconnect/delete have
+        // no open dialog to show it in, so a rejected mutation falls back to an alert instead of
+        // swapping the small error fragment into the live table
+        String html = template();
+        assertThat(html).contains("alert(extractErrorMessage(result.html, genericError));");
     }
 
     @Test
     void layoutFallsBackToTheDefaultConfirmationTextWhenNoMessageIsSupplied() throws Exception {
         // this pins layout.html rather than LayoutFlashMessagesTemplateTest: the property being
-        // protected is exactly what this file's manual-delete flow (deleteManual/confirmDelete
-        // wiring above) and the external disconnect form both depend on, so the pin belongs next
-        // to the feature it guards, not next to the unrelated flash-banner assertions
+        // protected is exactly what this file's manual-delete and external-disconnect flows
+        // (both wired through confirmDelete(button, callback) above) depend on, so the pin belongs
+        // next to the feature it guards, not next to the unrelated flash-banner assertions
         String html = layout();
         String normalized = html.replaceAll("\\s+", " ");
 
