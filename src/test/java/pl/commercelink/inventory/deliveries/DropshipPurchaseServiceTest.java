@@ -267,6 +267,9 @@ class DropshipPurchaseServiceTest {
 
         // then
         assertNull(form.getEstimatedDeliveryAt());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertNull(saved.getValue().getEstimatedDeliveryAt());
     }
 
     @Test
@@ -489,13 +492,14 @@ class DropshipPurchaseServiceTest {
         when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-a")).thenReturn(Optional.empty());
         DeliveryCreationForm submitForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
-        submitForm.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
+        LocalDate typedDate = LocalDate.now().plusDays(3);
+        submitForm.setEstimatedDeliveryAt(typedDate);
         submitForm.setShippingCost(9.99);
         submitForm.setPaymentCost(1.5);
         submitForm.setPaymentTerms(14);
         submitForm.setTax(23.0);
         DeliveryCreationForm manualForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
-        manualForm.setEstimatedDeliveryAt(submitForm.getEstimatedDeliveryAt());
+        manualForm.setEstimatedDeliveryAt(typedDate);
         manualForm.setShippingCost(submitForm.getShippingCost());
         manualForm.setPaymentCost(submitForm.getPaymentCost());
         manualForm.setPaymentTerms(submitForm.getPaymentTerms());
@@ -517,7 +521,10 @@ class DropshipPurchaseServiceTest {
         assertTrue(submitted.isDropship());
         assertTrue(manual.isDropship());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
-        assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
+        // The typed date only survives the manual "Save" path; automatic submission drops it, matching
+        // the warehouse mirror (see submitDropshipDropsTheTypedDate).
+        assertNull(submitted.getEstimatedDeliveryAt());
+        assertEquals(typedDate, manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());
         assertEquals(submitted.getPaymentCost(), manual.getPaymentCost());
         assertEquals(submitted.getPaymentTerms(), manual.getPaymentTerms());

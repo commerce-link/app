@@ -112,6 +112,11 @@ public class DropshipPurchaseService {
                     new PurchaseSubmission(existing.get().getDeliveryId(), requiresApproval));
         }
 
+        // The date comes from the supplier's shipping terms once the order is confirmed (see applyOrderResult).
+        // A date typed on the creation screen would stamp the orders now while the delivery gets the terms
+        // date later, leaving the two out of step. Must run before newDropshipDelivery, which copies this
+        // field onto the delivery header.
+        form.setEstimatedDeliveryAt(null);
         Delivery delivery = newDropshipDelivery(storeId, store, order, form);
         delivery.setOrderStatus(requiresApproval
                 ? DeliveryOrderStatus.AWAITING_APPROVAL
@@ -124,10 +129,6 @@ public class DropshipPurchaseService {
             // (minus blank answers; no declared options to validate/label against) rather than losing them.
             delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
         }
-        // The date comes from the supplier's shipping terms once the order is confirmed (see applyOrderResult).
-        // A date typed on the creation screen would stamp the orders now while the delivery gets the terms
-        // date later, leaving the two out of step.
-        form.setEstimatedDeliveryAt(null);
         deliveryCreationService.claimAllocationsForPurchase(storeId, delivery, form);
         deliveriesRepository.save(delivery);
 
