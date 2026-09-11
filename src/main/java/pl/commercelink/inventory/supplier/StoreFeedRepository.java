@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @Repository
@@ -62,6 +63,6 @@ public class StoreFeedRepository {
     }
 
     private String feedPrefix(String storeId, String supplierName) {
-        return storeId + "/supplier-feeds/" + supplierName.toLowerCase() + "-feed.";
+        return storeId + "/supplier-feeds/" + supplierName.toLowerCase(Locale.ROOT) + "-feed.";
     }
 }

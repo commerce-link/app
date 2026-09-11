@@ -152,7 +152,7 @@
                                                th:name="'configuration[' + ${cf.key()} + ']'"
                                                th:value="${cf.type().name() == 'PASSWORD'
                                                           ? ''
-                                                          : (submittedSupplierConfiguration != null and (entry.key == editSupplier or entry.key == addSupplier)
+                                                          : (submittedSupplierConfiguration != null and entry.key == editSupplier
                                                              ? (submittedSupplierConfiguration.get(cf.key()) ?: '')
                                                              : (form.supplierConfiguration.get(entry.key) != null
                                                                 ? form.supplierConfiguration.get(entry.key).get(cf.key()) : ''))}"
@@ -194,10 +194,9 @@
                     var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
                     var editTitle = /*[[#{store.supplier.edit.modal.title}]]*/ '';
                     var editSupplier = /*[[${editSupplier}]]*/ null;
-                    var addSupplier = /*[[${addSupplier}]]*/ null;
                     var submittedIncludeInPricing = /*[[${submittedIncludeInPricing}]]*/ null;
                     var submittedIncludeInFulfilment = /*[[${submittedIncludeInFulfilment}]]*/ null;
-                    var reopenTarget = editSupplier || addSupplier;
+                    var reopenTarget = editSupplier;
 
                     function rowFor(identity) {
                         for (var i = 0; i < rows.length; i++) {
@@ -269,7 +268,6 @@
                     modal.querySelector('.modal-background').addEventListener('click', close);
 
                     if (editSupplier) { open(editSupplier); }
-                    else if (addSupplier) { open(addSupplier); }
                 })();
             </script>
 

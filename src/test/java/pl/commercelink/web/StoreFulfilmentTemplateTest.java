@@ -50,7 +50,6 @@ class StoreFulfilmentTemplateTest {
     @Test
     void reopensTheSupplierModalAfterAFailedValidation() throws Exception {
         assertThat(template()).contains("${editSupplier}");
-        assertThat(template()).contains("${addSupplier}");
     }
 
     @Test
@@ -75,7 +74,7 @@ class StoreFulfilmentTemplateTest {
         // ...but only when the provider block being rendered is the one being reopened,
         // so a rejected submission for one provider can never leak into another provider's field
         assertThat(normalized).contains(
-                "submittedSupplierConfiguration != null and (entry.key == editSupplier or entry.key == addSupplier)");
+                "submittedSupplierConfiguration != null and entry.key == editSupplier");
 
         // password fields short-circuit to '' before ever consulting the submitted map
         assertThat(normalized).contains(
@@ -91,7 +90,7 @@ class StoreFulfilmentTemplateTest {
         assertThat(html).contains("var submittedIncludeInFulfilment = /*[[${submittedIncludeInFulfilment}]]*/ null;");
 
         // only applied when reopening for the exact supplier the flash values belong to
-        assertThat(html).contains("var reopenTarget = editSupplier || addSupplier;");
+        assertThat(html).contains("var reopenTarget = editSupplier;");
         assertThat(html).contains("identity === reopenTarget");
 
         // the checkbox state itself is set from the submitted flag, not the connection row,

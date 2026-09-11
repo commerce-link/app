@@ -141,7 +141,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         service.connectOrUpdate(store,
-                new SupplierSelectionForm("Kosatec", true, ConnectionMode.OWN, true, true),
+                new SupplierSelectionForm("Kosatec", ConnectionMode.OWN, true, true),
                 Map.of("login", "u"));
 
         // then
@@ -162,7 +162,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, false, true),
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, false, true),
                 Map.of());
 
         // then
@@ -182,7 +182,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", true, ConnectionMode.GLOBAL, true, true),
+                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
                 Map.of("login", "u"));
 
         // then
@@ -202,7 +202,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
                 Map.of("login", "u"));
 
         // then
@@ -222,7 +222,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
                 Map.of());
 
         // then
@@ -242,7 +242,7 @@ class StoreSupplierConnectionServiceTest {
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", true, ConnectionMode.OWN, true, true),
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
                 Map.of("login", "u"));
 
         // then

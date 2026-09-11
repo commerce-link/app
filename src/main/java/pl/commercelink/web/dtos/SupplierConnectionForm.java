@@ -7,20 +7,11 @@ import java.util.Map;
 
 public class SupplierConnectionForm {
 
-    private String storeId;
     private String supplierName;
     private ConnectionMode mode = ConnectionMode.OWN;
     private boolean includeInPricing;
     private boolean includeInFulfilment;
     private Map<String, String> configuration = new HashMap<>();
-
-    public String getStoreId() {
-        return storeId;
-    }
-
-    public void setStoreId(String storeId) {
-        this.storeId = storeId;
-    }
 
     public String getSupplierName() {
         return supplierName;

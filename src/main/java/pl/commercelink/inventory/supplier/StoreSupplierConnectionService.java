@@ -104,6 +104,11 @@ public class StoreSupplierConnectionService {
         return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
     }
 
+    // Case-insensitive on purpose: identities here always come from the supplier registry, which
+    // is also what StoreSupplierConnectionPersister compares by exact (case-sensitive) match when
+    // it works out what was added and removed. The two must keep agreeing on case, or an edit
+    // whose casing differs from what is stored would look like an add plus a remove and delete
+    // the supplier's secret.
     private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String supplierName) {
         List<StoreSupplierConnection> connections = new ArrayList<>();
         for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {

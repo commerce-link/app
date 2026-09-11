@@ -62,7 +62,7 @@ public class StoreFulfilmentSupplierController {
             return redirect(storeId, null);
         }
         SupplierSelectionForm selection = new SupplierSelectionForm(
-                form.getSupplierName(), true, form.getMode(),
+                form.getSupplierName(), form.getMode(),
                 form.isIncludeInPricing(), form.isIncludeInFulfilment());
 
         StoreSupplierConnectionService.ConnectionUpdateResult result =

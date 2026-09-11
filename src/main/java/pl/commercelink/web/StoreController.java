@@ -392,21 +392,19 @@ public class StoreController {
     @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
     public String storeFulfilmentConfiguration(@RequestParam(required = false) String edit,
-                                                @RequestParam(required = false) String add,
                                                 Model model) {
-        return renderStoreFulfilmentConfiguration(getStoreId(), edit, add, model);
+        return renderStoreFulfilmentConfiguration(getStoreId(), edit, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId,
                                                           @RequestParam(required = false) String edit,
-                                                          @RequestParam(required = false) String add,
                                                           Model model) {
-        return renderStoreFulfilmentConfiguration(storeId, edit, add, model);
+        return renderStoreFulfilmentConfiguration(storeId, edit, model);
     }
 
-    private String renderStoreFulfilmentConfiguration(String storeId, String edit, String add, Model model) {
+    private String renderStoreFulfilmentConfiguration(String storeId, String edit, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
@@ -436,7 +434,6 @@ public class StoreController {
                 ? "/dashboard/store/" + storeId
                 : "/dashboard/store");
         model.addAttribute("editSupplier", edit);
-        model.addAttribute("addSupplier", add);
 
         Set<String> connected = views.external().stream()
                 .map(SupplierConnectionView::identity)

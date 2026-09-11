@@ -2,7 +2,6 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
@@ -112,7 +111,6 @@ public class FulfilmentConfiguration {
      * persister computes what changed by comparing the store's current configuration against the
      * submitted one, so the submitted one must be a separate object.
      */
-    @DynamoDBIgnore
     public FulfilmentConfiguration withConnections(List<StoreSupplierConnection> connections) {
         FulfilmentConfiguration copy = new FulfilmentConfiguration();
         copy.setOrderAssemblyDays(orderAssemblyDays);
