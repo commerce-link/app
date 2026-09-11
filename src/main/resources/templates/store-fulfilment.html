@@ -285,7 +285,16 @@
                             <div th:each="entry : ${supplierFields}"
                                  th:id="'supplier-fields-' + ${entry.key}" class="supplier-fields">
                                 <div class="field" th:each="cf : ${entry.value}">
-                                    <label class="label" th:text="${cf.label()}"></label>
+                                    <label class="label">
+                                        <span th:text="${cf.label()}"></span>
+                                        <!-- Shown for every required field regardless of type or connection state:
+                                             a blank required password on an already-connected supplier is still a
+                                             mandatory field, it just does not need retyping (see the HTML required
+                                             attribute below, which is withheld only in that one case). -->
+                                        <span th:if="${cf.required()}" class="has-text-danger ml-1"
+                                              th:title="#{store.supplier.field.required.tooltip}"
+                                              th:text="#{store.supplier.field.required.marker}"></span>
+                                    </label>
                                     <div class="control">
                                         <input class="input"
                                                th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
@@ -294,7 +303,9 @@
                                                           ? ''
                                                           : (form.supplierConfiguration.get(entry.key) != null
                                                              ? form.supplierConfiguration.get(entry.key).get(cf.key()) : '')}"
-                                               th:placeholder="${cf.placeholder()}" disabled />
+                                               th:placeholder="${cf.placeholder()}"
+                                               th:required="${cf.required() and !(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig.contains(entry.key))}"
+                                               disabled />
                                     </div>
                                     <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
                                        th:text="#{store.supplier.password.keep}"></p>

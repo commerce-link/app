@@ -196,11 +196,59 @@ class StoreFulfilmentTemplateTest {
         String html = template();
 
         // rendered disabled by default: the fail-safe if the switching script never runs
-        assertThat(html).contains("th:placeholder=\"${cf.placeholder()}\" disabled />");
+        String normalized = html.replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "th:placeholder=\"${cf.placeholder()}\" "
+                        + "th:required=\"${cf.required() and !(cf.type().name() == 'PASSWORD' "
+                        + "and suppliersWithStoredConfig.contains(entry.key))}\" disabled />");
 
         // the script re-enables inputs only within the active provider's own field group
         assertThat(html).contains(
                 "group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });");
+    }
+
+    @Test
+    void marksEveryRequiredFieldRegardlessOfTypeOrConnectionState() throws Exception {
+        // the asterisk marker's own condition must depend on cf.required() alone -- if it were
+        // entangled with cf.type() or suppliersWithStoredConfig, a required password field on an
+        // already-connected supplier would silently lose its marker even though it is still
+        // mandatory (its blank submission is just preserved rather than rejected)
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "<span th:if=\"${cf.required()}\" class=\"has-text-danger ml-1\" "
+                        + "th:title=\"#{store.supplier.field.required.tooltip}\" "
+                        + "th:text=\"#{store.supplier.field.required.marker}\"></span>");
+    }
+
+    @Test
+    void withholdsTheHtmlRequiredAttributeOnlyForAPasswordOfAnAlreadyConnectedSupplier() throws Exception {
+        // ProviderConfigurationManager.saveConfiguration merges a blank password back to the
+        // stored value for a supplier that already has a configuration, and
+        // SupplierConnectionValidator accepts that blank submission (preservedPassword) -- the
+        // browser-side required attribute must agree, or the operator would be blocked from
+        // submitting the form at all while trying to edit anything else about that supplier
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "th:required=\"${cf.required() and "
+                        + "!(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig.contains(entry.key))}\"");
+    }
+
+    @Test
+    void nonPasswordFieldsIgnoreTheStoredConfigurationExclusionEntirely() throws Exception {
+        // the exclusion clause is scoped to cf.type().name() == 'PASSWORD': for TEXT/URL/NUMBER
+        // fields it always evaluates to !(false and ...) == true, so a required non-password
+        // field's required attribute is governed by cf.required() alone, exactly like the marker
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains("!(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig");
+    }
+
+    @Test
+    void doesNotFlattenTheRequiredAttributeToAPlainRequiredCheck() throws Exception {
+        // guards against "simplifying" the condition back to cf.required() alone -- that would
+        // force retyping a password nobody remembers on every edit of an already-connected
+        // supplier, the exact regression class this branch already fixed once
+        String html = template();
+        assertThat(html).doesNotContain("th:required=\"${cf.required()}\"");
     }
 
     @Test
