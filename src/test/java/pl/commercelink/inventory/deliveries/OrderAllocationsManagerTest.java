@@ -392,8 +392,6 @@ class OrderAllocationsManagerTest {
         claimed.setCost(42.0);
         claimed.markAsClaimed("delivery-1");
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
-        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of());
 
         // when
         orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
@@ -413,8 +411,6 @@ class OrderAllocationsManagerTest {
         second.setOrderId("order-2");
         second.markAsClaimed("delivery-1");
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
-        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of());
         doThrow(new RuntimeException("boom")).when(ordersManager)
                 .markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), any(), any(), any());
 
@@ -423,23 +419,6 @@ class OrderAllocationsManagerTest {
 
         // then
         verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq("order-2"), eq("delivery-1"), any(), eq(confirmed));
-    }
-
-    @Test
-    @DisplayName("markClaimedAsOrdered only applies the date to orders whose items the delivery already marked Ordered")
-    void markClaimedAsOrderedOnlyAppliesTheDateToOrdersWhoseItemsAreAlreadyOrdered() {
-        // given
-        LocalDate confirmed = LocalDate.of(2026, 9, 25);
-        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of());
-        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of(ORDER_ID));
-
-        // when
-        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
-
-        // then
-        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, ORDER_ID, confirmed);
-        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
     }
 
     @Test

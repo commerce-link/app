@@ -186,29 +186,6 @@ public class OrdersManager {
         });
     }
 
-    /**
-     * Applies a delivery's estimated date to an order after the supplier confirmed the purchase, i.e. when
-     * the date was unknown while the allocations were being claimed. Runs the lifecycle so the assembly
-     * notification is sent with the freshly computed dates.
-     */
-    public void updateEstimatedDeliveryAt(String storeId, String orderId, LocalDate estimatedDeliveryAt) {
-        if (estimatedDeliveryAt == null) {
-            return;
-        }
-        Order order = ordersRepository.findById(storeId, orderId);
-        if (order == null || order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
-            return;
-        }
-        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
-        LocalDate previousAssemblyAt = order.getEstimatedAssemblyAt();
-        LocalDate assemblyAt = order.updateEstimatedAssemblyAt(estimatedDeliveryAt);
-        orderLifecycle.update(order, orderItems);
-        if (previousAssemblyAt != null && !Objects.equals(previousAssemblyAt, assemblyAt)) {
-            // A date the customer already received moved later - same signal the operator's delivery edit sends.
-            notificationEventPublisher.publishAssemblyDateChanged(order, previousAssemblyAt);
-        }
-    }
-
     public void returnOrderItemsToSupplierAllocation(String storeId, String orderId, String deliveryId,
                                                     String provider, Collection<String> orderItemIds) {
         execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
