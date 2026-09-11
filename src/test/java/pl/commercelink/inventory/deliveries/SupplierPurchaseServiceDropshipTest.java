@@ -414,6 +414,7 @@ class SupplierPurchaseServiceDropshipTest {
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
         delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -456,9 +457,10 @@ class SupplierPurchaseServiceDropshipTest {
         Delivery dropshipDelivery = pendingDropshipDelivery(form, "ref-1");
         dropshipDelivery.setOrderStatus(DeliveryOrderStatus.FAILED);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dropshipDelivery);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, DELIVERY_ID)).thenReturn(dropshipDelivery);
         Delivery warehouseDelivery = new Delivery(STORE_ID, null, PROVIDER);
         warehouseDelivery.setType(DeliveryType.WAREHOUSE);
-        when(deliveriesRepository.findById(STORE_ID, "warehouse-delivery")).thenReturn(warehouseDelivery);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "warehouse-delivery")).thenReturn(warehouseDelivery);
 
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

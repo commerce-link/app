@@ -646,10 +646,11 @@ public class Order {
     }
 
     /**
-     * @param shippedBySupplier the goods travel straight from the supplier to the customer, so there is
-     *                          no in-house handling to add. Only a caller holding the delivery can tell:
-     *                          the order's fulfilment type is not enough, because a direct-to-consumer
-     *                          order can still be fulfilled from a warehouse delivery.
+     * @param shippedBySupplier every leg of this order travels straight from a supplier to the customer,
+     *                          so there is no in-house handling to add. Only a caller that asked the whole
+     *                          order can tell: neither a single delivery nor the order's fulfilment type
+     *                          is enough, because a direct-to-consumer order can still have goods arriving
+     *                          at our warehouse to be forwarded by hand.
      */
     @DynamoDBIgnore
     public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate, boolean shippedBySupplier) {
@@ -657,12 +658,16 @@ public class Order {
             return estimatedAssemblyAt;
         }
 
+        // The assembly date only moves forward: the order is ready once its last leg has landed.
         if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
             estimatedAssemblyAt = deliveryDate;
-            estimatedShippingAt = shippedBySupplier
-                    ? deliveryDate
-                    : addWeekdayDays(deliveryDate, orderRealizationDays);
         }
+        // The shipping date is derived again on every call, including one that does not move the assembly
+        // date: a leg confirmed for an earlier date can still be the one that puts a warehouse stop on the
+        // order, and nothing else would ever repair the handling time it owes.
+        estimatedShippingAt = shippedBySupplier
+                ? estimatedAssemblyAt
+                : addWeekdayDays(estimatedAssemblyAt, orderRealizationDays);
 
         return estimatedAssemblyAt;
     }

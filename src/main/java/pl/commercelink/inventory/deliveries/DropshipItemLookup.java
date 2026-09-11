@@ -69,13 +69,17 @@ public class DropshipItemLookup {
     /**
      * The distinct deliveries behind the order's items. Item delivery ids that resolve to nothing - a supplier
      * name carried by an item still in allocation, a deleted delivery - are skipped rather than guessed at.
+     *
+     * <p>The read is consistent on purpose: the ordering path saves a delivery and asks this question about
+     * it in the same request, and an eventually consistent replica answering "no such delivery" would drop a
+     * leg from the route and silently flip the answer.
      */
     public List<Delivery> deliveriesOf(String storeId, List<OrderItem> orderItems) {
         return orderItems.stream()
                 .map(OrderItem::getDeliveryId)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
-                .map(deliveryId -> deliveriesRepository.findById(storeId, deliveryId))
+                .map(deliveryId -> deliveriesRepository.findByIdConsistently(storeId, deliveryId))
                 .filter(Objects::nonNull)
                 .toList();
     }

@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
@@ -27,6 +28,17 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
     public Delivery findById(String storeId, String deliveryId) {
         return dynamoDBMapper.load(Delivery.class, storeId, deliveryId);
+    }
+
+    /**
+     * For callers that read a delivery back in the same request that wrote it - an eventually consistent
+     * read can still answer with the replica from before the write, and a delivery that reads as missing
+     * silently changes a decision (see DropshipItemLookup).
+     */
+    public Delivery findByIdConsistently(String storeId, String deliveryId) {
+        return dynamoDBMapper.load(Delivery.class, storeId, deliveryId, DynamoDBMapperConfig.builder()
+                .withConsistentReads(DynamoDBMapperConfig.ConsistentReads.CONSISTENT)
+                .build());
     }
 
     public Optional<Delivery> findByExternalDeliveryId(String storeId, String externalDeliveryId) {

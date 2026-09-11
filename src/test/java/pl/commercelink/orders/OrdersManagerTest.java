@@ -972,6 +972,46 @@ class OrdersManagerTest {
         assertThat(askedWith.getValue()).containsExactly(warehouseItem, dropshipItem);
     }
 
+    @Test
+    @DisplayName("a warehouse leg confirmed after the dropship one still puts the realization days back")
+    void marksOrderedAddsRealizationDaysWhenAnEarlierWarehouseLegFollowsTheDropshipOne() {
+        // given: the dropship leg is confirmed first, while the other item is not on a delivery yet
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem dropshipItem = orderItemInAllocation("item-1");
+        OrderItem warehouseItem = orderItemInAllocation("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipItem, warehouseItem));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true, false);
+
+        // when: the warehouse leg follows with an earlier date
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-dropship", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 20));
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-warehouse", Map.of("item-2", 10.0), LocalDate.of(2026, 9, 16));
+
+        // then: the earlier date leaves assembly alone but the warehouse stop earns its handling time
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 23));
+    }
+
+    @Test
+    @DisplayName("a confirmation without a date does not pay for the route lookup")
+    void marksOrderedSkipsTheRouteLookupWhenThereIsNoDate() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), null);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        verify(dropshipItemLookup, never()).isEntirelyDropship(any(), any());
+    }
+
     private OrderItem orderItemInAllocation(String itemId) {
         OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
         item.setItemId(itemId);

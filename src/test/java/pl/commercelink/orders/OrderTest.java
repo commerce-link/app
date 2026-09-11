@@ -262,6 +262,22 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("a later leg that does not move the assembly date still puts the handling time back")
+    void recomputesTheShippingDateWhenTheAssemblyDateDoesNotMove() {
+        // given: the dropship leg was confirmed first, for a date later than the warehouse one
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 20), true);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 16), false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 23));
+    }
+
+    @Test
     @DisplayName("the single-argument form keeps the warehouse rule")
     void singleArgumentFormKeepsTheWarehouseRule() {
         // given
