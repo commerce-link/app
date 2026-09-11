@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,46 +88,72 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
     }
 
     @Test
-    void completePendingStillCompletesTheDeliveryWhenDatePropagationFails() {
+    @DisplayName("claimAllocationsForPurchase claims both sides without ordering anything")
+    void claimAllocationsForPurchaseClaimsBothSidesWithoutOrderingAnything() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
+        verify(warehouseAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), "Acme", form.getItems());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("completePending orders the claimed allocations after saving the delivery")
+    void completePendingOrdersTheClaimedAllocationsAfterSavingTheDelivery() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, "Acme");
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider("Acme");
         form.setExternalDeliveryId("EXT-9");
-        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
-        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of())).thenReturn(0.0);
-        doThrow(new IllegalStateException("dynamo down"))
-                .when(orderAllocationsManager).propagateEstimatedDeliveryAt(any(), any(), any());
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
 
         // when
         service.completePending(STORE_ID, delivery, form);
 
         // then
-        assertThat(delivery.getOrderStatus()).isNull();
-        assertThat(delivery.getExternalDeliveryId()).isEqualTo("EXT-9");
-        verify(deliveriesRepository).save(delivery);
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25));
+        inOrder.verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
     }
 
     @Test
-    void completePendingPropagatesAfterTheDeliveryIsSaved() {
+    @DisplayName("completePending survives a failure while ordering the claimed allocations")
+    void completePendingSurvivesAFailureWhileOrderingTheClaimedAllocations() {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, "Acme");
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider("Acme");
-        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
-        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of())).thenReturn(0.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
+        form.setItems(List.of());
+        doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
+                .markClaimedAsOrdered(any(), any(), any());
 
-        // when
-        service.completePending(STORE_ID, delivery, form);
-
-        // then
-        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
-        inOrder.verify(deliveriesRepository).save(delivery);
-        inOrder.verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+        // when / then
+        assertThatNoException().isThrownBy(() -> service.completePending(STORE_ID, delivery, form));
+        verify(deliveriesRepository).save(delivery);
     }
 
     @Test
@@ -297,7 +326,7 @@ class DeliveryCreationServiceTest {
         assertEquals(3.0, delivery.getTotalCost());
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verify(orderAllocationsManager, never()).propagateEstimatedDeliveryAt(any(), any(), any());
+        verifyNoInteractions(orderAllocationsManager);
     }
 
     @Test

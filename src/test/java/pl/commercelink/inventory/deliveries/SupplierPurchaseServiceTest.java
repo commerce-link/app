@@ -104,8 +104,6 @@ class SupplierPurchaseServiceTest {
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
     @Mock
-    private OrderAllocationsManager orderAllocationsManager;
-    @Mock
     private DropshipPurchaseService dropshipPurchaseService;
 
     @InjectMocks
@@ -1015,6 +1013,7 @@ class SupplierPurchaseServiceTest {
                 request.getPurchaseRef().equals("ref-1")
                         && request.getDeliveryId().equals(saved.getValue().getDeliveryId())), anyString());
         assertEquals(saved.getValue().getDeliveryId(), result.getPayload().deliveryId());
+        verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
     }
 
     @Test
@@ -1029,7 +1028,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<DeliveryCreationForm> claimed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
-        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(), claimed.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), any(), claimed.capture());
         assertNull(claimed.getValue().getEstimatedDeliveryAt());
     }
 
@@ -1610,7 +1609,7 @@ class SupplierPurchaseServiceTest {
         // then
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
-        verify(deliveryCreationService).claimAllocations(STORE_ID, saved.getValue(), form);
+        verify(deliveryCreationService).claimAllocationsForPurchase(STORE_ID, saved.getValue(), form);
     }
 
     @Test
@@ -2132,7 +2131,7 @@ class SupplierPurchaseServiceTest {
         assertNull(delivery.getOrderStatus());
         assertNull(delivery.getOrderErrorMessage());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, DELIVERY_ID, ESTIMATED_DELIVERY_AT);
+        verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(ESTIMATED_DELIVERY_AT));
     }
 
     @Test
@@ -2153,7 +2152,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(4.0, delivery.getPaymentCost());
         assertEquals(30, delivery.getPaymentTerms());
         assertEquals(1.0, delivery.getTax());
-        verifyNoInteractions(supplierRegistry, deliveryTaxResolver, deliveryCreationService);
+        verifyNoInteractions(supplierRegistry, deliveryTaxResolver);
     }
 
     @Test
@@ -2166,8 +2165,7 @@ class SupplierPurchaseServiceTest {
         service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
 
         // then
-        verify(orderAllocationsManager).propagateEstimatedDeliveryAt(STORE_ID, DELIVERY_ID, ESTIMATED_DELIVERY_AT);
-        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(ESTIMATED_DELIVERY_AT));
         verify(deliveriesQueryService, never()).fetchDeliveryWithAllocations(any(), any());
     }
 
@@ -2228,7 +2226,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2247,7 +2245,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2266,7 +2264,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2284,7 +2282,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.number", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2302,7 +2300,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.date", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test

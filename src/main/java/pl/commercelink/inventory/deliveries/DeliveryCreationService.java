@@ -62,6 +62,18 @@ public class DeliveryCreationService {
         }
     }
 
+    /**
+     * The automatic purchase path: the allocations are reserved for this delivery but stay in allocation
+     * until the supplier confirms. The manual "Save" path keeps using claimAllocations/commit, where the
+     * order at the supplier already exists.
+     */
+    public void claimAllocationsForPurchase(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        prepareForm(storeId, form);
+        delivery.increaseTotalCost(allocationsCost(form));
+        orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
+        warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+    }
+
     /** Frees the allocations the operator unchecked on the creation form without creating a delivery. */
     public void releaseUnselectedAllocations(String storeId, DeliveryCreationForm form) {
         removeUnselectedAllocations(storeId, form.getItems());
@@ -84,7 +96,7 @@ public class DeliveryCreationService {
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
 
-        propagateEstimatedDeliveryAt(storeId, delivery, form.getEstimatedDeliveryAt());
+        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
     }
 
     public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
@@ -97,13 +109,14 @@ public class DeliveryCreationService {
     /**
      * The delivery is already saved with the supplier's order number, so a failure here must not undo the
      * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
-     * be lost. Log loudly and leave the dates for the operator to fix on the delivery instead.
+     * be lost. Log loudly instead.
      */
-    private void propagateEstimatedDeliveryAt(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
+    public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
-            orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+            warehouseAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId());
         } catch (RuntimeException e) {
-            log.error("Estimated delivery date propagation failed: store={} delivery={} provider={} estimatedDeliveryAt={}",
+            log.error("Claimed allocations not marked as ordered: store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }
     }

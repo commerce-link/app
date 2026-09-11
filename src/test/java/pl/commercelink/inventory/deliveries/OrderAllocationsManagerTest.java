@@ -329,50 +329,6 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("propagateEstimatedDeliveryAt updates every order with items ordered in the delivery")
-    void propagateEstimatedDeliveryAtUpdatesEveryOrderWithItemsOrderedInTheDelivery() {
-        // given
-        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 15);
-        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of("order-1", "order-2"));
-
-        // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt);
-
-        // then
-        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt);
-        verify(ordersManager, times(1)).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt);
-    }
-
-    @Test
-    @DisplayName("propagateEstimatedDeliveryAt continues with the other orders when one fails")
-    void propagateEstimatedDeliveryAtContinuesWithTheOtherOrdersWhenOneFails() {
-        // given
-        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 15);
-        when(orderItemsRepository.findByDeliveryIdAndStatuses("delivery-1", List.of(FulfilmentStatus.Ordered)))
-                .thenReturn(List.of("order-1", "order-2"));
-        doThrow(new IllegalStateException("version conflict"))
-                .when(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-1", estimatedDeliveryAt);
-
-        // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", estimatedDeliveryAt);
-
-        // then
-        verify(ordersManager).updateEstimatedDeliveryAt(STORE_ID, "order-2", estimatedDeliveryAt);
-    }
-
-    @Test
-    @DisplayName("propagateEstimatedDeliveryAt is a no-op without a date")
-    void propagateEstimatedDeliveryAtIsANoOpWithoutADate() {
-        // when
-        orderAllocationsManager.propagateEstimatedDeliveryAt(STORE_ID, "delivery-1", null);
-
-        // then
-        verify(orderItemsRepository, never()).findByDeliveryIdAndStatuses(any(), any());
-        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
-    }
-
-    @Test
     @DisplayName("claim hands the selected order allocations to the orders manager without ordering them")
     void claimHandsTheSelectedOrderAllocationsToTheOrdersManagerWithoutOrderingThem() {
         // given

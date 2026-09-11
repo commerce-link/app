@@ -61,7 +61,6 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
-    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -489,7 +488,7 @@ public class SupplierPurchaseService {
         deliveriesRepository.save(delivery);
 
         // The items were claimed when the purchase was submitted; only the date is new here.
-        orderAllocationsManager.propagateEstimatedDeliveryAt(storeId, deliveryId, estimatedDeliveryAt);
+        deliveryCreationService.markClaimedAsOrdered(storeId, delivery, estimatedDeliveryAt);
 
         log.info("Supplier order completed manually: store={} delivery={} provider={} ref={} externalOrderId={}",
                 storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());
@@ -612,7 +611,7 @@ public class SupplierPurchaseService {
         // A date typed on the creation screen would stamp the orders now while the delivery gets the terms
         // date later, leaving the two out of step.
         form.setEstimatedDeliveryAt(null);
-        deliveryCreationService.claimAllocations(storeId, delivery, form);
+        deliveryCreationService.claimAllocationsForPurchase(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);
