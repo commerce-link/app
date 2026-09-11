@@ -399,6 +399,9 @@
                     var addFile = document.getElementById('manual-add-file');
                     var addFilename = document.getElementById('manual-add-filename');
                     var addError = document.getElementById('manual-add-error');
+                    // set once the create call has succeeded; from then on the supplier already
+                    // exists, so a retry must only ever re-attempt the file upload, never the create
+                    var createdIdentity = null;
 
                     var configModal = document.getElementById('manualConfigModal');
                     var configForm = document.getElementById('manual-config-form');
@@ -425,9 +428,32 @@
                         element.classList.remove('is-hidden');
                     }
 
+                    function attemptAddFile(identity) {
+                        if (!addFile.files.length) { window.location.reload(); return; }
+                        var data = new FormData();
+                        data.append('file', addFile.files[0]);
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/feed',
+                              { method: 'POST', body: data })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                // the supplier was already created; a rejected file (empty, unparseable
+                                // rows) must be reported honestly instead of reloading as if it worked,
+                                // leaving the operator with an inactive supplier and no explanation
+                                if (!res.ok) { showError(addError, res.body.message); return; }
+                                window.location.reload();
+                            })
+                            .catch(function () { showError(addError); });
+                    }
+
                     function addManual() {
-                        var name = nameInput.value.trim();
                         addError.classList.add('is-hidden');
+                        if (createdIdentity) {
+                            // the create already succeeded in an earlier attempt; only the file
+                            // upload can be retried, never the create itself
+                            attemptAddFile(createdIdentity);
+                            return;
+                        }
+                        var name = nameInput.value.trim();
                         if (!name) { showError(addError, noNameMessage); return; }
                         var body = new URLSearchParams();
                         body.append('name', name);
@@ -435,14 +461,21 @@
                             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
                             .then(function (res) {
                                 if (!res.ok) { showError(addError, res.body.message); return; }
-                                if (!addFile.files.length) { window.location.reload(); return; }
-                                var data = new FormData();
-                                data.append('file', addFile.files[0]);
-                                return fetch(basePath + '/manual-supplier/' + encodeURIComponent(res.body.identity) + '/feed',
-                                             { method: 'POST', body: data })
-                                    .then(function () { window.location.reload(); });
+                                createdIdentity = res.body.identity;
+                                attemptAddFile(createdIdentity);
                             })
                             .catch(function () { showError(addError); });
+                    }
+
+                    function closeAddModal() {
+                        if (createdIdentity) {
+                            // the supplier already exists on the server; closing without a
+                            // successful upload must still reveal it (correctly shown as inactive,
+                            // no file) rather than pretend the modal session never happened
+                            window.location.reload();
+                            return;
+                        }
+                        addModal.classList.remove('is-active');
                     }
 
                     function uploadForCurrent() {
@@ -485,6 +518,7 @@
 
                     if (addButton) {
                         addButton.addEventListener('click', function () {
+                            createdIdentity = null;
                             nameInput.value = '';
                             addFile.value = '';
                             addFilename.textContent = '';
@@ -497,15 +531,9 @@
                         addFilename.textContent = addFile.files.length ? addFile.files[0].name : '';
                     });
                     document.getElementById('manual-add-confirm').addEventListener('click', addManual);
-                    document.getElementById('manual-add-cancel').addEventListener('click', function () {
-                        addModal.classList.remove('is-active');
-                    });
-                    document.getElementById('manual-add-close').addEventListener('click', function () {
-                        addModal.classList.remove('is-active');
-                    });
-                    addModal.querySelector('.modal-background').addEventListener('click', function () {
-                        addModal.classList.remove('is-active');
-                    });
+                    document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
+                    document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
+                    addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
 
                     configUpload.addEventListener('click', function () { configFileInput.click(); });
                     configFileInput.addEventListener('change', uploadForCurrent);

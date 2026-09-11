@@ -153,4 +153,28 @@ class StoreFulfilmentTemplateTest {
         assertThat(html).contains("configEnabled.disabled = !fileUploaded;");
         assertThat(html).doesNotContain("row.hasFeed");
     }
+
+    @Test
+    void surfacesAnUploadFailureDuringCreationInsteadOfReloadingAsIfItSucceeded() throws Exception {
+        // the supplier create call and the follow-up file upload are two separate requests; a
+        // server-rejected file (empty, unparseable rows) must not be swallowed by an unconditional
+        // reload that would leave the operator believing the upload worked
+        String normalized = template().replaceAll("\\s+", " ");
+
+        // the response is parsed and gated on res.ok before anything else happens, exactly like
+        // uploadForCurrent's proven pattern -- a plain ".then(function () { window.location.reload(); })"
+        // right after the fetch, with no such gate, would not match this
+        assertThat(normalized).contains(
+                "fetch(basePath + '/manual-supplier/' + encodeURIComponent(identity) + '/feed', "
+                        + "{ method: 'POST', body: data }) "
+                        + ".then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }) "
+                        + ".then(function (res) {");
+
+        // the reload happens only after the ok-check passes, and a dropped connection on this same
+        // call reports an error rather than falling through to a reload
+        assertThat(normalized).contains(
+                "if (!res.ok) { showError(addError, res.body.message); return; } "
+                        + "window.location.reload(); }) "
+                        + ".catch(function () { showError(addError); });");
+    }
 }
