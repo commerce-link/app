@@ -104,6 +104,10 @@
                                         <span th:text="#{store.supplier.include.fulfilment}"></span>
                                     </label>
                                 </div>
+                                <div class="field supplier-schedule">
+                                    <label class="label" th:text="#{store.supplier.feed.schedule}"></label>
+                                    <div th:replace="~{fragments/schedule-field :: input(|supplierSelections[${stat.index}].feedSchedule|, ${sel.feedSchedule}, ${scheduleMinIntervalMinutes})}"></div>
+                                </div>
                                 <div class="supplier-own-fields"
                                      th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
                                     <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">
@@ -195,12 +199,16 @@
                                 var modeWrap = panel.querySelector('.supplier-mode-wrap');
                                 var mode = panel.querySelector('.supplier-mode');
                                 var ownFields = panel.querySelector('.supplier-own-fields');
+                                var schedule = panel.querySelector('.supplier-schedule');
                                 if (detail) detail.style.display = isEnabled ? '' : 'none';
                                 if (modeWrap) modeWrap.style.display = allowed ? '' : 'none';
                                 if (mode) mode.disabled = !isEnabled || !allowed;
                                 var effectiveOwn = !allowed || (mode && mode.value === 'OWN');
                                 if (ownFields) {
                                     ownFields.style.display = (isEnabled && effectiveOwn) ? '' : 'none';
+                                }
+                                if (schedule) {
+                                    schedule.style.display = (isEnabled && effectiveOwn) ? '' : 'none';
                                 }
                             });
                         }
@@ -213,6 +221,8 @@
                         refreshAll();
                     })();
                 </script>
+                <script th:replace="~{fragments/schedule-field :: script}"></script>
+                <style th:replace="~{fragments/schedule-field :: style}"></style>
 
                 <script th:inline="javascript">
                     document.addEventListener('DOMContentLoaded', function () {

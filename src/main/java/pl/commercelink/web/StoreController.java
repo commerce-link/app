@@ -39,6 +39,9 @@ import java.util.stream.Collectors;
 @Controller
 public class StoreController {
 
+    @Value("${scheduling.min-interval-minutes}")
+    private int scheduleMinIntervalMinutes;
+
     @Autowired
     private StoresRepository storesRepository;
 
@@ -436,6 +439,7 @@ public class StoreController {
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
 
         return "store-fulfilment";
     }
@@ -781,6 +785,9 @@ public class StoreController {
         }
         for (String supplier : result.removed()) {
             messages.add(messageSource.getMessage("store.fulfilment.supplier.disconnect.queued", new Object[]{supplier}, locale));
+        }
+        for (String supplier : result.rescheduled()) {
+            messages.add(messageSource.getMessage("store.fulfilment.supplier.schedule.updated", new Object[]{supplier}, locale));
         }
         redirectAttributes.addFlashAttribute("successMessage", String.join(" ", messages));
 
