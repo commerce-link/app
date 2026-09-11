@@ -104,10 +104,12 @@ class SupplierSectionRenderingTest {
         context.setVariable("sectionShowMode", true);
         context.setVariable("sectionAvailableSuppliers", List.of("Acme"));
         context.setVariable("sectionSuccessMessage", "Supplier Elko saved.");
+        context.setVariable("sectionSuppliersWithStoredConfig", "Elko");
 
         String args = "${sectionRows}, false, ${sectionShowMode}, "
                 + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
-                + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}";
+                + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, "
+                + "${sectionSuppliersWithStoredConfig}";
 
         // when
         String html = templateEngine().process(SECTION.formatted(args), context);
@@ -118,9 +120,48 @@ class SupplierSectionRenderingTest {
         assertThat(html).contains("id=\"supplier-add-button\"");
         assertThat(html).contains("Elko");
         assertThat(html).contains("data-success-message=\"Supplier Elko saved.\"");
+        assertThat(html).contains("data-suppliers-with-stored-config=\"Elko\"");
         // Acme is the only unconnected supplier, but the Add button reflects a non-empty
         // availableSuppliers list, so it must not be disabled
         assertThat(html).doesNotContain("disabled=\"disabled\"");
+    }
+
+    @Test
+    void theStoredConfigListOnTheFragmentRootChangesBetweenTwoRendersInsteadOfStayingFixed() {
+        // Pins the actual outcome the JS fix depends on: swapping in this fragment after a save
+        // must hand the page a root whose data-suppliers-with-stored-config reflects THIS render's
+        // caller-supplied value, not a value stuck at some earlier state. A template that hardcodes
+        // the attribute, drops it, or ignores the variable would render identically both times below
+        // and fail the second assertion, exactly the class of bug that let a stale `required`
+        // survive a same-session save in the real page.
+        SupplierConnectionView elko = new SupplierConnectionView(
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+        String args = "${sectionRows}, false, ${sectionShowMode}, "
+                + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
+                + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, "
+                + "${sectionSuppliersWithStoredConfig}";
+
+        // when -- before Elko's credentials were ever saved
+        Context before = new Context();
+        before.setVariable("sectionRows", List.of(elko));
+        before.setVariable("sectionShowMode", true);
+        before.setVariable("sectionAvailableSuppliers", List.of("Acme"));
+        before.setVariable("sectionSuccessMessage", null);
+        before.setVariable("sectionSuppliersWithStoredConfig", "");
+        String htmlBefore = templateEngine().process(SECTION.formatted(args), before);
+
+        // ... and the very next render in the same page session, right after connecting Elko
+        Context after = new Context();
+        after.setVariable("sectionRows", List.of(elko));
+        after.setVariable("sectionShowMode", true);
+        after.setVariable("sectionAvailableSuppliers", List.of("Acme"));
+        after.setVariable("sectionSuccessMessage", "Supplier Elko saved.");
+        after.setVariable("sectionSuppliersWithStoredConfig", "Elko");
+        String htmlAfter = templateEngine().process(SECTION.formatted(args), after);
+
+        // then
+        assertThat(htmlBefore).doesNotContain("data-suppliers-with-stored-config=\"Elko\"");
+        assertThat(htmlAfter).contains("data-suppliers-with-stored-config=\"Elko\"");
     }
 
     @Test
@@ -133,7 +174,7 @@ class SupplierSectionRenderingTest {
         context.setVariable("sectionSuccessMessage", null);
 
         String args = "${sectionRows}, true, false, 'store.manual.section.title', "
-                + "'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}";
+                + "'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}, ''";
 
         // when
         String html = templateEngine().process(SECTION.formatted(args), context);
@@ -158,18 +199,20 @@ class SupplierSectionRenderingTest {
         context.setVariable("sectionShowMode", true);
         context.setVariable("sectionAvailableSuppliers", List.of("Acme"));
         context.setVariable("sectionSuccessMessage", "Supplier Elko saved.");
+        context.setVariable("sectionSuppliersWithStoredConfig", "Elko");
 
         // when
         String html = templateEngine().process(
                 "<div th:replace=\"~{fragments/supplier-section :: externalSection}\"></div>", context);
 
         // then -- proves the wrapper actually forwards to supplierSection with the right rows/
-        // showMode/availableSuppliers/successMessage, not just that it parses
+        // showMode/availableSuppliers/successMessage/storedConfigSuppliers, not just that it parses
         assertThat(html).doesNotContain("??store.supplier");
         assertThat(html).contains("Suppliers");
         assertThat(html).contains("id=\"supplier-add-button\"");
         assertThat(html).contains("Elko");
         assertThat(html).contains("data-success-message=\"Supplier Elko saved.\"");
+        assertThat(html).contains("data-suppliers-with-stored-config=\"Elko\"");
         assertThat(html).doesNotContain("disabled=\"disabled\"");
     }
 

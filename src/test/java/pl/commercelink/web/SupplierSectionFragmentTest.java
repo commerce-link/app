@@ -20,7 +20,8 @@ class SupplierSectionFragmentTest {
     void declaresTheSupplierSectionFragmentWithTheExpectedSignature() throws Exception {
         assertThat(fragment()).contains(
                 "th:fragment=\"supplierSection(rows, manual, showMode, titleKey, addButtonId, "
-                        + "addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage)\"");
+                        + "addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage, "
+                        + "storedConfigSuppliers)\"");
     }
 
     @Test
@@ -58,12 +59,13 @@ class SupplierSectionFragmentTest {
                         + "     th:replace=\"~{fragments/supplier-section :: supplierSection(${sectionRows}, false, "
                         + "${sectionShowMode}, 'store.supplier.section.title', 'supplier-add-button', "
                         + "'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, "
-                        + "'store.supplier.add.none', ${sectionSuccessMessage})}\">");
+                        + "'store.supplier.add.none', ${sectionSuccessMessage}, "
+                        + "${sectionSuppliersWithStoredConfig})}\">");
         assertThat(html).contains(
                 "th:fragment=\"manualSection\"\n"
                         + "     th:replace=\"~{fragments/supplier-section :: supplierSection(${sectionRows}, true, "
                         + "false, 'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', "
-                        + "false, null, ${sectionSuccessMessage})}\">");
+                        + "false, null, ${sectionSuccessMessage}, '')}\">");
     }
 
     @Test
@@ -84,7 +86,9 @@ class SupplierSectionFragmentTest {
         // response body instead -- the page script reads it once after swapping the section in and
         // shows it as a toast, the same way the dropship validation fragment carries
         // data-fully-available
-        assertThat(fragment()).contains("th:attr=\"data-success-message=${successMessage},data-show-mode=${showMode}\"");
+        assertThat(fragment()).contains(
+                "th:attr=\"data-success-message=${successMessage},data-show-mode=${showMode},"
+                        + "data-suppliers-with-stored-config=${storedConfigSuppliers}\"");
     }
 
     @Test
@@ -93,6 +97,17 @@ class SupplierSectionFragmentTest {
         // the supplier modal (rendered once, outside this fragment) reads this attribute fresh on
         // every open instead of relying on a page-load snapshot that such a save would leave stale
         assertThat(fragment()).contains("data-show-mode=${showMode}");
+    }
+
+    @Test
+    void carriesStoredConfigSuppliersAsADataAttributeSoRequirednessCanBeReadFreshOnTheNextOpen() throws Exception {
+        // a save can be the very thing that puts a supplier into this set (see
+        // StoreSupplierConnectionService.suppliersWithStoredConfiguration); the supplier modal
+        // (rendered once, outside this fragment) is never re-rendered by that save, so its password
+        // fields' required-ness must be re-derived from this fresh attribute on every open instead
+        // of the server-rendered `required` attribute, which is frozen at the page load that first
+        // built the modal markup
+        assertThat(fragment()).contains("data-suppliers-with-stored-config=${storedConfigSuppliers}");
     }
 
     @Test

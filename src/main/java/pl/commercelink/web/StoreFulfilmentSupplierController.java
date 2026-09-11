@@ -81,8 +81,8 @@ public class StoreFulfilmentSupplierController {
         }
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.saved", new Object[]{form.getSupplierName()}, locale);
-        return SupplierSectionModel.renderExternalSection(
-                supplierConnectionViewFactory, supplierRegistry, store, successMessage, model);
+        return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
     }
 
     private String doDisconnect(String storeId, String supplierName, Locale locale, Model model,
@@ -102,8 +102,8 @@ public class StoreFulfilmentSupplierController {
         }
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.disconnected", new Object[]{supplierName}, locale);
-        return SupplierSectionModel.renderExternalSection(
-                supplierConnectionViewFactory, supplierRegistry, store, successMessage, model);
+        return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
     }
 
     @GetMapping("/dashboard/store/fulfilment/supplier/section")
@@ -130,7 +130,7 @@ public class StoreFulfilmentSupplierController {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
-        return SupplierSectionModel.renderExternalSection(
-                supplierConnectionViewFactory, supplierRegistry, store, null, model);
+        return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), null, model);
     }
 }

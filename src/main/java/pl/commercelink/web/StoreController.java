@@ -424,7 +424,13 @@ public class StoreController {
         // Lets the modal render the HTML required attribute only where blank genuinely means
         // missing: a required password field already has a stored secret for suppliers in this
         // set, so a blank submission there is a deliberate "keep the current value", not an error.
-        model.addAttribute("suppliersWithStoredConfig", storeSupplierConnectionService.suppliersWithStoredConfiguration(store));
+        Set<String> suppliersWithStoredConfig = storeSupplierConnectionService.suppliersWithStoredConfiguration(store);
+        model.addAttribute("suppliersWithStoredConfig", suppliersWithStoredConfig);
+        // Republished on the external section's root as data-suppliers-with-stored-config (see
+        // fragments/supplier-section.html) so the modal's JS can re-derive password requiredness
+        // fresh on every open instead of trusting the required attribute above, which is frozen at
+        // this page load and never touched by an async section swap.
+        model.addAttribute("suppliersWithStoredConfigJoined", String.join(";", suppliersWithStoredConfig));
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());

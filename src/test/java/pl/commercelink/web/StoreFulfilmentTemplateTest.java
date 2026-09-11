@@ -200,11 +200,45 @@ class StoreFulfilmentTemplateTest {
         assertThat(normalized).contains(
                 "th:placeholder=\"${cf.placeholder()}\" "
                         + "th:required=\"${cf.required() and !(cf.type().name() == 'PASSWORD' "
-                        + "and suppliersWithStoredConfig.contains(entry.key))}\" disabled />");
+                        + "and suppliersWithStoredConfig.contains(entry.key))}\" "
+                        + "th:attr=\"data-required=${cf.required()}\" disabled />");
 
         // the script re-enables inputs only within the active provider's own field group
-        assertThat(html).contains(
-                "group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });");
+        assertThat(normalized).contains("group.querySelectorAll('input').forEach(function (input) { input.disabled = !active;");
+    }
+
+    @Test
+    void reDerivesPasswordRequirednessFromTheSectionsFreshStoredConfigListOnEveryModalOpenInsteadOfTheFrozenAttribute() throws Exception {
+        // This is the regression the four th:required-pinning tests above miss entirely: they only
+        // check the template string rendered once at page load, so they stay green even though the
+        // modal lives outside #external-supplier-section and is never re-rendered by a save -- a
+        // supplier connected with credentials in this same page session still shows `required` on
+        // its password field on the very next Edit click, because the server-rendered attribute
+        // never changes without a full reload. A stale implementation that computes `.required`
+        // from anything other than a fresh per-open read of data-suppliers-with-stored-config (or
+        // that never touches `.required` in JS at all, still relying on the frozen HTML attribute)
+        // fails every assertion below.
+        String normalized = template().replaceAll("\\s+", " ");
+
+        // refreshFields() is called on every modal open (already pinned above: "refreshModeVisibility();
+        // refreshFields(); modal.classList.add('is-active');"), so reading the fresh list inside it
+        // -- rather than once at script-parse time in the enclosing IIFE -- is what makes the fix
+        // actually apply on the very next Edit click after a save, with no reload in between.
+        assertThat(normalized).contains("function refreshFields() { var name = activeName(); var isOwn = mode.value === 'OWN';");
+        assertThat(normalized).contains(
+                "var root = externalSection.firstElementChild; "
+                        + "var storedConfigSuppliers = (root && root.getAttribute('data-suppliers-with-stored-config') || '') "
+                        + ".split(';').filter(function (s) { return s.length > 0; }); "
+                        + "var hasStoredConfig = storedConfigSuppliers.indexOf(name) !== -1;");
+
+        // the requiredness assignment must live inside that same per-open computation, deriving from
+        // a page-load-only baseRequired (data-required, never entangled with stored-config status)
+        // combined with the freshly-read hasStoredConfig -- not the server-rendered `required`
+        // attribute, which a "fix" that only re-reads data-show-mode-style booleans elsewhere would
+        // still leave stale
+        assertThat(normalized).contains(
+                "var baseRequired = input.dataset.required === 'true'; "
+                        + "input.required = baseRequired && !(input.type === 'password' && hasStoredConfig); }");
     }
 
     @Test

@@ -223,7 +223,8 @@
                 <div th:replace="~{fragments/supplier-section :: supplierSection(${externalConnections}, false,
                                    ${settings.canUseGlobalSuppliers},
                                    'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button',
-                                   ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null)}"></div>
+                                   ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null,
+                                   ${suppliersWithStoredConfigJoined})}"></div>
             </div>
 
             <div id="supplierModal" class="modal">
@@ -305,6 +306,7 @@
                                                              ? form.supplierConfiguration.get(entry.key).get(cf.key()) : '')}"
                                                th:placeholder="${cf.placeholder()}"
                                                th:required="${cf.required() and !(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig.contains(entry.key))}"
+                                               th:attr="data-required=${cf.required()}"
                                                disabled />
                                     </div>
                                     <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
@@ -390,10 +392,27 @@
                     function refreshFields() {
                         var name = activeName();
                         var isOwn = mode.value === 'OWN';
+                        // Read fresh off the (possibly just-swapped) section root, the same idiom as
+                        // refreshModeVisibility above: a save can be the very thing that puts this
+                        // supplier's identity into this list, and the modal is never re-rendered by
+                        // that save, so the server-rendered `required` attribute on the password
+                        // input below is frozen at page load and must not be trusted any more.
+                        var root = externalSection.firstElementChild;
+                        var storedConfigSuppliers = (root && root.getAttribute('data-suppliers-with-stored-config') || '')
+                                .split(';').filter(function (s) { return s.length > 0; });
+                        var hasStoredConfig = storedConfigSuppliers.indexOf(name) !== -1;
                         document.querySelectorAll('.supplier-fields').forEach(function (group) {
                             var active = group.id === 'supplier-fields-' + name && isOwn;
                             group.style.display = active ? '' : 'none';
-                            group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });
+                            group.querySelectorAll('input').forEach(function (input) {
+                                input.disabled = !active;
+                                // data-required carries cf.required() alone (never entangled with
+                                // stored-config status, unlike the server-rendered `required`
+                                // attribute), so this is the only piece that needs to survive from
+                                // page load; whether a password may stay blank is re-derived here.
+                                var baseRequired = input.dataset.required === 'true';
+                                input.required = baseRequired && !(input.type === 'password' && hasStoredConfig);
+                            });
                         });
                         var row = rowFor(name);
                         var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
@@ -542,7 +561,7 @@
             <div class="box" id="manual-supplier-section">
                 <div th:replace="~{fragments/supplier-section :: supplierSection(${manualConnections}, true, false,
                                    'store.manual.section.title', 'manual-add-button',
-                                   'store.manual.add.button', false, null, null)}"></div>
+                                   'store.manual.add.button', false, null, null, '')}"></div>
             </div>
 
             <div id="manualAddModal" class="modal">

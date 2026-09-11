@@ -38,6 +38,7 @@ public final class SupplierSectionModel {
 
     public static String renderExternalSection(SupplierConnectionViewFactory supplierConnectionViewFactory,
                                                SupplierRegistry supplierRegistry, Store store,
+                                               Set<String> suppliersWithStoredConfig,
                                                String successMessage, Model model) {
         SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
         Set<String> connected = views.external().stream()
@@ -50,6 +51,11 @@ public final class SupplierSectionModel {
         model.addAttribute("sectionShowMode", store.canUseGlobalSuppliers());
         model.addAttribute("sectionAvailableSuppliers", availableSuppliers);
         model.addAttribute("sectionSuccessMessage", successMessage);
+        // Republished on every render (like sectionShowMode) rather than left for the modal's
+        // page-load attribute: a save can be the very thing that puts a supplier into this set, and
+        // the modal lives outside this section and is never re-rendered, so the fix relies on the
+        // JS reading this fresh value off the swapped-in root on every open instead.
+        model.addAttribute("sectionSuppliersWithStoredConfig", String.join(";", suppliersWithStoredConfig));
         // No-argument view name: ThymeleafView (unlike th:replace/th:insert) rejects a view name
         // carrying positional fragment parameters, so everything the fragment needs travels as a
         // model attribute and the controller selects a wrapper fragment that has none.
