@@ -239,6 +239,10 @@ public class WarehouseAllocationsManager {
         if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
             return;
         }
+        // an item claimed by another pending delivery is already being bought there - do not steal it
+        if (warehouseItem.isClaimed() && !deliveryId.equals(warehouseItem.getClaimedDeliveryId())) {
+            return;
+        }
         warehouseItem.setCost(unitCost);
         warehouseItem.markAsClaimed(deliveryId);
         warehouseItem.setPurchaseClaimQty(qtyAdjustment);

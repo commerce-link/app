@@ -497,6 +497,50 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("claim leaves a warehouse item claimed by another delivery untouched")
+    void claimLeavesAWarehouseItemClaimedByAnotherDeliveryUntouched() {
+        // given
+        WarehouseItem claimed = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        claimed.setQty(4);
+        claimed.setPurchaseClaimQty(3);
+        claimed.markAsClaimed("delivery-other");
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(claimed);
+        DeliveryItem item = deliveryItemWithWarehouseAllocation();
+
+        // when
+        warehouseAllocationsManager.claim(STORE_ID, "delivery-1", PROVIDER, List.of(item));
+
+        // then
+        verify(warehouseRepository, never()).save(any());
+        verify(warehouseRepository, never()).delete(any(WarehouseItem.class));
+        assertThat(claimed.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        assertThat(claimed.getPurchaseClaimQty()).isEqualTo(3);
+        assertThat(claimed.getQty()).isEqualTo(4);
+        assertThat(claimed.getCost()).isEqualTo(10.0);
+    }
+
+    @Test
+    @DisplayName("claim still re-claims a warehouse item claimed by this same delivery")
+    void claimStillReclaimsAWarehouseItemClaimedByThisSameDelivery() {
+        // given
+        WarehouseItem claimed = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(claimed);
+        DeliveryItem item = deliveryItemWithWarehouseAllocation();
+
+        // when
+        warehouseAllocationsManager.claim(STORE_ID, "delivery-1", PROVIDER, List.of(item));
+
+        // then
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(claimed.getPurchaseClaimQty()).isEqualTo(3);
+        assertThat(claimed.getQty()).isEqualTo(4);
+        assertThat(claimed.getCost()).isEqualTo(55.5);
+        verify(warehouseRepository).save(claimed);
+    }
+
+    @Test
     @DisplayName("markClaimedAsOrdered orders the claimed warehouse items and leaves the quantities alone")
     void markClaimedAsOrderedOrdersTheClaimedWarehouseItemsAndLeavesTheQuantitiesAlone() {
         // given
