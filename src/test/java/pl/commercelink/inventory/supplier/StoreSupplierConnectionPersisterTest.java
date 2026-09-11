@@ -22,6 +22,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -99,7 +101,7 @@ class StoreSupplierConnectionPersisterTest {
 
         // then
         assertTrue(outcome.success());
-        verify(feedScheduler).createSchedule("store-1", "Acme", null);
+        verify(feedScheduler).schedule("store-1", "Acme", null);
         verify(configurationManager).saveConfiguration(eq(existing), eq("Acme"), eq(acme), any());
         verify(storesRepository).save(existing);
         verify(feedScheduler).triggerImmediateImport("store-1", "Acme");
@@ -136,7 +138,7 @@ class StoreSupplierConnectionPersisterTest {
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
         when(configurationManager.snapshot(existing, "Acme"))
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
-        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).createSchedule("store-1", "Acme", null);
+        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).schedule("store-1", "Acme", null);
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
@@ -189,6 +191,8 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true, new StoreSupplierConnection("Old", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("New", ConnectionMode.OWN));
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
+        when(feedScheduler.snapshot("store-1", "Old")).thenReturn(Optional.of("cron(37 2 * * ? *)"));
+        when(feedScheduler.snapshot("store-1", "New")).thenReturn(Optional.empty());
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
         // when
@@ -197,10 +201,10 @@ class StoreSupplierConnectionPersisterTest {
         // then
         assertFalse(outcome.success());
         InOrder inOrder = inOrder(feedScheduler);
-        inOrder.verify(feedScheduler).createSchedule("store-1", "New", null);
+        inOrder.verify(feedScheduler).schedule("store-1", "New", null);
         inOrder.verify(feedScheduler).deleteSchedule("store-1", "Old");
-        inOrder.verify(feedScheduler).createSchedule("store-1", "Old", null);
-        inOrder.verify(feedScheduler).deleteSchedule("store-1", "New");
+        inOrder.verify(feedScheduler).restore("store-1", "Old", Optional.of("cron(37 2 * * ? *)"));
+        inOrder.verify(feedScheduler).restore("store-1", "New", Optional.empty());
         verify(configurationManager).restore(eq(existing), eq("New"), any());
         verify(configurationManager).restore(eq(existing), eq("Old"), any());
         verify(feedScheduler, never()).triggerImmediateImport(any(), any());
@@ -238,7 +242,7 @@ class StoreSupplierConnectionPersisterTest {
 
         // then
         assertTrue(outcome.success());
-        verify(feedScheduler).createSchedule("store-1", "New", null);
+        verify(feedScheduler).schedule("store-1", "New", null);
         verify(feedScheduler).deleteSchedule("store-1", "Old");
         verify(storeFeedRepository).delete("store-1", "Old");
         verify(feedScheduler).triggerImmediateImport("store-1", "New");
@@ -269,7 +273,7 @@ class StoreSupplierConnectionPersisterTest {
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
         when(configurationManager.snapshot(existing, "Acme"))
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
-        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).createSchedule("store-1", "Acme", null);
+        doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).schedule("store-1", "Acme", null);
 
         // when
         persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
@@ -315,7 +319,7 @@ class StoreSupplierConnectionPersisterTest {
 
         // then
         assertTrue(outcome.success());
-        verify(feedScheduler).createSchedule("store-1", "Acme", "0/30 9-17 * * ? *");
+        verify(feedScheduler).schedule("store-1", "Acme", "0/30 9-17 * * ? *");
         assertThat(outcome.rescheduled()).isEmpty();
     }
 
@@ -333,8 +337,8 @@ class StoreSupplierConnectionPersisterTest {
         assertTrue(outcome.success());
         assertThat(outcome.rescheduled()).containsExactly("Acme");
         assertThat(outcome.added()).isEmpty();
-        verify(feedScheduler).updateSchedule("store-1", "Acme", "0/30 * * * ? *");
-        verify(feedScheduler, never()).createSchedule(anyString(), anyString(), any());
+        verify(feedScheduler).schedule("store-1", "Acme", "0/30 * * * ? *");
+        verify(feedScheduler, times(1)).schedule(anyString(), anyString(), any());
         verify(feedScheduler, never()).deleteSchedule(anyString(), anyString());
         verify(feedScheduler, never()).triggerImmediateImport(anyString(), anyString());
     }
@@ -343,7 +347,7 @@ class StoreSupplierConnectionPersisterTest {
     void clearingTheCronRestoresTheDefaultSchedule() {
         // given
         Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
-        FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", "  "));
+        FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", null));
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
@@ -351,22 +355,7 @@ class StoreSupplierConnectionPersisterTest {
 
         // then
         assertThat(outcome.rescheduled()).containsExactly("Acme");
-        verify(feedScheduler).updateSchedule("store-1", "Acme", null);
-    }
-
-    @Test
-    void treatsWhitespaceOnlyDifferencesAsTheSameSchedule() {
-        // given
-        Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
-        FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", " 0  5 * * ? * "));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
-
-        // when
-        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
-
-        // then
-        assertThat(outcome.rescheduled()).isEmpty();
-        verify(feedScheduler, never()).updateSchedule(anyString(), anyString(), any());
+        verify(feedScheduler).schedule("store-1", "Acme", null);
     }
 
     @Test
@@ -375,6 +364,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
         FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", "0/30 * * * ? *"));
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
+        when(feedScheduler.snapshot("store-1", "Acme")).thenReturn(Optional.of("cron(0 5 * * ? *)"));
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
         // when
@@ -383,22 +373,24 @@ class StoreSupplierConnectionPersisterTest {
         // then
         assertFalse(outcome.success());
         InOrder inOrder = inOrder(feedScheduler);
-        inOrder.verify(feedScheduler).updateSchedule("store-1", "Acme", "0/30 * * * ? *");
-        inOrder.verify(feedScheduler).updateSchedule("store-1", "Acme", "0 5 * * ? *");
+        inOrder.verify(feedScheduler).schedule("store-1", "Acme", "0/30 * * * ? *");
+        inOrder.verify(feedScheduler).restore("store-1", "Acme", Optional.of("cron(0 5 * * ? *)"));
     }
 
     @Test
-    void recreatesRemovedSupplierWithItsPreviousCronOnRollback() {
+    void restoresRemovedSupplierScheduleExactlyOnRollback() {
         // given
-        Store existing = storeWith(true, ownWithSchedule("Old", "0 5 * * ? *"));
+        Store existing = storeWith(true, new StoreSupplierConnection("Old", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true);
         when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
+        when(feedScheduler.snapshot("store-1", "Old")).thenReturn(Optional.of("cron(12 3 * * ? *)"));
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
         // when
         persister.persist(existing, submitted, Map.of());
 
         // then
-        verify(feedScheduler).createSchedule("store-1", "Old", "0 5 * * ? *");
+        verify(feedScheduler).restore("store-1", "Old", Optional.of("cron(12 3 * * ? *)"));
+        verify(feedScheduler, never()).schedule(anyString(), anyString(), any());
     }
 }

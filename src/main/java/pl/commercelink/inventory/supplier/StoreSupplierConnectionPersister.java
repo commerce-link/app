@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
-import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -18,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -79,7 +79,6 @@ public class StoreSupplierConnectionPersister {
                 difference(newOwn, previousOwn),
                 difference(previousOwn, newOwn),
                 rescheduled,
-                previousSchedules,
                 newSchedules,
                 union(newOwn, previousOwn));
     }
@@ -87,17 +86,22 @@ public class StoreSupplierConnectionPersister {
     private void applyScheduleChanges(ConnectionChanges changes, Deque<Runnable> compensations) {
         String storeId = changes.storeId();
         for (String supplier : changes.added()) {
-            feedScheduler.createSchedule(storeId, supplier, changes.newSchedules().get(supplier));
-            compensations.push(() -> feedScheduler.deleteSchedule(storeId, supplier));
+            rememberSchedule(storeId, supplier, compensations);
+            feedScheduler.schedule(storeId, supplier, changes.newSchedules().get(supplier));
         }
         for (String supplier : changes.removed()) {
+            rememberSchedule(storeId, supplier, compensations);
             feedScheduler.deleteSchedule(storeId, supplier);
-            compensations.push(() -> feedScheduler.createSchedule(storeId, supplier, changes.previousSchedules().get(supplier)));
         }
         for (String supplier : changes.rescheduled()) {
-            feedScheduler.updateSchedule(storeId, supplier, changes.newSchedules().get(supplier));
-            compensations.push(() -> feedScheduler.updateSchedule(storeId, supplier, changes.previousSchedules().get(supplier)));
+            rememberSchedule(storeId, supplier, compensations);
+            feedScheduler.schedule(storeId, supplier, changes.newSchedules().get(supplier));
         }
+    }
+
+    private void rememberSchedule(String storeId, String supplier, Deque<Runnable> compensations) {
+        Optional<String> before = feedScheduler.snapshot(storeId, supplier);
+        compensations.push(() -> feedScheduler.restore(storeId, supplier, before));
     }
 
     private void saveStore(Store existingStore, FulfilmentConfiguration submitted) {
@@ -168,7 +172,7 @@ public class StoreSupplierConnectionPersister {
         }
         for (StoreSupplierConnection connection : config.getSupplierConnections()) {
             if (connection.getMode() == ConnectionMode.OWN) {
-                schedules.put(connection.getSupplierName(), PollingSchedule.normalizeOrNull(connection.getFeedSchedule()));
+                schedules.put(connection.getSupplierName(), connection.getFeedSchedule());
             }
         }
         return schedules;
@@ -190,7 +194,6 @@ public class StoreSupplierConnectionPersister {
                                      Set<String> added,
                                      Set<String> removed,
                                      Set<String> rescheduled,
-                                     Map<String, String> previousSchedules,
                                      Map<String, String> newSchedules,
                                      Set<String> affectedSecrets) {
     }

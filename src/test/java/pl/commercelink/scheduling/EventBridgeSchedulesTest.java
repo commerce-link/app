@@ -10,6 +10,8 @@ import software.amazon.awssdk.services.scheduler.model.ConflictException;
 import software.amazon.awssdk.services.scheduler.model.CreateScheduleRequest;
 import software.amazon.awssdk.services.scheduler.model.DeleteScheduleRequest;
 import software.amazon.awssdk.services.scheduler.model.FlexibleTimeWindowMode;
+import software.amazon.awssdk.services.scheduler.model.GetScheduleRequest;
+import software.amazon.awssdk.services.scheduler.model.GetScheduleResponse;
 import software.amazon.awssdk.services.scheduler.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.scheduler.model.UpdateScheduleRequest;
 
@@ -115,6 +117,41 @@ class EventBridgeSchedulesTest {
         assertThat(request.getValue().scheduleExpressionTimezone()).isEqualTo("Europe/Warsaw");
         assertThat(request.getValue().target().arn()).isEqualTo(TARGET_ARN);
         assertThat(request.getValue().target().roleArn()).isEqualTo(ROLE_ARN);
+    }
+
+    @Test
+    void expressionOfReturnsTheCurrentExpression() {
+        // given
+        EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, schedulerClient);
+        when(schedulerClient.getSchedule(any(GetScheduleRequest.class)))
+                .thenReturn(GetScheduleResponse.builder().scheduleExpression("cron(37 2 * * ? *)").build());
+
+        // when / then
+        assertThat(schedules.expressionOf("supplier-feed-s1-acme")).contains("cron(37 2 * * ? *)");
+        ArgumentCaptor<GetScheduleRequest> request = ArgumentCaptor.forClass(GetScheduleRequest.class);
+        verify(schedulerClient).getSchedule(request.capture());
+        assertThat(request.getValue().name()).isEqualTo("supplier-feed-s1-acme");
+    }
+
+    @Test
+    void expressionOfIsEmptyForAMissingSchedule() {
+        // given
+        EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, schedulerClient);
+        when(schedulerClient.getSchedule(any(GetScheduleRequest.class)))
+                .thenThrow(ResourceNotFoundException.builder().message("missing").build());
+
+        // when / then
+        assertThat(schedules.expressionOf("supplier-feed-s1-acme")).isEmpty();
+    }
+
+    @Test
+    void expressionOfIsEmptyWhenDisabled() {
+        // given
+        EventBridgeSchedules schedules = new EventBridgeSchedules("localhost", null, ROLE_ARN, schedulerClient);
+
+        // when / then
+        assertThat(schedules.expressionOf("supplier-feed-s1-acme")).isEmpty();
+        verifyNoInteractions(schedulerClient);
     }
 
     @Test
