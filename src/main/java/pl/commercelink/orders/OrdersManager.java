@@ -143,13 +143,27 @@ public class OrdersManager {
     }
 
     public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
-        execute(storeId, orderId, orderItemId2Costs.keySet(), (order, orderItem) -> {
+        // captured inside the lifecycle action so the order is read once, by execute
+        LocalDate[] previousAssemblyAtHolder = new LocalDate[1];
+
+        Result result = execute(storeId, orderId, orderItemId2Costs.keySet(), (order, orderItem) -> {
             // an item claimed by another pending delivery is already being bought there - do not steal it
             if (orderItem.isInAllocation() && (!orderItem.isClaimed() || deliveryId.equals(orderItem.getClaimedDeliveryId()))) {
                 orderItem.markAsOrdered(deliveryId, orderItemId2Costs.get(orderItem.getItemId()));
                 orderItemsRepository.save(orderItem);
             }
-        }, o -> o.updateEstimatedAssemblyAt(estimatedDeliveryAt));
+        }, o -> {
+            previousAssemblyAtHolder[0] = o.getEstimatedAssemblyAt();
+            o.updateEstimatedAssemblyAt(estimatedDeliveryAt);
+        });
+
+        LocalDate previousAssemblyAt = previousAssemblyAtHolder[0];
+        LocalDate assemblyAt = result.getOrder().getEstimatedAssemblyAt();
+        if (previousAssemblyAt != null && !Objects.equals(previousAssemblyAt, assemblyAt)) {
+            // A date the customer may already have received moved later - the notifications service decides
+            // whether the customer actually saw the old one.
+            notificationEventPublisher.publishAssemblyDateChanged(result.getOrder(), previousAssemblyAt);
+        }
     }
 
     /**
