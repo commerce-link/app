@@ -373,9 +373,78 @@ class WarehouseAllocationsManagerTest {
         assertThat(alreadyOrdered.getDeliveryId()).isEqualTo("existing-delivery");
     }
 
+    @Test
+    @DisplayName("claim reserves the surplus on an existing warehouse item without ordering it")
+    void claimReservesTheSurplusOnAnExistingWarehouseItemWithoutOrderingIt() {
+        // given
+        WarehouseItem warehouseItem = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        when(warehouseRepository.findById(STORE_ID, ITEM_ID)).thenReturn(warehouseItem);
+        DeliveryItem item = deliveryItemWithWarehouseAllocation();
+
+        // when
+        warehouseAllocationsManager.claim(STORE_ID, "delivery-1", PROVIDER, List.of(item));
+
+        // then
+        assertThat(warehouseItem.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(warehouseItem.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(warehouseItem.getPurchaseClaimQty()).isEqualTo(3);
+        assertThat(warehouseItem.getQty()).isEqualTo(4);
+        assertThat(warehouseItem.getCost()).isEqualTo(55.5);
+        verify(warehouseRepository).save(warehouseItem);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered orders the claimed warehouse items and leaves the quantities alone")
+    void markClaimedAsOrderedOrdersTheClaimedWarehouseItemsAndLeavesTheQuantitiesAlone() {
+        // given
+        WarehouseItem warehouseItem = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        warehouseItem.setQty(4);
+        warehouseItem.setPurchaseClaimQty(3);
+        warehouseItem.markAsClaimed("delivery-1");
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(warehouseItem));
+
+        // when
+        warehouseAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1");
+
+        // then
+        assertThat(warehouseItem.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(warehouseItem.getQty()).isEqualTo(4);
+        assertThat(warehouseItem.getPurchaseClaimQty()).isEqualTo(3);
+        verify(warehouseRepository).save(warehouseItem);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered ignores items that are not claimed by this delivery")
+    void markClaimedAsOrderedIgnoresItemsThatAreNotClaimedByThisDelivery() {
+        // given
+        WarehouseItem alreadyOrdered = warehouseItemInStatus(FulfilmentStatus.Ordered);
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(alreadyOrdered));
+
+        // when
+        warehouseAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1");
+
+        // then
+        verify(warehouseRepository, never()).save(alreadyOrdered);
+    }
+
     private WarehouseItem warehouseItemInStatus(FulfilmentStatus status) {
         WarehouseItem item = new WarehouseItem(STORE_ID, PROVIDER, "Other", "test", "old-ean", "OLD-MFN", 10.0, 1);
         item.setStatus(status);
+        return item;
+    }
+
+    private DeliveryItem deliveryItemWithWarehouseAllocation() {
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(null, ITEM_ID, "Warehouse"));
+        allocation.setType(AllocationType.Warehouse);
+        allocation.setQty(2);
+        allocation.setSelected(true);
+
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("OLD-MFN");
+        item.setUnitCost(55.5);
+        item.setRequestedQty(5);
+        item.setAllocations(List.of(allocation));
         return item;
     }
 }

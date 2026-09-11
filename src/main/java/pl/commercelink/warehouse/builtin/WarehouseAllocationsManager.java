@@ -60,6 +60,23 @@ public class WarehouseAllocationsManager {
         }
     }
 
+    /** Reserves the delivery's warehouse quantities before the supplier confirmed the purchase. */
+    public void claim(String storeId, String deliveryId, String provider, List<DeliveryItem> items) {
+        for (DeliveryItem item : items) {
+            claimAllocations(storeId, deliveryId, provider, item);
+        }
+    }
+
+    /** The supplier confirmed: only the status and the confirmed cost change, never the quantities. */
+    public void markClaimedAsOrdered(String storeId, String deliveryId) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            if (item.isClaimed()) {
+                item.markAsOrdered(deliveryId, item.getCost());
+                warehouseRepository.save(item);
+            }
+        }
+    }
+
     public boolean updateFulfilment(String storeId, String provider, String itemId, String ean, String mfn, double unitCost) {
         WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
         if (warehouseItem == null || !warehouseItem.updateFulfilment(provider, ean, mfn, unitCost)) {
@@ -185,6 +202,49 @@ public class WarehouseAllocationsManager {
     private void createNewWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
         WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
         warehouseItem.markAsOrdered(deliveryId, item.getUnitCost());
+        warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
+        warehouseRepository.save(warehouseItem);
+    }
+
+    private void claimAllocations(String storeId, String deliveryId, String provider, DeliveryItem item) {
+        Allocation allocation = item.getSelectedAllocations(AllocationType.Warehouse).stream()
+                .findFirst()
+                .orElse(null);
+
+        int warehouseQtyAdjustment = item.getWarehouseQtyAdjustment();
+
+        if (allocation != null) {
+            claimExistingWarehouseItem(storeId, deliveryId, allocation, item.getUnitCost(), warehouseQtyAdjustment);
+        } else if (warehouseQtyAdjustment > 0) {
+            createClaimedWarehouseItem(storeId, deliveryId, provider, item);
+        }
+    }
+
+    private void claimExistingWarehouseItem(String storeId, String deliveryId, Allocation allocation, double unitCost, int qtyAdjustment) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
+        if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
+            return;
+        }
+        warehouseItem.setCost(unitCost);
+        warehouseItem.markAsClaimed(deliveryId);
+        warehouseItem.setPurchaseClaimQty(qtyAdjustment);
+        if (qtyAdjustment != 0) {
+            int newQty = warehouseItem.getQty() + qtyAdjustment;
+            if (newQty > 0) {
+                warehouseItem.setQty(newQty);
+                warehouseRepository.save(warehouseItem);
+            } else {
+                warehouseRepository.delete(warehouseItem);
+            }
+        } else {
+            warehouseRepository.save(warehouseItem);
+        }
+    }
+
+    private void createClaimedWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
+        WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
+        warehouseItem.setCost(item.getUnitCost());
+        warehouseItem.markAsClaimed(deliveryId);
         warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
         warehouseRepository.save(warehouseItem);
     }
