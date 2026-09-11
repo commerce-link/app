@@ -133,7 +133,8 @@ class DeliveryCreationServiceTest {
         service.completePending(STORE_ID, delivery, form);
 
         // then
-        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
+        InOrder inOrder = inOrder(deliveryCostSync, deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
+        inOrder.verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
         inOrder.verify(deliveriesRepository).save(delivery);
         inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25));
         inOrder.verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
@@ -154,6 +155,23 @@ class DeliveryCreationServiceTest {
         // when / then
         assertThatNoException().isThrownBy(() -> service.completePending(STORE_ID, delivery, form));
         verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered still orders the warehouse side after the order side fails")
+    void markClaimedAsOrderedStillOrdersTheWarehouseSideAfterTheOrderSideFails() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 25);
+        doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
+                .markClaimedAsOrdered(any(), any(), any());
+
+        // when
+        assertThatNoException().isThrownBy(() ->
+                service.markClaimedAsOrdered(STORE_ID, delivery, estimatedDeliveryAt));
+
+        // then
+        verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
     }
 
     @Test

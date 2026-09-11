@@ -109,14 +109,23 @@ public class DeliveryCreationService {
     /**
      * The delivery is already saved with the supplier's order number, so a failure here must not undo the
      * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
-     * be lost. Log loudly instead.
+     * be lost. Log loudly instead - the affected items stay claimed to this delivery (excluded from the
+     * allocation pool) and need a manual release before the operator can move them onto another delivery.
+     * Each side gets its own try/catch so a failure on one does not also skip the other.
      */
     public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
             orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+        } catch (RuntimeException e) {
+            log.error("Claimed order allocations not marked as ordered, items remain claimed and need a manual release: " +
+                            "store={} delivery={} provider={} estimatedDeliveryAt={}",
+                    storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
+        }
+        try {
             warehouseAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId());
         } catch (RuntimeException e) {
-            log.error("Claimed allocations not marked as ordered: store={} delivery={} provider={} estimatedDeliveryAt={}",
+            log.error("Claimed warehouse allocations not marked as ordered, items remain claimed and need a manual release: " +
+                            "store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }
     }
