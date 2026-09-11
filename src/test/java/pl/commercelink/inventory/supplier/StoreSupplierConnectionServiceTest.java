@@ -255,6 +255,48 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void connectOrUpdateReportsTheSupplierAsHavingStoredConfigurationWhenEditingAnOwnConnection() {
+        // given: an OWN connection whose provider already saved configuration -- the contract
+        // that a blank password on edit means "keep the current secret" depends on the validator
+        // being told this supplier has one
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
+        when(configurationManager.loadConfiguration(store, "Elko")).thenReturn(Map.of("login", "u"));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when: re-saving with a blank password, as the "leave blank to keep the current value" field does
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
+                Map.of("password", ""));
+
+        // then
+        ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(validator).validate(anyBoolean(), anyList(), anyMap(), anyMap(), storedConfigCaptor.capture());
+        assertThat(storedConfigCaptor.getValue()).contains("Elko");
+    }
+
+    @Test
+    void connectOrUpdateReportsNoStoredConfigurationWhenEditingAGlobalConnection() {
+        // given: GLOBAL mode never keeps its own stored credentials, regardless of what the
+        // provider's configuration manager holds for this supplier
+        Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.GLOBAL, true, true));
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.connectOrUpdate(store,
+                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
+                Map.of("password", ""));
+
+        // then
+        ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(validator).validate(anyBoolean(), anyList(), anyMap(), anyMap(), storedConfigCaptor.capture());
+        assertThat(storedConfigCaptor.getValue()).isEmpty();
+    }
+
+    @Test
     void disconnectRemovesOnlyTheNamedSupplier() {
         // given
         Store store = storeWith(true,
