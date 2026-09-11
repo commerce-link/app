@@ -993,6 +993,26 @@ class OrdersManagerTest {
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
     }
 
+    @Test
+    @DisplayName("markOrderItemsAsOrdered does not notify when a New order's date moves on the way into Assembly")
+    void markOrderItemsAsOrderedDoesNotNotifyWhenANewOrdersDateMovesOnTheWayIntoAssembly() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
+
+        // then
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
     private OrderItem orderItemInAllocation(String itemId) {
         OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
         item.setItemId(itemId);

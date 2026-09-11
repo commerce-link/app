@@ -145,6 +145,7 @@ public class OrdersManager {
     public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
         // captured inside the lifecycle action so the order is read once, by execute
         LocalDate[] previousAssemblyAtHolder = new LocalDate[1];
+        OrderStatus[] previousStatusHolder = new OrderStatus[1];
 
         Result result = execute(storeId, orderId, orderItemId2Costs.keySet(), (order, orderItem) -> {
             // an item claimed by another pending delivery is already being bought there - do not steal it
@@ -154,12 +155,17 @@ public class OrdersManager {
             }
         }, o -> {
             previousAssemblyAtHolder[0] = o.getEstimatedAssemblyAt();
+            previousStatusHolder[0] = o.getStatus();
             o.updateEstimatedAssemblyAt(estimatedDeliveryAt);
         });
 
         LocalDate previousAssemblyAt = previousAssemblyAtHolder[0];
         LocalDate assemblyAt = result.getOrder().getEstimatedAssemblyAt();
-        if (previousAssemblyAt != null && !Objects.equals(previousAssemblyAt, assemblyAt)) {
+        // Only an order that was already in Assembly before this call can have had its date communicated:
+        // an order still in New gets its first date together with the ORDER_ASSEMBLY notification this very
+        // call triggers, and announcing a change against a date nobody ever received is pure noise.
+        boolean wasInAssembly = previousStatusHolder[0] == OrderStatus.Assembly;
+        if (wasInAssembly && previousAssemblyAt != null && !Objects.equals(previousAssemblyAt, assemblyAt)) {
             // A date the customer may already have received moved later - the notifications service decides
             // whether the customer actually saw the old one.
             notificationEventPublisher.publishAssemblyDateChanged(result.getOrder(), previousAssemblyAt);
