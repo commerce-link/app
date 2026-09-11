@@ -150,8 +150,12 @@
                                         <input class="input"
                                                th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
                                                th:name="'configuration[' + ${cf.key()} + ']'"
-                                               th:value="${form.supplierConfiguration.get(entry.key) != null
-                                                          ? form.supplierConfiguration.get(entry.key).get(cf.key()) : ''}"
+                                               th:value="${cf.type().name() == 'PASSWORD'
+                                                          ? ''
+                                                          : (submittedSupplierConfiguration != null and (entry.key == editSupplier or entry.key == addSupplier)
+                                                             ? (submittedSupplierConfiguration.get(cf.key()) ?: '')
+                                                             : (form.supplierConfiguration.get(entry.key) != null
+                                                                ? form.supplierConfiguration.get(entry.key).get(cf.key()) : ''))}"
                                                th:placeholder="${cf.placeholder()}" disabled />
                                     </div>
                                     <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"

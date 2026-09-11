@@ -61,4 +61,21 @@ class StoreFulfilmentTemplateTest {
         assertThat(html).doesNotContain("supplierSelections[");
         assertThat(html).doesNotContain("class=\"supplier-enabled\"");
     }
+
+    @Test
+    void restoresSubmittedCredentialsOnlyForTheProviderBeingReopened() throws Exception {
+        String normalized = template().replaceAll("\\s+", " ");
+
+        // the value expression actually reads from the flash map of what was just submitted
+        assertThat(normalized).contains("submittedSupplierConfiguration.get(cf.key())");
+
+        // ...but only when the provider block being rendered is the one being reopened,
+        // so a rejected submission for one provider can never leak into another provider's field
+        assertThat(normalized).contains(
+                "submittedSupplierConfiguration != null and (entry.key == editSupplier or entry.key == addSupplier)");
+
+        // password fields short-circuit to '' before ever consulting the submitted map
+        assertThat(normalized).contains(
+                "${cf.type().name() == 'PASSWORD' ? '' : (submittedSupplierConfiguration");
+    }
 }
