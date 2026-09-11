@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,7 +24,15 @@ import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.OrdersManager;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import pl.commercelink.stores.ConnectionMode;
@@ -37,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -49,6 +59,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -385,6 +396,58 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals("ACME-PHONE-1", delivery.getExternalDeliveryId());
         verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(estimatedDeliveryAt));
         verifyNoInteractions(supplierProvider, dropshipPurchaseService, supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    @DisplayName("completing a failed dropship delivery manually stamps assembly and shipping with the same date")
+    void completeManuallyOnFailedDropshipStampsBothDatesTheSame() {
+        // given: wire the real completion chain (DeliveryCreationService -> OrderAllocationsManager ->
+        // OrdersManager -> Order) instead of mocking it away, so the dropship date rule is proven
+        // end-to-end through the exact entry point the manual completion screen calls, not just where
+        // each collaborator happens to be mocked in isolation.
+        OrdersRepository ordersRepository = mock(OrdersRepository.class);
+        OrderItemsRepository orderItemsRepository = mock(OrderItemsRepository.class);
+
+        OrdersManager realOrdersManager = new OrdersManager();
+        ReflectionTestUtils.setField(realOrdersManager, "ordersRepository", ordersRepository);
+        ReflectionTestUtils.setField(realOrdersManager, "orderItemsRepository", orderItemsRepository);
+        ReflectionTestUtils.setField(realOrdersManager, "orderLifecycle", mock(OrderLifecycle.class));
+
+        OrderAllocationsManager realOrderAllocationsManager = new OrderAllocationsManager();
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersRepository", ordersRepository);
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "orderItemsRepository", orderItemsRepository);
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersManager", realOrdersManager);
+
+        DeliveryCreationService realDeliveryCreationService = new DeliveryCreationService();
+        ReflectionTestUtils.setField(realDeliveryCreationService, "orderAllocationsManager", realOrderAllocationsManager);
+        ReflectionTestUtils.setField(realDeliveryCreationService, "warehouseAllocationsManager", mock(WarehouseAllocationsManager.class));
+        ReflectionTestUtils.setField(service, "deliveryCreationService", realDeliveryCreationService);
+
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.New);
+        // A non-zero value is essential: with zero realization days the warehouse rule and the dropship
+        // rule land on the same date, and the test could not tell them apart.
+        order.setOrderRealizationDays(3);
+        OrderItem claimedItem = new OrderItem(ORDER_ID, "Other", "Product EAN-1", 1, 100.0, "MFN-1", false);
+        claimedItem.setItemId("item-1");
+        claimedItem.markAsClaimed(DELIVERY_ID);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(claimedItem));
+        when(orderItemsRepository.findByDeliveryId(DELIVERY_ID)).thenReturn(List.of(claimedItem));
+
+        // when
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "ACME-PHONE-1", LocalDate.of(2026, 9, 14));
+
+        // then
+        assertTrue(result.isSuccess());
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
     }
 
 }

@@ -434,6 +434,9 @@ class DropshipPurchaseServiceTest {
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
+        // The manual "Save" path orders the items immediately - it must not take the automatic purchase's
+        // claim-only route, which would leave them reserved but unordered until a supplier confirmation.
+        verify(deliveryCreationService, never()).claimAllocationsForPurchase(any(), any(), any());
         verify(supplierPurchaseEventPublisher, never()).publish(any());
         verify(supplierProvider, never()).placeDropshipOrder(any());
     }
