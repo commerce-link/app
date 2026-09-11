@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
@@ -47,7 +46,6 @@ class OrderLifecycleTest {
     @Mock private OrderItemsRepository orderItemsRepository;
     @Mock private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Mock private OrderNotificationsEventPublisher notificationEventPublisher;
-    @Mock private DeliveriesRepository deliveriesRepository;
     @Mock private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private DropshipItemLookup dropshipItemLookup;
@@ -312,9 +310,9 @@ class OrderLifecycleTest {
         when(item.getDeliveryId()).thenReturn("d1");
 
         Delivery dropshipDelivery = mock(Delivery.class);
-        when(dropshipDelivery.isDropship()).thenReturn(true);
         when(dropshipDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
-        when(deliveriesRepository.findById("store-1", "d1")).thenReturn(dropshipDelivery);
+        when(dropshipItemLookup.deliveriesOf(eq("store-1"), any())).thenReturn(List.of(dropshipDelivery));
+        when(dropshipItemLookup.isEntirelyDropship(List.of(dropshipDelivery))).thenReturn(true);
 
         // when
         orderLifecycle.update(order, List.of(item));
@@ -341,20 +339,58 @@ class OrderLifecycleTest {
         when(warehouseItem.getDeliveryId()).thenReturn("d2");
 
         Delivery dropshipDelivery = mock(Delivery.class);
-        when(dropshipDelivery.isDropship()).thenReturn(true);
         when(dropshipDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
-        when(deliveriesRepository.findById("store-1", "d1")).thenReturn(dropshipDelivery);
-
         Delivery warehouseDelivery = mock(Delivery.class);
-        when(warehouseDelivery.isDropship()).thenReturn(false);
         when(warehouseDelivery.getEstimatedDeliveryAt()).thenReturn(LocalDate.of(2026, 9, 14));
-        when(deliveriesRepository.findById("store-1", "d2")).thenReturn(warehouseDelivery);
+        when(dropshipItemLookup.deliveriesOf(eq("store-1"), any()))
+                .thenReturn(List.of(dropshipDelivery, warehouseDelivery));
+        when(dropshipItemLookup.isEntirelyDropship(List.of(dropshipDelivery, warehouseDelivery))).thenReturn(false);
 
         // when
         orderLifecycle.update(order, List.of(dropshipItem, warehouseItem));
 
         // then
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("an all-dropship order that is fully delivered gains no realization days")
+    void assembledDropshipOnlyOrderShipsOnTheAssemblyDay() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(true);
+        when(dropshipItemLookup.isEntirelyDropship(eq("store-1"), any())).thenReturn(true);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Assembled, order.getStatus());
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(order.getEstimatedAssemblyAt());
+    }
+
+    @Test
+    @DisplayName("an order with a warehouse leg still adds the realization days once fully delivered")
+    void assembledOrderWithAWarehouseLegKeepsItsRealizationDays() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(true);
+        when(dropshipItemLookup.isEntirelyDropship(eq("store-1"), any())).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Assembled, order.getStatus());
+        assertThat(order.getEstimatedShippingAt()).isAfter(order.getEstimatedAssemblyAt());
     }
 
     @Test

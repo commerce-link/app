@@ -408,21 +408,7 @@ class SupplierPurchaseServiceDropshipTest {
         // each collaborator happens to be mocked in isolation.
         OrdersRepository ordersRepository = mock(OrdersRepository.class);
         OrderItemsRepository orderItemsRepository = mock(OrderItemsRepository.class);
-
-        OrdersManager realOrdersManager = new OrdersManager();
-        ReflectionTestUtils.setField(realOrdersManager, "ordersRepository", ordersRepository);
-        ReflectionTestUtils.setField(realOrdersManager, "orderItemsRepository", orderItemsRepository);
-        ReflectionTestUtils.setField(realOrdersManager, "orderLifecycle", mock(OrderLifecycle.class));
-
-        OrderAllocationsManager realOrderAllocationsManager = new OrderAllocationsManager();
-        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersRepository", ordersRepository);
-        ReflectionTestUtils.setField(realOrderAllocationsManager, "orderItemsRepository", orderItemsRepository);
-        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersManager", realOrdersManager);
-
-        DeliveryCreationService realDeliveryCreationService = new DeliveryCreationService();
-        ReflectionTestUtils.setField(realDeliveryCreationService, "orderAllocationsManager", realOrderAllocationsManager);
-        ReflectionTestUtils.setField(realDeliveryCreationService, "warehouseAllocationsManager", mock(WarehouseAllocationsManager.class));
-        ReflectionTestUtils.setField(service, "deliveryCreationService", realDeliveryCreationService);
+        wireRealCompletionChain(ordersRepository, orderItemsRepository);
 
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
         Delivery delivery = pendingDropshipDelivery(form, "ref-1");
@@ -455,6 +441,80 @@ class SupplierPurchaseServiceDropshipTest {
         assertThat(claimedItem.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("a dropship completion on an order with a warehouse leg still adds the realization days")
+    void completeManuallyOnADropshipLegOfAMixedOrderKeepsTheRealizationDays() {
+        // given: the same real completion chain, but the order also has an item bought for the warehouse,
+        // which still has to be picked, packed and forwarded by hand
+        OrdersRepository ordersRepository = mock(OrdersRepository.class);
+        OrderItemsRepository orderItemsRepository = mock(OrderItemsRepository.class);
+        wireRealCompletionChain(ordersRepository, orderItemsRepository);
+
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery dropshipDelivery = pendingDropshipDelivery(form, "ref-1");
+        dropshipDelivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(dropshipDelivery);
+        Delivery warehouseDelivery = new Delivery(STORE_ID, null, PROVIDER);
+        warehouseDelivery.setType(DeliveryType.WAREHOUSE);
+        when(deliveriesRepository.findById(STORE_ID, "warehouse-delivery")).thenReturn(warehouseDelivery);
+
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 14), false);
+        OrderItem warehouseItem = allocatedItem("item-1", "EAN-1", "MFN-1");
+        warehouseItem.markAsOrdered("warehouse-delivery", 100.0);
+        OrderItem claimedItem = allocatedItem("item-2", "EAN-2", "MFN-2");
+        claimedItem.markAsClaimed(DELIVERY_ID);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(warehouseItem, claimedItem));
+        when(orderItemsRepository.findByDeliveryId(DELIVERY_ID)).thenReturn(List.of(claimedItem));
+
+        // when: the dropship leg is confirmed for a later date than the warehouse one
+        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "ACME-PHONE-1", LocalDate.of(2026, 9, 20));
+
+        // then: the later date moves assembly, and the warehouse leg still earns the realization days
+        assertTrue(result.isSuccess());
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 23));
+    }
+
+    /**
+     * Wires the real completion chain (DeliveryCreationService -> OrderAllocationsManager -> OrdersManager
+     * -> Order, with the real per-order route lookup) into the service under test instead of mocking it
+     * away, so the date rule is proven end-to-end through the exact entry point the manual completion
+     * screen calls, not just where each collaborator happens to be mocked in isolation.
+     */
+    private void wireRealCompletionChain(OrdersRepository ordersRepository, OrderItemsRepository orderItemsRepository) {
+        OrdersManager realOrdersManager = new OrdersManager();
+        ReflectionTestUtils.setField(realOrdersManager, "ordersRepository", ordersRepository);
+        ReflectionTestUtils.setField(realOrdersManager, "orderItemsRepository", orderItemsRepository);
+        ReflectionTestUtils.setField(realOrdersManager, "orderLifecycle", mock(OrderLifecycle.class));
+        ReflectionTestUtils.setField(realOrdersManager, "dropshipItemLookup", new DropshipItemLookup(deliveriesRepository));
+
+        OrderAllocationsManager realOrderAllocationsManager = new OrderAllocationsManager();
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersRepository", ordersRepository);
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "orderItemsRepository", orderItemsRepository);
+        ReflectionTestUtils.setField(realOrderAllocationsManager, "ordersManager", realOrdersManager);
+
+        DeliveryCreationService realDeliveryCreationService = new DeliveryCreationService();
+        ReflectionTestUtils.setField(realDeliveryCreationService, "orderAllocationsManager", realOrderAllocationsManager);
+        ReflectionTestUtils.setField(realDeliveryCreationService, "warehouseAllocationsManager", mock(WarehouseAllocationsManager.class));
+        ReflectionTestUtils.setField(service, "deliveryCreationService", realDeliveryCreationService);
+    }
+
+    private OrderItem allocatedItem(String itemId, String ean, String mfn) {
+        // isInAllocation() requires hasAllocationDetails() (ean + manufacturerCode + deliveryId): without
+        // these the per-item guard in OrdersManager.markOrderItemsAsOrdered never fires and the item is
+        // never actually marked Ordered, which would make the date assertions pass for the wrong reason.
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "Product " + ean, 1, 100.0, mfn, false);
+        item.setItemId(itemId);
+        item.setEan(ean);
+        item.setManufacturerCode(mfn);
+        return item;
     }
 
 }

@@ -82,4 +82,57 @@ class DropshipItemLookupTest {
         // then
         assertThat(ids).isEmpty();
     }
+
+    @Test
+    void anOrderIsEntirelyDropshipOnlyWhenEveryDeliveryBehindItsItemsIsOne() {
+        // given
+        OrderItem first = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem second = item("i2", FulfilmentStatus.Ordered, "d-2");
+        when(deliveriesRepository.findById(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findById(STORE_ID, "d-2")).thenReturn(delivery("d-2", DeliveryType.DROPSHIP));
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(first, second))).isTrue();
+    }
+
+    @Test
+    void oneWarehouseLegIsEnoughToMakeTheOrderNotEntirelyDropship() {
+        // given
+        OrderItem dropshipped = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem throughTheWarehouse = item("i2", FulfilmentStatus.Ordered, "d-2");
+        when(deliveriesRepository.findById(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findById(STORE_ID, "d-2")).thenReturn(delivery("d-2", DeliveryType.WAREHOUSE));
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(dropshipped, throughTheWarehouse))).isFalse();
+    }
+
+    @Test
+    void anOrderWithNoResolvableDeliveryIsNotEntirelyDropship() {
+        // given
+        OrderItem stillAllocating = item("i1", FulfilmentStatus.Allocation, "Acme");
+        OrderItem withoutADelivery = item("i2", FulfilmentStatus.New, null);
+        when(deliveriesRepository.findById(STORE_ID, "Acme")).thenReturn(null);
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(stillAllocating, withoutADelivery))).isFalse();
+    }
+
+    @Test
+    void deliveriesOfLooksUpEachDeliveryOnceAndSkipsTheOnesThatDoNotExist() {
+        // given
+        OrderItem first = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem sameDelivery = item("i2", FulfilmentStatus.Ordered, "d-1");
+        OrderItem orphan = item("i3", FulfilmentStatus.Ordered, "gone");
+        Delivery dropship = delivery("d-1", DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findById(STORE_ID, "d-1")).thenReturn(dropship);
+        when(deliveriesRepository.findById(STORE_ID, "gone")).thenReturn(null);
+
+        // when
+        List<Delivery> deliveries = lookup.deliveriesOf(STORE_ID, List.of(first, sameDelivery, orphan));
+
+        // then
+        assertThat(deliveries).containsExactly(dropship);
+        verify(deliveriesRepository, times(1)).findById(STORE_ID, "d-1");
+    }
 }

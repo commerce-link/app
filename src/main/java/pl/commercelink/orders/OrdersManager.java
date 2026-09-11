@@ -142,7 +142,7 @@ public class OrdersManager {
         return new Result(order, orderItems);
     }
 
-    public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt, boolean shippedBySupplier) {
+    public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
         // captured inside the lifecycle action so the order is read once, by execute
         LocalDate[] previousAssemblyAtHolder = new LocalDate[1];
         OrderStatus[] previousStatusHolder = new OrderStatus[1];
@@ -153,10 +153,12 @@ public class OrdersManager {
                 orderItem.markAsOrdered(deliveryId, orderItemId2Costs.get(orderItem.getItemId()));
                 orderItemsRepository.save(orderItem);
             }
-        }, o -> {
+        }, (o, items) -> {
             previousAssemblyAtHolder[0] = o.getEstimatedAssemblyAt();
             previousStatusHolder[0] = o.getStatus();
-            o.updateEstimatedAssemblyAt(estimatedDeliveryAt, shippedBySupplier);
+            // Whether the realization days apply is a property of the whole order, not of the delivery that
+            // happens to be confirmed now: the items just marked point at their deliveries, so ask there.
+            o.updateEstimatedAssemblyAt(estimatedDeliveryAt, dropshipItemLookup.isEntirelyDropship(storeId, items));
         });
 
         LocalDate previousAssemblyAt = previousAssemblyAtHolder[0];
@@ -244,7 +246,7 @@ public class OrdersManager {
     }
 
     private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action) {
-        return execute(storeId, orderId, orderItemIds, action, o -> { });
+        return execute(storeId, orderId, orderItemIds, action, (o, items) -> { });
     }
 
     /** Items sitting in a dropship delivery never reach the warehouse: they are left untouched and counted. */
@@ -255,11 +257,11 @@ public class OrdersManager {
         Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, orderItems);
         List<String> selected = orderItemIds.stream().filter(id -> !dropshipItemIds.contains(id)).toList();
         int skipped = orderItemIds.size() - selected.size();
-        Result result = execute(storeId, orderId, selected, action, o -> { });
+        Result result = execute(storeId, orderId, selected, action, (o, items) -> { });
         return new Result(result.getOrder(), result.getOrderItems(), skipped);
     }
 
-    private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action, Consumer<Order> lifecycleAction) {
+    private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action, BiConsumer<Order, List<OrderItem>> lifecycleAction) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
 
@@ -267,7 +269,7 @@ public class OrdersManager {
             action.accept(order, i);
         });
 
-        lifecycleAction.accept(order);
+        lifecycleAction.accept(order, orderItems);
         orderLifecycle.update(order, orderItems);
 
         return new Result(order, orderItems);

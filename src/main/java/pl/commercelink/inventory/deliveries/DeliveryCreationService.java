@@ -52,7 +52,10 @@ public class DeliveryCreationService {
         prepareForm(storeId, form);
         clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
-        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems(), delivery.isDropship());
+        // The delivery has to exist before the items start pointing at it: the ordering step asks the
+        // deliveries behind the order's items how the goods travel, and an unsaved delivery reads as none.
+        deliveriesRepository.save(delivery);
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
         if (!delivery.isDropship()) {
             warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
         }
@@ -125,7 +128,7 @@ public class DeliveryCreationService {
      */
     public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
-            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt, delivery.isDropship());
+            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
         } catch (RuntimeException e) {
             log.error("Claimed order allocations not marked as ordered - items remain claimed and stuck in " +
                             "allocation, needs an engineer to re-run the marking: " +
@@ -176,7 +179,7 @@ public class DeliveryCreationService {
 
         deliveriesRepository.save(delivery);
 
-        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems(), delivery.isDropship());
+        orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
         warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
     }
 

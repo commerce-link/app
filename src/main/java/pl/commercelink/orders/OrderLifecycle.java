@@ -1,11 +1,9 @@
 package pl.commercelink.orders;
 
 import jakarta.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
@@ -36,8 +34,6 @@ public class OrderLifecycle {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private OrderNotificationsEventPublisher notificationEventPublisher;
-    @Autowired
-    private DeliveriesRepository deliveriesRepository;
     @Autowired
     private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Autowired
@@ -74,16 +70,16 @@ public class OrderLifecycle {
 
             if (hasAllOrderItemsDelivered) {
                 order.setStatus(OrderStatus.Assembled);
-                order.updateEstimatedAssemblyAt(LocalDate.now());
+                // The goods are in hand today, but the route still decides whether there is any in-house
+                // handling left to pay for: a dropship parcel is already on its way to the customer.
+                order.updateEstimatedAssemblyAt(LocalDate.now(),
+                        dropshipItemLookup.isEntirelyDropship(order.getStoreId(), orderItems));
             } else if (hasAllOrderItemsOrdered) {
                 order.setStatus(OrderStatus.Assembly);
                 if (order.getEstimatedAssemblyAt() == null) {
-                    List<Delivery> deliveries = deliveriesOf(order, orderItems);
-                    // Any leg through our warehouse justifies the realization days, so only an order
-                    // travelling entirely by dropship skips them.
-                    boolean shippedBySupplier = !deliveries.isEmpty()
-                            && deliveries.stream().allMatch(Delivery::isDropship);
-                    order.updateEstimatedAssemblyAt(latestDeliveryDate(deliveries), shippedBySupplier);
+                    List<Delivery> deliveries = dropshipItemLookup.deliveriesOf(order.getStoreId(), orderItems);
+                    order.updateEstimatedAssemblyAt(latestDeliveryDate(deliveries),
+                            dropshipItemLookup.isEntirelyDropship(deliveries));
                 }
             }
         }
@@ -161,16 +157,6 @@ public class OrderLifecycle {
         if (order.getStatus() == OrderStatus.Completed) {
             orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCompleted);
         }
-    }
-
-    private List<Delivery> deliveriesOf(Order order, List<OrderItem> orderItems) {
-        return orderItems.stream()
-                .map(OrderItem::getDeliveryId)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .map(deliveryId -> deliveriesRepository.findById(order.getStoreId(), deliveryId))
-                .filter(Objects::nonNull)
-                .toList();
     }
 
     private LocalDate latestDeliveryDate(List<Delivery> deliveries) {

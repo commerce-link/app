@@ -54,9 +54,9 @@ public class OrderAllocationsManager {
         return allocations;
     }
 
-    public void commit(String storeId, String deliveryId, LocalDate estimatedDeliveryAt, List<DeliveryItem> items, boolean shippedBySupplier) {
+    public void commit(String storeId, String deliveryId, LocalDate estimatedDeliveryAt, List<DeliveryItem> items) {
         selectedOrderAllocations(items).forEach((orderId, costs) ->
-                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt, shippedBySupplier));
+                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt));
     }
 
     /** Reserves the allocations for a pending delivery: bound to it, still in allocation. */
@@ -84,7 +84,7 @@ public class OrderAllocationsManager {
      * <p>The date may be missing: a confirmation without one still orders the items, because the purchase
      * did happen. The assembly-date update is a no-op for a null date.
      */
-    public void markClaimedAsOrdered(String storeId, String deliveryId, LocalDate estimatedDeliveryAt, boolean shippedBySupplier) {
+    public void markClaimedAsOrdered(String storeId, String deliveryId, LocalDate estimatedDeliveryAt) {
         Map<String, Map<String, Double>> claimedByOrderId = new HashMap<>();
         for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
             if (item.isClaimed()) {
@@ -96,7 +96,7 @@ public class OrderAllocationsManager {
 
         claimedByOrderId.forEach((orderId, costs) -> {
             try {
-                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt, shippedBySupplier);
+                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt);
             } catch (RuntimeException e) {
                 log.error("Claimed items not marked as ordered: store={} delivery={} order={} estimatedDeliveryAt={}",
                         storeId, deliveryId, orderId, estimatedDeliveryAt, e);

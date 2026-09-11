@@ -183,7 +183,6 @@ public class DropshipPurchaseService {
         Delivery delivery = newDropshipDelivery(storeId, store, order, form);
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         deliveryCreationService.claimAllocations(storeId, delivery, form);
-        deliveriesRepository.save(delivery);
 
         return OperationResult.success(delivery.getDeliveryId());
     }

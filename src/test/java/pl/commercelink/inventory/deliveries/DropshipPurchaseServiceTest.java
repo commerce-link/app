@@ -425,15 +425,14 @@ class DropshipPurchaseServiceTest {
         // when
         OperationResult<String> result = service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
 
-        // then
+        // then: the delivery is persisted by claimAllocations, before the order items point at it
         assertTrue(result.isSuccess());
-        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
-        Delivery delivery = saved.getValue();
+        ArgumentCaptor<Delivery> claimed = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), claimed.capture(), same(form));
+        Delivery delivery = claimed.getValue();
         assertTrue(delivery.isDropship());
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
-        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
         verify(supplierPurchaseEventPublisher, never()).publish(any());
         verify(supplierProvider, never()).placeDropshipOrder(any());
     }
@@ -528,11 +527,13 @@ class DropshipPurchaseServiceTest {
         OperationResult<String> manualResult =
                 service.createManualDropship(STORE_ID, directToConsumerOrder(), manualForm);
 
-        // then
+        // then: the automatic path saves the delivery itself, the manual one leaves that to claimAllocations
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository, times(2)).save(saved.capture());
-        Delivery submitted = saved.getAllValues().get(0);
-        Delivery manual = saved.getAllValues().get(1);
+        verify(deliveriesRepository).save(saved.capture());
+        ArgumentCaptor<Delivery> claimed = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), claimed.capture(), same(manualForm));
+        Delivery submitted = saved.getValue();
+        Delivery manual = claimed.getValue();
         assertEquals(submitted.getProvider(), manual.getProvider());
         assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
         assertTrue(submitted.isDropship());

@@ -819,7 +819,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
 
         // then
         assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
@@ -839,7 +839,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
 
         // then
         assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
@@ -862,7 +862,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
 
         // then
         verify(notificationEventPublisher).publishAssemblyDateChanged(order, LocalDate.of(2026, 9, 11));
@@ -881,7 +881,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
 
         // then
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
@@ -901,7 +901,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
 
         // then
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
@@ -917,9 +917,10 @@ class OrdersManagerTest {
         OrderItem item = orderItemInAllocation("item-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true);
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14), true);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14));
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
@@ -936,13 +937,39 @@ class OrdersManagerTest {
         OrderItem item = orderItemInAllocation("item-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
 
         // when
-        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14), false);
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14));
 
         // then
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("a mixed order keeps its realization days when the dropship leg carries the later date")
+    void marksOrderedKeepsRealizationDaysWhenOnlyOneLegTravelsByDropship() {
+        // given: item-1 already ordered on a warehouse delivery, item-2 now ordered on a later dropship one
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem warehouseItem = orderItemInAllocation("item-1");
+        warehouseItem.markAsOrdered("d-warehouse", 10.0);
+        OrderItem dropshipItem = orderItemInAllocation("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(warehouseItem, dropshipItem));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-dropship", Map.of("item-2", 10.0), LocalDate.of(2026, 9, 20));
+
+        // then: the later dropship date moves assembly, but item-1 still has to be forwarded by hand
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 23));
+        ArgumentCaptor<List<OrderItem>> askedWith = ArgumentCaptor.forClass(List.class);
+        verify(dropshipItemLookup).isEntirelyDropship(eq(STORE_ID), askedWith.capture());
+        assertThat(askedWith.getValue()).containsExactly(warehouseItem, dropshipItem);
     }
 
     private OrderItem orderItemInAllocation(String itemId) {

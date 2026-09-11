@@ -53,6 +53,8 @@ class DeliveriesManagerTest {
     private OrderAllocationsManager orderAllocationsManager;
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Mock
+    private DropshipItemLookup dropshipItemLookup;
 
     @InjectMocks
     private DeliveriesManager deliveriesManager;
@@ -144,7 +146,7 @@ class DeliveriesManagerTest {
     }
 
     @Test
-    @DisplayName("pushing a dropship delivery's date keeps assembly and shipping on the same day")
+    @DisplayName("pushing a date on an all-dropship order keeps assembly and shipping on the same day")
     void updateDeliveryKeepsDropshipDatesTogetherWhenDelayed() {
         // given
         Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
@@ -157,6 +159,7 @@ class DeliveriesManagerTest {
         when(orderItemsRepository.findByDeliveryIdAndStatuses(eq(DELIVERY_ID),
                 eq(Collections.singletonList(FulfilmentStatus.Ordered)))).thenReturn(List.of("order-1"));
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true);
 
         // when
         deliveriesManager.updateDelivery(updated);
@@ -167,7 +170,7 @@ class DeliveriesManagerTest {
     }
 
     @Test
-    @DisplayName("pushing a warehouse delivery's date leaves shipping trailing assembly by the realization days")
+    @DisplayName("pushing a date on an order with a warehouse leg leaves shipping trailing assembly")
     void updateDeliveryKeepsWarehouseShippingLaterThanAssemblyWhenDelayed() {
         // given
         Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
@@ -180,6 +183,7 @@ class DeliveriesManagerTest {
         when(orderItemsRepository.findByDeliveryIdAndStatuses(eq(DELIVERY_ID),
                 eq(Collections.singletonList(FulfilmentStatus.Ordered)))).thenReturn(List.of("order-1"));
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
 
         // when
         deliveriesManager.updateDelivery(updated);
