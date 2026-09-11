@@ -17,6 +17,8 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -133,5 +135,25 @@ class MarketplaceOrdersImportEventListenerTest {
         verify(marketplaceOrderImporter).importOrder(store, "Allegro", order);
         verify(storesRepository).save(store);
         assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNotNull();
+    }
+
+    @Test
+    void aFailedImportDoesNotMarkTheStoreAsFetched() {
+        // given
+        Store store = storeWithIntegration("store-1", "Allegro", true);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(providerFactory.get(store, "Allegro")).thenReturn(provider);
+        RuntimeException failure = new RuntimeException("marketplace API unavailable");
+        when(provider.fetchOrders()).thenThrow(failure);
+        MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload =
+                new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", "store-1");
+
+        // when
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> listener.handleMessage(payload));
+
+        // then
+        assertSame(failure, thrown);
+        assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNull();
+        verify(storesRepository, never()).save(any());
     }
 }

@@ -51,7 +51,14 @@ class PollingScheduleTest {
             "0 5 32 * ? *",
             "0 5 * 13 ? *",
             "0 5 ? * 8 *",
-            "0 5 * * ? 1969"
+            "0 5 * * ? 1969",
+            ", * * * ? *",
+            "0, 5 * * ? *",
+            "0,,30 * * * ? *",
+            "0 5 ?,15 * ? *",
+            "0 5 15,? * ? *",
+            "0 5 ? * ?,MON *",
+            "0 5 ? * MON,L *"
     })
     void rejectsMalformedExpressions(String expression) {
         // when / then
@@ -109,7 +116,7 @@ class PollingScheduleTest {
     @Test
     void storedOrRandomNightlyKeepsAStoredCronAndFallsBackWhenBlank() {
         // when / then
-        assertThat(PollingSchedule.storedOrRandomNightly(" 0 5 * * ? * ").awsExpression()).isEqualTo("cron(0 5 * * ? *)");
+        assertThat(PollingSchedule.storedOrRandomNightly("0 5 * * ? *").awsExpression()).isEqualTo("cron(0 5 * * ? *)");
         assertThat(PollingSchedule.storedOrRandomNightly("  ").awsExpression()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
         assertThat(PollingSchedule.storedOrRandomNightly(null).awsExpression()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
     }
@@ -124,12 +131,14 @@ class PollingScheduleTest {
     }
 
     @Test
-    void normalizesWhitespace() {
+    void parsesTheNormalizedFormOnly() {
         // when
-        PollingSchedule schedule = PollingSchedule.parse("  0/30   9-17 *  * ?   * ", 5);
+        PollingSchedule schedule = PollingSchedule.parse(PollingSchedule.normalizeOrNull("  0/30   9-17 *  * ?   * "), 5);
 
         // then
         assertThat(schedule.expression()).isEqualTo("0/30 9-17 * * ? *");
+        assertThatThrownBy(() -> PollingSchedule.parse("  0/30 9-17 * * ? *", 5))
+                .isInstanceOf(InvalidScheduleException.class);
     }
 
     @Test

@@ -9,6 +9,7 @@ import pl.commercelink.starter.util.ConversionUtil;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class StoreSupplierFeedScheduler {
@@ -28,16 +29,29 @@ public class StoreSupplierFeedScheduler {
         this.sqsTemplate = sqsTemplate;
     }
 
-    public void createSchedule(String storeId, String supplierName, String feedSchedule) {
-        putSchedule(storeId, supplierName, feedSchedule);
-    }
-
-    public void updateSchedule(String storeId, String supplierName, String feedSchedule) {
-        putSchedule(storeId, supplierName, feedSchedule);
+    public void schedule(String storeId, String supplierName, String feedSchedule) {
+        schedules.put(
+                scheduleName(storeId, supplierName),
+                PollingSchedule.storedOrRandomNightly(feedSchedule).awsExpression(),
+                feedImportQueueArn,
+                ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
     }
 
     public void deleteSchedule(String storeId, String supplierName) {
         schedules.delete(scheduleName(storeId, supplierName));
+    }
+
+    public Optional<String> snapshot(String storeId, String supplierName) {
+        return schedules.expressionOf(scheduleName(storeId, supplierName));
+    }
+
+    public void restore(String storeId, String supplierName, Optional<String> snapshot) {
+        String name = scheduleName(storeId, supplierName);
+        if (snapshot.isPresent()) {
+            schedules.put(name, snapshot.get(), feedImportQueueArn, ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
+        } else {
+            schedules.delete(name);
+        }
     }
 
     public void triggerImmediateImport(String storeId, String supplierName) {
@@ -45,23 +59,13 @@ public class StoreSupplierFeedScheduler {
             return;
         }
 
-        sqsTemplate.send(FEED_IMPORT_QUEUE, feedImportRequest(storeId, supplierName));
+        sqsTemplate.send(FEED_IMPORT_QUEUE, new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId, 0));
     }
 
     public void scheduleConfigurationRetry(String storeId, String supplierName, int attempt) {
-        Map<String, String> request = feedImportRequest(storeId, supplierName);
-        request.put("attempt", String.valueOf(attempt));
         sqsTemplate.send(to -> to.queue(FEED_IMPORT_QUEUE)
-                .payload(request)
+                .payload(new SqsFeedLoaderEventListener.FeedLoaderEventPayload(supplierName, storeId, attempt))
                 .delaySeconds(CONFIGURATION_RETRY_DELAY_SECONDS));
-    }
-
-    private void putSchedule(String storeId, String supplierName, String feedSchedule) {
-        schedules.put(
-                scheduleName(storeId, supplierName),
-                PollingSchedule.storedOrRandomNightly(feedSchedule).awsExpression(),
-                feedImportQueueArn,
-                ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
     }
 
     private Map<String, String> feedImportRequest(String storeId, String supplierName) {

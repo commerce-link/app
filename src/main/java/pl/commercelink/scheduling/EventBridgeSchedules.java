@@ -1,7 +1,7 @@
 package pl.commercelink.scheduling;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.scheduler.SchedulerClient;
 import software.amazon.awssdk.services.scheduler.model.ConflictException;
@@ -9,8 +9,11 @@ import software.amazon.awssdk.services.scheduler.model.CreateScheduleRequest;
 import software.amazon.awssdk.services.scheduler.model.DeleteScheduleRequest;
 import software.amazon.awssdk.services.scheduler.model.FlexibleTimeWindow;
 import software.amazon.awssdk.services.scheduler.model.FlexibleTimeWindowMode;
+import software.amazon.awssdk.services.scheduler.model.GetScheduleRequest;
 import software.amazon.awssdk.services.scheduler.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.scheduler.model.Target;
+
+import java.util.Optional;
 import software.amazon.awssdk.services.scheduler.model.UpdateScheduleRequest;
 
 @Component
@@ -25,7 +28,7 @@ public class EventBridgeSchedules {
     public EventBridgeSchedules(@Value("${application.env}") String env,
                                 @Value("${eventbridge.scheduler.enabled:#{null}}") Boolean enabledOverride,
                                 @Value("${eventbridge.scheduler.role.arn}") String roleArn,
-                                @Autowired(required = false) SchedulerClient schedulerClient) {
+                                @Nullable SchedulerClient schedulerClient) {
         this.enabled = enabledOverride != null ? enabledOverride : "prod".equals(env);
         this.roleArn = roleArn;
         this.schedulerClient = schedulerClient;
@@ -63,6 +66,17 @@ public class EventBridgeSchedules {
                     .flexibleTimeWindow(window)
                     .target(target)
                     .build());
+        }
+    }
+
+    public Optional<String> expressionOf(String name) {
+        if (!isEnabled()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(schedulerClient.getSchedule(GetScheduleRequest.builder().name(name).build()).scheduleExpression());
+        } catch (ResourceNotFoundException missing) {
+            return Optional.empty();
         }
     }
 
