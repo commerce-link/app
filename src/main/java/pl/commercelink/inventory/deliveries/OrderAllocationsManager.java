@@ -28,6 +28,8 @@ public class OrderAllocationsManager {
         for (Order order : activeOrders) {
             List<Allocation> orderAllocations = orderItemsRepository.findByOrderIdAndStatus(order.getOrderId(), FulfilmentStatus.Allocation)
                     .stream()
+                    // an allocation claimed by a pending delivery is already being bought - it must not be offered again
+                    .filter(i -> !i.isClaimed())
                     .map(i -> Allocation.fromOrderItem(order, i))
                     .toList();
             allocations.addAll(orderAllocations);

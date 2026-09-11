@@ -427,6 +427,22 @@ class WarehouseAllocationsManagerTest {
         verify(warehouseRepository, never()).save(alreadyOrdered);
     }
 
+    @Test
+    @DisplayName("fetchAll skips warehouse items already claimed by a delivery")
+    void fetchAllSkipsWarehouseItemsAlreadyClaimedByADelivery() {
+        // given
+        WarehouseItem free = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        WarehouseItem claimed = warehouseItemInStatus(FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(warehouseRepository.findAll(STORE_ID, FulfilmentStatus.Allocation)).thenReturn(List.of(free, claimed));
+
+        // when
+        List<Allocation> allocations = warehouseAllocationsManager.fetchAll(STORE_ID);
+
+        // then
+        assertThat(allocations).hasSize(1);
+    }
+
     private WarehouseItem warehouseItemInStatus(FulfilmentStatus status) {
         WarehouseItem item = new WarehouseItem(STORE_ID, PROVIDER, "Other", "test", "old-ean", "OLD-MFN", 10.0, 1);
         item.setStatus(status);

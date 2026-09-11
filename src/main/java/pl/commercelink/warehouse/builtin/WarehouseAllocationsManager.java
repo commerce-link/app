@@ -23,6 +23,8 @@ public class WarehouseAllocationsManager {
     public List<Allocation> fetchAll(String storeId) {
         return warehouseRepository.findAll(storeId, FulfilmentStatus.Allocation)
                 .stream()
+                // claimed by a pending delivery: already being bought
+                .filter(item -> !item.isClaimed())
                 .map(Allocation::fromWarehouseItem)
                 .collect(Collectors.toList());
     }

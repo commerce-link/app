@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -415,6 +416,27 @@ class OrderAllocationsManagerTest {
         verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("fetchAll skips allocations already claimed by a delivery")
+    void fetchAllSkipsAllocationsAlreadyClaimedByADelivery() {
+        // given
+        Order order = orderWithStatus(OrderStatus.New);
+        OrderItem free = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        OrderItem claimed = orderItemInStatus("item-2", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(ordersRepository.findAllByStoreIdAndStatus(STORE_ID, OrderStatus.New, OrderStatus.Assembly))
+                .thenReturn(List.of(order));
+        when(orderItemsRepository.findByOrderIdAndStatus(ORDER_ID, FulfilmentStatus.Allocation))
+                .thenReturn(List.of(free, claimed));
+
+        // when
+        List<Allocation> allocations = orderAllocationsManager.fetchAll(STORE_ID);
+
+        // then
+        assertThat(allocations).hasSize(1);
+        assertThat(allocations.get(0).getKey().getItemId()).isEqualTo("item-1");
+    }
+
     private DeliveryItem deliveryItemWithSelectedOrderAllocation(String itemId, double unitCost) {
         Allocation allocation = new Allocation();
         allocation.setKey(new AllocationKey(ORDER_ID, itemId, "buyer@example.com"));
@@ -434,6 +456,10 @@ class OrderAllocationsManagerTest {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         order.setStatus(status);
+        // set up minimal billing details for Allocation.fromOrderItem
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("buyer@example.com");
+        order.setBillingDetails(billingDetails);
         return order;
     }
 
