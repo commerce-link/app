@@ -42,15 +42,22 @@ public class DeliveriesManager {
             return;
         }
 
+        double totalRemovedCost = 0;
+
         for (Allocation allocation : active) {
             if (allocation.getType() == AllocationType.Warehouse) {
                 warehouseAllocationsManager.remove(storeId, allocation.getKey().getItemId());
+                totalRemovedCost += allocation.getTotalCost();
             } else if (allocation.getType() == AllocationType.Order) {
-                orderAllocationsManager.remove(storeId, allocation.getKey().getOrderId(), allocation.getKey().getItemId());
+                // this delivery owns the claim on its own items, so it may give them back: on a failed
+                // purchase this is the operator's only way out of a delivery they do not want to retry
+                boolean removed = orderAllocationsManager.remove(
+                        storeId, allocation.getKey().getOrderId(), allocation.getKey().getItemId(), deliveryId);
+                if (removed) {
+                    totalRemovedCost += allocation.getTotalCost();
+                }
             }
         }
-
-        double totalRemovedCost = active.stream().mapToDouble(Allocation::getTotalCost).sum();
 
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         delivery.decreaseTotalCost(totalRemovedCost);

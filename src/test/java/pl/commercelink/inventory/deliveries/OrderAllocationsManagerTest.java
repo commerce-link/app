@@ -104,6 +104,47 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("remove frees an allocation claimed by the very delivery that is removing it")
+    void removeFreesAnAllocationClaimedByTheDeliveryThatIsRemovingIt() {
+        // given
+        Order order = orderWithStatus(OrderStatus.Assembly);
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        boolean removed = orderAllocationsManager.remove(STORE_ID, ORDER_ID, "item-1", "delivery-1");
+
+        // then
+        assertThat(removed).isTrue();
+        assertThat(claimed.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(claimed.getClaimedDeliveryId()).isNull();
+        assertThat(claimed.getDeliveryId()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.New);
+        verify(orderItemsRepository).save(claimed);
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    @DisplayName("remove still refuses an allocation claimed by a different delivery than the one removing")
+    void removeStillRefusesAnAllocationClaimedByADifferentDelivery() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-other");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when
+        boolean removed = orderAllocationsManager.remove(STORE_ID, ORDER_ID, "item-1", "delivery-1");
+
+        // then
+        assertThat(removed).isFalse();
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(claimed);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("remove only clears items that are in Allocation/Ordered state and ignores others")
     void removeOnlyClearsItemsThatAreInAllocationOrOrderedStateAndIgnoresRest() {
         // given

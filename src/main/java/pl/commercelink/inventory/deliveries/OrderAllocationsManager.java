@@ -175,21 +175,41 @@ public class OrderAllocationsManager {
         }
     }
 
-    public void remove(String storeId, String orderId, String itemId) {
-        remove(storeId, orderId, Collections.singletonList(itemId));
+    public boolean remove(String storeId, String orderId, String itemId) {
+        return remove(storeId, orderId, Collections.singletonList(itemId));
     }
 
-    public void remove(String storeId, String orderId, List<String> orderItemIds) {
+    public boolean remove(String storeId, String orderId, List<String> orderItemIds) {
+        return remove(storeId, orderId, orderItemIds, null);
+    }
+
+    public boolean remove(String storeId, String orderId, String itemId, String releasingDeliveryId) {
+        return remove(storeId, orderId, Collections.singletonList(itemId), releasingDeliveryId);
+    }
+
+    /**
+     * Gives the items back to the order: fulfilment cleared, order back to New.
+     *
+     * @param releasingDeliveryId the delivery that is allowed to give its own claimed items back, or null
+     *                            when the caller is not a delivery. An item claimed by any other delivery is
+     *                            already being bought there and is left alone.
+     * @return whether anything was actually removed
+     */
+    public boolean remove(String storeId, String orderId, List<String> orderItemIds, String releasingDeliveryId) {
         boolean removed = false;
 
         for (String orderItemId : orderItemIds) {
             OrderItem orderItem = orderItemsRepository.findById(orderId, orderItemId);
-            // an item claimed by a pending delivery is already being bought at the supplier
-            if (orderItem.isInAllocationOrOrdered() && !orderItem.isClaimed()) {
-                orderItem.removeFulfilment();
-                orderItemsRepository.save(orderItem);
-                removed = true;
+            if (!orderItem.isInAllocationOrOrdered()) {
+                continue;
             }
+            // an item claimed by a pending delivery is already being bought at the supplier
+            if (orderItem.isClaimed() && !orderItem.getClaimedDeliveryId().equals(releasingDeliveryId)) {
+                continue;
+            }
+            orderItem.removeFulfilment();
+            orderItemsRepository.save(orderItem);
+            removed = true;
         }
 
         if (removed) {
@@ -197,6 +217,8 @@ public class OrderAllocationsManager {
             order.setStatus(OrderStatus.New);
             ordersRepository.save(order);
         }
+
+        return removed;
     }
 
 }
