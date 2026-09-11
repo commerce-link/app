@@ -27,6 +27,11 @@
   the current values fresh when it opens, instead of a page-load snapshot that would go stale
   after a save -- the same pattern the supplier/manual modals use when reading a table row's
   dataset in the JS below.
+
+  data-can-use-global-suppliers and data-inventory-cache-ttl-minutes are withheld entirely for a
+  non-super-admin, matching the table rows just below (also gated by isSuperAdmin): nothing here
+  is editable by a non-super-admin either way, but a non-super-admin genuinely never receives
+  these two fields in the markup, not just an ungated row hidden by CSS.
 -->
 <div th:fragment="fulfilmentSettingsSection(settings, isSuperAdmin, successMessage, refreshExternalSuppliers)"
      th:attr="data-success-message=${successMessage},
@@ -35,8 +40,8 @@
               data-order-realization-days=${settings.orderRealizationDays},
               data-automated-fulfilment=${settings.automatedFulfilment},
               data-default-fulfilment-type=${settings.defaultFulfilmentType},
-              data-can-use-global-suppliers=${settings.canUseGlobalSuppliers},
-              data-inventory-cache-ttl-minutes=${settings.inventoryCacheTtlMinutes}">
+              data-can-use-global-suppliers=${isSuperAdmin} ? ${settings.canUseGlobalSuppliers} : null,
+              data-inventory-cache-ttl-minutes=${isSuperAdmin} ? ${settings.inventoryCacheTtlMinutes} : null">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
         <h2 class="subtitle mb-0" th:text="#{store.fulfilment.settings}"></h2>
         <button type="button" class="button is-primary is-small" id="fulfilment-settings-edit-button"

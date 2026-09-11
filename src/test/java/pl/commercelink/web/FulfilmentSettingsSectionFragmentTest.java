@@ -54,8 +54,11 @@ class FulfilmentSettingsSectionFragmentTest {
         assertThat(html).contains("data-order-realization-days=${settings.orderRealizationDays}");
         assertThat(html).contains("data-automated-fulfilment=${settings.automatedFulfilment}");
         assertThat(html).contains("data-default-fulfilment-type=${settings.defaultFulfilmentType}");
-        assertThat(html).contains("data-can-use-global-suppliers=${settings.canUseGlobalSuppliers}");
-        assertThat(html).contains("data-inventory-cache-ttl-minutes=${settings.inventoryCacheTtlMinutes}");
+        // the two super-admin-only fields are additionally gated by isSuperAdmin (see
+        // withholdsTheTwoSuperAdminOnlyDataAttributesForANonSuperAdmin below) -- nothing is
+        // editable by a non-super-admin either way, but the markup must not even carry them
+        assertThat(html).contains("data-can-use-global-suppliers=${isSuperAdmin} ? ${settings.canUseGlobalSuppliers} : null");
+        assertThat(html).contains("data-inventory-cache-ttl-minutes=${isSuperAdmin} ? ${settings.inventoryCacheTtlMinutes} : null");
     }
 
     @Test

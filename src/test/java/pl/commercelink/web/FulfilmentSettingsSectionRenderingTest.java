@@ -134,9 +134,13 @@ class FulfilmentSettingsSectionRenderingTest {
                 SECTION.formatted("${settings}, ${isSuperAdmin}, ${successMessage}, ${refreshExternalSuppliers}"),
                 context);
 
-        // then -- a non-super-admin must never even receive these two fields in the markup
+        // then -- a non-super-admin must never even receive these two fields in the markup: neither
+        // the table row (already pinned above) nor the data attribute a script could still read
+        // them from
         assertThat(html).doesNotContain("Use Global Supplier Settings");
         assertThat(html).doesNotContain("Inventory cache TTL (min)");
+        assertThat(html).doesNotContain("data-can-use-global-suppliers");
+        assertThat(html).doesNotContain("data-inventory-cache-ttl-minutes");
         assertThat(html).doesNotContain("data-success-message");
         assertThat(html).contains("data-refresh-external-suppliers=\"false\"");
     }
