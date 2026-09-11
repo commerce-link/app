@@ -30,6 +30,7 @@ import pl.commercelink.stores.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
+import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 import pl.commercelink.web.dtos.ParcelForm;
 import pl.commercelink.web.dtos.PrinterForm;
 
@@ -417,6 +418,7 @@ public class StoreController {
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
 
         model.addAttribute("form", form);
+        model.addAttribute("settings", FulfilmentSettingsForm.from(store));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
@@ -749,34 +751,6 @@ public class StoreController {
                 : "redirect:/dashboard/store/notification";
     }
 
-    @PostMapping("/dashboard/store/fulfilment")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreFulfilmentConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        if (existingStore == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Store not found.");
-            return redirectToFulfilment(form.getStore().getStoreId());
-        }
-        FulfilmentConfiguration submitted = form.getStore().getFulfilmentConfiguration() != null
-                ? form.getStore().getFulfilmentConfiguration()
-                : new FulfilmentConfiguration();
-
-        StoreSupplierConnectionService.ConnectionUpdateResult result =
-                storeSupplierConnectionService.applyStoreSettings(existingStore, submitted, isSuperAdmin());
-        if (result.hasErrors()) {
-            String errorMessage = result.errors().stream()
-                    .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
-                    .collect(Collectors.joining(" "));
-            redirectAttributes.addFlashAttribute("errorMessage", errorMessage);
-            return redirectToFulfilment(form.getStore().getStoreId());
-        }
-
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
-
-        return redirectToFulfilment(form.getStore().getStoreId());
-    }
-
     @PostMapping("/dashboard/store/payments/checkout/edit")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String updateStoreCheckoutConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
@@ -1004,12 +978,6 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/report", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/report";
-    }
-
-    private String redirectToFulfilment(String storeId) {
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/fulfilment", storeId)
-                : "redirect:/dashboard/store/fulfilment";
     }
 
     private Branding createOrUpdateBranding(StoreForm form, Store store) throws IOException {

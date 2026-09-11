@@ -6,6 +6,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -103,5 +104,33 @@ public class StoreFulfilmentSupplierController {
                 "store.fulfilment.supplier.disconnected", new Object[]{supplierName}, locale);
         return SupplierSectionModel.renderExternalSection(
                 supplierConnectionViewFactory, supplierRegistry, store, successMessage, model);
+    }
+
+    @GetMapping("/dashboard/store/fulfilment/supplier/section")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String section(Locale locale, Model model, HttpServletResponse response) {
+        return doRenderSection(CustomSecurityContext.getStoreId(), locale, model, response);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/fulfilment/supplier/section")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String sectionForStore(@PathVariable String storeId, Locale locale, Model model,
+                                  HttpServletResponse response) {
+        return doRenderSection(storeId, locale, model, response);
+    }
+
+    // Used only to refresh the external section after a fulfilment settings save that flipped
+    // canUseGlobalSuppliers (see StoreFulfilmentSettingsController): that endpoint returns its own
+    // section, so this is what lets the page also pick up the resulting mode-column/mode-selector
+    // change without a full reload -- the same role the manual section's GET endpoint plays for
+    // the create/upload-feed JSON endpoints.
+    private String doRenderSection(String storeId, Locale locale, Model model, HttpServletResponse response) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+        }
+        return SupplierSectionModel.renderExternalSection(
+                supplierConnectionViewFactory, supplierRegistry, store, null, model);
     }
 }

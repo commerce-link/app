@@ -224,4 +224,71 @@ class StoreFulfilmentSupplierControllerTest {
             assertThat(model.getAttribute("errorMessage")).isEqualTo("Store not found.");
         }
     }
+
+    @Test
+    void sectionRendersTheExternalSectionWithNoSuccessMessage() {
+        // given: used only to refresh the section from elsewhere on the page (the fulfilment
+        // settings save, when it flips canUseGlobalSuppliers), so it must not show a toast of its
+        // own -- see StoreFulfilmentSettingsController
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            String view = controller.section(Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+            assertThat(view).doesNotContain("(");
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(model.getAttribute("sectionSuccessMessage")).isNull();
+        }
+    }
+
+    @Test
+    void sectionForStoreRendersTheSectionForTheStoreFromThePath() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+            // getStoreId() is intentionally not stubbed: a regression that read the store from the
+            // security context instead of the path variable would look up a different store and
+            // this test would fail rather than pass silently.
+
+            // when
+            String view = controller.sectionForStore(STORE_ID, Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: externalSection");
+        }
+    }
+
+    @Test
+    void sectionReturnsTheSmallErrorFragmentWhenTheStoreIsMissing() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Store not found.");
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = controller.section(Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+        }
+    }
 }
