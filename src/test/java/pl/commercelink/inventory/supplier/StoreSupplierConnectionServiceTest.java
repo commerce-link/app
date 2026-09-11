@@ -314,4 +314,64 @@ class StoreSupplierConnectionServiceTest {
         verify(persister).persist(any(), captor.capture(), anyMap());
         assertFalse(captor.getValue().isCanUseGlobalSuppliers());
     }
+
+    @Test
+    void applyStoreSettingsAlwaysOverwritesEnabledProductGroupsFromTheExistingConfiguration() {
+        // given: enabledProductGroups is a legacy field with no form control of its own on this
+        // screen, so whatever the submitted form happens to carry must never win over storage.
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledProductGroups(List.of("Computers"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledProductGroups(List.of("Ignored"));
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledProductGroups()).containsExactly("Computers");
+    }
+
+    @Test
+    void applyStoreSettingsCarriesOverEnabledCategoriesWhenSubmittedDidNotProvideAny() {
+        // given
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom", "Biuro"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(null);
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledCategories()).containsExactly("Dom", "Biuro");
+    }
+
+    @Test
+    void applyStoreSettingsKeepsSubmittedEnabledCategoriesWhenTheFormProvidedThem() {
+        // given: unlike enabledProductGroups, enabledCategories is only defaulted from storage
+        // when the submitted configuration carries no value at all (null) — a non-null value,
+        // even an emptied-out list, must not be clobbered by whatever is stored.
+        Store store = storeWith(true);
+        store.getFulfilmentConfiguration().setEnabledCategories(List.of("Dom"));
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setEnabledCategories(new ArrayList<>());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+
+        // when
+        service.applyStoreSettings(store, submitted, true);
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        assertThat(captor.getValue().getEnabledCategories()).isEmpty();
+    }
 }
