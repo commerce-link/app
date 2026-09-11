@@ -30,10 +30,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,8 +110,10 @@ class OrderFulfilmentInTransitStockTest {
     }
 
     @Test
-    void directToConsumerOrdersFulfilledFromInTransitStockAlsoReachAssembly() {
-        // given
+    void directToConsumerOrderFulfilledFromInTransitWarehouseStockKeepsRealizationDays() {
+        // given: the delivery is a WAREHOUSE delivery (the default Delivery type), not a dropship one, so
+        // even on a DirectToConsumer order these goods still pass through our warehouse and have to be
+        // picked, packed and forwarded by hand - the realization days must not be skipped.
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         order.setFulfilmentType(FulfilmentType.DirectToConsumer);
@@ -131,26 +133,35 @@ class OrderFulfilmentInTransitStockTest {
         // then
         assertEquals(OrderStatus.Assembly, order.getStatus());
         assertEquals(LocalDate.of(2026, 9, 10), order.getEstimatedAssemblyAt());
+        // 2026-09-10 is a Thursday: +3 working days lands on Tuesday 2026-09-15 (weekend skipped). The
+        // shipping date must NOT equal the assembly date - that would mean the warehouse handling step
+        // was skipped because the order happens to be DirectToConsumer.
         assertEquals(LocalDate.of(2026, 9, 15), order.getEstimatedShippingAt());
+        assertNotEquals(order.getEstimatedAssemblyAt(), order.getEstimatedShippingAt());
     }
 
     @Test
     void aPartiallyFulfilledOrderIsNotPromotedAndStaysNew() {
-        // given
+        // given: the batch committed here is fully fulfilled (Ordered from in-transit stock), so the
+        // widened OrderFulfilment guard passes and OrderLifecycle.update(order) IS invoked. commit() never
+        // passes it any items, so update() re-reads ALL of the order's items from the repository - including
+        // one this batch never touched, that is still New with no warehouse candidate. The lifecycle's own
+        // allMatch(isOrdered) over that full set is what must keep the order from being promoted.
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
-        OrderItem orderedFromInTransitStock = inTransitItem();
+        OrderItem batchItem = inTransitItem();
         OrderItem stillUnfulfilled = new OrderItem(ORDER_ID, Categories.UNCATEGORIZED, "Gadget", 1, 99.0, "MFN-2", false);
 
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(orderedFromInTransitStock, stillUnfulfilled));
+        when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(batchItem));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(batchItem, stillUnfulfilled));
 
         // when
-        fulfilment().commit(STORE_ID, List.of(orderedFromInTransitStock, stillUnfulfilled));
+        fulfilment().commit(STORE_ID, List.of(batchItem));
 
         // then
+        verify(orderItemsRepository).findByOrderId(ORDER_ID);
         assertEquals(OrderStatus.New, order.getStatus());
-        verify(orderItemsRepository, never()).findByOrderId(any());
     }
 
     @Test
