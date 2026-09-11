@@ -125,4 +125,32 @@ class StoreFulfilmentTemplateTest {
         assertThat(html).contains(
                 "group.querySelectorAll('input').forEach(function (input) { input.disabled = !active; });");
     }
+
+    @Test
+    void addsAManualSupplierWithItsNameAndFileInOneModal() throws Exception {
+        String html = template();
+        assertThat(html).contains("id=\"manualAddModal\"");
+        assertThat(html).contains("id=\"manual-new-name\"");
+        assertThat(html).contains("id=\"manual-add-file\"");
+    }
+
+    @Test
+    void savesManualSupplierFlagsThroughItsOwnEndpoint() throws Exception {
+        assertThat(template()).contains("'/fulfilment/manual-supplier/'");
+    }
+
+    @Test
+    void disablesTheActiveFlagUntilAFileHasBeenUploaded() throws Exception {
+        // applySelections forces enabled to false without a feed, so the checkbox must not pretend otherwise
+        String html = template();
+        assertThat(html).contains("#{store.manual.enable.needsfeed}");
+        assertThat(html).contains("manual-enabled");
+
+        // pins the actual disabling logic, not just the presence of the hint and the class:
+        // hasFeed() never reaches this script (it does not survive Jackson serialisation on the
+        // record), so the check must be driven by feedLastModified instead
+        assertThat(html).contains("var fileUploaded = !!row.feedLastModified;");
+        assertThat(html).contains("configEnabled.disabled = !fileUploaded;");
+        assertThat(html).doesNotContain("row.hasFeed");
+    }
 }

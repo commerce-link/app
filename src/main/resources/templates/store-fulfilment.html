@@ -283,227 +283,47 @@
                                    false, ${basePath})}"></div>
             </div>
 
-            <script th:inline="javascript">
-                document.addEventListener('DOMContentLoaded', function () {
-                    var list = document.getElementById('manual-supplier-list');
-                    var nextIndex = list.querySelectorAll('.manual-item').length;
-                    var storeId = /*[[${form.store.storeId}]]*/ '';
-                    var isSuperAdmin = /*[[${isSuperAdmin}]]*/ false;
-                    var manualBase = isSuperAdmin
-                        ? '/dashboard/store/' + encodeURIComponent(storeId) + '/manual-supplier'
-                        : '/dashboard/store/manual-supplier';
-
-                    var presentLabel = /*[[#{store.manual.feed.present}]]*/ 'Plik wgrany';
-                    var noFileMessage = /*[[#{store.manual.error.csv.empty}]]*/ 'Nie wybrano pliku.';
-                    var genericError = /*[[#{general.error}]]*/ 'Błąd';
-
-                    function showError(el) { el.textContent = genericError; el.classList.remove('is-hidden'); }
-
-                    var addButton = document.getElementById('manual-add-button');
-                    var addModal = document.getElementById('manualAddModal');
-                    var nameInput = document.getElementById('manual-new-name');
-                    var addError = document.getElementById('manual-add-error');
-
-                    var uploadModal = document.getElementById('manualUploadModal');
-                    var uploadInput = document.getElementById('manual-upload-input');
-                    var uploadFilename = document.getElementById('manual-upload-filename');
-                    var uploadError = document.getElementById('manual-upload-error');
-                    var uploadRow = null;
-
-                    function openAddModal() {
-                        nameInput.value = '';
-                        addError.classList.add('is-hidden');
-                        addModal.classList.add('is-active');
-                        nameInput.focus();
-                    }
-                    function closeAddModal() { addModal.classList.remove('is-active'); }
-
-                    function openUploadModal(row) {
-                        uploadRow = row;
-                        uploadInput.value = '';
-                        uploadFilename.textContent = '';
-                        uploadError.classList.add('is-hidden');
-                        uploadModal.classList.add('is-active');
-                    }
-                    function closeUploadModal() { uploadModal.classList.remove('is-active'); uploadRow = null; }
-
-                    function markRowHasFeed(row, fileName) {
-                        row.setAttribute('data-hasfeed', 'true');
-                        var tag = row.querySelector('.manual-file-tag');
-                        tag.textContent = presentLabel + (fileName ? ': ' + fileName : '');
-                        tag.classList.add('is-success');
-                        var hint = row.querySelector('.manual-enable-hint');
-                        if (hint) { hint.classList.add('is-hidden'); }
-                    }
-
-                    function wireRow(row) {
-                        var enabled = row.querySelector('.manual-enabled');
-                        var detail = row.querySelector('.manual-detail');
-                        var openBtn = row.querySelector('.manual-upload-open');
-                        var hint = row.querySelector('.manual-enable-hint');
-                        var hasFeed = row.getAttribute('data-hasfeed') === 'true';
-                        function refresh() { detail.style.display = enabled.checked ? '' : 'none'; }
-                        enabled.addEventListener('change', refresh);
-                        refresh();
-                        if (hint) {
-                            if (hasFeed) { hint.classList.add('is-hidden'); }
-                            else { hint.classList.remove('is-hidden'); }
-                        }
-                        openBtn.addEventListener('click', function () { openUploadModal(row); });
-                        row.querySelector('.manual-delete').addEventListener('click', function (e) {
-                            var identity = e.currentTarget.getAttribute('data-identity');
-                            confirmDelete(e.currentTarget, function () { deleteManual(identity, row); });
-                        });
-                    }
-
-                    function deleteManual(identity, row) {
-                        fetch(manualBase + '/' + encodeURIComponent(identity) + '/delete',
-                              { method: 'POST' })
-                            .then(function (r) { if (r.ok) { row.remove(); } })
-                            .catch(function () {});
-                    }
-
-                    function addManual() {
-                        var name = nameInput.value.trim();
-                        addError.classList.add('is-hidden');
-                        if (!name) { return; }
-                        var body = new URLSearchParams(); body.append('name', name);
-                        fetch(manualBase, { method: 'POST', body: body })
-                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                            .then(function (res) {
-                                if (!res.ok) {
-                                    addError.textContent = res.body.message || 'error';
-                                    addError.classList.remove('is-hidden');
-                                    return;
-                                }
-                                var template = document.getElementById('manual-row-template');
-                                var html = template.innerHTML.replace(/__INDEX__/g, nextIndex++);
-                                var wrap = document.createElement('div');
-                                wrap.innerHTML = html.trim();
-                                var row = wrap.firstElementChild;
-                                row.setAttribute('data-identity', res.body.identity);
-                                row.querySelector('input[name$=".identity"]').value = res.body.identity;
-                                row.querySelector('input[name$=".label"]').value = res.body.label;
-                                row.querySelector('.manual-label').textContent = res.body.label;
-                                row.querySelector('.manual-delete').setAttribute('data-identity', res.body.identity);
-                                list.appendChild(row);
-                                wireRow(row);
-                                closeAddModal();
-                            })
-                            .catch(function () { showError(addError); });
-                    }
-
-                    function uploadFeed() {
-                        if (!uploadRow) { return; }
-                        uploadError.classList.add('is-hidden');
-                        if (!uploadInput.files.length) {
-                            uploadError.textContent = noFileMessage;
-                            uploadError.classList.remove('is-hidden');
-                            return;
-                        }
-                        var identity = uploadRow.getAttribute('data-identity');
-                        var row = uploadRow;
-                        var pickedName = uploadInput.files[0].name;
-                        var fd = new FormData();
-                        fd.append('file', uploadInput.files[0]);
-                        fetch(manualBase + '/' + encodeURIComponent(identity) + '/feed',
-                              { method: 'POST', body: fd })
-                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                            .then(function (res) {
-                                if (!res.ok) {
-                                    uploadError.textContent = res.body.message || 'error';
-                                    uploadError.classList.remove('is-hidden');
-                                    return;
-                                }
-                                markRowHasFeed(row, res.body.fileName || pickedName);
-                                closeUploadModal();
-                            })
-                            .catch(function () { showError(uploadError); });
-                    }
-
-                    addButton.addEventListener('click', openAddModal);
-                    document.getElementById('manual-add-confirm').addEventListener('click', addManual);
-                    document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
-                    document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
-                    addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
-                    nameInput.addEventListener('keydown', function (e) {
-                        if (e.key === 'Enter') { e.preventDefault(); addManual(); }
-                    });
-
-                    uploadInput.addEventListener('change', function () {
-                        uploadFilename.textContent = uploadInput.files.length ? uploadInput.files[0].name : '';
-                    });
-                    document.getElementById('manual-upload-save').addEventListener('click', uploadFeed);
-                    document.getElementById('manual-upload-cancel').addEventListener('click', closeUploadModal);
-                    document.getElementById('manual-upload-close').addEventListener('click', closeUploadModal);
-                    uploadModal.querySelector('.modal-background').addEventListener('click', closeUploadModal);
-
-                    list.querySelectorAll('.manual-item').forEach(wireRow);
-                });
-            </script>
-
-            <template id="manual-row-template">
-                <div class="field manual-item" data-identity="" data-hasfeed="false">
-                    <input type="hidden" name="manualSupplierSelections[__INDEX__].identity" />
-                    <input type="hidden" name="manualSupplierSelections[__INDEX__].label" />
-                    <div class="is-flex is-align-items-center">
-                        <label class="checkbox">
-                            <input type="checkbox" class="manual-enabled"
-                                   name="manualSupplierSelections[__INDEX__].enabled" value="true" />
-                            <span class="manual-label"></span>
-                        </label>
-                        <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
-                                data-identity="" th:title="#{store.manual.delete.button}">
-                            <span class="icon"><i class="fas fa-trash"></i></span>
-                        </button>
-                    </div>
-                    <div class="manual-detail ml-5 mt-2" style="display:none">
-                        <div class="field is-flex is-align-items-center">
-                            <button type="button" class="button is-link is-light is-small manual-upload-open"
-                                    th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                            <span class="icon has-text-grey ml-2 cl-tooltip"
-                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                <i class="fas fa-info-circle"></i>
-                            </span>
-                            <span class="tag manual-file-tag is-light ml-3" th:text="#{store.manual.feed.missing}"></span>
-                        </div>
-                        <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
-                        <div class="field">
-                            <label class="checkbox">
-                                <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInPricing" value="true" checked />
-                                <span th:text="#{store.supplier.include.pricing}"></span>
-                            </label>
-                        </div>
-                        <div class="field">
-                            <label class="checkbox">
-                                <input type="checkbox" name="manualSupplierSelections[__INDEX__].includeInFulfilment" value="true" checked />
-                                <span th:text="#{store.supplier.include.fulfilment}"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
             <div id="manualAddModal" class="modal">
                 <div class="modal-background"></div>
                 <div class="modal-content">
                     <div class="box">
-                        <h2 class="subtitle" th:text="#{store.manual.add.modal.title}">Dodaj manualnego dostawcę</h2>
+                        <h2 class="subtitle" th:text="#{store.manual.add.modal.title}"></h2>
                         <div class="field">
+                            <label class="label" th:text="#{store.manual.add.label}"></label>
                             <div class="control">
                                 <input class="input" type="text" id="manual-new-name"
                                        th:placeholder="#{store.manual.add.label}" />
                             </div>
                         </div>
+                        <div class="field">
+                            <label class="label">
+                                <span th:text="#{store.manual.upload.open}"></span>
+                                <span class="icon has-text-grey ml-1 cl-tooltip"
+                                      th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                    <i class="fas fa-info-circle"></i>
+                                </span>
+                            </label>
+                            <div class="file has-name">
+                                <label class="file-label">
+                                    <input class="file-input" type="file" accept=".csv" id="manual-add-file" />
+                                    <span class="file-cta">
+                                        <span class="file-icon"><i class="fas fa-upload"></i></span>
+                                        <span class="file-label" th:text="#{store.manual.file.choose}"></span>
+                                    </span>
+                                    <span class="file-name" id="manual-add-filename"></span>
+                                </label>
+                            </div>
+                            <p class="help" th:text="#{store.manual.add.file.optional}"></p>
+                        </div>
                         <p class="help is-danger is-hidden" id="manual-add-error"></p>
                         <div class="field is-grouped mt-3">
                             <div class="control">
                                 <button type="button" class="button is-primary" id="manual-add-confirm"
-                                        th:text="#{store.manual.add.button}">Dodaj</button>
+                                        th:text="#{store.manual.add.button}"></button>
                             </div>
                             <div class="control">
                                 <button type="button" class="button" id="manual-add-cancel"
-                                        th:text="#{general.cancel}">Anuluj</button>
+                                        th:text="#{general.cancel}"></button>
                             </div>
                         </div>
                     </div>
@@ -511,42 +331,203 @@
                 <button class="modal-close is-large" aria-label="close" id="manual-add-close"></button>
             </div>
 
-            <div id="manualUploadModal" class="modal">
+            <div id="manualConfigModal" class="modal">
                 <div class="modal-background"></div>
                 <div class="modal-content">
-                    <div class="box">
-                        <h2 class="subtitle">
-                            <span th:text="#{store.manual.upload.modal.title}">Wgraj plik CSV</span>
-                            <span class="icon has-text-grey ml-1 cl-tooltip"
-                                  th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                <i class="fas fa-info-circle"></i>
-                            </span>
-                        </h2>
-                        <div class="file has-name">
-                            <label class="file-label">
-                                <input class="file-input" type="file" accept=".csv" id="manual-upload-input" />
-                                <span class="file-cta">
-                                    <span class="file-icon"><i class="fas fa-upload"></i></span>
-                                    <span class="file-label" th:text="#{store.manual.file.choose}">Wybierz plik</span>
+                    <form method="post" id="manual-config-form">
+                        <div class="box">
+                            <h2 class="subtitle" id="manual-config-title"></h2>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="enabled" value="true"
+                                           class="manual-enabled" id="manual-config-enabled" />
+                                    <span th:text="#{store.supplier.column.enabled}"></span>
+                                </label>
+                                <p class="help is-hidden" id="manual-config-hint"
+                                   th:text="#{store.manual.enable.needsfeed}"></p>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInPricing" value="true" id="manual-config-pricing" />
+                                    <span th:text="#{store.supplier.include.pricing}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="includeInFulfilment" value="true" id="manual-config-fulfilment" />
+                                    <span th:text="#{store.supplier.include.fulfilment}"></span>
+                                </label>
+                            </div>
+                            <div class="field">
+                                <button type="button" class="button is-link is-light is-small"
+                                        id="manual-config-upload" th:text="#{store.manual.upload.open}"></button>
+                                <span class="icon has-text-grey ml-1 cl-tooltip"
+                                      th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
+                                    <i class="fas fa-info-circle"></i>
                                 </span>
-                                <span class="file-name" id="manual-upload-filename"></span>
-                            </label>
-                        </div>
-                        <p class="help is-danger is-hidden mt-2" id="manual-upload-error"></p>
-                        <div class="field is-grouped mt-3">
-                            <div class="control">
-                                <button type="button" class="button is-primary" id="manual-upload-save"
-                                        th:text="#{general.save}">Zapisz</button>
+                                <span class="tag is-light ml-2" id="manual-config-file"></span>
+                                <input class="is-hidden" type="file" accept=".csv" id="manual-config-file-input" />
                             </div>
-                            <div class="control">
-                                <button type="button" class="button" id="manual-upload-cancel"
-                                        th:text="#{general.cancel}">Anuluj</button>
+                            <p class="help is-danger is-hidden" id="manual-config-error"></p>
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="manual-config-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
-                <button class="modal-close is-large" aria-label="close" id="manual-upload-close"></button>
+                <button class="modal-close is-large" aria-label="close" id="manual-config-close"></button>
             </div>
+
+            <script th:inline="javascript">
+                (function () {
+                    var basePath = /*[[${basePath}]]*/ '';
+                    var rows = /*[[${manualConnections}]]*/ [];
+                    var genericError = /*[[#{general.error}]]*/ 'Error';
+                    var noNameMessage = /*[[#{store.manual.error.name.invalid}]]*/ 'Invalid name';
+                    var feedPresentLabel = /*[[#{store.manual.feed.present}]]*/ 'File uploaded';
+                    var feedMissingLabel = /*[[#{store.manual.feed.missing}]]*/ 'No file';
+
+                    var addButton = document.getElementById('manual-add-button');
+                    var addModal = document.getElementById('manualAddModal');
+                    var nameInput = document.getElementById('manual-new-name');
+                    var addFile = document.getElementById('manual-add-file');
+                    var addFilename = document.getElementById('manual-add-filename');
+                    var addError = document.getElementById('manual-add-error');
+
+                    var configModal = document.getElementById('manualConfigModal');
+                    var configForm = document.getElementById('manual-config-form');
+                    var configTitle = document.getElementById('manual-config-title');
+                    var configEnabled = document.getElementById('manual-config-enabled');
+                    var configHint = document.getElementById('manual-config-hint');
+                    var configPricing = document.getElementById('manual-config-pricing');
+                    var configFulfilment = document.getElementById('manual-config-fulfilment');
+                    var configUpload = document.getElementById('manual-config-upload');
+                    var configFile = document.getElementById('manual-config-file');
+                    var configFileInput = document.getElementById('manual-config-file-input');
+                    var configError = document.getElementById('manual-config-error');
+                    var current = null;
+
+                    function rowFor(identity) {
+                        for (var i = 0; i < rows.length; i++) {
+                            if (rows[i].identity === identity) { return rows[i]; }
+                        }
+                        return null;
+                    }
+
+                    function showError(element, message) {
+                        element.textContent = message || genericError;
+                        element.classList.remove('is-hidden');
+                    }
+
+                    function addManual() {
+                        var name = nameInput.value.trim();
+                        addError.classList.add('is-hidden');
+                        if (!name) { showError(addError, noNameMessage); return; }
+                        var body = new URLSearchParams();
+                        body.append('name', name);
+                        fetch(basePath + '/manual-supplier', { method: 'POST', body: body })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) { showError(addError, res.body.message); return; }
+                                if (!addFile.files.length) { window.location.reload(); return; }
+                                var data = new FormData();
+                                data.append('file', addFile.files[0]);
+                                return fetch(basePath + '/manual-supplier/' + encodeURIComponent(res.body.identity) + '/feed',
+                                             { method: 'POST', body: data })
+                                    .then(function () { window.location.reload(); });
+                            })
+                            .catch(function () { showError(addError); });
+                    }
+
+                    function uploadForCurrent() {
+                        if (!current || !configFileInput.files.length) { return; }
+                        var data = new FormData();
+                        data.append('file', configFileInput.files[0]);
+                        fetch(basePath + '/manual-supplier/' + encodeURIComponent(current) + '/feed',
+                              { method: 'POST', body: data })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) { showError(configError, res.body.message); return; }
+                                window.location.reload();
+                            })
+                            .catch(function () { showError(configError); });
+                    }
+
+                    function openConfig(identity) {
+                        var row = rowFor(identity);
+                        if (!row) { return; }
+                        current = identity;
+                        // hasFeed() is a derived accessor, not a record component, so it does not
+                        // survive Jackson serialisation onto this row; feedLastModified is the
+                        // field that actually reaches this script, so presence of a feed is
+                        // judged from it instead.
+                        var fileUploaded = !!row.feedLastModified;
+                        configTitle.textContent = row.label;
+                        configForm.action = basePath + '/fulfilment/manual-supplier/' + encodeURIComponent(identity);
+                        configEnabled.checked = row.enabled;
+                        // applySelections forces enabled back to false without a feed, so the
+                        // checkbox must not let the operator tick something the server undoes
+                        configEnabled.disabled = !fileUploaded;
+                        configHint.classList.toggle('is-hidden', fileUploaded);
+                        configPricing.checked = row.includeInPricing;
+                        configFulfilment.checked = row.includeInFulfilment;
+                        configFile.textContent = fileUploaded ? feedPresentLabel : feedMissingLabel;
+                        configFileInput.value = '';
+                        configError.classList.add('is-hidden');
+                        configModal.classList.add('is-active');
+                    }
+
+                    if (addButton) {
+                        addButton.addEventListener('click', function () {
+                            nameInput.value = '';
+                            addFile.value = '';
+                            addFilename.textContent = '';
+                            addError.classList.add('is-hidden');
+                            addModal.classList.add('is-active');
+                            nameInput.focus();
+                        });
+                    }
+                    addFile.addEventListener('change', function () {
+                        addFilename.textContent = addFile.files.length ? addFile.files[0].name : '';
+                    });
+                    document.getElementById('manual-add-confirm').addEventListener('click', addManual);
+                    document.getElementById('manual-add-cancel').addEventListener('click', function () {
+                        addModal.classList.remove('is-active');
+                    });
+                    document.getElementById('manual-add-close').addEventListener('click', function () {
+                        addModal.classList.remove('is-active');
+                    });
+                    addModal.querySelector('.modal-background').addEventListener('click', function () {
+                        addModal.classList.remove('is-active');
+                    });
+
+                    configUpload.addEventListener('click', function () { configFileInput.click(); });
+                    configFileInput.addEventListener('change', uploadForCurrent);
+                    document.getElementById('manual-config-cancel').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+                    document.getElementById('manual-config-close').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+                    configModal.querySelector('.modal-background').addEventListener('click', function () {
+                        configModal.classList.remove('is-active');
+                    });
+
+                    // scoped to the manual table only -- the external supplier table renders the
+                    // same data-configure-supplier buttons and is bound by its own script
+                    document.querySelectorAll('#manual-supplier-section [data-configure-supplier]').forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            openConfig(button.getAttribute('data-configure-supplier'));
+                        });
+                    });
+                })();
+            </script>
 
         </div>
     </section>
