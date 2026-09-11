@@ -55,6 +55,20 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
+    void blocksABlankOrNonNumericDayCountBeforeItEverReachesTheServer() throws Exception {
+        // orderAssemblyDays/orderRealizationDays bind as primitive int with no BindingResult
+        // parameter, so a blank or non-numeric submission previously reached Spring's own binding
+        // failure (400, framework error page) instead of being caught client-side; type="number"
+        // with `required` stops the reachable case -- clearing the field or typing text -- before
+        // the request is even sent
+        String html = template();
+        assertThat(html).contains(
+                "<input class=\"input\" type=\"number\" min=\"0\" required name=\"orderAssemblyDays\"");
+        assertThat(html).contains(
+                "<input class=\"input\" type=\"number\" min=\"0\" required name=\"orderRealizationDays\"");
+    }
+
+    @Test
     void prefillsTheSettingsModalFreshFromTheSectionsDataAttributesRatherThanAPageLoadSnapshot() throws Exception {
         String normalized = template().replaceAll("\\s+", " ");
         assertThat(normalized).contains(
@@ -67,9 +81,12 @@ class StoreFulfilmentTemplateTest {
     void savingSettingsSwapsTheSectionAndClosesTheModalOnSuccessOrKeepsItOpenWithTheOperatorsInputOnFailure() throws Exception {
         String normalized = template().replaceAll("\\s+", " ");
         assertThat(normalized).contains("applySectionSwap(settingsSection, result.html); close();");
+        // routes through the shared guarded helper (also used by the supplier and manual-config
+        // forms) instead of trusting an arbitrary 400 body inline: a binding failure on the int day
+        // fields (no BindingResult parameter) makes Spring itself return 400 with the whole
+        // framework error page as the body, which must not be written into the modal raw
         assertThat(normalized).contains(
-                "formError.innerHTML = (result.status === 400 && result.html) ? result.html "
-                        + ": ('<div class=\"notification is-danger\">' + genericError + '</div>'); return;");
+                "if (!result.ok) { applyFormError(formError, result.html, result.status); return; }");
     }
 
     @Test
@@ -83,6 +100,30 @@ class StoreFulfilmentTemplateTest {
                 "var refreshed = settingsSection.firstElementChild; "
                         + "if (refreshed && refreshed.getAttribute('data-refresh-external-suppliers') === 'true') { "
                         + "refreshExternalSupplierSection(basePath, externalSection); }");
+    }
+
+    @Test
+    void refuseToSwapInARefreshedExternalSectionThatDoesNotActuallyLookLikeOne() throws Exception {
+        // A same-origin redirect to a login page after a session expiry returns 200 (r.ok is true),
+        // so checking only r.ok would swap a whole login document into #external-supplier-section,
+        // silently replacing the suppliers table -- the response is only trusted once its root
+        // actually carries data-show-mode, which every genuine render of this fragment sets.
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "var root = temp.firstElementChild; "
+                        + "if (!root || !root.hasAttribute('data-show-mode')) { "
+                        + "throw new Error('Refreshed body did not look like the external supplier section'); }");
+    }
+
+    @Test
+    void surfacesANonBlockingWarningWhenTheExternalSupplierSectionRefreshFails() throws Exception {
+        // the settings save itself already succeeded and has its own toast, so the failure itself
+        // stays silent, but leaving a stale section with nothing on screen has a real, concrete
+        // consequence -- e.g. canUseGlobalSuppliers just turned on but the mode selector stays
+        // hidden with no explanation -- so the operator is told to reload instead of nothing at all
+        String html = template();
+        assertThat(html).contains(".catch(function () { showToast(supplierSectionStaleWarning, 'warning'); });");
+        assertThat(html).doesNotContain("/* best-effort, see comment above */");
     }
 
     @Test
@@ -421,10 +462,38 @@ class StoreFulfilmentTemplateTest {
         // SupplierSectionModel.renderErrorFragment) is trusted raw
         assertThat(html).contains(
                 "function showFormError(html, status) {\n"
-                        + "                        supplierFormError.innerHTML = (status === 400 && html)\n"
-                        + "                                ? html\n"
-                        + "                                : ('<div class=\"notification is-danger\">' + genericError + '</div>');\n"
+                        + "                        applyFormError(supplierFormError, html, status);\n"
                         + "                    }");
+    }
+
+    @Test
+    void doesNotTrustA400BodyOnStatusAlone() throws Exception {
+        // FulfilmentSettingsForm binds orderAssemblyDays/orderRealizationDays as primitive int with
+        // no BindingResult parameter, so clearing one of the number inputs (or the browser-side
+        // guard failing) makes Spring itself return 400 with the framework's own error page as the
+        // body -- checking `status === 400 && html` alone (the bug this branch had) would still
+        // write that whole document into the modal, since both conditions are true. The body must
+        // also look like the small sectionError fragment the server renders for a genuine 400.
+        String normalized = template().replaceAll("\\s+", " ");
+        assertThat(normalized).contains(
+                "function looksLikeSectionErrorFragment(html) { "
+                        + "return !!html && html.indexOf('notification is-danger') !== -1 "
+                        + "&& html.indexOf('<html') === -1; }");
+        assertThat(normalized).contains(
+                "function applyFormError(target, html, status) { "
+                        + "target.innerHTML = (status === 400 && looksLikeSectionErrorFragment(html)) "
+                        + "? html : ('<div class=\"notification is-danger\">' + genericError + '</div>'); }");
+    }
+
+    @Test
+    void everyRejectedFormSaveRoutesThroughTheSharedGuardedFormErrorHelperInsteadOfDuplicatingItAThirdTime() throws Exception {
+        // supplier form (showFormError, pinned above), settings form and manual-config form all
+        // reject a save the same way -- a regression back to inlining the status-only ternary in
+        // any one of them (as the settings handler originally did) reopens exactly this bug
+        String html = template();
+        assertThat(html).contains("applyFormError(formError, result.html, result.status);");
+        assertThat(html).contains("applyFormError(configSaveError, result.html, result.status);");
+        assertThat(html).doesNotContain("result.status === 400 && result.html");
     }
 
     @Test

@@ -27,7 +27,7 @@
                             <div class="field">
                                 <label class="label" th:text="#{store.order.assembly.days}"></label>
                                 <div class="control">
-                                    <input class="input" type="text" name="orderAssemblyDays"
+                                    <input class="input" type="number" min="0" required name="orderAssemblyDays"
                                            id="fulfilment-settings-assembly-days"
                                            th:placeholder="#{store.order.assembly.days}" />
                                 </div>
@@ -36,7 +36,7 @@
                             <div class="field">
                                 <label class="label" th:text="#{store.order.realization.days}"></label>
                                 <div class="control">
-                                    <input class="input" type="text" name="orderRealizationDays"
+                                    <input class="input" type="number" min="0" required name="orderRealizationDays"
                                            id="fulfilment-settings-realization-days"
                                            th:placeholder="#{store.order.realization.days}" />
                                 </div>
@@ -100,6 +100,10 @@
                 // flash it through, so it travels in the response body instead, the same way the
                 // dropship validation fragment carries data-fully-available.
                 var genericError = /*[[#{general.error}]]*/ 'Error';
+                // Shown when refreshExternalSupplierSection below cannot trust the response it got
+                // back and leaves the section untouched instead of swapping it in.
+                var supplierSectionStaleWarning = /*[[#{store.supplier.section.refresh.stale}]]*/
+                        'The supplier list may be out of date. Reload the page to see it refreshed.';
 
                 function applySectionSwap(container, html) {
                     var temp = document.createElement('div');
@@ -117,21 +121,52 @@
                     return text || fallback;
                 }
 
+                // A rejected save's response body is trusted as our own small sectionError fragment
+                // only when the status is 400 AND the body actually looks like that fragment: a
+                // form bound with @ModelAttribute and no BindingResult (e.g. FulfilmentSettingsForm's
+                // int day fields, left blank or given text) makes Spring itself return 400 with the
+                // whole framework error page as the body, which must fall back to the generic
+                // notification instead of being written into the modal raw. Shared by every section
+                // script below instead of duplicating the same check a third time.
+                function looksLikeSectionErrorFragment(html) {
+                    return !!html && html.indexOf('notification is-danger') !== -1 && html.indexOf('<html') === -1;
+                }
+
+                function applyFormError(target, html, status) {
+                    target.innerHTML = (status === 400 && looksLikeSectionErrorFragment(html))
+                            ? html
+                            : ('<div class="notification is-danger">' + genericError + '</div>');
+                }
+
                 // Used by the fulfilment settings save below when it flips canUseGlobalSuppliers:
                 // that flag also governs the external suppliers section's mode column and the
                 // supplier modal's mode selector, so this fetches and swaps that section in too,
                 // the same way refreshManualSection() does further down for the manual section.
                 // Best-effort: the settings save itself already succeeded and already has its own
-                // toast, so a failure here is not surfaced -- the next supplier action (or a page
-                // reload) will show the current state anyway.
+                // toast, so a failure here is not surfaced as an error -- but a session expiry
+                // returns 200 with a same-origin login page instead of the section fragment, and
+                // swapping that in would silently replace the suppliers table with a login form, so
+                // the response is only trusted once its root actually looks like the section (it
+                // carries data-show-mode, which every real render of this fragment sets). A failed
+                // refresh still has a real, visible consequence -- e.g. canUseGlobalSuppliers just
+                // turned on but the stale section still hides the mode selector -- so it is not left
+                // completely silent, just non-blocking.
                 function refreshExternalSupplierSection(basePath, container) {
                     return fetch(basePath + '/fulfilment/supplier/section')
                         .then(function (r) {
                             if (!r.ok) { throw new Error('Failed to refresh the external supplier section'); }
                             return r.text();
                         })
-                        .then(function (html) { applySectionSwap(container, html); })
-                        .catch(function () { /* best-effort, see comment above */ });
+                        .then(function (html) {
+                            var temp = document.createElement('div');
+                            temp.innerHTML = html;
+                            var root = temp.firstElementChild;
+                            if (!root || !root.hasAttribute('data-show-mode')) {
+                                throw new Error('Refreshed body did not look like the external supplier section');
+                            }
+                            applySectionSwap(container, html);
+                        })
+                        .catch(function () { showToast(supplierSectionStaleWarning, 'warning'); });
                 }
             </script>
 
@@ -194,9 +229,7 @@
                                 submitInFlight = false;
                                 submitButton.disabled = false;
                                 if (!result.ok) {
-                                    formError.innerHTML = (result.status === 400 && result.html)
-                                            ? result.html
-                                            : ('<div class="notification is-danger">' + genericError + '</div>');
+                                    applyFormError(formError, result.html, result.status);
                                     return;
                                 }
                                 applySectionSwap(settingsSection, result.html);
@@ -425,12 +458,12 @@
 
                     // html is only trusted when it is the small sectionError fragment the server
                     // renders for a 400 (see SupplierSectionModel.renderErrorFragment); on any
-                    // other status the body could be a whole error or login-redirect page, so it
-                    // falls back to the generic notification instead of being written in raw.
+                    // other status -- or a 400 whose body doesn't actually look like that fragment
+                    // -- it falls back to the generic notification instead of being written in raw.
+                    // Delegates to the shared applyFormError helper (see the first script block)
+                    // instead of duplicating the guard here.
                     function showFormError(html, status) {
-                        supplierFormError.innerHTML = (status === 400 && html)
-                                ? html
-                                : ('<div class="notification is-danger">' + genericError + '</div>');
+                        applyFormError(supplierFormError, html, status);
                     }
 
                     // The full provider list is rendered once (data-all-suppliers, set at page
@@ -941,9 +974,7 @@
                                     // only the trusted 400 sectionError fragment is injected raw;
                                     // any other status (500, a login redirect) falls back to the
                                     // generic notification instead of writing a whole page in here
-                                    configSaveError.innerHTML = (result.status === 400 && result.html)
-                                        ? result.html
-                                        : ('<div class="notification is-danger">' + genericError + '</div>');
+                                    applyFormError(configSaveError, result.html, result.status);
                                     return;
                                 }
                                 applySectionSwap(manualSection, result.html);
