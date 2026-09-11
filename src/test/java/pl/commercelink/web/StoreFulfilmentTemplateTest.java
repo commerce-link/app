@@ -11,9 +11,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StoreFulfilmentTemplateTest {
 
     private static final Path TEMPLATE = Path.of("src/main/resources/templates/store-fulfilment.html");
+    private static final Path LAYOUT = Path.of("src/main/resources/templates/layout.html");
 
     private String template() throws Exception {
         return Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+    }
+
+    private String layout() throws Exception {
+        return Files.readString(LAYOUT, StandardCharsets.UTF_8);
     }
 
     @Test
@@ -175,5 +180,32 @@ class StoreFulfilmentTemplateTest {
                 "if (!res.ok) { showError(addError, res.body.message); return; } "
                         + "window.location.reload(); }) "
                         + ".catch(function () { showError(addError); });");
+    }
+
+    @Test
+    void layoutFallsBackToTheDefaultConfirmationTextWhenNoMessageIsSupplied() throws Exception {
+        // this pins layout.html rather than LayoutFlashMessagesTemplateTest: the property being
+        // protected is exactly what this file's manual-delete flow (deleteManual/confirmDelete
+        // wiring above) and the external disconnect form both depend on, so the pin belongs next
+        // to the feature it guards, not next to the unrelated flash-banner assertions
+        String html = layout();
+        String normalized = html.replaceAll("\\s+", " ");
+
+        // the default text is captured once from the server-rendered paragraph, so it always
+        // mirrors whatever #{confirm.delete} resolves to, in whichever locale
+        assertThat(html).contains("<p id=\"deleteModalMessage\" th:text=\"#{confirm.delete}\">");
+        assertThat(normalized).contains(
+                "const defaultDeleteMessage = document.getElementById('deleteModalMessage').textContent;");
+
+        // every screen that still calls confirmDelete(this) with no data-confirm-message must
+        // keep seeing exactly that captured default; dropping the "|| defaultDeleteMessage" half
+        // of this fallback (or reordering it) would leave those screens showing "undefined"
+        assertThat(normalized).contains(
+                "document.getElementById('deleteModalMessage').textContent = "
+                        + "button.dataset.confirmMessage || defaultDeleteMessage;");
+
+        // guards against the pre-fix shape reappearing: an id-less paragraph gives confirmDelete
+        // no element to read the default from or swap the text of
+        assertThat(html).doesNotContain("<p th:text=\"#{confirm.delete}\">");
     }
 }

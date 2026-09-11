@@ -64,4 +64,46 @@ class SupplierTableFragmentTest {
     void marksRowsWhoseProviderIsNoLongerRegistered() throws Exception {
         assertThat(fragment()).contains("${!row.knownProvider()}");
     }
+
+    @Test
+    void manualRowRendersDeleteControlAsAButtonNotAForm() throws Exception {
+        String html = fragment();
+
+        // manual rows carry the identity on a plain button; store-fulfilment.html's own script
+        // wires it up with a fetch call, instead of a <form> posting straight to the
+        // @ResponseBody delete endpoint, which used to strand the operator on a raw JSON page
+        assertThat(html).contains("<button type=\"button\" th:if=\"${manual}\"");
+        assertThat(html).contains("class=\"button is-small is-danger is-outlined manual-delete-button\"");
+        assertThat(html).contains(
+                "data-identity=${row.identity()},data-confirm-message=#{store.manual.delete.confirm}");
+
+        // guards against the old shape reappearing: a <form> conditioned on manual whose action
+        // posts straight to the JSON delete endpoint, submitted via the callback-less confirmDelete(this)
+        assertThat(html).doesNotContain("<form th:if=\"${manual}\"");
+        assertThat(html).doesNotContain("'/manual-supplier/' + ${row.identity()} + '/delete'");
+        assertThat(html).doesNotContain(
+                "${manual} ? #{store.supplier.action.delete} : #{store.supplier.action.disconnect}");
+    }
+
+    @Test
+    void externalRowKeepsFormAndConfirmDeleteThisShape() throws Exception {
+        String html = fragment();
+
+        // the external/global disconnect endpoint redirects, so this row may legitimately stay a
+        // plain form submitted through the callback-less confirmDelete(this) -- a future change
+        // must not quietly convert it to the manual row's data-attribute/button style too
+        assertThat(html).contains("<form th:unless=\"${manual}\"");
+        assertThat(html).contains("'/fulfilment/supplier/' + ${row.identity()} + '/disconnect'");
+        assertThat(html).contains("onclick=\"confirmDelete(this)\"");
+    }
+
+    @Test
+    void bothDestructiveControlsCarryAConfirmationMessageAttribute() throws Exception {
+        String html = fragment();
+
+        // each destructive action names exactly what it destroys, instead of sharing the modal's
+        // generic default text
+        assertThat(html).contains("data-confirm-message=#{store.manual.delete.confirm}");
+        assertThat(html).contains("data-confirm-message=#{store.supplier.disconnect.confirm}");
+    }
 }
