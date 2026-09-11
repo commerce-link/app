@@ -53,21 +53,26 @@ public class OrderAllocationsManager {
     }
 
     public void commit(String storeId, String deliveryId, LocalDate estimatedDeliveryAt, List<DeliveryItem> items) {
-        Map<String, Map<String, Double>> allocationsByOrderId = new HashMap<>();
+        selectedOrderAllocations(items).forEach((orderId, costs) ->
+                ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, costs, estimatedDeliveryAt));
+    }
 
+    /** Reserves the allocations for a pending delivery: bound to it, still in allocation. */
+    public void claim(String storeId, String deliveryId, List<DeliveryItem> items) {
+        selectedOrderAllocations(items).forEach((orderId, costs) ->
+                ordersManager.claimOrderItems(storeId, orderId, deliveryId, costs));
+    }
+
+    private Map<String, Map<String, Double>> selectedOrderAllocations(List<DeliveryItem> items) {
+        Map<String, Map<String, Double>> allocationsByOrderId = new HashMap<>();
         for (DeliveryItem item : items) {
             for (Allocation allocation : item.getSelectedAllocations(AllocationType.Order)) {
-                String orderId = allocation.getKey().getOrderId();
-                String itemId = allocation.getKey().getItemId();
                 allocationsByOrderId
-                        .computeIfAbsent(orderId, k -> new HashMap<>())
-                        .put(itemId, item.getUnitCost());
+                        .computeIfAbsent(allocation.getKey().getOrderId(), k -> new HashMap<>())
+                        .put(allocation.getKey().getItemId(), item.getUnitCost());
             }
         }
-
-        for (String orderId : allocationsByOrderId.keySet()) {
-            ordersManager.markOrderItemsAsOrdered(storeId, orderId, deliveryId, allocationsByOrderId.get(orderId), estimatedDeliveryAt);
-        }
+        return allocationsByOrderId;
     }
 
     /**

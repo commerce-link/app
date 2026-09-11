@@ -330,6 +330,35 @@ class OrderAllocationsManagerTest {
         verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("claim hands the selected order allocations to the orders manager without ordering them")
+    void claimHandsTheSelectedOrderAllocationsToTheOrdersManagerWithoutOrderingThem() {
+        // given
+        DeliveryItem item = deliveryItemWithSelectedOrderAllocation("item-1", 42.0);
+
+        // when
+        orderAllocationsManager.claim(STORE_ID, "delivery-1", List.of(item));
+
+        // then
+        verify(ordersManager).claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+    }
+
+    private DeliveryItem deliveryItemWithSelectedOrderAllocation(String itemId, double unitCost) {
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(ORDER_ID, itemId, "buyer@example.com"));
+        allocation.setType(AllocationType.Order);
+        allocation.setQty(1);
+        allocation.setSelected(true);
+
+        DeliveryItem deliveryItem = new DeliveryItem();
+        deliveryItem.setMfn("MFN-" + itemId);
+        deliveryItem.setUnitCost(unitCost);
+        deliveryItem.setRequestedQty(1);
+        deliveryItem.setAllocations(List.of(allocation));
+        return deliveryItem;
+    }
+
     private Order orderWithStatus(OrderStatus status) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

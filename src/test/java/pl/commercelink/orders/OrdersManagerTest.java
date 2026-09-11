@@ -32,6 +32,7 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -849,6 +850,56 @@ class OrdersManagerTest {
         // then
         verify(ordersRepository, never()).findById(any(), any());
         verify(orderLifecycle, never()).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("claimOrderItems binds items to the delivery and leaves them in allocation")
+    void claimOrderItemsBindsItemsToTheDeliveryAndLeavesThemInAllocation() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getCost()).isEqualTo(42.0);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.New);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("claimOrderItems leaves an item already claimed by another delivery untouched")
+    void claimOrderItemsLeavesAnItemAlreadyClaimedByAnotherDeliveryUntouched() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-other");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+
+        // then
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(item);
+    }
+
+    private OrderItem orderItemInAllocation(String itemId) {
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
+        item.setItemId(itemId);
+        item.setEan("EAN-" + itemId);
+        item.setManufacturerCode("MFN-" + itemId);
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+        return item;
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

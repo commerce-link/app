@@ -152,6 +152,20 @@ public class OrdersManager {
     }
 
     /**
+     * Reserves the items for a delivery whose purchase has not been confirmed yet. The status stays
+     * Allocation, so the order does not move to Assembly and the customer is not notified.
+     */
+    public void claimOrderItems(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs) {
+        execute(storeId, orderId, orderItemId2Costs.keySet(), (order, orderItem) -> {
+            if (orderItem.isInAllocation() && !orderItem.isClaimed()) {
+                orderItem.setCost(orderItemId2Costs.get(orderItem.getItemId()));
+                orderItem.markAsClaimed(deliveryId);
+                orderItemsRepository.save(orderItem);
+            }
+        });
+    }
+
+    /**
      * Applies a delivery's estimated date to an order after the supplier confirmed the purchase, i.e. when
      * the date was unknown while the allocations were being claimed. Runs the lifecycle so the assembly
      * notification is sent with the freshly computed dates.
