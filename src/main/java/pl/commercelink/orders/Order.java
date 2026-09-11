@@ -640,12 +640,8 @@ public class Order {
         this.orderRealizationDays = orderRealizationDays;
     }
 
-    @DynamoDBIgnore
-    public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate) {
-        return updateEstimatedAssemblyAt(deliveryDate, false);
-    }
-
     /**
+     * @param deliveryDate      when this leg's goods land, or null for a confirmation that carries no date
      * @param shippedBySupplier every leg of this order travels straight from a supplier to the customer,
      *                          so there is no in-house handling to add. Only a caller that asked the whole
      *                          order can tell: neither a single delivery nor the order's fulfilment type
@@ -654,17 +650,16 @@ public class Order {
      */
     @DynamoDBIgnore
     public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate, boolean shippedBySupplier) {
-        if (deliveryDate == null) {
-            return estimatedAssemblyAt;
-        }
-
         // The assembly date only moves forward: the order is ready once its last leg has landed.
-        if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
+        if (deliveryDate != null && (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt))) {
             estimatedAssemblyAt = deliveryDate;
         }
-        // The shipping date is derived again on every call, including one that does not move the assembly
-        // date: a leg confirmed for an earlier date can still be the one that puts a warehouse stop on the
-        // order, and nothing else would ever repair the handling time it owes.
+        if (estimatedAssemblyAt == null) {
+            return null;
+        }
+        // The shipping date is derived again on every call, including one that moves no date at all: a leg
+        // confirmed for an earlier date, or with no date, can still be the one that puts a warehouse stop on
+        // the order, and nothing else would ever repair the handling time it owes.
         estimatedShippingAt = shippedBySupplier
                 ? estimatedAssemblyAt
                 : addWeekdayDays(estimatedAssemblyAt, orderRealizationDays);

@@ -855,7 +855,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(100.0);
         order.setStatus(OrderStatus.Assembly);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);
         OrderItem item = orderItemInAllocation("item-1");
         item.markAsClaimed("delivery-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -894,7 +894,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(100.0);
         order.setStatus(OrderStatus.New);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);
         OrderItem item = orderItemInAllocation("item-1");
         item.markAsClaimed("delivery-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -995,8 +995,53 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("a confirmation without a date does not pay for the route lookup")
-    void marksOrderedSkipsTheRouteLookupWhenThereIsNoDate() {
+    @DisplayName("a dateless confirmation still puts the realization days back on an order that has a date")
+    void marksOrderedReDerivesTheShippingDateForADatelessConfirmation() {
+        // given: the dropship leg landed first and left both dates on the same day, and the leg confirmed
+        // now - the one that adds the warehouse stop - carries no date of its own
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 14));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 14));
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), null);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("a dateless confirmation on an all-dropship order does not invent handling time")
+    void marksOrderedKeepsTheDropshipRuleForADatelessConfirmation() {
+        // given: an order whose every leg is a dropship one, already stamped with both dates on the same day
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 14));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 14));
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true);
+
+        // when: the second dropship leg is confirmed without a date of its own
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d2", Map.of("item-1", 10.0), null);
+
+        // then: the route still says the goods never reach us, so no handling time is added
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("a confirmation with no date, on an order with no date, does not pay for the route lookup")
+    void marksOrderedSkipsTheRouteLookupWhenThereIsNothingToDeriveFrom() {
         // given
         Order order = orderWithTotalPrice(100.0);
         order.setStatus(OrderStatus.New);

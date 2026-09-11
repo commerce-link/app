@@ -278,16 +278,33 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("the single-argument form keeps the warehouse rule")
-    void singleArgumentFormKeepsTheWarehouseRule() {
+    @DisplayName("a confirmation carrying no date still re-derives the shipping date from the assembly date")
+    void reDerivesTheShippingDateWhenTheConfirmationCarriesNoDate() {
+        // given: a dropship leg landed first and left both dates on the same day
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), true);
+
+        // when: the leg that adds a warehouse stop is confirmed without a date of its own
+        order.updateEstimatedAssemblyAt(null, false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("an order with no date at all is left alone by a confirmation carrying no date")
+    void leavesAnOrderWithoutAnyDateAlone() {
         // given
         Order order = new Order("store-1");
         order.setOrderRealizationDays(3);
 
         // when
-        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14));
+        order.updateEstimatedAssemblyAt(null, false);
 
         // then
-        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+        assertThat(order.getEstimatedAssemblyAt()).isNull();
+        assertThat(order.getEstimatedShippingAt()).isNull();
     }
 }

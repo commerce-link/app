@@ -158,8 +158,10 @@ public class OrdersManager {
             previousStatusHolder[0] = o.getStatus();
             // Whether the realization days apply is a property of the whole order, not of the delivery that
             // happens to be confirmed now: the items just marked point at their deliveries, so ask there.
-            // A confirmation without a date changes no date at all, so it does not pay for the lookup.
-            boolean shippedBySupplier = estimatedDeliveryAt != null
+            // A dateless confirmation still re-derives the shipping date from the date the order already
+            // has, so the lookup is skipped only when there is no date to derive anything from at all.
+            boolean nothingToDerive = estimatedDeliveryAt == null && o.getEstimatedAssemblyAt() == null;
+            boolean shippedBySupplier = !nothingToDerive
                     && dropshipItemLookup.isEntirelyDropship(storeId, items);
             o.updateEstimatedAssemblyAt(estimatedDeliveryAt, shippedBySupplier);
         });

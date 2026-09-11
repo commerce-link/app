@@ -78,7 +78,7 @@ class OrderNotificationsServiceTest {
     void sendDispatchesQualifyingOrderAssemblyEmailAndPersistsEvent() {
         // given
         Order order = orderBase(OrderStatus.Assembly);
-        order.updateEstimatedAssemblyAt(LocalDate.now().plusDays(2));
+        order.updateEstimatedAssemblyAt(LocalDate.now().plusDays(2), false);
         when(orderEventsRepository.hasEvent(eq(ORDER_ID), eq(EventType.email), anyString())).thenReturn(false);
         when(emailClient.send(eq(STORE_ID), eq(EmailNotificationType.ORDER_ASSEMBLY), any(EmailNotification.class)))
                 .thenReturn(true);
@@ -173,7 +173,7 @@ class OrderNotificationsServiceTest {
         // given
         Order order = orderBase(OrderStatus.Assembly);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18), false);
         when(orderEventsRepository.hasEvent(ORDER_ID, EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name()))
                 .thenReturn(false);
 
@@ -190,7 +190,7 @@ class OrderNotificationsServiceTest {
         // given
         Order order = orderBase(OrderStatus.Assembly);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18), false);
         when(orderEventsRepository.hasEvent(ORDER_ID, EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name()))
                 .thenReturn(true);
         when(emailClient.send(any(), eq(EmailNotificationType.ORDER_ASSEMBLY_DATE_CHANGED), any())).thenReturn(true);
