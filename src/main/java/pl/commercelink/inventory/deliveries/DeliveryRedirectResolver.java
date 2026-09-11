@@ -39,6 +39,8 @@ public class DeliveryRedirectResolver {
     }
 
     private boolean isAwaitingDelivery(Item item) {
-        return item.hasOneOfTheStatuses(FulfilmentStatus.New, FulfilmentStatus.Allocation);
+        // a claimed item is still in Allocation but already belongs to a delivery: its deliveryId is that
+        // delivery's id, not a provider name, so the planning screen has nothing to show for it
+        return item.hasOneOfTheStatuses(FulfilmentStatus.New, FulfilmentStatus.Allocation) && !item.isClaimed();
     }
 }

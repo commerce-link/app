@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -17,11 +18,14 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -80,6 +84,64 @@ class OrderAllocationsManagerTest {
         verify(orderItemsRepository, never()).save(any());
         verify(ordersRepository, never()).save(any());
         verify(ordersRepository, never()).findById(any(), any());
+    }
+
+    @Test
+    @DisplayName("remove leaves an allocation claimed by a pending delivery untouched")
+    void removeLeavesAnAllocationClaimedByAPendingDeliveryUntouched() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when
+        orderAllocationsManager.remove(STORE_ID, ORDER_ID, List.of("item-1"));
+
+        // then
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        verify(orderItemsRepository, never()).save(claimed);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("remove frees an allocation claimed by the very delivery that is removing it")
+    void removeFreesAnAllocationClaimedByTheDeliveryThatIsRemovingIt() {
+        // given
+        Order order = orderWithStatus(OrderStatus.Assembly);
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        boolean removed = orderAllocationsManager.remove(STORE_ID, ORDER_ID, "item-1", "delivery-1");
+
+        // then
+        assertThat(removed).isTrue();
+        assertThat(claimed.getStatus()).isEqualTo(FulfilmentStatus.New);
+        assertThat(claimed.getClaimedDeliveryId()).isNull();
+        assertThat(claimed.getDeliveryId()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.New);
+        verify(orderItemsRepository).save(claimed);
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    @DisplayName("remove still refuses an allocation claimed by a different delivery than the one removing")
+    void removeStillRefusesAnAllocationClaimedByADifferentDelivery() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-other");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when
+        boolean removed = orderAllocationsManager.remove(STORE_ID, ORDER_ID, "item-1", "delivery-1");
+
+        // then
+        assertThat(removed).isFalse();
+        assertThat(claimed.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(claimed);
+        verify(ordersRepository, never()).save(any());
     }
 
     @Test
@@ -206,6 +268,29 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
+    @DisplayName("isClaimed reports true for an item claimed by a pending delivery")
+    void isClaimedReportsTrueForAClaimedItem() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(claimed);
+
+        // when / then
+        assertThat(orderAllocationsManager.isClaimed(ORDER_ID, "item-1")).isTrue();
+    }
+
+    @Test
+    @DisplayName("isClaimed reports false for an unclaimed item")
+    void isClaimedReportsFalseForAnUnclaimedItem() {
+        // given
+        OrderItem free = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(free);
+
+        // when / then
+        assertThat(orderAllocationsManager.isClaimed(ORDER_ID, "item-1")).isFalse();
+    }
+
+    @Test
     @DisplayName("updateUnitCosts applies confirmed price and returns delta")
     void updateUnitCostsAppliesConfirmedPriceAndReturnsDelta() {
         // given
@@ -284,10 +369,117 @@ class OrderAllocationsManagerTest {
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
     }
 
+    @Test
+    @DisplayName("claim hands the selected order allocations to the orders manager without ordering them")
+    void claimHandsTheSelectedOrderAllocationsToTheOrdersManagerWithoutOrderingThem() {
+        // given
+        DeliveryItem item = deliveryItemWithSelectedOrderAllocation("item-1", 42.0);
+
+        // when
+        orderAllocationsManager.claim(STORE_ID, "delivery-1", List.of(item));
+
+        // then
+        verify(ordersManager).claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered orders every claimed item of the delivery with the confirmed date")
+    void markClaimedAsOrderedOrdersEveryClaimedItemOfTheDeliveryWithTheConfirmedDate() {
+        // given
+        LocalDate confirmed = LocalDate.of(2026, 9, 25);
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.setCost(42.0);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+
+        // then
+        verify(ordersManager).markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), confirmed);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered continues with the other orders when one fails")
+    void markClaimedAsOrderedContinuesWithTheOtherOrdersWhenOneFails() {
+        // given
+        LocalDate confirmed = LocalDate.of(2026, 9, 25);
+        OrderItem first = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        first.markAsClaimed("delivery-1");
+        OrderItem second = orderItemInStatus("item-2", FulfilmentStatus.Allocation);
+        second.setOrderId("order-2");
+        second.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(first, second));
+        doThrow(new RuntimeException("boom")).when(ordersManager)
+                .markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), any(), any(), any());
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", confirmed);
+
+        // then
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq("order-2"), eq("delivery-1"), any(), eq(confirmed));
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered still orders the claimed items when the supplier confirmed without a date")
+    void markClaimedAsOrderedStillOrdersTheClaimedItemsWithoutADate() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
+
+        // when
+        orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", null);
+
+        // then
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), eq("delivery-1"), any(), eq(null));
+    }
+
+    @Test
+    @DisplayName("fetchAll skips allocations already claimed by a delivery")
+    void fetchAllSkipsAllocationsAlreadyClaimedByADelivery() {
+        // given
+        Order order = orderWithStatus(OrderStatus.New);
+        OrderItem free = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        OrderItem claimed = orderItemInStatus("item-2", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(ordersRepository.findAllByStoreIdAndStatus(STORE_ID, OrderStatus.New, OrderStatus.Assembly))
+                .thenReturn(List.of(order));
+        when(orderItemsRepository.findByOrderIdAndStatus(ORDER_ID, FulfilmentStatus.Allocation))
+                .thenReturn(List.of(free, claimed));
+
+        // when
+        List<Allocation> allocations = orderAllocationsManager.fetchAll(STORE_ID);
+
+        // then
+        assertThat(allocations).hasSize(1);
+        assertThat(allocations.get(0).getKey().getItemId()).isEqualTo("item-1");
+    }
+
+    private DeliveryItem deliveryItemWithSelectedOrderAllocation(String itemId, double unitCost) {
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(ORDER_ID, itemId, "buyer@example.com"));
+        allocation.setType(AllocationType.Order);
+        allocation.setQty(1);
+        allocation.setSelected(true);
+
+        DeliveryItem deliveryItem = new DeliveryItem();
+        deliveryItem.setMfn("MFN-" + itemId);
+        deliveryItem.setUnitCost(unitCost);
+        deliveryItem.setRequestedQty(1);
+        deliveryItem.setAllocations(List.of(allocation));
+        return deliveryItem;
+    }
+
     private Order orderWithStatus(OrderStatus status) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         order.setStatus(status);
+        // set up minimal billing details for Allocation.fromOrderItem
+        BillingDetails billingDetails = new BillingDetails();
+        billingDetails.setEmail("buyer@example.com");
+        order.setBillingDetails(billingDetails);
         return order;
     }
 

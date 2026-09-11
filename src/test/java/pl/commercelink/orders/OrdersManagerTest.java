@@ -18,6 +18,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
+import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -28,8 +29,10 @@ import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,6 +79,8 @@ class OrdersManagerTest {
     private ManualWarehouseItemFulfilment manualWarehouseItemFulfilment;
     @Mock
     private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private OrderNotificationsEventPublisher notificationEventPublisher;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -584,6 +589,27 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("returnOrderItemsToSupplierAllocation releases a claimed item back to the supplier pool")
+    void returnOrderItemsToSupplierAllocationReleasesAClaimedItemBackToTheSupplierPool() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.returnOrderItemsToSupplierAllocation(STORE_ID, ORDER_ID, "delivery-1", "Elko", List.of("item-1"));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getDeliveryId()).isEqualTo("Elko");
+        assertThat(item.getClaimedDeliveryId()).isNull();
+        assertThat(item.isClaimed()).isFalse();
+    }
+
+    @Test
     @DisplayName("splitOrder moves a pre-claim Allocation item to the new order with its allocation intact")
     void splitOrderMovesAnAllocatedItemWithItsAllocation() {
         // given
@@ -739,6 +765,156 @@ class OrdersManagerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("warehouse.item.not.available");
         verify(manualWarehouseItemFulfilment, never()).run(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("claimOrderItems binds items to the delivery and leaves them in allocation")
+    void claimOrderItemsBindsItemsToTheDeliveryAndLeavesThemInAllocation() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getCost()).isEqualTo(42.0);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.New);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("claimOrderItems leaves an item already claimed by another delivery untouched")
+    void claimOrderItemsLeavesAnItemAlreadyClaimedByAnotherDeliveryUntouched() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-other");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.claimOrderItems(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0));
+
+        // then
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(item);
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered leaves an item claimed by another delivery untouched")
+    void markOrderItemsAsOrderedLeavesAnItemClaimedByAnotherDeliveryUntouched() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-other");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-other");
+        verify(orderItemsRepository, never()).save(item);
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered still orders an item claimed by this same delivery")
+    void markOrderItemsAsOrderedStillOrdersAnItemClaimedByThisSameDelivery() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 25));
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getCost()).isEqualTo(42.0);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered notifies when an existing assembly date moves later")
+    void markOrderItemsAsOrderedNotifiesWhenAnExistingAssemblyDateMovesLater() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
+
+        // then
+        verify(notificationEventPublisher).publishAssemblyDateChanged(order, LocalDate.of(2026, 9, 11));
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered does not notify when the date is set for the first time")
+    void markOrderItemsAsOrderedDoesNotNotifyWhenTheDateIsSetForTheFirstTime() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(1);
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
+
+        // then
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
+    @DisplayName("markOrderItemsAsOrdered does not notify when a New order's date moves on the way into Assembly")
+    void markOrderItemsAsOrderedDoesNotNotifyWhenANewOrdersDateMovesOnTheWayIntoAssembly() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        OrderItem item = orderItemInAllocation("item-1");
+        item.markAsClaimed("delivery-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "delivery-1", Map.of("item-1", 42.0), LocalDate.of(2026, 9, 18));
+
+        // then
+        verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    private OrderItem orderItemInAllocation(String itemId) {
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "test", 1, 100.0, "SKU-" + itemId, false);
+        item.setItemId(itemId);
+        item.setEan("EAN-" + itemId);
+        item.setManufacturerCode("MFN-" + itemId);
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+        return item;
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

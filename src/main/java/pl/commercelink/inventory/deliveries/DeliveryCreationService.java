@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -10,6 +11,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class DeliveryCreationService {
 
     @Autowired
@@ -59,6 +62,21 @@ public class DeliveryCreationService {
         }
     }
 
+    /**
+     * The automatic purchase path: the allocations are reserved for this delivery but stay in allocation
+     * until the supplier confirms. The manual "Save" path keeps using claimAllocations/commit, where the
+     * order at the supplier already exists.
+     */
+    public void claimAllocationsForPurchase(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        prepareForm(storeId, form);
+        delivery.increaseTotalCost(allocationsCost(form));
+        orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
+        if (!delivery.isDropship()) {
+            // dropship goods never reach the warehouse, so they must not leave a reserved row behind
+            warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        }
+    }
+
     /** Frees the allocations the operator unchecked on the creation form without creating a delivery. */
     public void releaseUnselectedAllocations(String storeId, DeliveryCreationForm form) {
         removeUnselectedAllocations(storeId, form.getItems());
@@ -80,6 +98,8 @@ public class DeliveryCreationService {
 
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
+
+        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
     }
 
     public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
@@ -87,6 +107,36 @@ public class DeliveryCreationService {
         delivery.setOrderStatus(null);
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
+    }
+
+    /**
+     * The delivery is already saved with the supplier's order number, so a failure here must not undo the
+     * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
+     * be lost. Log loudly instead. The delivery itself is complete, but the affected items are stuck in
+     * allocation, still claimed to it - neither ordered nor visible on the allocation screen. Release does
+     * not reach them (the delivery is no longer AWAITING_APPROVAL, the only state it goes through); the one
+     * in-application way out is deleting the allocations on the delivery's details screen, which gives the
+     * items back to their orders but also drops them from the delivery. Restoring the intended state -
+     * items ordered against this delivery - needs an engineer to re-run the marking. Each side gets its own
+     * try/catch so a failure on one does not also skip the other.
+     */
+    public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
+        try {
+            orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
+        } catch (RuntimeException e) {
+            log.error("Claimed order allocations not marked as ordered - items remain claimed and stuck in " +
+                            "allocation, needs an engineer to re-run the marking: " +
+                            "store={} delivery={} provider={} estimatedDeliveryAt={}",
+                    storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
+        }
+        try {
+            warehouseAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId());
+        } catch (RuntimeException e) {
+            log.error("Claimed warehouse allocations not marked as ordered - items remain claimed and stuck in " +
+                            "allocation, needs an engineer to re-run the marking: " +
+                            "store={} delivery={} provider={} estimatedDeliveryAt={}",
+                    storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
+        }
     }
 
     private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {

@@ -291,6 +291,39 @@ class DeliveriesManagerTest {
         assertThat(target.getPurchaseRef()).isNull();
     }
 
+    @Test
+    @DisplayName("deleteAllocations on a failed delivery frees its claimed items and decreases the cost by what was removed")
+    void deleteAllocationsOnAFailedDeliveryFreesClaimedItemsAndDecreasesCostByWhatWasRemoved() {
+        // given
+        Delivery delivery = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+        delivery.setTotalCost(300.0);
+        Allocation claimedByThisDelivery = orderAllocation("order-1", "item-1", 2, 50.0);
+        Allocation claimedByAnother = orderAllocation("order-2", "item-2", 1, 100.0);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(orderAllocationsManager.remove(STORE_ID, "order-1", "item-1", DELIVERY_ID)).thenReturn(true);
+        when(orderAllocationsManager.remove(STORE_ID, "order-2", "item-2", DELIVERY_ID)).thenReturn(false);
+
+        // when
+        deliveriesManager.deleteAllocations(STORE_ID, DELIVERY_ID, List.of(claimedByThisDelivery, claimedByAnother));
+
+        // then
+        verify(orderAllocationsManager).remove(STORE_ID, "order-1", "item-1", DELIVERY_ID);
+        verify(orderAllocationsManager).remove(STORE_ID, "order-2", "item-2", DELIVERY_ID);
+        assertThat(delivery.getTotalCost()).isEqualTo(200.0);
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    private Allocation orderAllocation(String orderId, String itemId, int qty, double unitCost) {
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey(orderId, itemId, "buyer@example.com"));
+        allocation.setType(AllocationType.Order);
+        allocation.setQty(qty);
+        allocation.setUnitCost(unitCost);
+        allocation.setInAllocation(true);
+        return allocation;
+    }
+
     private Delivery deliveryWith(LocalDate estimatedDeliveryAt) {
         Delivery d = new Delivery();
         d.setStoreId(STORE_ID);

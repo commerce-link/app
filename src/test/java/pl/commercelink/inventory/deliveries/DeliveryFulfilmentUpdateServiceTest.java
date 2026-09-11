@@ -78,6 +78,24 @@ class DeliveryFulfilmentUpdateServiceTest {
     }
 
     @Test
+    @DisplayName("run returns a claimed-specific failure when the only requested item is already claimed")
+    void runReturnsClaimedFailureWhenTheOnlyRequestedItemIsAlreadyClaimed() {
+        // given
+        when(orderAllocationsManager.updateFulfilment(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyDouble()))
+                .thenReturn(false);
+        when(orderAllocationsManager.isClaimed("order-1", "item-1")).thenReturn(true);
+        DeliveryFulfilmentUpdateForm form = form("new-ean", "new-mfn", 99.99,
+                List.of(allocationRef("order-1", "item-1")), List.of());
+
+        // when
+        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(STORE_ID, PROVIDER, form);
+
+        // then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("deliveries.allocation.edit.claimed");
+    }
+
+    @Test
     @DisplayName("run returns partial failure when only some allocations were updated")
     void runReturnsPartialFailureWhenOnlySomeAllocationsUpdated() {
         // given

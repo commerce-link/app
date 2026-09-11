@@ -9,6 +9,7 @@ import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static pl.commercelink.orders.FulfilmentStatus.*;
 
 class OrderItemTest {
 
@@ -267,6 +268,78 @@ class OrderItemTest {
 
         // then
         assertThat(copy.getCondition()).isEqualTo(ItemCondition.OpenBox);
+    }
+
+    @Test
+    @DisplayName("markAsClaimed keeps the item in allocation and binds it to the delivery")
+    void markAsClaimedKeepsTheItemInAllocationAndBindsItToTheDelivery() {
+        // given
+        OrderItem item = new OrderItem("order-1", "Other", "test", 1, 100.0, "SKU-1", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+
+        // when
+        item.markAsClaimed("delivery-1");
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        assertThat(item.getDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.getClaimedDeliveryId()).isEqualTo("delivery-1");
+        assertThat(item.isClaimed()).isTrue();
+        assertThat(item.isInAllocation()).isTrue();
+    }
+
+    @Test
+    @DisplayName("an item in a free allocation is not claimed")
+    void anItemInAFreeAllocationIsNotClaimed() {
+        // given
+        OrderItem item = new OrderItem("order-1", "Other", "test", 1, 100.0, "SKU-1", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+
+        // then
+        assertThat(item.isClaimed()).isFalse();
+        assertThat(item.isReleasable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a claimed item is not releasable")
+    void aClaimedItemIsNotReleasable() {
+        // given
+        OrderItem item = new OrderItem("order-1", "Other", "test", 1, 100.0, "SKU-1", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+
+        // when
+        item.markAsClaimed("delivery-1");
+
+        // then
+        assertThat(item.isReleasable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("updateFulfilment refuses to edit a claimed item")
+    void updateFulfilmentRefusesToEditAClaimedItem() {
+        // given
+        OrderItem item = new OrderItem("order-1", "Other", "test", 1, 100.0, "SKU-1", false);
+        item.setEan("EAN-1");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("Elko");
+        item.markAsInAllocation();
+        item.markAsClaimed("delivery-1");
+
+        // when
+        boolean updated = item.updateFulfilment("Elko", "EAN-2", "MFN-2", 50.0);
+
+        // then
+        assertThat(updated).isFalse();
+        assertThat(item.getEan()).isEqualTo("EAN-1");
     }
 
     private BasketItem basketItem(String mfn) {

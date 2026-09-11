@@ -109,6 +109,34 @@ class DeliveryRedirectResolverTest {
     }
 
     @Test
+    void claimedItemLinksToTheDeliveryThatClaimedItInsteadOfDeliveryCreation() {
+        // given
+        Order order = order(FulfilmentType.WarehouseFulfilment);
+        OrderItem item = item("AcmeB", FulfilmentStatus.Allocation);
+        item.markAsClaimed("delivery-1");
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-1");
+    }
+
+    @Test
+    void claimedItemOnDirectToConsumerOrderLinksToTheDeliveryInsteadOfTheDropshipPage() {
+        // given
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item("AcmeB", FulfilmentStatus.Allocation);
+        item.markAsClaimed("delivery-1");
+
+        // when
+        String url = resolver.resolveFor(order, item);
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-1");
+    }
+
+    @Test
     void newItemWithAProviderNameRequiringEncodingLinksToTheEncodedDropshipPage() {
         // given
         Order order = order(FulfilmentType.DirectToConsumer);
