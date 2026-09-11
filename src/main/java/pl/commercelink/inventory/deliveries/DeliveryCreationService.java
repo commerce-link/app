@@ -71,7 +71,10 @@ public class DeliveryCreationService {
         prepareForm(storeId, form);
         delivery.increaseTotalCost(allocationsCost(form));
         orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
-        warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        if (!delivery.isDropship()) {
+            // dropship goods never reach the warehouse, so they must not leave a reserved row behind
+            warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        }
     }
 
     /** Frees the allocations the operator unchecked on the creation form without creating a delivery. */
@@ -110,18 +113,19 @@ public class DeliveryCreationService {
      * The delivery is already saved with the supplier's order number, so a failure here must not undo the
      * completion: an SQS redelivery would stop at the "no longer pending" guard and the order number would
      * be lost. Log loudly instead. The delivery itself is complete, but the affected items are stuck in
-     * allocation, still claimed to it - neither ordered nor visible on the allocation screen - and there is
-     * no in-application remedy for that state by this point (the delivery is no longer AWAITING_APPROVAL,
-     * which is the only state release goes through). Recovery needs an engineer to intervene directly:
-     * clear the claim on the affected items or re-run the marking. Each side gets its own try/catch so a
-     * failure on one does not also skip the other.
+     * allocation, still claimed to it - neither ordered nor visible on the allocation screen. Release does
+     * not reach them (the delivery is no longer AWAITING_APPROVAL, the only state it goes through); the one
+     * in-application way out is deleting the allocations on the delivery's details screen, which gives the
+     * items back to their orders but also drops them from the delivery. Restoring the intended state -
+     * items ordered against this delivery - needs an engineer to re-run the marking. Each side gets its own
+     * try/catch so a failure on one does not also skip the other.
      */
     public void markClaimedAsOrdered(String storeId, Delivery delivery, LocalDate estimatedDeliveryAt) {
         try {
             orderAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId(), estimatedDeliveryAt);
         } catch (RuntimeException e) {
             log.error("Claimed order allocations not marked as ordered - items remain claimed and stuck in " +
-                            "allocation with no in-application remedy, needs an engineer to intervene directly: " +
+                            "allocation, needs an engineer to re-run the marking: " +
                             "store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }
@@ -129,7 +133,7 @@ public class DeliveryCreationService {
             warehouseAllocationsManager.markClaimedAsOrdered(storeId, delivery.getDeliveryId());
         } catch (RuntimeException e) {
             log.error("Claimed warehouse allocations not marked as ordered - items remain claimed and stuck in " +
-                            "allocation with no in-application remedy, needs an engineer to intervene directly: " +
+                            "allocation, needs an engineer to re-run the marking: " +
                             "store={} delivery={} provider={} estimatedDeliveryAt={}",
                     storeId, delivery.getDeliveryId(), delivery.getProvider(), estimatedDeliveryAt, e);
         }

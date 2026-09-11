@@ -79,14 +79,15 @@ public class OrderAllocationsManager {
 
     /**
      * The supplier confirmed the purchase: every item claimed by this delivery becomes ordered and the
-     * orders receive the confirmed date. Deliveries created before this change carry items that are
-     * already Ordered - those orders only receive the date.
+     * orders receive the confirmed date. A delivery may also hold items that are already Ordered rather
+     * than claimed - today that is the dropship path, which marks its items Ordered at submit and reaches
+     * this method through "complete manually"; those orders only receive the date. Dropship keeps that
+     * shape until it migrates to the claimed model.
+     *
+     * <p>The date may be missing: a confirmation without one still orders the items, because the purchase
+     * did happen. Both the assembly-date update and the fallback loop are no-ops for a null date.
      */
     public void markClaimedAsOrdered(String storeId, String deliveryId, LocalDate estimatedDeliveryAt) {
-        if (estimatedDeliveryAt == null) {
-            return;
-        }
-
         Map<String, Map<String, Double>> claimedByOrderId = new HashMap<>();
         for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
             if (item.isClaimed()) {
@@ -105,6 +106,8 @@ public class OrderAllocationsManager {
             }
         });
 
+        // orders whose items this delivery already marked Ordered rather than claimed - the dropship path,
+        // which orders at submit - need nothing but the date
         orderItemsRepository.findByDeliveryIdAndStatuses(deliveryId, List.of(FulfilmentStatus.Ordered)).stream()
                 .filter(orderId -> !claimedByOrderId.containsKey(orderId))
                 .forEach(orderId -> {

@@ -426,8 +426,8 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("markClaimedAsOrdered only applies the date to orders whose items were already ordered before the deploy")
-    void markClaimedAsOrderedOnlyAppliesTheDateToOrdersWhoseItemsWereAlreadyOrderedBeforeTheDeploy() {
+    @DisplayName("markClaimedAsOrdered only applies the date to orders whose items the delivery already marked Ordered")
+    void markClaimedAsOrderedOnlyAppliesTheDateToOrdersWhoseItemsAreAlreadyOrdered() {
         // given
         LocalDate confirmed = LocalDate.of(2026, 9, 25);
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of());
@@ -443,14 +443,18 @@ class OrderAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("markClaimedAsOrdered is a no-op without a date")
-    void markClaimedAsOrderedIsANoOpWithoutADate() {
+    @DisplayName("markClaimedAsOrdered still orders the claimed items when the supplier confirmed without a date")
+    void markClaimedAsOrderedStillOrdersTheClaimedItemsWithoutADate() {
+        // given
+        OrderItem claimed = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        claimed.markAsClaimed("delivery-1");
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(claimed));
+
         // when
         orderAllocationsManager.markClaimedAsOrdered(STORE_ID, "delivery-1", null);
 
         // then
-        verify(ordersManager, never()).markOrderItemsAsOrdered(any(), any(), any(), any(), any());
-        verify(ordersManager, never()).updateEstimatedDeliveryAt(any(), any(), any());
+        verify(ordersManager).markOrderItemsAsOrdered(eq(STORE_ID), eq(ORDER_ID), eq("delivery-1"), any(), eq(null));
     }
 
     @Test

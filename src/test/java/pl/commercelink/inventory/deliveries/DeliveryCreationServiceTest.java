@@ -115,6 +115,28 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
+    @DisplayName("claimAllocationsForPurchase leaves the warehouse alone for a dropship delivery")
+    void claimAllocationsForPurchaseLeavesTheWarehouseAloneForADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
+        verify(warehouseAllocationsManager, never()).claim(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("completePending orders the claimed allocations after saving the delivery")
     void completePendingOrdersTheClaimedAllocationsAfterSavingTheDelivery() {
         // given
