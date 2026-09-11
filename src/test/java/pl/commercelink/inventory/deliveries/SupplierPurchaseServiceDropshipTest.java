@@ -157,7 +157,7 @@ class SupplierPurchaseServiceDropshipTest {
     }
 
     @Test
-    void processPendingRoutesDropshipPlacementWithoutCompletingTheOrder() throws Exception {
+    void processPendingRoutesDropshipPlacementAndCompletesTheOrder() throws Exception {
         // given
         connectSupplier(ConnectionMode.OWN);
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
@@ -180,8 +180,7 @@ class SupplierPurchaseServiceDropshipTest {
         // then
         verify(dropshipPurchaseService).placeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
         verify(supplierProvider, never()).placeOrder(any());
-        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
     }
 

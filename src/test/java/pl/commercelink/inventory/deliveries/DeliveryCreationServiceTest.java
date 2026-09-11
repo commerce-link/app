@@ -375,33 +375,47 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
-    void completeDropshipPendingSyncsPricesWithoutTouchingTheHeader() {
+    @DisplayName("completing a dropship purchase stamps the delivery date and orders the claimed items")
+    void completePendingStampsTheDateAndOrdersClaimedDropshipItems() {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId("delivery-1");
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        delivery.setShippingCost(15.0);
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
         DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setExternalDeliveryId("ACME-DS-1");
         form.setProvider("Acme");
-        DeliveryItem item = new DeliveryItem();
-        item.setMfn("MFN-1");
-        item.setRequestedQty(2);
-        item.setUnitCost(8.5);
-        form.getItems().add(item);
-        when(deliveryCostSync.apply(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5))).thenReturn(3.0);
+        form.setExternalDeliveryId("EXT-9");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 14));
+        form.setItems(List.of());
 
         // when
-        service.completeDropshipPending(STORE_ID, delivery, form);
+        service.completePending(STORE_ID, delivery, form);
 
         // then
-        assertEquals("ACME-DS-1", delivery.getExternalDeliveryId());
-        assertNull(delivery.getOrderStatus());
-        assertEquals(15.0, delivery.getShippingCost());
-        assertEquals(3.0, delivery.getTotalCost());
-        verify(deliveriesRepository).save(delivery);
-        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verifyNoInteractions(orderAllocationsManager);
+        assertThat(delivery.getEstimatedDeliveryAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        verify(orderAllocationsManager)
+                .markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 14), true);
+    }
+
+    @Test
+    @DisplayName("a dropship completion leaves the delivery header alone")
+    void completePendingLeavesTheDropshipHeaderAlone() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setTax(23);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setShippingCost(99.0);
+        form.setPaymentCost(7.0);
+        form.setTax(8);
+        form.setItems(List.of());
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        assertThat(delivery.getShippingCost()).isEqualTo(0.0);
+        assertThat(delivery.getPaymentCost()).isEqualTo(0.0);
+        assertThat(delivery.getTax()).isEqualTo(23);
     }
 
     @Test

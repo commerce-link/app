@@ -1915,7 +1915,7 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void reconcileCompletesDropshipDeliveryViaDropshipPath() throws Exception {
+    void reconcileCompletesDropshipDeliveryViaTheSharedCompletionPath() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
         Delivery delivery = pendingDelivery(form, "ref-1");
@@ -1937,8 +1937,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).completeDropshipPending(eq(STORE_ID), same(delivery), any());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
     }
 
     @Test

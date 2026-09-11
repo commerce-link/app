@@ -224,11 +224,7 @@ public class SupplierPurchaseService {
             applyOrderResult(form, validation, orderResult);
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-            if (delivery.isDropship()) {
-                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
-            } else {
-                deliveryCreationService.completePending(storeId, delivery, form);
-            }
+            deliveryCreationService.completePending(storeId, delivery, form);
             log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
                     storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
                     orderResult.externalOrderId());
@@ -425,11 +421,7 @@ public class SupplierPurchaseService {
             delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
             delivery.setOrderErrorMessage(null);
             delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
-            if (delivery.isDropship()) {
-                deliveryCreationService.completeDropshipPending(storeId, delivery, form);
-            } else {
-                deliveryCreationService.completePending(storeId, delivery, form);
-            }
+            deliveryCreationService.completePending(storeId, delivery, form);
             if (orderResult.provisional()) {
                 try {
                     orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(

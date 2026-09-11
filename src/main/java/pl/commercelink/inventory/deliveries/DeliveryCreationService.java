@@ -95,23 +95,21 @@ public class DeliveryCreationService {
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
-        delivery.updateShippingCost(form.getShippingCost());
-        delivery.updatePaymentCost(form.getPaymentCost());
-        delivery.setPaymentTerms(form.getPaymentTerms());
-        delivery.setTax(form.getTax());
+        if (!delivery.isDropship()) {
+            // A dropship delivery carries no freight of ours: the supplier ships to the customer, so the
+            // shipping, payment and tax terms of a warehouse delivery do not apply and must not be
+            // overwritten by the purchase form.
+            delivery.updateShippingCost(form.getShippingCost());
+            delivery.updatePaymentCost(form.getPaymentCost());
+            delivery.setPaymentTerms(form.getPaymentTerms());
+            delivery.setTax(form.getTax());
+        }
         delivery.setOrderStatus(null);
 
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
 
         markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
-    }
-
-    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
-        delivery.setOrderStatus(null);
-        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
-        deliveriesRepository.save(delivery);
     }
 
     /**
