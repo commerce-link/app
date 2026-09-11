@@ -2,6 +2,7 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
@@ -104,5 +105,25 @@ public class FulfilmentConfiguration {
 
     public void setInventoryCacheTtlMinutes(Integer inventoryCacheTtlMinutes) {
         this.inventoryCacheTtlMinutes = inventoryCacheTtlMinutes;
+    }
+
+    /**
+     * Returns a copy carrying the given connection list. Used by the per-supplier save paths: the
+     * persister computes what changed by comparing the store's current configuration against the
+     * submitted one, so the submitted one must be a separate object.
+     */
+    @DynamoDBIgnore
+    public FulfilmentConfiguration withConnections(List<StoreSupplierConnection> connections) {
+        FulfilmentConfiguration copy = new FulfilmentConfiguration();
+        copy.setOrderAssemblyDays(orderAssemblyDays);
+        copy.setOrderRealizationDays(orderRealizationDays);
+        copy.setAutomatedFulfilment(automatedFulfilment);
+        copy.setDefaultFulfilmentType(defaultFulfilmentType);
+        copy.setEnabledProductGroups(enabledProductGroups);
+        copy.setEnabledCategories(enabledCategories);
+        copy.setCanUseGlobalSuppliers(canUseGlobalSuppliers);
+        copy.setInventoryCacheTtlMinutes(inventoryCacheTtlMinutes);
+        copy.setSupplierConnections(new ArrayList<>(connections));
+        return copy;
     }
 }
