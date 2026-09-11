@@ -180,7 +180,7 @@ public class DeliveriesManager {
                 .forEach(order -> {
                     LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
                     LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
-                            delivery.getEstimatedDeliveryAt()
+                            delivery.getEstimatedDeliveryAt(), delivery.isDropship()
                     );
 
                     if (oldAssemblyDate != null && !Objects.equals(oldAssemblyDate, newAssemblyDate)) {

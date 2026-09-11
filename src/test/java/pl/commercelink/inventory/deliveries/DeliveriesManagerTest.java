@@ -144,6 +144,52 @@ class DeliveriesManagerTest {
     }
 
     @Test
+    @DisplayName("pushing a dropship delivery's date keeps assembly and shipping on the same day")
+    void updateDeliveryKeepsDropshipDatesTogetherWhenDelayed() {
+        // given
+        Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        existing.setType(DeliveryType.DROPSHIP);
+        Delivery updated = deliveryWith(NEW_DELIVERY_DATE);
+        updated.setType(DeliveryType.DROPSHIP);
+        Order order = orderWithAssemblyDate("order-1", ORIGINAL_DELIVERY_DATE, OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+        when(orderItemsRepository.findByDeliveryIdAndStatuses(eq(DELIVERY_ID),
+                eq(Collections.singletonList(FulfilmentStatus.Ordered)))).thenReturn(List.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(NEW_DELIVERY_DATE);
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(NEW_DELIVERY_DATE);
+    }
+
+    @Test
+    @DisplayName("pushing a warehouse delivery's date leaves shipping trailing assembly by the realization days")
+    void updateDeliveryKeepsWarehouseShippingLaterThanAssemblyWhenDelayed() {
+        // given
+        Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        existing.setType(DeliveryType.WAREHOUSE);
+        Delivery updated = deliveryWith(NEW_DELIVERY_DATE);
+        updated.setType(DeliveryType.WAREHOUSE);
+        Order order = orderWithAssemblyDate("order-1", ORIGINAL_DELIVERY_DATE, OrderStatus.Assembly);
+        order.setOrderRealizationDays(3);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+        when(orderItemsRepository.findByDeliveryIdAndStatuses(eq(DELIVERY_ID),
+                eq(Collections.singletonList(FulfilmentStatus.Ordered)))).thenReturn(List.of("order-1"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(NEW_DELIVERY_DATE);
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(NEW_DELIVERY_DATE.plusDays(3));
+    }
+
+    @Test
     void updateDeliverySetsEstimatedDateWhenExistingDeliveryHasNone() {
         // given
         Delivery existing = deliveryWith(null);
