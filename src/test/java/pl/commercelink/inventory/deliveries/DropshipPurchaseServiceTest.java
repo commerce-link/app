@@ -434,11 +434,25 @@ class DropshipPurchaseServiceTest {
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
-        // The manual "Save" path orders the items immediately - it must not take the automatic purchase's
-        // claim-only route, which would leave them reserved but unordered until a supplier confirmation.
-        verify(deliveryCreationService, never()).claimAllocationsForPurchase(any(), any(), any());
         verify(supplierPurchaseEventPublisher, never()).publish(any());
         verify(supplierProvider, never()).placeDropshipOrder(any());
+    }
+
+    @Test
+    void createManualDropshipStillOrdersImmediately() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+
+        // when
+        service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
+
+        // then: the manual "Save" path orders the items immediately - it must not take the automatic
+        // purchase's claim-only route, which would leave them reserved but unordered until a supplier
+        // confirmation that manual save never asks for.
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(Delivery.class), eq(form));
+        verify(deliveryCreationService, never()).claimAllocationsForPurchase(any(), any(), any());
     }
 
     @Test

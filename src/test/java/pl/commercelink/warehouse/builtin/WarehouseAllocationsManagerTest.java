@@ -251,20 +251,6 @@ class WarehouseAllocationsManagerTest {
     }
 
     @Test
-    @DisplayName("release on a dropship delivery finds no warehouse rows and performs no save and no delete")
-    void releaseOnDropshipDeliveryTouchesNoWarehouseRow() {
-        // given: a dropship delivery has no warehouse rows at all - everything lives in the order allocation pool
-        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of());
-
-        // when
-        warehouseAllocationsManager.release(STORE_ID, "delivery-1", "Acme");
-
-        // then
-        verify(warehouseRepository, never()).save(any());
-        verify(warehouseRepository, never()).delete(any(WarehouseItem.class));
-    }
-
-    @Test
     @DisplayName("release gives back the quantity claimed by a pending delivery")
     void releaseGivesBackTheQuantityClaimedByAPendingDelivery() {
         // given

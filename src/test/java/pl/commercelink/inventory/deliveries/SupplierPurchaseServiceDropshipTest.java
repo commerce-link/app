@@ -23,6 +23,7 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierQuote;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -436,6 +437,11 @@ class SupplierPurchaseServiceDropshipTest {
         order.setOrderRealizationDays(3);
         OrderItem claimedItem = new OrderItem(ORDER_ID, "Other", "Product EAN-1", 1, 100.0, "MFN-1", false);
         claimedItem.setItemId("item-1");
+        // isInAllocation() requires hasAllocationDetails() (ean + manufacturerCode + deliveryId): without
+        // these the per-item guard in OrdersManager.markOrderItemsAsOrdered never fires and the item is
+        // never actually marked Ordered, which would make the date assertion below pass for the wrong reason.
+        claimedItem.setEan("EAN-1");
+        claimedItem.setManufacturerCode("MFN-1");
         claimedItem.markAsClaimed(DELIVERY_ID);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(claimedItem));
@@ -446,6 +452,7 @@ class SupplierPurchaseServiceDropshipTest {
 
         // then
         assertTrue(result.isSuccess());
+        assertThat(claimedItem.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
         assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
         assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
     }
