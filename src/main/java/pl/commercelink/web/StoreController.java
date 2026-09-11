@@ -14,7 +14,6 @@ import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
@@ -76,9 +75,6 @@ public class StoreController {
 
     @Autowired
     private PrintProviderRegistry printProviderRegistry;
-
-    @Autowired
-    private ManualSupplierService manualSupplierService;
 
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
@@ -424,23 +420,9 @@ public class StoreController {
 
         StoreForm form = new StoreForm(store);
         form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
-        form.setSupplierSelections(storeSupplierConnectionService.selectionsFor(store));
-        List<ManualSupplierSelectionForm> manualSelections = new ArrayList<>();
-        for (ManualSupplierService.ManualSupplierView view : manualSupplierService.list(store)) {
-            ManualSupplierSelectionForm selection = new ManualSupplierSelectionForm();
-            selection.setIdentity(view.identity());
-            selection.setLabel(view.label());
-            selection.setEnabled(view.enabled());
-            selection.setIncludeInPricing(view.includeInPricing());
-            selection.setIncludeInFulfilment(view.includeInFulfilment());
-            selection.setHasFeed(view.hasFeed());
-            manualSelections.add(selection);
-        }
-        form.setManualSupplierSelections(manualSelections);
 
         model.addAttribute("form", form);
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("supplierTypes", supplierRegistry.getExternalSupplierNames());
         model.addAttribute("supplierFields", supplierFields);
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)

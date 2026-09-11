@@ -54,7 +54,7 @@
 
                     <div class="field" th:if="${isSuperAdmin}">
                         <label class="checkbox">
-                            <input type="checkbox" class="global-suppliers-toggle"
+                            <input type="checkbox"
                                    th:field="*{store.fulfilmentConfiguration.canUseGlobalSuppliers}">
                             <strong th:text="#{store.use.global.suppliers}"></strong>
                         </label>
