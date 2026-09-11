@@ -642,13 +642,26 @@ public class Order {
 
     @DynamoDBIgnore
     public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate) {
+        return updateEstimatedAssemblyAt(deliveryDate, false);
+    }
+
+    /**
+     * @param shippedBySupplier the goods travel straight from the supplier to the customer, so there is
+     *                          no in-house handling to add. Only a caller holding the delivery can tell:
+     *                          the order's fulfilment type is not enough, because a direct-to-consumer
+     *                          order can still be fulfilled from a warehouse delivery.
+     */
+    @DynamoDBIgnore
+    public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate, boolean shippedBySupplier) {
         if (deliveryDate == null) {
             return estimatedAssemblyAt;
         }
 
         if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
             estimatedAssemblyAt = deliveryDate;
-            estimatedShippingAt = addWeekdayDays(deliveryDate, orderRealizationDays);
+            estimatedShippingAt = shippedBySupplier
+                    ? deliveryDate
+                    : addWeekdayDays(deliveryDate, orderRealizationDays);
         }
 
         return estimatedAssemblyAt;

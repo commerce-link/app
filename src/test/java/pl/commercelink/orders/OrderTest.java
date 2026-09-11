@@ -230,4 +230,48 @@ class OrderTest {
         order.setStatus(OrderStatus.New);
         return order;
     }
+
+    @Test
+    @DisplayName("goods shipped by the supplier leave on the delivery day, with no in-house handling added")
+    void shipsOnTheDeliveryDayWhenTheSupplierShipsToTheCustomer() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), true);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("goods passing through the warehouse still add the realization days as working days")
+    void addsRealizationDaysWhenTheGoodsPassThroughTheWarehouse() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("the single-argument form keeps the warehouse rule")
+    void singleArgumentFormKeepsTheWarehouseRule() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14));
+
+        // then
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+    }
 }
