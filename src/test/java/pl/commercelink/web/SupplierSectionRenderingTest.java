@@ -3,20 +3,10 @@ package pl.commercelink.web;
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-import org.thymeleaf.context.ITemplateContext;
-import org.thymeleaf.messageresolver.IMessageResolver;
-import org.thymeleaf.spring6.dialect.SpringStandardDialect;
-import org.thymeleaf.templatemode.TemplateMode;
-import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
-import org.thymeleaf.templateresolver.StringTemplateResolver;
 import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.stores.ConnectionMode;
 
-import java.text.MessageFormat;
 import java.util.List;
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,55 +33,7 @@ class SupplierSectionRenderingTest {
     private static final String SECTION = "<div th:replace=\"~{fragments/supplier-section :: supplierSection(%s)}\"></div>";
 
     private TemplateEngine templateEngine() {
-        StringTemplateResolver stringResolver = new StringTemplateResolver();
-        stringResolver.setOrder(1);
-        stringResolver.setTemplateMode(TemplateMode.HTML);
-        stringResolver.setResolvablePatterns(Set.of("*<*"));
-
-        ClassLoaderTemplateResolver classpathResolver = new ClassLoaderTemplateResolver();
-        classpathResolver.setOrder(2);
-        classpathResolver.setPrefix("templates/");
-        classpathResolver.setSuffix(".html");
-        classpathResolver.setTemplateMode(TemplateMode.HTML);
-
-        TemplateEngine templateEngine = new TemplateEngine();
-        templateEngine.setDialect(new SpringStandardDialect());
-        templateEngine.addTemplateResolver(stringResolver);
-        templateEngine.addTemplateResolver(classpathResolver);
-        templateEngine.setMessageResolver(new EnglishMessages());
-        return templateEngine;
-    }
-
-    private static class EnglishMessages implements IMessageResolver {
-
-        private final ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.ENGLISH);
-
-        @Override
-        public String getName() {
-            return "english";
-        }
-
-        @Override
-        public Integer getOrder() {
-            return 1;
-        }
-
-        @Override
-        public String resolveMessage(ITemplateContext context, Class<?> origin, String key, Object[] parameters) {
-            if (!messages.containsKey(key)) {
-                return null;
-            }
-            String message = messages.getString(key);
-            return parameters == null || parameters.length == 0
-                    ? message
-                    : new MessageFormat(message, Locale.ENGLISH).format(parameters);
-        }
-
-        @Override
-        public String createAbsentMessageRepresentation(ITemplateContext context, Class<?> origin, String key,
-                                                        Object[] parameters) {
-            return "??" + key + "??";
-        }
+        return EnglishFragmentTemplateEngine.create();
     }
 
     @Test
