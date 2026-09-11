@@ -78,7 +78,12 @@ public class OrderLifecycle {
             } else if (hasAllOrderItemsOrdered) {
                 order.setStatus(OrderStatus.Assembly);
                 if (order.getEstimatedAssemblyAt() == null) {
-                    order.updateEstimatedAssemblyAt(calculateEstimatedDeliveryDate(order, orderItems));
+                    List<Delivery> deliveries = deliveriesOf(order, orderItems);
+                    // Any leg through our warehouse justifies the realization days, so only an order
+                    // travelling entirely by dropship skips them.
+                    boolean shippedBySupplier = !deliveries.isEmpty()
+                            && deliveries.stream().allMatch(Delivery::isDropship);
+                    order.updateEstimatedAssemblyAt(latestDeliveryDate(deliveries), shippedBySupplier);
                 }
             }
         }
@@ -158,15 +163,17 @@ public class OrderLifecycle {
         }
     }
 
-    private LocalDate calculateEstimatedDeliveryDate(Order order, List<OrderItem> orderItems) {
-        List<Delivery> deliveries = orderItems.stream()
+    private List<Delivery> deliveriesOf(Order order, List<OrderItem> orderItems) {
+        return orderItems.stream()
                 .map(OrderItem::getDeliveryId)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .map(deliveryId -> deliveriesRepository.findById(order.getStoreId(), deliveryId))
                 .filter(Objects::nonNull)
                 .toList();
+    }
 
+    private LocalDate latestDeliveryDate(List<Delivery> deliveries) {
         return deliveries.stream()
                 .map(Delivery::getEstimatedDeliveryAt)
                 .filter(Objects::nonNull)
