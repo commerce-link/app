@@ -181,7 +181,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertTrue(saved.getValue().isDropship());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
@@ -207,7 +207,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(Map.of("shippingService", "express"), saved.getValue().getSupplierOrderChoices());
         assertNull(saved.getValue().getSupplierOrderChoicesLabel());
     }
@@ -227,7 +227,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         ArgumentCaptor<SupplierPurchaseEventRequest> event =
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
@@ -268,7 +268,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertNull(form.getEstimatedDeliveryAt());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertNull(saved.getValue().getEstimatedDeliveryAt());
     }
 
@@ -309,7 +309,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         Delivery delivery = saved.getValue();
         assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
         assertThat(delivery.getSupplierOrderChoicesLabel()).isNotBlank();
@@ -527,9 +527,9 @@ class DropshipPurchaseServiceTest {
         OperationResult<String> manualResult =
                 service.createManualDropship(STORE_ID, directToConsumerOrder(), manualForm);
 
-        // then: the automatic path saves the delivery itself, the manual one leaves that to claimAllocations
+        // then: both paths hand their delivery to the creation service, which is what persists it
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         ArgumentCaptor<Delivery> claimed = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryCreationService).claimAllocations(eq(STORE_ID), claimed.capture(), same(manualForm));
         Delivery submitted = saved.getValue();
@@ -778,7 +778,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertThat(result.isSuccess()).isTrue();
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertThat(saved.getValue().getOrderStatus()).isEqualTo(DeliveryOrderStatus.ORDER_PENDING);
         ArgumentCaptor<SupplierPurchaseEventRequest> event =
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);

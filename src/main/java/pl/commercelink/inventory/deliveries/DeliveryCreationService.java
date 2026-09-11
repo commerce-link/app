@@ -70,6 +70,11 @@ public class DeliveryCreationService {
         prepareForm(storeId, form);
         clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
+        // The delivery has to exist before the items start pointing at it. A claim is written onto the items
+        // themselves and hides them from the allocation screen: saved the other way round, a failed save
+        // would leave them reserved for a delivery that does not exist, with no screen left to release them
+        // from. The caller must not save again - whatever it sets on the delivery has to be set before this.
+        deliveriesRepository.save(delivery);
         orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
         if (!delivery.isDropship()) {
             // dropship goods never reach the warehouse, so they must not leave a reserved row behind

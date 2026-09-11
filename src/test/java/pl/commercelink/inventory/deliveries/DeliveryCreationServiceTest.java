@@ -450,6 +450,26 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
+    @DisplayName("claimAllocationsForPurchase saves the delivery before reserving the order items for it")
+    void claimAllocationsForPurchaseSavesTheDeliveryBeforeClaimingTheOrderAllocations() {
+        // given: a claim is written onto the items and hides them from the allocation screen, so a delivery
+        // saved only afterwards would leave them reserved for something that does not exist
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setItems(List.of());
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).claim(eq(STORE_ID), eq(delivery.getDeliveryId()), any());
+    }
+
+    @Test
     @DisplayName("claimAllocations saves the delivery before the order items start pointing at it")
     void claimAllocationsSavesTheDeliveryBeforeCommittingTheOrderAllocations() {
         // given

@@ -130,7 +130,6 @@ public class DropshipPurchaseService {
             delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
         }
         deliveryCreationService.claimAllocationsForPurchase(storeId, delivery, form);
-        deliveriesRepository.save(delivery);
 
         if (!requiresApproval) {
             supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(

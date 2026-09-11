@@ -279,7 +279,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         assertTrue(result.getPayload().awaitingApproval());
-        verify(deliveriesRepository).save(any());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), any(), any());
     }
 
     @Test
@@ -300,7 +300,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         assertTrue(result.getPayload().awaitingApproval());
-        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOrderChoices());
         assertNull(saved.getValue().getSupplierOrderChoicesLabel());
     }
@@ -325,7 +325,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(Map.of("lane", "fast"), saved.getValue().getSupplierOrderChoices());
     }
 
@@ -358,7 +358,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveriesRepository, times(2)).save(any());
+        verify(deliveriesRepository).save(any());
     }
 
     @Test
@@ -949,7 +949,7 @@ class SupplierPurchaseServiceTest {
         assertTrue(result.isSuccess());
         assertTrue(result.getPayload().awaitingApproval());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
@@ -970,7 +970,7 @@ class SupplierPurchaseServiceTest {
         assertTrue(result.isSuccess());
         assertFalse(result.getPayload().awaitingApproval());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository, times(2)).save(saved.capture());
+        verify(deliveriesRepository).save(saved.capture());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class), anyString());
     }
@@ -1006,7 +1006,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository, times(2)).save(saved.capture());
+        verify(deliveriesRepository).save(saved.capture());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         assertEquals("ref-1", saved.getValue().getPurchaseRef());
         verify(supplierPurchaseEventPublisher).publish(argThat(request ->
@@ -1045,7 +1045,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository, times(2)).save(saved.capture());
+        verify(deliveriesRepository).save(saved.capture());
         assertEquals("addr-7", saved.getValue().getDeliveryAddressId());
     }
 
@@ -1608,8 +1608,8 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
-        verify(deliveryCreationService).claimAllocationsForPurchase(STORE_ID, saved.getValue(), form);
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), eq(form));
+        assertEquals("ref-claim", saved.getValue().getPurchaseRef());
     }
 
     @Test
@@ -2357,7 +2357,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
     }
 }
