@@ -34,7 +34,8 @@ public class MarketplaceOrderImporter {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
-    public void importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+    /** @return false when the marketplace order is already in the store and nothing was saved. */
+    public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -105,7 +106,7 @@ public class MarketplaceOrderImporter {
                 })
                 .collect(Collectors.toList());
 
-        ordersManager.saveWithFulfilment(order, orderItems);
+        return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
     String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {
