@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
+import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.provider.api.ProviderField;
@@ -59,6 +60,9 @@ public class StoreController {
 
     @Autowired
     private StoreSupplierConnectionService storeSupplierConnectionService;
+
+    @Autowired
+    private SupplierConnectionViewFactory supplierConnectionViewFactory;
 
     @Value("${app.domain}")
     private String appDomain;
@@ -390,17 +394,22 @@ public class StoreController {
 
     @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeFulfilmentConfiguration(Model model) {
-        return renderStoreFulfilmentConfiguration(getStoreId(), model);
+    public String storeFulfilmentConfiguration(@RequestParam(required = false) String edit,
+                                                @RequestParam(required = false) String add,
+                                                Model model) {
+        return renderStoreFulfilmentConfiguration(getStoreId(), edit, add, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId, Model model) {
-        return renderStoreFulfilmentConfiguration(storeId, model);
+    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId,
+                                                          @RequestParam(required = false) String edit,
+                                                          @RequestParam(required = false) String add,
+                                                          Model model) {
+        return renderStoreFulfilmentConfiguration(storeId, edit, add, model);
     }
 
-    private String renderStoreFulfilmentConfiguration(String storeId, Model model) {
+    private String renderStoreFulfilmentConfiguration(String storeId, String edit, String add, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
@@ -436,6 +445,15 @@ public class StoreController {
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+
+        SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
+        model.addAttribute("externalConnections", views.external());
+        model.addAttribute("manualConnections", views.manual());
+        model.addAttribute("basePath", isSuperAdmin()
+                ? "/dashboard/store/" + storeId
+                : "/dashboard/store");
+        model.addAttribute("editSupplier", edit);
+        model.addAttribute("addSupplier", add);
 
         return "store-fulfilment";
     }

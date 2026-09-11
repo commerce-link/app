@@ -68,310 +68,7 @@
                         <p th:text="#{store.inventory.cache.ttl.description}"></p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.enabled.providers}"></label>
-                        <div th:each="sel, stat : *{supplierSelections}" class="field supplier-item">
-                            <input type="hidden" th:field="*{supplierSelections[__${stat.index}__].supplierName}" />
-                            <label class="checkbox">
-                                <input type="checkbox" class="supplier-enabled"
-                                       th:field="*{supplierSelections[__${stat.index}__].enabled}" />
-                                <span th:text="${sel.supplierName}"></span>
-                            </label>
-                            <div class="supplier-detail ml-5 mt-2">
-                                <div class="field supplier-mode-wrap">
-                                    <label class="label" th:text="#{store.supplier.connection.mode}"></label>
-                                    <div class="control">
-                                        <div class="select">
-                                            <select class="supplier-mode" th:field="*{supplierSelections[__${stat.index}__].mode}">
-                                                <option th:each="m : ${connectionModes}"
-                                                        th:value="${m}"
-                                                        th:text="#{'store.supplier.mode.' + ${m}}"></option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox"
-                                               th:field="*{supplierSelections[__${stat.index}__].includeInPricing}" />
-                                        <span th:text="#{store.supplier.include.pricing}"></span>
-                                    </label>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox"
-                                               th:field="*{supplierSelections[__${stat.index}__].includeInFulfilment}" />
-                                        <span th:text="#{store.supplier.include.fulfilment}"></span>
-                                    </label>
-                                </div>
-                                <div class="supplier-own-fields"
-                                     th:if="${supplierFields.get(sel.supplierName) != null and !supplierFields.get(sel.supplierName).isEmpty()}">
-                                    <div class="field" th:each="cf : ${supplierFields.get(sel.supplierName)}">
-                                        <label class="label" th:text="${cf.label()}"></label>
-                                        <div class="control">
-                                            <input class="input"
-                                                   th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
-                                                   th:name="'supplierConfiguration[' + ${sel.supplierName} + '][' + ${cf.key()} + ']'"
-                                                   th:value="${form.supplierConfiguration.get(sel.supplierName) != null ? form.supplierConfiguration.get(sel.supplierName).get(cf.key()) : ''}"
-                                                   th:placeholder="${cf.placeholder()}" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <div class="is-flex is-align-items-center mb-2">
-                            <label class="label mb-0" th:text="#{store.manual.section.title}">Manualni dostawcy</label>
-                            <button type="button" class="button is-success is-light is-small ml-2" id="manual-add-button"
-                                    th:title="#{store.manual.add.button}" th:aria-label="#{store.manual.add.button}">
-                                <span class="icon"><i class="fas fa-plus"></i></span>
-                            </button>
-                        </div>
-
-                        <div id="manual-supplier-list">
-                            <div th:each="ms, mstat : *{manualSupplierSelections}" class="field manual-item"
-                                 th:attr="data-identity=${ms.identity},data-hasfeed=${ms.hasFeed}">
-                                <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].identity}" />
-                                <input type="hidden" th:field="*{manualSupplierSelections[__${mstat.index}__].label}" />
-                                <div class="is-flex is-align-items-center">
-                                    <label class="checkbox">
-                                        <input type="checkbox" class="manual-enabled"
-                                               th:field="*{manualSupplierSelections[__${mstat.index}__].enabled}" />
-                                        <span th:text="${ms.label}">label</span>
-                                    </label>
-                                    <button type="button" class="button is-danger is-light is-small manual-delete ml-2"
-                                            th:data-identity="${ms.identity}" th:title="#{store.manual.delete.button}">
-                                        <span class="icon"><i class="fas fa-trash"></i></span>
-                                    </button>
-                                </div>
-                                <div class="manual-detail ml-5 mt-2">
-                                    <div class="field is-flex is-align-items-center">
-                                        <button type="button" class="button is-link is-light is-small manual-upload-open"
-                                                th:text="#{store.manual.upload.open}">Wgraj plik CSV</button>
-                                        <span class="icon has-text-grey ml-2 cl-tooltip"
-                                              th:attr="data-tooltip=#{store.manual.upload.format.tooltip}">
-                                            <i class="fas fa-info-circle"></i>
-                                        </span>
-                                        <span class="tag manual-file-tag ml-3"
-                                              th:classappend="${ms.hasFeed} ? 'is-success is-light' : 'is-light'"
-                                              th:text="${ms.hasFeed} ? #{store.manual.feed.present} : #{store.manual.feed.missing}">status</span>
-                                    </div>
-                                    <p class="help manual-enable-hint" th:text="#{store.manual.enable.needsfeed}"></p>
-                                    <div class="field">
-                                        <label class="checkbox">
-                                            <input type="checkbox"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].includeInPricing}" />
-                                            <span th:text="#{store.supplier.include.pricing}"></span>
-                                        </label>
-                                    </div>
-                                    <div class="field">
-                                        <label class="checkbox">
-                                            <input type="checkbox"
-                                                   th:field="*{manualSupplierSelections[__${mstat.index}__].includeInFulfilment}" />
-                                            <span th:text="#{store.supplier.include.fulfilment}"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-
-                <script th:inline="javascript">
-                    (function() {
-                        var globalToggle = document.querySelector('.global-suppliers-toggle');
-                        var storeGlobalAllowed = /*[[${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}]]*/ true;
-                        var panels = document.querySelectorAll('.supplier-item');
-                        function globalAllowed() {
-                            return globalToggle ? globalToggle.checked : storeGlobalAllowed;
-                        }
-                        function refreshAll() {
-                            var allowed = globalAllowed();
-                            panels.forEach(function(panel) {
-                                var isEnabled = panel.querySelector('.supplier-enabled').checked;
-                                var detail = panel.querySelector('.supplier-detail');
-                                var modeWrap = panel.querySelector('.supplier-mode-wrap');
-                                var mode = panel.querySelector('.supplier-mode');
-                                var ownFields = panel.querySelector('.supplier-own-fields');
-                                if (detail) detail.style.display = isEnabled ? '' : 'none';
-                                if (modeWrap) modeWrap.style.display = allowed ? '' : 'none';
-                                if (mode) mode.disabled = !isEnabled || !allowed;
-                                var effectiveOwn = !allowed || (mode && mode.value === 'OWN');
-                                if (ownFields) {
-                                    ownFields.style.display = (isEnabled && effectiveOwn) ? '' : 'none';
-                                }
-                            });
-                        }
-                        panels.forEach(function(panel) {
-                            panel.querySelector('.supplier-enabled').addEventListener('change', refreshAll);
-                            var mode = panel.querySelector('.supplier-mode');
-                            if (mode) mode.addEventListener('change', refreshAll);
-                        });
-                        if (globalToggle) globalToggle.addEventListener('change', refreshAll);
-                        refreshAll();
-                    })();
-                </script>
-
-                <script th:inline="javascript">
-                    document.addEventListener('DOMContentLoaded', function () {
-                        var list = document.getElementById('manual-supplier-list');
-                        var nextIndex = list.querySelectorAll('.manual-item').length;
-                        var storeId = /*[[${form.store.storeId}]]*/ '';
-                        var isSuperAdmin = /*[[${isSuperAdmin}]]*/ false;
-                        var manualBase = isSuperAdmin
-                            ? '/dashboard/store/' + encodeURIComponent(storeId) + '/manual-supplier'
-                            : '/dashboard/store/manual-supplier';
-
-                        var presentLabel = /*[[#{store.manual.feed.present}]]*/ 'Plik wgrany';
-                        var noFileMessage = /*[[#{store.manual.error.csv.empty}]]*/ 'Nie wybrano pliku.';
-                        var genericError = /*[[#{general.error}]]*/ 'Błąd';
-
-                        function showError(el) { el.textContent = genericError; el.classList.remove('is-hidden'); }
-
-                        var addButton = document.getElementById('manual-add-button');
-                        var addModal = document.getElementById('manualAddModal');
-                        var nameInput = document.getElementById('manual-new-name');
-                        var addError = document.getElementById('manual-add-error');
-
-                        var uploadModal = document.getElementById('manualUploadModal');
-                        var uploadInput = document.getElementById('manual-upload-input');
-                        var uploadFilename = document.getElementById('manual-upload-filename');
-                        var uploadError = document.getElementById('manual-upload-error');
-                        var uploadRow = null;
-
-                        function openAddModal() {
-                            nameInput.value = '';
-                            addError.classList.add('is-hidden');
-                            addModal.classList.add('is-active');
-                            nameInput.focus();
-                        }
-                        function closeAddModal() { addModal.classList.remove('is-active'); }
-
-                        function openUploadModal(row) {
-                            uploadRow = row;
-                            uploadInput.value = '';
-                            uploadFilename.textContent = '';
-                            uploadError.classList.add('is-hidden');
-                            uploadModal.classList.add('is-active');
-                        }
-                        function closeUploadModal() { uploadModal.classList.remove('is-active'); uploadRow = null; }
-
-                        function markRowHasFeed(row, fileName) {
-                            row.setAttribute('data-hasfeed', 'true');
-                            var tag = row.querySelector('.manual-file-tag');
-                            tag.textContent = presentLabel + (fileName ? ': ' + fileName : '');
-                            tag.classList.add('is-success');
-                            var hint = row.querySelector('.manual-enable-hint');
-                            if (hint) { hint.classList.add('is-hidden'); }
-                        }
-
-                        function wireRow(row) {
-                            var enabled = row.querySelector('.manual-enabled');
-                            var detail = row.querySelector('.manual-detail');
-                            var openBtn = row.querySelector('.manual-upload-open');
-                            var hint = row.querySelector('.manual-enable-hint');
-                            var hasFeed = row.getAttribute('data-hasfeed') === 'true';
-                            function refresh() { detail.style.display = enabled.checked ? '' : 'none'; }
-                            enabled.addEventListener('change', refresh);
-                            refresh();
-                            if (hint) {
-                                if (hasFeed) { hint.classList.add('is-hidden'); }
-                                else { hint.classList.remove('is-hidden'); }
-                            }
-                            openBtn.addEventListener('click', function () { openUploadModal(row); });
-                            row.querySelector('.manual-delete').addEventListener('click', function (e) {
-                                var identity = e.currentTarget.getAttribute('data-identity');
-                                confirmDelete(e.currentTarget, function () { deleteManual(identity, row); });
-                            });
-                        }
-
-                        function deleteManual(identity, row) {
-                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/delete',
-                                  { method: 'POST' })
-                                .then(function (r) { if (r.ok) { row.remove(); } })
-                                .catch(function () {});
-                        }
-
-                        function addManual() {
-                            var name = nameInput.value.trim();
-                            addError.classList.add('is-hidden');
-                            if (!name) { return; }
-                            var body = new URLSearchParams(); body.append('name', name);
-                            fetch(manualBase, { method: 'POST', body: body })
-                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                                .then(function (res) {
-                                    if (!res.ok) {
-                                        addError.textContent = res.body.message || 'error';
-                                        addError.classList.remove('is-hidden');
-                                        return;
-                                    }
-                                    var template = document.getElementById('manual-row-template');
-                                    var html = template.innerHTML.replace(/__INDEX__/g, nextIndex++);
-                                    var wrap = document.createElement('div');
-                                    wrap.innerHTML = html.trim();
-                                    var row = wrap.firstElementChild;
-                                    row.setAttribute('data-identity', res.body.identity);
-                                    row.querySelector('input[name$=".identity"]').value = res.body.identity;
-                                    row.querySelector('input[name$=".label"]').value = res.body.label;
-                                    row.querySelector('.manual-label').textContent = res.body.label;
-                                    row.querySelector('.manual-delete').setAttribute('data-identity', res.body.identity);
-                                    list.appendChild(row);
-                                    wireRow(row);
-                                    closeAddModal();
-                                })
-                                .catch(function () { showError(addError); });
-                        }
-
-                        function uploadFeed() {
-                            if (!uploadRow) { return; }
-                            uploadError.classList.add('is-hidden');
-                            if (!uploadInput.files.length) {
-                                uploadError.textContent = noFileMessage;
-                                uploadError.classList.remove('is-hidden');
-                                return;
-                            }
-                            var identity = uploadRow.getAttribute('data-identity');
-                            var row = uploadRow;
-                            var pickedName = uploadInput.files[0].name;
-                            var fd = new FormData();
-                            fd.append('file', uploadInput.files[0]);
-                            fetch(manualBase + '/' + encodeURIComponent(identity) + '/feed',
-                                  { method: 'POST', body: fd })
-                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-                                .then(function (res) {
-                                    if (!res.ok) {
-                                        uploadError.textContent = res.body.message || 'error';
-                                        uploadError.classList.remove('is-hidden');
-                                        return;
-                                    }
-                                    markRowHasFeed(row, res.body.fileName || pickedName);
-                                    closeUploadModal();
-                                })
-                                .catch(function () { showError(uploadError); });
-                        }
-
-                        addButton.addEventListener('click', openAddModal);
-                        document.getElementById('manual-add-confirm').addEventListener('click', addManual);
-                        document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
-                        document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
-                        addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
-                        nameInput.addEventListener('keydown', function (e) {
-                            if (e.key === 'Enter') { e.preventDefault(); addManual(); }
-                        });
-
-                        uploadInput.addEventListener('change', function () {
-                            uploadFilename.textContent = uploadInput.files.length ? uploadInput.files[0].name : '';
-                        });
-                        document.getElementById('manual-upload-save').addEventListener('click', uploadFeed);
-                        document.getElementById('manual-upload-cancel').addEventListener('click', closeUploadModal);
-                        document.getElementById('manual-upload-close').addEventListener('click', closeUploadModal);
-                        uploadModal.querySelector('.modal-background').addEventListener('click', closeUploadModal);
-
-                        list.querySelectorAll('.manual-item').forEach(wireRow);
-                    });
-                </script>
 
                 <div class="field is-grouped">
                     <div class="control">
@@ -383,6 +80,185 @@
                     </div>
                 </div>
             </form>
+
+            <div class="box" id="external-supplier-section">
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+                    <h2 class="subtitle mb-0" th:text="#{store.supplier.section.title}"></h2>
+                    <button type="button" class="button is-primary is-small" id="supplier-add-button"
+                            th:text="#{store.supplier.add.button}"></button>
+                </div>
+                <div th:replace="~{fragments/supplier-table :: supplierTable(${externalConnections}, false,
+                                   ${form.store.fulfilmentConfiguration.canUseGlobalSuppliers}, ${basePath})}"></div>
+            </div>
+
+            <div class="box" id="manual-supplier-section">
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+                    <h2 class="subtitle mb-0" th:text="#{store.manual.section.title}"></h2>
+                    <button type="button" class="button is-primary is-small" id="manual-add-button"
+                            th:text="#{store.manual.add.button}"></button>
+                </div>
+                <div th:replace="~{fragments/supplier-table :: supplierTable(${manualConnections}, true,
+                                   false, ${basePath})}"></div>
+            </div>
+
+            <script th:inline="javascript">
+                document.addEventListener('DOMContentLoaded', function () {
+                    var list = document.getElementById('manual-supplier-list');
+                    var nextIndex = list.querySelectorAll('.manual-item').length;
+                    var storeId = /*[[${form.store.storeId}]]*/ '';
+                    var isSuperAdmin = /*[[${isSuperAdmin}]]*/ false;
+                    var manualBase = isSuperAdmin
+                        ? '/dashboard/store/' + encodeURIComponent(storeId) + '/manual-supplier'
+                        : '/dashboard/store/manual-supplier';
+
+                    var presentLabel = /*[[#{store.manual.feed.present}]]*/ 'Plik wgrany';
+                    var noFileMessage = /*[[#{store.manual.error.csv.empty}]]*/ 'Nie wybrano pliku.';
+                    var genericError = /*[[#{general.error}]]*/ 'Błąd';
+
+                    function showError(el) { el.textContent = genericError; el.classList.remove('is-hidden'); }
+
+                    var addButton = document.getElementById('manual-add-button');
+                    var addModal = document.getElementById('manualAddModal');
+                    var nameInput = document.getElementById('manual-new-name');
+                    var addError = document.getElementById('manual-add-error');
+
+                    var uploadModal = document.getElementById('manualUploadModal');
+                    var uploadInput = document.getElementById('manual-upload-input');
+                    var uploadFilename = document.getElementById('manual-upload-filename');
+                    var uploadError = document.getElementById('manual-upload-error');
+                    var uploadRow = null;
+
+                    function openAddModal() {
+                        nameInput.value = '';
+                        addError.classList.add('is-hidden');
+                        addModal.classList.add('is-active');
+                        nameInput.focus();
+                    }
+                    function closeAddModal() { addModal.classList.remove('is-active'); }
+
+                    function openUploadModal(row) {
+                        uploadRow = row;
+                        uploadInput.value = '';
+                        uploadFilename.textContent = '';
+                        uploadError.classList.add('is-hidden');
+                        uploadModal.classList.add('is-active');
+                    }
+                    function closeUploadModal() { uploadModal.classList.remove('is-active'); uploadRow = null; }
+
+                    function markRowHasFeed(row, fileName) {
+                        row.setAttribute('data-hasfeed', 'true');
+                        var tag = row.querySelector('.manual-file-tag');
+                        tag.textContent = presentLabel + (fileName ? ': ' + fileName : '');
+                        tag.classList.add('is-success');
+                        var hint = row.querySelector('.manual-enable-hint');
+                        if (hint) { hint.classList.add('is-hidden'); }
+                    }
+
+                    function wireRow(row) {
+                        var enabled = row.querySelector('.manual-enabled');
+                        var detail = row.querySelector('.manual-detail');
+                        var openBtn = row.querySelector('.manual-upload-open');
+                        var hint = row.querySelector('.manual-enable-hint');
+                        var hasFeed = row.getAttribute('data-hasfeed') === 'true';
+                        function refresh() { detail.style.display = enabled.checked ? '' : 'none'; }
+                        enabled.addEventListener('change', refresh);
+                        refresh();
+                        if (hint) {
+                            if (hasFeed) { hint.classList.add('is-hidden'); }
+                            else { hint.classList.remove('is-hidden'); }
+                        }
+                        openBtn.addEventListener('click', function () { openUploadModal(row); });
+                        row.querySelector('.manual-delete').addEventListener('click', function (e) {
+                            var identity = e.currentTarget.getAttribute('data-identity');
+                            confirmDelete(e.currentTarget, function () { deleteManual(identity, row); });
+                        });
+                    }
+
+                    function deleteManual(identity, row) {
+                        fetch(manualBase + '/' + encodeURIComponent(identity) + '/delete',
+                              { method: 'POST' })
+                            .then(function (r) { if (r.ok) { row.remove(); } })
+                            .catch(function () {});
+                    }
+
+                    function addManual() {
+                        var name = nameInput.value.trim();
+                        addError.classList.add('is-hidden');
+                        if (!name) { return; }
+                        var body = new URLSearchParams(); body.append('name', name);
+                        fetch(manualBase, { method: 'POST', body: body })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) {
+                                    addError.textContent = res.body.message || 'error';
+                                    addError.classList.remove('is-hidden');
+                                    return;
+                                }
+                                var template = document.getElementById('manual-row-template');
+                                var html = template.innerHTML.replace(/__INDEX__/g, nextIndex++);
+                                var wrap = document.createElement('div');
+                                wrap.innerHTML = html.trim();
+                                var row = wrap.firstElementChild;
+                                row.setAttribute('data-identity', res.body.identity);
+                                row.querySelector('input[name$=".identity"]').value = res.body.identity;
+                                row.querySelector('input[name$=".label"]').value = res.body.label;
+                                row.querySelector('.manual-label').textContent = res.body.label;
+                                row.querySelector('.manual-delete').setAttribute('data-identity', res.body.identity);
+                                list.appendChild(row);
+                                wireRow(row);
+                                closeAddModal();
+                            })
+                            .catch(function () { showError(addError); });
+                    }
+
+                    function uploadFeed() {
+                        if (!uploadRow) { return; }
+                        uploadError.classList.add('is-hidden');
+                        if (!uploadInput.files.length) {
+                            uploadError.textContent = noFileMessage;
+                            uploadError.classList.remove('is-hidden');
+                            return;
+                        }
+                        var identity = uploadRow.getAttribute('data-identity');
+                        var row = uploadRow;
+                        var pickedName = uploadInput.files[0].name;
+                        var fd = new FormData();
+                        fd.append('file', uploadInput.files[0]);
+                        fetch(manualBase + '/' + encodeURIComponent(identity) + '/feed',
+                              { method: 'POST', body: fd })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                            .then(function (res) {
+                                if (!res.ok) {
+                                    uploadError.textContent = res.body.message || 'error';
+                                    uploadError.classList.remove('is-hidden');
+                                    return;
+                                }
+                                markRowHasFeed(row, res.body.fileName || pickedName);
+                                closeUploadModal();
+                            })
+                            .catch(function () { showError(uploadError); });
+                    }
+
+                    addButton.addEventListener('click', openAddModal);
+                    document.getElementById('manual-add-confirm').addEventListener('click', addManual);
+                    document.getElementById('manual-add-cancel').addEventListener('click', closeAddModal);
+                    document.getElementById('manual-add-close').addEventListener('click', closeAddModal);
+                    addModal.querySelector('.modal-background').addEventListener('click', closeAddModal);
+                    nameInput.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') { e.preventDefault(); addManual(); }
+                    });
+
+                    uploadInput.addEventListener('change', function () {
+                        uploadFilename.textContent = uploadInput.files.length ? uploadInput.files[0].name : '';
+                    });
+                    document.getElementById('manual-upload-save').addEventListener('click', uploadFeed);
+                    document.getElementById('manual-upload-cancel').addEventListener('click', closeUploadModal);
+                    document.getElementById('manual-upload-close').addEventListener('click', closeUploadModal);
+                    uploadModal.querySelector('.modal-background').addEventListener('click', closeUploadModal);
+
+                    list.querySelectorAll('.manual-item').forEach(wireRow);
+                });
+            </script>
 
             <template id="manual-row-template">
                 <div class="field manual-item" data-identity="" data-hasfeed="false">
