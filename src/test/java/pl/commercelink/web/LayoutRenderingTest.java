@@ -80,6 +80,7 @@ class LayoutRenderingTest {
         assertThat(html).contains(CONTENT_MARKER);
         assertThat(html).doesNotContain("cl-sidebar");
         assertThat(html).doesNotContain("cl-topbar");
+        assertThat(html).contains("class=\"cl-shell cl-shell-bare\"");
     }
 
     @Test
@@ -99,6 +100,7 @@ class LayoutRenderingTest {
         assertThat(html).contains(CONTENT_MARKER);
         assertThat(html).contains("cl-sidebar");
         assertThat(html).contains("cl-topbar");
+        assertThat(html).doesNotContain("cl-shell-bare");
     }
 
     private TemplateEngine templateEngine() {
