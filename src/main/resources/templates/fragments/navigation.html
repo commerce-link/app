@@ -15,7 +15,7 @@
                 <li th:each="item : ${section.items()}">
                     <a class="cl-nav-item"
                        th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
-                       th:href="${item.path()}"
+                       th:href="@{${item.path()}}"
                        th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
                                 aria-label=#{${item.messageKey()}}">
                         <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
@@ -31,7 +31,7 @@
             <li th:each="item : ${navigation.footer()}">
                 <a class="cl-nav-item"
                    th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
-                   th:href="${item.path()}"
+                   th:href="@{${item.path()}}"
                    th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
                             aria-label=#{${item.messageKey()}}">
                     <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>

@@ -1,14 +1,19 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
 import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
 import org.thymeleaf.context.ITemplateContext;
+import org.thymeleaf.context.WebContext;
 import org.thymeleaf.messageresolver.IMessageResolver;
 import org.thymeleaf.spring6.dialect.SpringStandardDialect;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.StringTemplateResolver;
+import org.thymeleaf.web.IWebExchange;
+import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.nav.NavigationModel;
 
@@ -22,7 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NavigationSidebarFragmentTest {
 
     private String renderFor(UserRole role, String path) {
-        Context context = new Context();
+        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
+        IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
+        WebContext context = new WebContext(exchange);
         context.setVariable("navigation", NavigationModel.forRoleAndPath(role, path));
         return templateEngine().process(
                 "<div th:replace=\"~{fragments/navigation :: sidebar}\"></div>", context);
@@ -79,6 +86,7 @@ class NavigationSidebarFragmentTest {
 
         // then
         assertThat(html).contains("aria-label=\"Magazyn\"");
+        assertThat(html).contains("aria-label=\"Ustawienia\"");
     }
 
     private TemplateEngine templateEngine() {
