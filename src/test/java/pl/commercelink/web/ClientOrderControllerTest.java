@@ -72,6 +72,7 @@ class ClientOrderControllerTest {
     @DisplayName("getOrderForClient returns 404 when the order does not exist")
     void returns404WhenOrderMissing() {
         // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when
@@ -79,13 +80,14 @@ class ClientOrderControllerTest {
 
         // then
         assertThat(template).isEqualTo("error/404");
-        verifyNoInteractions(storesRepository, orderItemsRepository);
+        verifyNoInteractions(orderItemsRepository);
     }
 
     @Test
     @DisplayName("getOrderForClient returns 404 for a completed order so the public link expires with it")
     void returns404ForCompletedOrder() {
         // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
 
         // when
@@ -93,7 +95,7 @@ class ClientOrderControllerTest {
 
         // then
         assertThat(template).isEqualTo("error/404");
-        verifyNoInteractions(storesRepository, orderItemsRepository);
+        verifyNoInteractions(orderItemsRepository);
     }
 
     @Test
@@ -117,7 +119,6 @@ class ClientOrderControllerTest {
     @DisplayName("getOrderForClient returns 404 when the store has the client order page disabled")
     void returns404WhenClientOrderPageDisabled() {
         // given
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
 
         // when
@@ -125,7 +126,7 @@ class ClientOrderControllerTest {
 
         // then
         assertThat(template).isEqualTo("error/404");
-        verifyNoInteractions(orderItemsRepository);
+        verifyNoInteractions(ordersRepository, orderItemsRepository);
     }
 
     private static Order order(OrderStatus status) {
