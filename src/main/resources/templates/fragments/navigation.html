@@ -73,9 +73,11 @@
 
         <div class="cl-lang">
             <a th:href="${currentUri + '?' + currentQuery + 'lang=pl'}"
-               th:classappend="${#locale.language == 'pl'} ? 'is-current' : ''">PL</a>
+               th:classappend="${#locale.language == 'pl'} ? 'is-current' : ''"
+               th:attr="aria-current=${#locale.language == 'pl'} ? 'true' : null">PL</a>
             <a th:href="${currentUri + '?' + currentQuery + 'lang=en'}"
-               th:classappend="${#locale.language == 'en'} ? 'is-current' : ''">EN</a>
+               th:classappend="${#locale.language == 'en'} ? 'is-current' : ''"
+               th:attr="aria-current=${#locale.language == 'en'} ? 'true' : null">EN</a>
         </div>
 
         <div class="cl-user">
