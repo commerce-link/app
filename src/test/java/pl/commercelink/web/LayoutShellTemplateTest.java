@@ -73,4 +73,13 @@ class LayoutShellTemplateTest {
         // then
         assertThat(html).doesNotContain("@latest");
     }
+
+    @Test
+    void loadsTheNavigationBehaviourScript() throws Exception {
+        // when
+        String html = layout();
+
+        // then
+        assertThat(html).contains("/js/navigation.js");
+    }
 }

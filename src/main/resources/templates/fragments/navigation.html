@@ -49,7 +49,9 @@
     </button>
 
     <button type="button" class="cl-icon-button cl-collapse-toggle" id="clCollapseToggle"
-            th:attr="aria-label=#{nav.panel.collapse}">
+            th:attr="aria-label=#{nav.panel.collapse},
+                     data-collapse-label=#{nav.panel.collapse},
+                     data-expand-label=#{nav.panel.expand}">
         <span class="icon"><i class="fas fa-columns"></i></span>
     </button>
 
