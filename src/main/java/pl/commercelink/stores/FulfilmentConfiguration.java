@@ -30,6 +30,10 @@ public class FulfilmentConfiguration {
     private List<StoreSupplierConnection> supplierConnections = new ArrayList<>();
     @DynamoDBAttribute(attributeName = "inventoryCacheTtlMinutes")
     private Integer inventoryCacheTtlMinutes;
+    @DynamoDBAttribute(attributeName = "clientOrderPageEnabled")
+    private boolean clientOrderPageEnabled = false;
+    @DynamoDBAttribute(attributeName = "clientShippingAddressChangeEnabled")
+    private boolean clientShippingAddressChangeEnabled = false;
 
     public FulfilmentConfiguration() {
     }
@@ -104,5 +108,21 @@ public class FulfilmentConfiguration {
 
     public void setInventoryCacheTtlMinutes(Integer inventoryCacheTtlMinutes) {
         this.inventoryCacheTtlMinutes = inventoryCacheTtlMinutes;
+    }
+
+    public boolean isClientOrderPageEnabled() {
+        return clientOrderPageEnabled;
+    }
+
+    public void setClientOrderPageEnabled(boolean clientOrderPageEnabled) {
+        this.clientOrderPageEnabled = clientOrderPageEnabled;
+    }
+
+    public boolean isClientShippingAddressChangeEnabled() {
+        return clientShippingAddressChangeEnabled;
+    }
+
+    public void setClientShippingAddressChangeEnabled(boolean clientShippingAddressChangeEnabled) {
+        this.clientShippingAddressChangeEnabled = clientShippingAddressChangeEnabled;
     }
 }

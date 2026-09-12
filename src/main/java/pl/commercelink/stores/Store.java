@@ -443,6 +443,20 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isClientOrderPageEnabled() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isClientOrderPageEnabled)
+                .orElse(false);
+    }
+
+    @DynamoDBIgnore
+    public boolean isClientShippingAddressChangeEnabled() {
+        return isClientOrderPageEnabled() && Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isClientShippingAddressChangeEnabled)
+                .orElse(false);
+    }
+
+    @DynamoDBIgnore
     public List<String> getEnabledCategories() {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getEnabledCategories)

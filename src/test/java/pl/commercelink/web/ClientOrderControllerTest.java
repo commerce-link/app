@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.stores.Branding;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.CategoryLocalizer;
@@ -112,6 +113,21 @@ class ClientOrderControllerTest {
         assertThat(((ClientOrderView) model.getAttribute("view")).isCancelled()).isTrue();
     }
 
+    @Test
+    @DisplayName("getOrderForClient returns 404 when the store has the client order page disabled")
+    void returns404WhenClientOrderPageDisabled() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+
+        // when
+        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, new ExtendedModelMap());
+
+        // then
+        assertThat(template).isEqualTo("error/404");
+        verifyNoInteractions(orderItemsRepository);
+    }
+
     private static Order order(OrderStatus status) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -123,6 +139,9 @@ class ClientOrderControllerTest {
         Store store = new Store();
         store.setStoreId(STORE_ID);
         store.setName("Sklep");
+        FulfilmentConfiguration configuration = new FulfilmentConfiguration();
+        configuration.setClientOrderPageEnabled(true);
+        store.setFulfilmentConfiguration(configuration);
         return store;
     }
 }

@@ -28,14 +28,14 @@ public class ClientOrderController {
 
     @GetMapping("")
     public String getOrderForClient(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
-        Order order = ordersRepository.findById(storeId, orderId);
-        // A completed order has nothing left to track; the link expires with it rather than staying public forever.
-        if (order == null || order.hasStatus(OrderStatus.Completed)) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !store.isClientOrderPageEnabled()) {
             return "error/404";
         }
 
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
+        Order order = ordersRepository.findById(storeId, orderId);
+        // A completed order has nothing left to track; the link expires with it rather than staying public forever.
+        if (order == null || order.hasStatus(OrderStatus.Completed)) {
             return "error/404";
         }
 
