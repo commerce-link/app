@@ -41,7 +41,7 @@ public class BasketOrderImporter {
                 .withPaymentSource(dto.getPaymentSource())
                 .build();
 
-        List<OrderItem> orderItems = basket.getBasketItems().stream()
+        List<OrderItem> orderItems = basket.getEffectiveBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
                 .collect(Collectors.toList());
 

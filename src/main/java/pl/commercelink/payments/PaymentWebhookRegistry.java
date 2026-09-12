@@ -66,7 +66,7 @@ public class PaymentWebhookRegistry {
 
         Order order = orderBuilder.build();
 
-        List<OrderItem> orderItems = basket.getBasketItems().stream()
+        List<OrderItem> orderItems = basket.getEffectiveBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(order.getOrderId(), i))
                 .collect(Collectors.toList());
 

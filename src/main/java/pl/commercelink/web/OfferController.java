@@ -30,6 +30,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.OfferCreationDto;
+import pl.commercelink.web.dtos.OfferTableRow;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -178,14 +179,16 @@ public class OfferController {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
 
         double deliveryPrice = basket.getDeliveryPrice(store);
-        double totalPrice = offerItems.stream().mapToDouble(OfferItem::getTotalPrice).sum() + deliveryPrice;
-        double totalCost = offerItems.stream().mapToDouble(OfferItem::getTotalCost).sum();
+        double totalPrice = basket.getTotalPrice() + deliveryPrice;
+        double totalCost = basket.getTotalCost();
         double totalProfitGross = totalPrice - totalCost;
         double totalProfitNet = totalProfitGross / DEFAULT_VAT_RATE; // Assuming 23% VAT
 
         model.addAttribute("mode", mode.name());
         model.addAttribute("offer", basket);
         model.addAttribute("offerItems", offerItems);
+        model.addAttribute("offerRows", OfferTableRow.from(offerItems));
+        model.addAttribute("hasVariantGroups", basket.hasVariantGroups());
         model.addAttribute("productCategories", storeCategories.names(catalogs));
         model.addAttribute("productCategoryGroups", storeCategories.groups(catalogs));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());

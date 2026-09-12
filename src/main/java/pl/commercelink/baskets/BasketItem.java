@@ -39,6 +39,10 @@ public class BasketItem {
     @DynamoDBAttribute(attributeName = "position")
     private int position;
     private boolean service;
+    @DynamoDBAttribute(attributeName = "variantGroupId")
+    private String variantGroupId;
+    @DynamoDBAttribute(attributeName = "variantSelected")
+    private boolean variantSelected;
 
     public BasketItem() {
     }
@@ -164,6 +168,32 @@ public class BasketItem {
 
     public void setPosition(int position) {
         this.position = position;
+    }
+
+    public String getVariantGroupId() {
+        return variantGroupId;
+    }
+
+    public void setVariantGroupId(String variantGroupId) {
+        this.variantGroupId = isNotBlank(variantGroupId) ? variantGroupId.trim() : null;
+    }
+
+    public boolean isVariantSelected() {
+        return variantSelected;
+    }
+
+    public void setVariantSelected(boolean variantSelected) {
+        this.variantSelected = variantSelected;
+    }
+
+    @DynamoDBIgnore
+    public boolean isInVariantGroup() {
+        return variantGroupId != null;
+    }
+
+    @DynamoDBIgnore
+    public boolean isInVariantGroup(String groupId) {
+        return variantGroupId != null && variantGroupId.equals(groupId);
     }
 
     @DynamoDBIgnore

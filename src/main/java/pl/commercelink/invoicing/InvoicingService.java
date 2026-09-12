@@ -66,7 +66,7 @@ public class InvoicingService {
             return new OperationResult(null, null, null, messageSource.getMessage("error.message.billing.details.missing", null, locale));
         }
 
-        List<OrderItem> orderItems = basket.getBasketItems().stream()
+        List<OrderItem> orderItems = basket.getEffectiveBasketItems().stream()
                 .map(i -> OrderItem.fromBasketItem(null, i))
                 .collect(Collectors.toList());
 
