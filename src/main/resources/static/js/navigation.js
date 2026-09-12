@@ -82,15 +82,20 @@
         }
     });
 
+    function applyCollapseLabel(collapsed) {
+        collapseToggle.setAttribute('aria-label',
+            collapsed ? collapseToggle.dataset.expandLabel : collapseToggle.dataset.collapseLabel);
+    }
+
     if (collapseToggle) {
+        applyCollapseLabel(document.documentElement.classList.contains('cl-nav-collapsed'));
         collapseToggle.addEventListener('click', function () {
             const collapsed = document.documentElement.classList.toggle('cl-nav-collapsed');
             try {
                 localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
             } catch (error) {
             }
-            collapseToggle.setAttribute('aria-label',
-                collapsed ? collapseToggle.dataset.expandLabel : collapseToggle.dataset.collapseLabel);
+            applyCollapseLabel(collapsed);
         });
     }
 
