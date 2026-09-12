@@ -37,6 +37,8 @@ public class WebSecurityConfiguration {
                             "/store/*/client/rma/**",
                             "/store/*/client/order/**",
                             "/StoreLogo/**",
+                            "/css/**",
+                            "/js/**",
                             "/register",
                             "/register/password",
                             "/demo/register",

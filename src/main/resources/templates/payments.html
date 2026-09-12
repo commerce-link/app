@@ -84,6 +84,7 @@
                 <span class="mx-3">|</span>
                 <span th:text="#{payments.total.unpaid.gross} + ': ' + ${#numbers.formatDecimal(unpaidOrdersAmountGross, 1, 2)} + ' PLN'"></span>
             </p>
+            <div class="table-container">
             <table class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                 <tr>
@@ -123,6 +124,7 @@
                 </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </section>
 
