@@ -42,5 +42,55 @@
     </div>
 </aside>
 
+<header th:fragment="topbar" class="cl-topbar">
+    <button type="button" class="cl-icon-button cl-drawer-toggle" id="clDrawerToggle"
+            aria-expanded="false" aria-controls="clSidebar" th:attr="aria-label=#{nav.menu.open}">
+        <span class="icon"><i class="fas fa-bars"></i></span>
+    </button>
+
+    <button type="button" class="cl-icon-button cl-collapse-toggle" id="clCollapseToggle"
+            th:attr="aria-label=#{nav.panel.collapse}">
+        <span class="icon"><i class="fas fa-columns"></i></span>
+    </button>
+
+    <nav class="cl-crumbs" th:attr="aria-label=#{nav.aria.breadcrumb}"
+         th:if="${navigation != null and navigation.active() != null}">
+        <span th:if="${navigation.activeSectionMessageKey() != null}"
+              th:text="#{${navigation.activeSectionMessageKey()}}"></span>
+        <span th:if="${navigation.activeSectionMessageKey() != null}">/</span>
+        <strong th:text="#{${navigation.activeMessageKey()}}"></strong>
+    </nav>
+
+    <div class="cl-bar-right">
+        <a class="cl-store-chip" th:if="${storeContext != null}" th:href="@{/dashboard/stores}"
+           th:attr="title=#{nav.store.context.exit}">
+            <span th:text="#{nav.store.context}"></span>
+            <span th:text="${storeContext.name()}"></span>
+            <span class="icon is-small"><i class="fas fa-times"></i></span>
+        </a>
+
+        <div class="cl-lang">
+            <a th:href="${currentUri + '?' + currentQuery + 'lang=pl'}"
+               th:classappend="${#locale.language == 'pl'} ? 'is-current' : ''">PL</a>
+            <a th:href="${currentUri + '?' + currentQuery + 'lang=en'}"
+               th:classappend="${#locale.language == 'en'} ? 'is-current' : ''">EN</a>
+        </div>
+
+        <div class="cl-user">
+            <button type="button" class="cl-icon-button" id="clUserToggle" aria-expanded="false"
+                    aria-controls="clUserMenu" th:attr="aria-label=#{nav.user.menu}">
+                <span class="icon"><i class="fas fa-user"></i></span>
+            </button>
+            <div class="cl-user-pop" id="clUserMenu" hidden>
+                <p class="cl-user-email" th:if="${userEmail != null}" th:text="${userEmail}"></p>
+                <form th:action="@{/logout}" method="get">
+                    <button type="submit" class="button is-danger is-small is-fullwidth"
+                            th:text="#{general.logout}"></button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>
+
 </body>
 </html>

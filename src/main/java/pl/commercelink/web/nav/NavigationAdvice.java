@@ -34,6 +34,13 @@ public class NavigationAdvice {
         return store == null ? null : new StoreContext(storeId, store.getName());
     }
 
+    @ModelAttribute("userEmail")
+    public String userEmail() {
+        return CustomSecurityContext.getLoggedInUser()
+                .map(user -> (String) user.getAttribute("email"))
+                .orElse(null);
+    }
+
     private UserRole currentRole() {
         return CustomSecurityContext.getLoggedInUser()
                 .flatMap(user -> user.getCustomAttribute("role"))
