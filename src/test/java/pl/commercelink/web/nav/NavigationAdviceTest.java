@@ -32,8 +32,16 @@ class NavigationAdviceTest {
     private NavigationAdvice advice;
 
     private void loggedInAs(String role) {
+        loggedInAs(role, Map.of("sub", "user-1"));
+    }
+
+    private void loggedInAs(String role, String email) {
+        loggedInAs(role, Map.of("sub", "user-1", "email", email));
+    }
+
+    private void loggedInAs(String role, Map<String, Object> attributes) {
         CustomUser user = new CustomUser(
-                new DefaultOAuth2User(List.of(), Map.of("sub", "user-1"), "sub"), null, Map.of("role", role));
+                new DefaultOAuth2User(List.of(), attributes, "sub"), null, Map.of("role", role));
         TestingAuthenticationToken authentication = new TestingAuthenticationToken(user, null);
         authentication.setAuthenticated(true);
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -110,5 +118,20 @@ class NavigationAdviceTest {
         // then
         assertThat(context).isNull();
         verifyNoInteractions(storesRepository);
+    }
+
+    @Test
+    void returnsTheLoggedInUsersEmailAddress() {
+        // given
+        loggedInAs("ADMIN", "operator@commercelink.local");
+
+        // when / then
+        assertThat(advice.userEmail()).isEqualTo("operator@commercelink.local");
+    }
+
+    @Test
+    void returnsNoEmailWhenNobodyIsLoggedIn() {
+        // when / then
+        assertThat(advice.userEmail()).isNull();
     }
 }
