@@ -132,8 +132,24 @@ public class DropshipPurchaseService {
         deliveryCreationService.claimAllocationsForPurchase(storeId, delivery, form);
 
         if (!requiresApproval) {
-            supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
-                    storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef, order.getOrderId()));
+            // The delivery is already saved as ORDER_PENDING with its allocations claimed, and nothing in the
+            // application moves a delivery out of that state: the order would sit in New with its items
+            // reserved and hidden from the allocation screen, and neither the customer nor the marketplace
+            // would hear anything. A publish that never reaches the queue is therefore turned into FAILED,
+            // from where retry and manual completion are open to the operator.
+            try {
+                supplierPurchaseEventPublisher.publish(new SupplierPurchaseEventRequest(
+                        storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef, order.getOrderId()));
+            } catch (RuntimeException e) {
+                // Logged before the save: the save can fail for the same reason the publish did, and it
+                // would then throw away the only record of the original cause.
+                log.error("Dropship purchase not queued - marking the delivery FAILED so the operator can act: "
+                                + "store={} delivery={} provider={} ref={}",
+                        storeId, delivery.getDeliveryId(), form.getProvider(), purchaseRef, e);
+                delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
+                delivery.setOrderErrorMessage(SupplierPurchaseService.PURCHASE_NOT_QUEUED_MESSAGE);
+                deliveriesRepository.save(delivery);
+            }
         }
         return OperationResult.success(new PurchaseSubmission(delivery.getDeliveryId(), requiresApproval));
     }

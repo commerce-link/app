@@ -50,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -270,6 +271,29 @@ class DropshipPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertNull(saved.getValue().getEstimatedDeliveryAt());
+    }
+
+    @Test
+    @DisplayName("a dropship purchase message that never reaches the queue leaves the delivery FAILED")
+    void aFailedPublishMarksTheDropshipDeliveryFailedSoTheOperatorCanRetry() {
+        // given: nothing in the application moves a delivery out of ORDER_PENDING, so a delivery left there
+        // would keep its order in New with the allocations reserved and no screen to release them from
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        doThrow(new IllegalStateException("queue unavailable"))
+                .when(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(DeliveryOrderStatus.FAILED, saved.getValue().getOrderStatus());
+        assertEquals(SupplierPurchaseService.PURCHASE_NOT_QUEUED_MESSAGE, saved.getValue().getOrderErrorMessage());
     }
 
     @Test

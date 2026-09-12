@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +45,7 @@ import pl.commercelink.documents.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,7 +57,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -973,6 +977,36 @@ class SupplierPurchaseServiceTest {
         verify(deliveriesRepository).save(saved.capture());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         verify(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class), anyString());
+    }
+
+    @Test
+    @DisplayName("a purchase message that never reaches the queue leaves the delivery FAILED, not stuck pending")
+    void aFailedPublishMarksTheDeliveryFailedSoTheOperatorCanRetry() {
+        // given: nothing in the application moves a delivery out of ORDER_PENDING, so a delivery left there
+        // would keep its order in New with the allocations reserved and no screen to release them from
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.OWN);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(supplierProvider);
+        when(deliveriesRepository.findByPurchaseRef(eq(STORE_ID), anyString())).thenReturn(Optional.empty());
+        doThrow(new IllegalStateException("queue unavailable"))
+                .when(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class), anyString());
+        List<DeliveryOrderStatus> savedStatuses = new ArrayList<>();
+        doAnswer(invocation -> {
+            savedStatuses.add(invocation.getArgument(0, Delivery.class).getOrderStatus());
+            return null;
+        }).when(deliveriesRepository).save(any(Delivery.class));
+        DeliveryCreationForm form = formWithOneOrderableItem();
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitPurchase(STORE_ID, form, "ref-3");
+
+        // then: recorded at save time, because the captor would otherwise hold one mutable delivery read
+        // after the fact and pass even if the FAILED state was never written
+        assertTrue(result.isSuccess());
+        assertThat(savedStatuses).endsWith(DeliveryOrderStatus.FAILED);
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository, atLeastOnce()).save(saved.capture());
+        assertEquals(SupplierPurchaseService.PURCHASE_NOT_QUEUED_MESSAGE, saved.getValue().getOrderErrorMessage());
     }
 
     @Test

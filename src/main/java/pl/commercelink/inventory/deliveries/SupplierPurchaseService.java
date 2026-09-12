@@ -45,6 +45,7 @@ import java.util.stream.IntStream;
 public class SupplierPurchaseService {
 
     private static final String ORDERED_AUTOMATICALLY_EVENT = "DELIVERY_ORDERED_AUTOMATICALLY";
+    static final String PURCHASE_NOT_QUEUED_MESSAGE = "The purchase request could not be queued";
     static final String DELIVERY_CREATED_EVENT = "DELIVERY_CREATED";
     private static final String PURCHASE_APPROVED_EVENT = "DELIVERY_PURCHASE_APPROVED";
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
@@ -373,14 +374,31 @@ public class SupplierPurchaseService {
         return OperationResult.success(delivery.getDeliveryId());
     }
 
+    /**
+     * Every caller has already saved the delivery as ORDER_PENDING with its allocations claimed, and nothing
+     * in the application moves a delivery out of that state: the order would sit in New with its items
+     * reserved and hidden from the allocation screen, and neither the customer nor the marketplace would
+     * hear anything. A publish that never reaches the queue is therefore turned into FAILED, from where
+     * retry and manual completion are open to the operator.
+     */
     private void publishPurchase(Delivery delivery) {
         delivery.setPurchaseAttempts(delivery.getPurchaseAttempts() + 1);
         deliveriesRepository.save(delivery);
         SupplierPurchaseEventRequest request = new SupplierPurchaseEventRequest(
                 delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(),
                 delivery.getPurchaseRef(), null, delivery.getPurchaseAttempts());
-        supplierPurchaseEventPublisher.publish(request,
-                delivery.getPurchaseRef() + ":" + delivery.getPurchaseAttempts());
+        try {
+            supplierPurchaseEventPublisher.publish(request,
+                    delivery.getPurchaseRef() + ":" + delivery.getPurchaseAttempts());
+        } catch (RuntimeException e) {
+            // Logged before the save: the save can fail for the same reason the publish did, and it would
+            // then throw away the only record of the original cause.
+            log.error("Supplier purchase not queued - marking the delivery FAILED so the operator can act: "
+                            + "store={} delivery={} provider={} ref={}",
+                    delivery.getStoreId(), delivery.getDeliveryId(), delivery.getProvider(),
+                    delivery.getPurchaseRef(), e);
+            failDelivery(delivery, PURCHASE_NOT_QUEUED_MESSAGE);
+        }
     }
 
     public OperationResult<String> retry(String storeId, String deliveryId) {
