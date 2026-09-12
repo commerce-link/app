@@ -58,21 +58,21 @@ class ClientVerificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClientVerificationService(repository, emailClient, clock);
+        service = new ClientVerificationService(repository, emailClient, clock, null);
         when(repository.findBySubjectKey(SUBJECT.getKey())).thenReturn(List.of());
         when(emailClient.send(eq("store-1"), eq(EmailNotificationType.CLIENT_VERIFICATION_CODE), any(EmailNotification.class)))
                 .thenReturn(true);
     }
 
     @Test
-    @DisplayName("issue e-mails a six digit code and stores only its hash with a ten minute expiry")
+    @DisplayName("issue e-mails a six character code and stores only its hash with a ten minute expiry")
     void issueSendsCodeAndStoresHashedRecord() {
         // when
         String verificationId = service.issue(SUBJECT, ClientVerificationPurpose.SHIPPING_ADDRESS_CHANGE, EMAIL, "Jan");
 
         // then
         ClientVerificationEmailNotification sent = sentNotification();
-        assertThat(sent.getCode()).matches("\\d{6}");
+        assertThat(sent.getCode()).matches("[A-HJ-KM-NP-Z2-9]{6}");
         assertThat(sent.getRecipientEmail()).isEqualTo(EMAIL);
         assertThat(sent.getOrderId()).isEqualTo("order-1");
         assertThat(sent.getExpiresInMinutes()).isEqualTo(10);
@@ -84,6 +84,38 @@ class ClientVerificationServiceTest {
         assertThat(saved.getCodeHash()).doesNotContain(sent.getCode()).hasSize(64);
         assertThat(saved.getExpiresAt()).isEqualTo(localNow().plusMinutes(10));
         assertThat(saved.getTtl()).isEqualTo(localNow().plusHours(24).toEpochSecond(ZoneOffset.UTC));
+    }
+
+    @Test
+    @DisplayName("issue uses the configured fixed code when one is set for the environment")
+    void issueUsesFixedCodeWhenConfigured() {
+        // given
+        ClientVerificationService fixed = new ClientVerificationService(repository, emailClient, clock, "123456");
+
+        // when
+        String verificationId = fixed.issue(SUBJECT, ClientVerificationPurpose.SHIPPING_ADDRESS_CHANGE, EMAIL, "Jan");
+
+        // then
+        assertThat(sentNotification().getCode()).isEqualTo("123456");
+        ClientVerification stored = savedVerification();
+        when(repository.findById(SUBJECT.getKey(), verificationId)).thenReturn(Optional.of(stored));
+        assertThat(fixed.confirm(SUBJECT, verificationId, "123456")).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("confirm accepts the code regardless of letter case and surrounding whitespace")
+    void confirmIgnoresCaseAndWhitespace() {
+        // given
+        String verificationId = service.issue(SUBJECT, ClientVerificationPurpose.SHIPPING_ADDRESS_CHANGE, EMAIL, "Jan");
+        ClientVerification stored = savedVerification();
+        when(repository.findById(SUBJECT.getKey(), verificationId)).thenReturn(Optional.of(stored));
+        String typed = " " + sentNotification().getCode().toLowerCase() + " ";
+
+        // when
+        String editToken = service.confirm(SUBJECT, verificationId, typed);
+
+        // then
+        assertThat(editToken).isNotBlank();
     }
 
     @Test

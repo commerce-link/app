@@ -6,6 +6,9 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.UUID;
+import java.util.stream.Stream;
+
+import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @DynamoDBDocument
 public class ShippingDetails {
@@ -178,6 +181,34 @@ public class ShippingDetails {
         shippingDetails.setPhone(pickUpAddress.getPhone());
         shippingDetails.set_default(true);
         return shippingDetails;
+    }
+
+    @DynamoDBIgnore
+    public boolean isCountryChange(String requestedCountry) {
+        String requested = trimToNull(requestedCountry);
+        return requested != null && !StringUtils.equalsIgnoreCase(requested, country);
+    }
+
+    @DynamoDBIgnore
+    public ShippingDetails withEditableFieldsFrom(ShippingDetails requested) {
+        ShippingDetails updated = copy();
+        updated.setId(id);
+        updated.setName(trimToNull(requested.getName()));
+        updated.setSurname(trimToNull(requested.getSurname()));
+        updated.setCompanyName(trimToNull(requested.getCompanyName()));
+        updated.setStreetAndNumber(trimToNull(requested.getStreetAndNumber()));
+        updated.setPostalCode(trimToNull(requested.getPostalCode()));
+        updated.setCity(trimToNull(requested.getCity()));
+        updated.setEmail(trimToNull(requested.getEmail()));
+        updated.setPhone(trimToNull(requested.getPhone()));
+        return updated;
+    }
+
+    @DynamoDBIgnore
+    public boolean isPlainTextWithin(int maxFieldLength) {
+        return Stream.of(name, surname, companyName, streetAndNumber, postalCode, city, email, phone)
+                .filter(StringUtils::isNotEmpty)
+                .allMatch(value -> value.length() <= maxFieldLength && !value.contains("<") && !value.contains(">"));
     }
 
     @DynamoDBIgnore
