@@ -4,52 +4,54 @@
     <div class="box" th:fragment="box(title, orders)">
         <h3 th:text="${title}"></h3>
 
-        <table class="table is-fullwidth is-striped is-hoverable">
-            <thead>
-                <tr>
-                    <th th:text="#{order.number}"></th>
-                    <th th:text="#{orders.email}"></th>
-                    <th th:text="#{order.source}"></th>
-                    <th th:text="#{orders.ordered.at.date}"></th>
-                    <th th:text="#{order.shipped.at}"></th>
-                    <th th:text="#{order.status}"></th>
-                    <th th:text="#{order.warehouse.document}"></th>
-                    <th th:text="#{order.billing.document}"></th>
-                    <th th:text="#{order.review.status}"></th>
-                    <th th:text="#{orders.total.price}"></th>
-                    <th th:text="#{orders.unpaid}"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="order : ${orders}">
-                    <td>
-                        <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.shortenedOrderId}"></a>
-                        <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="#{order.external.order.id(${order.externalOrderId})}"></p>
-                    </td>
-                    <td th:text="${order.billingDetails?.email}"></td>
-                    <td th:text="${order.source?.type ?: '-'}"></td>
-                    <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
-                    <td th:text="${order.estimatedShippingAt}"></td>
-                    <td th:text="${enumI18n.localize(order.status)}"></td>
-                    <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
-                        <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
-                        <span th:unless="${goodsIssue.isPresent()}">-</span>
-                    </td>
-                    <td th:with="closing=${order.closingDocument},pending=${order.nextDocumentToIssue}">
-                        <th:block th:if="${closing.isPresent()}">
-                            <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></a>
-                            <span th:if="${closing.get().viewUrl == null}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></span>
-                        </th:block>
-                        <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get())} + ' — ' + #{order.document.to.issue}"></span>
-                        <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
-                    </td>
-                    <td th:text="${order.review?.status != null ? enumI18n.localize(order.review.status) : '-'}"></td>
-                    <td th:text="${#numbers.formatDecimal(order.totalPrice, 1, 2)} + ' PLN'"></td>
-                    <td th:text="${#numbers.formatDecimal(order.unpaidAmount, 1, 2)} + ' PLN'"
-                        th:classappend="${order.unpaidAmount != 0} ? 'has-text-danger' : ''"></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                    <tr>
+                        <th th:text="#{order.number}"></th>
+                        <th th:text="#{orders.email}"></th>
+                        <th th:text="#{order.source}"></th>
+                        <th th:text="#{orders.ordered.at.date}"></th>
+                        <th th:text="#{order.shipped.at}"></th>
+                        <th th:text="#{order.status}"></th>
+                        <th th:text="#{order.warehouse.document}"></th>
+                        <th th:text="#{order.billing.document}"></th>
+                        <th th:text="#{order.review.status}"></th>
+                        <th th:text="#{orders.total.price}"></th>
+                        <th th:text="#{orders.unpaid}"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="order : ${orders}">
+                        <td>
+                            <a th:href="@{/dashboard/orders/{id}(id=${order.orderId})}" th:text="${order.shortenedOrderId}"></a>
+                            <p th:if="${order.marketplaceOrder}" class="is-size-7 has-text-grey" th:text="#{order.external.order.id(${order.externalOrderId})}"></p>
+                        </td>
+                        <td th:text="${order.billingDetails?.email}"></td>
+                        <td th:text="${order.source?.type ?: '-'}"></td>
+                        <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
+                        <td th:text="${order.estimatedShippingAt}"></td>
+                        <td th:text="${enumI18n.localize(order.status)}"></td>
+                        <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
+                            <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>
+                            <span th:unless="${goodsIssue.isPresent()}">-</span>
+                        </td>
+                        <td th:with="closing=${order.closingDocument},pending=${order.nextDocumentToIssue}">
+                            <th:block th:if="${closing.isPresent()}">
+                                <a th:if="${closing.get().viewUrl != null}" th:href="${closing.get().viewUrl}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></a>
+                                <span th:if="${closing.get().viewUrl == null}" th:text="${enumI18n.localize(closing.get().type) + ' ' + closing.get().number}"></span>
+                            </th:block>
+                            <span th:if="${!closing.isPresent() and pending.isPresent()}" th:text="${enumI18n.localize(pending.get())} + ' — ' + #{order.document.to.issue}"></span>
+                            <span th:if="${!closing.isPresent() and !pending.isPresent()}">-</span>
+                        </td>
+                        <td th:text="${order.review?.status != null ? enumI18n.localize(order.review.status) : '-'}"></td>
+                        <td th:text="${#numbers.formatDecimal(order.totalPrice, 1, 2)} + ' PLN'"></td>
+                        <td th:text="${#numbers.formatDecimal(order.unpaidAmount, 1, 2)} + ' PLN'"
+                            th:classappend="${order.unpaidAmount != 0} ? 'has-text-danger' : ''"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>
