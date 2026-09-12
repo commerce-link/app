@@ -201,13 +201,13 @@
                 if (!supported) { return TEXT.custom; }
                 if (mode === 'default') { return TEXT['default']; }
                 if (mode === 'every') {
-                    return format(TEXT['every.' + everyUnit.value], everyValue.value) + ' ' + TEXT.timezone;
+                    return format(TEXT['every.' + everyUnit.value], everyValue.value) + '. ' + TEXT.timezone;
                 }
                 var chosen = hours();
                 if (chosen.length === 0) { return null; }
                 var times = chosen.map(function (h) { return pad(h) + ':' + pad(parseInt(minute.value, 10)); }).join(', ');
                 var key = day.value === 'every' ? 'at' : 'at.' + day.value;
-                return format(TEXT[key], times) + ' ' + TEXT.timezone;
+                return format(TEXT[key], times) + '. ' + TEXT.timezone;
             }
 
             function render() {
@@ -336,7 +336,11 @@
     .schedule-field .schedule-hours .button { min-width: 2.4rem; }
     .schedule-field .field.is-grouped .control + .control { margin-left: .5rem; }
     .schedule-field .tabs.is-toggle { margin-bottom: .5rem; }
-    .schedule-field .tabs.is-toggle ul { border-bottom: 0; }
+    /* The screen's body is a Bulma `.content` block, and `.content ul` applies its typography to
+       any plain list -- including the one a tabs bar is built from. That indented the mode toggle
+       by 2em (24px at this font size) and pushed it down by 1em, while every other control in the
+       modal starts at the box's left edge. */
+    .schedule-field .tabs ul { margin: 0; list-style: none; border-bottom: 0; }
 </style>
 
 </body>

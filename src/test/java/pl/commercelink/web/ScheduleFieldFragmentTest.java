@@ -56,6 +56,19 @@ class ScheduleFieldFragmentTest {
     }
 
     @Test
+    void theStyleFragmentKeepsTheModeToggleFlushWithTheRestOfTheModal() {
+        // the screen's body is a Bulma `.content` block, whose `.content ul` typography indents any
+        // plain list by 2em and pushes it down by 1em -- and a tabs bar is built from a plain list,
+        // so without this reset the mode toggle alone sits inset from every other control
+        String html = render("style");
+
+        // then
+        assertThat(html).contains(".schedule-field .tabs ul");
+        assertThat(html).contains("margin: 0");
+        assertThat(html).contains("list-style: none");
+    }
+
+    @Test
     void theScriptFragmentInlinesTheSameSummaryTextsTheTableCellUses() {
         // when
         String html = render("script");
