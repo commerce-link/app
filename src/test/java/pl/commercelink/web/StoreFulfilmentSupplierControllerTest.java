@@ -79,7 +79,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -108,7 +108,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
                         List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")),
-                        Set.of(), Set.of()));
+                        Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("missing field");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -132,7 +132,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -156,7 +156,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -183,7 +183,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
