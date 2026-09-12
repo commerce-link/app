@@ -640,16 +640,29 @@ public class Order {
         this.orderRealizationDays = orderRealizationDays;
     }
 
+    /**
+     * @param deliveryDate      when this leg's goods land, or null for a confirmation that carries no date
+     * @param shippedBySupplier every leg of this order travels straight from a supplier to the customer,
+     *                          so there is no in-house handling to add. Only a caller that asked the whole
+     *                          order can tell: neither a single delivery nor the order's fulfilment type
+     *                          is enough, because a direct-to-consumer order can still have goods arriving
+     *                          at our warehouse to be forwarded by hand.
+     */
     @DynamoDBIgnore
-    public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate) {
-        if (deliveryDate == null) {
-            return estimatedAssemblyAt;
-        }
-
-        if (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt)) {
+    public LocalDate updateEstimatedAssemblyAt(LocalDate deliveryDate, boolean shippedBySupplier) {
+        // The assembly date only moves forward: the order is ready once its last leg has landed.
+        if (deliveryDate != null && (estimatedAssemblyAt == null || deliveryDate.isAfter(estimatedAssemblyAt))) {
             estimatedAssemblyAt = deliveryDate;
-            estimatedShippingAt = addWeekdayDays(deliveryDate, orderRealizationDays);
         }
+        if (estimatedAssemblyAt == null) {
+            return null;
+        }
+        // The shipping date is derived again on every call, including one that moves no date at all: a leg
+        // confirmed for an earlier date, or with no date, can still be the one that puts a warehouse stop on
+        // the order, and nothing else would ever repair the handling time it owes.
+        estimatedShippingAt = shippedBySupplier
+                ? estimatedAssemblyAt
+                : addWeekdayDays(estimatedAssemblyAt, orderRealizationDays);
 
         return estimatedAssemblyAt;
     }

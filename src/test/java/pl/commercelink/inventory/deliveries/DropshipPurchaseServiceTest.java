@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -180,7 +182,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertTrue(saved.getValue().isDropship());
         assertEquals(DeliveryOrderStatus.AWAITING_APPROVAL, saved.getValue().getOrderStatus());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
@@ -206,7 +208,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(Map.of("shippingService", "express"), saved.getValue().getSupplierOrderChoices());
         assertNull(saved.getValue().getSupplierOrderChoicesLabel());
     }
@@ -226,12 +228,72 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(DeliveryOrderStatus.ORDER_PENDING, saved.getValue().getOrderStatus());
         ArgumentCaptor<SupplierPurchaseEventRequest> event =
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);
         verify(supplierPurchaseEventPublisher).publish(event.capture());
         assertEquals(ORDER_ID, event.getValue().getOrderId());
+    }
+
+    @Test
+    @DisplayName("submitting a dropship purchase claims the allocations instead of ordering them")
+    void submitDropshipClaimsInsteadOfOrdering() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), any(Delivery.class), eq(form));
+        verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a date typed on the dropship form never reaches the order at submit time")
+    void submitDropshipDropsTheTypedDate() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 12, 24));
+
+        // when
+        service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertNull(form.getEstimatedDeliveryAt());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
+        assertNull(saved.getValue().getEstimatedDeliveryAt());
+    }
+
+    @Test
+    @DisplayName("a dropship purchase message that never reaches the queue leaves the delivery FAILED")
+    void aFailedPublishMarksTheDropshipDeliveryFailedSoTheOperatorCanRetry() {
+        // given: nothing in the application moves a delivery out of ORDER_PENDING, so a delivery left there
+        // would keep its order in New with the allocations reserved and no screen to release them from
+        connectSupplier(ConnectionMode.OWN);
+        when(supplierProvider.supportsDropshipping()).thenReturn(true);
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        doThrow(new IllegalStateException("queue unavailable"))
+                .when(supplierPurchaseEventPublisher).publish(any(SupplierPurchaseEventRequest.class));
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+
+        // when
+        OperationResult<PurchaseSubmission> result = service.submitDropship(STORE_ID, directToConsumerOrder(), form, "ref-1");
+
+        // then
+        assertTrue(result.isSuccess());
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesRepository).save(saved.capture());
+        assertEquals(DeliveryOrderStatus.FAILED, saved.getValue().getOrderStatus());
+        assertEquals(SupplierPurchaseService.PURCHASE_NOT_QUEUED_MESSAGE, saved.getValue().getOrderErrorMessage());
     }
 
     @Test
@@ -271,7 +333,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         Delivery delivery = saved.getValue();
         assertEquals(Map.of("lane", "fast"), delivery.getSupplierOrderChoices());
         assertThat(delivery.getSupplierOrderChoicesLabel()).isNotBlank();
@@ -387,17 +449,33 @@ class DropshipPurchaseServiceTest {
         // when
         OperationResult<String> result = service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
 
-        // then
+        // then: the delivery is persisted by claimAllocations, before the order items point at it
         assertTrue(result.isSuccess());
-        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
-        Delivery delivery = saved.getValue();
+        ArgumentCaptor<Delivery> claimed = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), claimed.capture(), same(form));
+        Delivery delivery = claimed.getValue();
         assertTrue(delivery.isDropship());
         assertEquals("PHONE-123", delivery.getExternalDeliveryId());
         assertNull(delivery.getOrderStatus());
-        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), same(delivery), same(form));
         verify(supplierPurchaseEventPublisher, never()).publish(any());
         verify(supplierProvider, never()).placeDropshipOrder(any());
+    }
+
+    @Test
+    void createManualDropshipStillOrdersImmediately() {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
+
+        // when
+        service.createManualDropship(STORE_ID, directToConsumerOrder(), form);
+
+        // then: the manual "Save" path orders the items immediately - it must not take the automatic
+        // purchase's claim-only route, which would leave them reserved but unordered until a supplier
+        // confirmation that manual save never asks for.
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), any(Delivery.class), eq(form));
+        verify(deliveryCreationService, never()).claimAllocationsForPurchase(any(), any(), any());
     }
 
     @Test
@@ -454,13 +532,14 @@ class DropshipPurchaseServiceTest {
         when(supplierConnectionModeResolver.resolve(store, PROVIDER)).thenReturn(ConnectionMode.OWN);
         when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-a")).thenReturn(Optional.empty());
         DeliveryCreationForm submitForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
-        submitForm.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
+        LocalDate typedDate = LocalDate.now().plusDays(3);
+        submitForm.setEstimatedDeliveryAt(typedDate);
         submitForm.setShippingCost(9.99);
         submitForm.setPaymentCost(1.5);
         submitForm.setPaymentTerms(14);
         submitForm.setTax(23.0);
         DeliveryCreationForm manualForm = formWithItem("EAN-1", "MFN-1", 2, 100.0);
-        manualForm.setEstimatedDeliveryAt(submitForm.getEstimatedDeliveryAt());
+        manualForm.setEstimatedDeliveryAt(typedDate);
         manualForm.setShippingCost(submitForm.getShippingCost());
         manualForm.setPaymentCost(submitForm.getPaymentCost());
         manualForm.setPaymentTerms(submitForm.getPaymentTerms());
@@ -472,17 +551,22 @@ class DropshipPurchaseServiceTest {
         OperationResult<String> manualResult =
                 service.createManualDropship(STORE_ID, directToConsumerOrder(), manualForm);
 
-        // then
+        // then: both paths hand their delivery to the creation service, which is what persists it
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository, times(2)).save(saved.capture());
-        Delivery submitted = saved.getAllValues().get(0);
-        Delivery manual = saved.getAllValues().get(1);
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
+        ArgumentCaptor<Delivery> claimed = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryCreationService).claimAllocations(eq(STORE_ID), claimed.capture(), same(manualForm));
+        Delivery submitted = saved.getValue();
+        Delivery manual = claimed.getValue();
         assertEquals(submitted.getProvider(), manual.getProvider());
         assertEquals(submitted.getConnectionMode(), manual.getConnectionMode());
         assertTrue(submitted.isDropship());
         assertTrue(manual.isDropship());
         assertEquals(submitted.getDeliveryAddress(), manual.getDeliveryAddress());
-        assertEquals(submitted.getEstimatedDeliveryAt(), manual.getEstimatedDeliveryAt());
+        // The typed date only survives the manual "Save" path; automatic submission drops it, matching
+        // the warehouse mirror (see submitDropshipDropsTheTypedDate).
+        assertNull(submitted.getEstimatedDeliveryAt());
+        assertEquals(typedDate, manual.getEstimatedDeliveryAt());
         assertEquals(submitted.getShippingCost(), manual.getShippingCost());
         assertEquals(submitted.getPaymentCost(), manual.getPaymentCost());
         assertEquals(submitted.getPaymentTerms(), manual.getPaymentTerms());
@@ -718,7 +802,7 @@ class DropshipPurchaseServiceTest {
         // then
         assertThat(result.isSuccess()).isTrue();
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveriesRepository).save(saved.capture());
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertThat(saved.getValue().getOrderStatus()).isEqualTo(DeliveryOrderStatus.ORDER_PENDING);
         ArgumentCaptor<SupplierPurchaseEventRequest> event =
                 ArgumentCaptor.forClass(SupplierPurchaseEventRequest.class);

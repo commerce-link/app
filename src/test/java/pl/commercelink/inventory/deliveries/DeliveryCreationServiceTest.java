@@ -26,14 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,19 +118,53 @@ class DeliveryCreationServiceTest {
         // given
         Delivery delivery = new Delivery(STORE_ID, null, "Acme");
         delivery.setType(DeliveryType.DROPSHIP);
+        Allocation selected = new Allocation();
+        selected.setType(AllocationType.Order);
+        selected.setQty(2);
+        selected.setSelected(true);
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider("Acme");
         DeliveryItem item = new DeliveryItem();
         item.setMfn("MFN-1");
         item.setRequestedQty(2);
         item.setUnitCost(8.5);
+        item.setAllocations(List.of(selected));
         form.setItems(List.of(item));
 
         // when
         service.claimAllocationsForPurchase(STORE_ID, delivery, form);
 
-        // then
+        // then: the clamp keeps the full requested quantity because it matches the selected allocation
+        assertEquals(2, item.getRequestedQty());
         verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
+        verify(warehouseAllocationsManager, never()).claim(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a dropship purchase claims exactly what the allocations need, whatever the form asks for")
+    void claimAllocationsForPurchaseClampsDropshipQuantities() {
+        // given: a tampered form asks for more than the selected order allocation covers
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        Allocation selected = new Allocation();
+        selected.setType(AllocationType.Order);
+        selected.setQty(1);
+        selected.setSelected(true);
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(9);
+        item.setUnitCost(8.5);
+        item.setAllocations(List.of(selected));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.getItems().add(item);
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        assertEquals(1, item.getRequestedQty());
+        assertEquals(8.5, delivery.getTotalCost());
         verify(warehouseAllocationsManager, never()).claim(any(), any(), any(), any());
     }
 
@@ -340,33 +372,47 @@ class DeliveryCreationServiceTest {
     }
 
     @Test
-    void completeDropshipPendingSyncsPricesWithoutTouchingTheHeader() {
+    @DisplayName("completing a dropship purchase stamps the delivery date and orders the claimed items")
+    void completePendingStampsTheDateAndOrdersClaimedDropshipItems() {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId("delivery-1");
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        delivery.setShippingCost(15.0);
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
         DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setExternalDeliveryId("ACME-DS-1");
         form.setProvider("Acme");
-        DeliveryItem item = new DeliveryItem();
-        item.setMfn("MFN-1");
-        item.setRequestedQty(2);
-        item.setUnitCost(8.5);
-        form.getItems().add(item);
-        when(deliveryCostSync.apply(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5))).thenReturn(3.0);
+        form.setExternalDeliveryId("EXT-9");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 14));
+        form.setItems(List.of());
 
         // when
-        service.completeDropshipPending(STORE_ID, delivery, form);
+        service.completePending(STORE_ID, delivery, form);
 
         // then
-        assertEquals("ACME-DS-1", delivery.getExternalDeliveryId());
-        assertNull(delivery.getOrderStatus());
-        assertEquals(15.0, delivery.getShippingCost());
-        assertEquals(3.0, delivery.getTotalCost());
-        verify(deliveriesRepository).save(delivery);
-        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
-        verifyNoInteractions(orderAllocationsManager);
+        assertThat(delivery.getEstimatedDeliveryAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        verify(orderAllocationsManager)
+                .markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("a dropship completion leaves the delivery header alone")
+    void completePendingLeavesTheDropshipHeaderAlone() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        delivery.setTax(23);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setShippingCost(99.0);
+        form.setPaymentCost(7.0);
+        form.setTax(8);
+        form.setItems(List.of());
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        assertThat(delivery.getShippingCost()).isEqualTo(0.0);
+        assertThat(delivery.getPaymentCost()).isEqualTo(0.0);
+        assertThat(delivery.getTax()).isEqualTo(23);
     }
 
     @Test
@@ -401,5 +447,44 @@ class DeliveryCreationServiceTest {
         assertEquals(90.0, delivery.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), eq(form.getItems()));
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("claimAllocationsForPurchase saves the delivery before reserving the order items for it")
+    void claimAllocationsForPurchaseSavesTheDeliveryBeforeClaimingTheOrderAllocations() {
+        // given: a claim is written onto the items and hides them from the allocation screen, so a delivery
+        // saved only afterwards would leave them reserved for something that does not exist
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setItems(List.of());
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).claim(eq(STORE_ID), eq(delivery.getDeliveryId()), any());
+    }
+
+    @Test
+    @DisplayName("claimAllocations saves the delivery before the order items start pointing at it")
+    void claimAllocationsSavesTheDeliveryBeforeCommittingTheOrderAllocations() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, "ACME-DS-2", "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setItems(List.of());
+
+        // when
+        service.claimAllocations(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveriesRepository, orderAllocationsManager);
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).commit(eq(STORE_ID), eq(delivery.getDeliveryId()), any(), any());
     }
 }

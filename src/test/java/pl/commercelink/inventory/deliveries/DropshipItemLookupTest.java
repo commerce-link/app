@@ -82,4 +82,107 @@ class DropshipItemLookupTest {
         // then
         assertThat(ids).isEmpty();
     }
+
+    @Test
+    void anOrderIsEntirelyDropshipOnlyWhenEveryDeliveryBehindItsItemsIsOne() {
+        // given
+        OrderItem first = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem second = item("i2", FulfilmentStatus.Ordered, "d-2");
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-2")).thenReturn(delivery("d-2", DeliveryType.DROPSHIP));
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(first, second))).isTrue();
+    }
+
+    @Test
+    void oneWarehouseLegIsEnoughToMakeTheOrderNotEntirelyDropship() {
+        // given
+        OrderItem dropshipped = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem throughTheWarehouse = item("i2", FulfilmentStatus.Ordered, "d-2");
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-2")).thenReturn(delivery("d-2", DeliveryType.WAREHOUSE));
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(dropshipped, throughTheWarehouse))).isFalse();
+    }
+
+    @Test
+    void anOrderWithNoResolvableDeliveryIsNotEntirelyDropship() {
+        // given
+        OrderItem stillAllocating = item("i1", FulfilmentStatus.Allocation, "Acme");
+        OrderItem withoutADelivery = item("i2", FulfilmentStatus.New, null);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "Acme")).thenReturn(null);
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(stillAllocating, withoutADelivery))).isFalse();
+    }
+
+    @Test
+    void anItemNotOnADeliveryYetStopsTheOrderFromCountingAsEntirelyDropship() {
+        // given: the dropship leg has been bought, the second item is still waiting for its purchase and
+        // carries only its supplier's name - it may yet travel through our warehouse
+        OrderItem dropshipped = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem notBoughtYet = item("i2", FulfilmentStatus.Allocation, "Acme");
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "Acme")).thenReturn(null);
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(dropshipped, notBoughtYet))).isFalse();
+    }
+
+    @Test
+    void anItemTakenFromOurOwnShelfStopsTheOrderFromCountingAsEntirelyDropship() {
+        // given: stock already on the shelf resolves to no delivery, and it is exactly the goods somebody
+        // still has to pick and pack
+        OrderItem dropshipped = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem fromStock = item("i2", FulfilmentStatus.Delivered, SupplierRegistry.WAREHOUSE);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, SupplierRegistry.WAREHOUSE)).thenReturn(null);
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(dropshipped, fromStock))).isFalse();
+    }
+
+    @Test
+    void aServiceCarriesNoGoodsAndDoesNotDecideTheRoute() {
+        // given
+        OrderItem dropshipped = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem service = item("i2", FulfilmentStatus.Delivered, OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        service.setService(true);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(delivery("d-1", DeliveryType.DROPSHIP));
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(dropshipped, service))).isTrue();
+        verify(deliveriesRepository, never()).findByIdConsistently(STORE_ID, OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+    }
+
+    @Test
+    void anOrderOfNothingButServicesIsNotEntirelyDropship() {
+        // given
+        OrderItem service = item("i1", FulfilmentStatus.Delivered, OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        service.setService(true);
+
+        // when / then
+        assertThat(lookup.isEntirelyDropship(STORE_ID, List.of(service))).isFalse();
+    }
+
+    @Test
+    void theRouteLooksUpEachDeliveryOnceAndSkipsTheOnesThatDoNotExist() {
+        // given
+        OrderItem first = item("i1", FulfilmentStatus.Ordered, "d-1");
+        OrderItem sameDelivery = item("i2", FulfilmentStatus.Ordered, "d-1");
+        OrderItem orphan = item("i3", FulfilmentStatus.Ordered, "gone");
+        Delivery dropship = delivery("d-1", DeliveryType.DROPSHIP);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "d-1")).thenReturn(dropship);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, "gone")).thenReturn(null);
+
+        // when
+        DropshipItemLookup.GoodsRoute route = lookup.routeOf(STORE_ID, List.of(first, sameDelivery, orphan));
+
+        // then: the orphan still counts against the route even though it contributes no delivery
+        assertThat(route.deliveries()).containsExactly(dropship);
+        assertThat(route.entirelyDropship()).isFalse();
+        verify(deliveriesRepository, times(1)).findByIdConsistently(STORE_ID, "d-1");
+    }
 }
