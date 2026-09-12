@@ -2,6 +2,7 @@ package pl.commercelink.web.nav;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -9,6 +10,9 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.Arrays;
+
+@Slf4j
 @ControllerAdvice
 @RequiredArgsConstructor
 public class NavigationAdvice {
@@ -44,7 +48,17 @@ public class NavigationAdvice {
     private UserRole currentRole() {
         return CustomSecurityContext.getLoggedInUser()
                 .flatMap(user -> user.getCustomAttribute("role"))
-                .map(UserRole::valueOf)
+                .map(NavigationAdvice::toRole)
                 .orElse(null);
+    }
+
+    private static UserRole toRole(String role) {
+        return Arrays.stream(UserRole.values())
+                .filter(known -> known.name().equals(role))
+                .findFirst()
+                .orElseGet(() -> {
+                    log.warn("Unknown user role '{}' — rendering the dashboard without navigation", role);
+                    return null;
+                });
     }
 }

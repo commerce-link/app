@@ -70,6 +70,31 @@ class NavigationAdviceTest {
     }
 
     @Test
+    void rendersWithoutNavigationInsteadOfFailingWhenTheRoleIsUnknown() {
+        // given
+        loggedInAs("MERCHANDISER");
+
+        // when
+        NavigationModel model = advice.navigation(request("/dashboard/orders"));
+
+        // then
+        assertThat(model).isNull();
+    }
+
+    @Test
+    void leavesTheStoreChipOffWhenTheRoleIsUnknown() {
+        // given
+        loggedInAs("MERCHANDISER");
+
+        // when
+        StoreContext context = advice.storeContext(request("/dashboard/store/uma2dqukxr/deliveries"));
+
+        // then
+        assertThat(context).isNull();
+        verifyNoInteractions(storesRepository);
+    }
+
+    @Test
     void buildsNoNavigationWhenNobodyIsLoggedIn() {
         // when
         NavigationModel model = advice.navigation(request("/dashboard/orders"));
