@@ -23,6 +23,8 @@ public class WarehouseAllocationsManager {
     public List<Allocation> fetchAll(String storeId) {
         return warehouseRepository.findAll(storeId, FulfilmentStatus.Allocation)
                 .stream()
+                // claimed by a pending delivery: already being bought
+                .filter(item -> !item.isClaimed())
                 .map(Allocation::fromWarehouseItem)
                 .collect(Collectors.toList());
     }
@@ -58,6 +60,29 @@ public class WarehouseAllocationsManager {
         for (DeliveryItem item : items) {
             commitAllocations(storeId, deliveryId, provider, item);
         }
+    }
+
+    /** Reserves the delivery's warehouse quantities before the supplier confirmed the purchase. */
+    public void claim(String storeId, String deliveryId, String provider, List<DeliveryItem> items) {
+        for (DeliveryItem item : items) {
+            claimAllocations(storeId, deliveryId, provider, item);
+        }
+    }
+
+    /** The supplier confirmed: only the status and the confirmed cost change, never the quantities. */
+    public void markClaimedAsOrdered(String storeId, String deliveryId) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            if (item.isClaimed()) {
+                item.markAsOrdered(deliveryId, item.getCost());
+                warehouseRepository.save(item);
+            }
+        }
+    }
+
+    /** Whether the item is currently reserved by a pending delivery's supplier purchase. */
+    public boolean isClaimed(String storeId, String itemId) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, itemId);
+        return warehouseItem != null && warehouseItem.isClaimed();
     }
 
     public boolean updateFulfilment(String storeId, String provider, String itemId, String ean, String mfn, double unitCost) {
@@ -109,8 +134,10 @@ public class WarehouseAllocationsManager {
     }
 
     public void release(String storeId, String deliveryId, String provider) {
-        for (WarehouseItem item : warehouseRepository.findByDeliveryIdAndStatuses(storeId, deliveryId,
-                List.of(FulfilmentStatus.Ordered))) {
+        for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
+            if (!item.hasOneOfTheStatuses(FulfilmentStatus.Ordered) && !item.isClaimed()) {
+                continue;
+            }
             int delta = item.getPurchaseClaimQty();
             if (delta > 0 && delta >= item.getQty()) {
                 warehouseRepository.delete(item);
@@ -167,6 +194,10 @@ public class WarehouseAllocationsManager {
         if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
             return;
         }
+        // an item claimed by another pending delivery is already being bought there - do not steal it
+        if (warehouseItem.isClaimed() && !deliveryId.equals(warehouseItem.getClaimedDeliveryId())) {
+            return;
+        }
         warehouseItem.markAsOrdered(deliveryId, unitCost);
         warehouseItem.setPurchaseClaimQty(qtyAdjustment);
         if (qtyAdjustment != 0) {
@@ -185,6 +216,53 @@ public class WarehouseAllocationsManager {
     private void createNewWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
         WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
         warehouseItem.markAsOrdered(deliveryId, item.getUnitCost());
+        warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
+        warehouseRepository.save(warehouseItem);
+    }
+
+    private void claimAllocations(String storeId, String deliveryId, String provider, DeliveryItem item) {
+        Allocation allocation = item.getSelectedAllocations(AllocationType.Warehouse).stream()
+                .findFirst()
+                .orElse(null);
+
+        int warehouseQtyAdjustment = item.getWarehouseQtyAdjustment();
+
+        if (allocation != null) {
+            claimExistingWarehouseItem(storeId, deliveryId, allocation, item.getUnitCost(), warehouseQtyAdjustment);
+        } else if (warehouseQtyAdjustment > 0) {
+            createClaimedWarehouseItem(storeId, deliveryId, provider, item);
+        }
+    }
+
+    private void claimExistingWarehouseItem(String storeId, String deliveryId, Allocation allocation, double unitCost, int qtyAdjustment) {
+        WarehouseItem warehouseItem = warehouseRepository.findById(storeId, allocation.getKey().getItemId());
+        if (warehouseItem == null || !warehouseItem.hasOneOfTheStatuses(FulfilmentStatus.Allocation)) {
+            return;
+        }
+        // an item claimed by another pending delivery is already being bought there - do not steal it
+        if (warehouseItem.isClaimed() && !deliveryId.equals(warehouseItem.getClaimedDeliveryId())) {
+            return;
+        }
+        warehouseItem.setCost(unitCost);
+        warehouseItem.markAsClaimed(deliveryId);
+        warehouseItem.setPurchaseClaimQty(qtyAdjustment);
+        if (qtyAdjustment != 0) {
+            int newQty = warehouseItem.getQty() + qtyAdjustment;
+            if (newQty > 0) {
+                warehouseItem.setQty(newQty);
+                warehouseRepository.save(warehouseItem);
+            } else {
+                warehouseRepository.delete(warehouseItem);
+            }
+        } else {
+            warehouseRepository.save(warehouseItem);
+        }
+    }
+
+    private void createClaimedWarehouseItem(String storeId, String deliveryId, String provider, DeliveryItem item) {
+        WarehouseItem warehouseItem = warehouseItemFactory.create(storeId, provider, item);
+        warehouseItem.setCost(item.getUnitCost());
+        warehouseItem.markAsClaimed(deliveryId);
         warehouseItem.setPurchaseClaimQty(warehouseItem.getQty());
         warehouseRepository.save(warehouseItem);
     }

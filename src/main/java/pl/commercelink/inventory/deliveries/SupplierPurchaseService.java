@@ -61,7 +61,6 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
-    private final OrderAllocationsManager orderAllocationsManager;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -488,11 +487,8 @@ public class SupplierPurchaseService {
         delivery.addEvent(new Event(EventType.action, ORDERED_MANUALLY_EVENT, LocalDateTime.now()));
         deliveriesRepository.save(delivery);
 
-        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
-        withAllocations.getItems().forEach(item -> item.getAllocations().stream()
-                .filter(allocation -> allocation.getType() == AllocationType.Order)
-                .forEach(allocation -> allocation.setSelected(true)));
-        orderAllocationsManager.commit(storeId, deliveryId, estimatedDeliveryAt, withAllocations.getItems());
+        // The items were claimed when the purchase was submitted; only the date is new here.
+        deliveryCreationService.markClaimedAsOrdered(storeId, delivery, estimatedDeliveryAt);
 
         log.info("Supplier order completed manually: store={} delivery={} provider={} ref={} externalOrderId={}",
                 storeId, deliveryId, delivery.getProvider(), delivery.getPurchaseRef(), externalOrderId.trim());
@@ -611,7 +607,11 @@ public class SupplierPurchaseService {
             // (minus blank answers; no declared options to validate/label against) rather than losing them.
             delivery.setSupplierOrderChoices(SupplierOrderChoices.withoutBlankValues(form.getSupplierOrderChoices()));
         }
-        deliveryCreationService.claimAllocations(storeId, delivery, form);
+        // The date comes from the supplier's shipping terms once the order is confirmed (see applyOrderResult).
+        // A date typed on the creation screen would stamp the orders now while the delivery gets the terms
+        // date later, leaving the two out of step.
+        form.setEstimatedDeliveryAt(null);
+        deliveryCreationService.claimAllocationsForPurchase(storeId, delivery, form);
         delivery.addEvent(new Event(EventType.action, DELIVERY_CREATED_EVENT, LocalDateTime.now()));
 
         deliveriesRepository.save(delivery);

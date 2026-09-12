@@ -18,9 +18,11 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -65,6 +67,25 @@ class OrderLifecycleTest {
         // then
         assertEquals(OrderStatus.Assembly, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderAccepted);
+    }
+
+    @Test
+    void updateKeepsAnExistingAssemblyDateOnAnAssemblyOrder() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        OrderItem item = mock(OrderItem.class);
+        when(item.isOrdered()).thenReturn(true);
+        when(item.isDelivered()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertEquals(OrderStatus.Assembly, order.getStatus());
     }
 
     @Test

@@ -104,8 +104,6 @@ class SupplierPurchaseServiceTest {
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
     @Mock
-    private OrderAllocationsManager orderAllocationsManager;
-    @Mock
     private DropshipPurchaseService dropshipPurchaseService;
 
     @InjectMocks
@@ -572,6 +570,30 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void processPendingPassesTheShippingTermsDateToCompletePending() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 90.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 90.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenReturn(new SupplierOrderResult(
+                "555", 450.0, "PLN", List.of()));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(4, new ShippingCostPolicy.FlatRate(400, 50)))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture());
+        assertEquals(LocalDate.now().plusDays(4), completed.getValue().getEstimatedDeliveryAt());
+    }
+
+    @Test
     void processPendingRebuildsOrderLinesFromClaimedAllocations() throws Exception {
         // given
         DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
@@ -991,6 +1013,23 @@ class SupplierPurchaseServiceTest {
                 request.getPurchaseRef().equals("ref-1")
                         && request.getDeliveryId().equals(saved.getValue().getDeliveryId())), anyString());
         assertEquals(saved.getValue().getDeliveryId(), result.getPayload().deliveryId());
+        verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
+    }
+
+    @Test
+    void submitPurchaseIgnoresAnEstimatedDeliveryDatePostedWithTheForm() {
+        // given
+        when(deliveriesRepository.findByPurchaseRef(STORE_ID, "ref-1")).thenReturn(Optional.empty());
+        DeliveryCreationForm form = formWithItem("4006381333931", "MFN-A", 2, 90.0);
+        form.setEstimatedDeliveryAt(LocalDate.now().plusDays(3));
+
+        // when
+        service.submitPurchase(STORE_ID, form, "ref-1");
+
+        // then
+        ArgumentCaptor<DeliveryCreationForm> claimed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
+        verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), any(), claimed.capture());
+        assertNull(claimed.getValue().getEstimatedDeliveryAt());
     }
 
     @Test
@@ -1570,7 +1609,7 @@ class SupplierPurchaseServiceTest {
         // then
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveriesRepository).save(saved.capture());
-        verify(deliveryCreationService).claimAllocations(STORE_ID, saved.getValue(), form);
+        verify(deliveryCreationService).claimAllocationsForPurchase(STORE_ID, saved.getValue(), form);
     }
 
     @Test
@@ -2080,8 +2119,6 @@ class SupplierPurchaseServiceTest {
         delivery.setOrderErrorMessage("outcome unknown");
         delivery.setProvider(PROVIDER);
         delivery.setPurchaseRef("ref-1");
-        Delivery withAllocations = deliveryWithOrderAllocation(DELIVERY_ID, 100.0);
-        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -2094,7 +2131,7 @@ class SupplierPurchaseServiceTest {
         assertNull(delivery.getOrderStatus());
         assertNull(delivery.getOrderErrorMessage());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_MANUALLY"));
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(ESTIMATED_DELIVERY_AT), same(withAllocations.getItems()));
+        verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(ESTIMATED_DELIVERY_AT));
     }
 
     @Test
@@ -2115,26 +2152,21 @@ class SupplierPurchaseServiceTest {
         assertEquals(4.0, delivery.getPaymentCost());
         assertEquals(30, delivery.getPaymentTerms());
         assertEquals(1.0, delivery.getTax());
-        verifyNoInteractions(supplierRegistry, deliveryTaxResolver, deliveryCreationService);
+        verifyNoInteractions(supplierRegistry, deliveryTaxResolver);
     }
 
     @Test
     void completeManuallyStampsLinkedOrdersWithEstimatedDeliveryAt() {
         // given
         Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 2, 100.0), "ref-1");
-        Delivery withAllocations = deliveryWithOrderAllocation(DELIVERY_ID, 100.0);
-        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
         service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
 
         // then
-        ArgumentCaptor<List<DeliveryItem>> items = ArgumentCaptor.forClass(List.class);
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(ESTIMATED_DELIVERY_AT), items.capture());
-        assertSame(withAllocations.getItems(), items.getValue());
-        assertEquals(1, items.getValue().get(0).getSelectedAllocations(AllocationType.Order).size());
-        assertEquals(100.0, items.getValue().get(0).getUnitCost());
+        verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(ESTIMATED_DELIVERY_AT));
+        verify(deliveriesQueryService, never()).fetchDeliveryWithAllocations(any(), any());
     }
 
     @Test
@@ -2194,7 +2226,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2213,7 +2245,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2232,7 +2264,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2250,7 +2282,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.number", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2268,7 +2300,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.complete.error.date", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(orderAllocationsManager);
+        verifyNoInteractions(deliveryCreationService);
     }
 
     @Test
@@ -2310,22 +2342,6 @@ class SupplierPurchaseServiceTest {
         lenient().when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
                 .thenReturn(deliveryWithAllocations(form, DELIVERY_ID));
         return delivery;
-    }
-
-    private Delivery deliveryWithOrderAllocation(String deliveryId, double unitCost) {
-        Allocation allocation = new Allocation();
-        allocation.setKey(new AllocationKey("order-1", "item-1", "client@example.com"));
-        allocation.setType(AllocationType.Order);
-        allocation.setName("Product EAN-1");
-        allocation.setEan("EAN-1");
-        allocation.setMfn("MFN-1");
-        allocation.setUnitCost(unitCost);
-        allocation.setQty(2);
-        Delivery withAllocations = new Delivery();
-        withAllocations.setDeliveryId(deliveryId);
-        withAllocations.setProvider(PROVIDER);
-        withAllocations.setItems(DeliveryItem.groupAndUnify(List.of(allocation)));
-        return withAllocations;
     }
 
     @Test

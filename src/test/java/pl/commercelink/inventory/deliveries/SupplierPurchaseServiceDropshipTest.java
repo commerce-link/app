@@ -90,8 +90,6 @@ class SupplierPurchaseServiceDropshipTest {
     private DropshipPurchaseService dropshipPurchaseService;
     @Mock
     private DropshipOrderLocator dropshipOrderLocator;
-    @Mock
-    private OrderAllocationsManager orderAllocationsManager;
 
     @InjectMocks
     private SupplierPurchaseService service;
@@ -386,7 +384,7 @@ class SupplierPurchaseServiceDropshipTest {
         assertNull(delivery.getOrderErrorMessage());
         assertFalse(delivery.hasBeenReceived());
         assertEquals("ACME-PHONE-1", delivery.getExternalDeliveryId());
-        verify(orderAllocationsManager).commit(eq(STORE_ID), eq(DELIVERY_ID), eq(estimatedDeliveryAt), anyList());
+        verify(deliveryCreationService).markClaimedAsOrdered(eq(STORE_ID), same(delivery), eq(estimatedDeliveryAt));
         verifyNoInteractions(supplierProvider, dropshipPurchaseService, supplierPurchaseEventPublisher);
     }
 

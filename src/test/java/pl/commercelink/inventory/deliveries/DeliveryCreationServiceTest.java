@@ -1,8 +1,10 @@
 package pl.commercelink.inventory.deliveries;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,13 +23,17 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,6 +68,7 @@ class DeliveryCreationServiceTest {
         form.setExternalDeliveryId("EXT-9");
         form.setShippingCost(20.0);
         form.setPaymentCost(5.0);
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
         DeliveryItem item = new DeliveryItem();
         item.setMfn("MFN-1");
         item.setRequestedQty(2);
@@ -81,6 +88,112 @@ class DeliveryCreationServiceTest {
         verify(deliveriesRepository).save(delivery);
         verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    @DisplayName("claimAllocationsForPurchase claims both sides without ordering anything")
+    void claimAllocationsForPurchaseClaimsBothSidesWithoutOrderingAnything() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
+        verify(warehouseAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), "Acme", form.getItems());
+        verify(orderAllocationsManager, never()).commit(any(), any(), any(), any());
+        verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("claimAllocationsForPurchase leaves the warehouse alone for a dropship delivery")
+    void claimAllocationsForPurchaseLeavesTheWarehouseAloneForADropshipDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setType(DeliveryType.DROPSHIP);
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
+
+        // when
+        service.claimAllocationsForPurchase(STORE_ID, delivery, form);
+
+        // then
+        verify(orderAllocationsManager).claim(STORE_ID, delivery.getDeliveryId(), form.getItems());
+        verify(warehouseAllocationsManager, never()).claim(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("completePending orders the claimed allocations after saving the delivery")
+    void completePendingOrdersTheClaimedAllocationsAfterSavingTheDelivery() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setExternalDeliveryId("EXT-9");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
+        DeliveryItem item = new DeliveryItem();
+        item.setMfn("MFN-1");
+        item.setRequestedQty(2);
+        item.setUnitCost(8.5);
+        form.setItems(List.of(item));
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        InOrder inOrder = inOrder(deliveryCostSync, deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
+        inOrder.verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
+        inOrder.verify(deliveriesRepository).save(delivery);
+        inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25));
+        inOrder.verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
+    }
+
+    @Test
+    @DisplayName("completePending survives a failure while ordering the claimed allocations")
+    void completePendingSurvivesAFailureWhileOrderingTheClaimedAllocations() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
+        form.setItems(List.of());
+        doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
+                .markClaimedAsOrdered(any(), any(), any());
+
+        // when / then
+        assertThatNoException().isThrownBy(() -> service.completePending(STORE_ID, delivery, form));
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
+    @DisplayName("markClaimedAsOrdered still orders the warehouse side after the order side fails")
+    void markClaimedAsOrderedStillOrdersTheWarehouseSideAfterTheOrderSideFails() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        LocalDate estimatedDeliveryAt = LocalDate.of(2026, 9, 25);
+        doThrow(new RuntimeException("boom")).when(orderAllocationsManager)
+                .markClaimedAsOrdered(any(), any(), any());
+
+        // when
+        assertThatNoException().isThrownBy(() ->
+                service.markClaimedAsOrdered(STORE_ID, delivery, estimatedDeliveryAt));
+
+        // then
+        verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
     }
 
     @Test
@@ -253,6 +366,7 @@ class DeliveryCreationServiceTest {
         assertEquals(3.0, delivery.getTotalCost());
         verify(deliveriesRepository).save(delivery);
         verify(warehouseAllocationsManager, never()).commit(any(), any(), any(), any());
+        verifyNoInteractions(orderAllocationsManager);
     }
 
     @Test
