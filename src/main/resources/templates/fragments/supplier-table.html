@@ -13,6 +13,7 @@
                 <th th:text="#{store.supplier.column.pricing}"></th>
                 <th th:text="#{store.supplier.column.fulfilment}"></th>
                 <th th:text="${manual} ? #{store.supplier.column.file} : #{store.supplier.column.feed}"></th>
+                <th th:unless="${manual}" th:text="#{store.supplier.column.schedule}"></th>
                 <th th:text="#{general.actions}"></th>
             </tr>
         </thead>
@@ -20,7 +21,8 @@
             <tr th:each="row : ${rows}"
                 th:attr="data-mode=${row.mode()},data-include-pricing=${row.includeInPricing()},
                          data-include-fulfilment=${row.includeInFulfilment()},data-label=${row.label()},
-                         data-enabled=${row.enabled()},data-feed-last-modified=${row.feedLastModified()}">
+                         data-enabled=${row.enabled()},data-feed-last-modified=${row.feedLastModified()},
+                         data-feed-schedule=${row.feedSchedule()}">
                 <td>
                     <span th:text="${row.label()}">name</span>
                     <span class="tag is-warning is-light ml-2" th:if="${!row.knownProvider()}"
@@ -53,6 +55,15 @@
                           th:text="${#temporals.format(row.feedLastModified(), 'dd.MM.yyyy HH:mm')}"></span>
                     <span th:unless="${row.hasFeed()}" class="has-text-grey"
                           th:text="#{store.supplier.feed.missing}"></span>
+                </td>
+                <!-- Own connections are the only ones pulled on a schedule of this store's own:
+                     a global connection rides the platform-wide feed and a manual one is uploaded
+                     by hand, so there is nothing to show for either. -->
+                <td th:unless="${manual}">
+                    <span th:if="${row.hasSchedule()}" th:title="${row.feedSchedule()}"
+                          th:text="${#messages.msgWithParams(row.scheduleDescription().code(),
+                                                             row.scheduleDescription().messageArgs())}"></span>
+                    <span th:unless="${row.hasSchedule()}" class="has-text-grey">&mdash;</span>
                 </td>
                 <td>
                     <button type="button" class="button is-small is-link is-outlined mr-2"

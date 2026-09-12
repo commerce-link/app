@@ -64,7 +64,7 @@ class SupplierSectionModelTest {
         SupplierConnectionViewFactory viewFactory = mock(SupplierConnectionViewFactory.class);
         SupplierRegistry registry = mock(SupplierRegistry.class);
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, true);
         when(viewFactory.views(any())).thenReturn(
                 new SupplierConnectionViewFactory.SupplierConnectionViews(List.of(elko), List.of()));
         when(registry.getExternalSupplierNames()).thenReturn(List.of("Elko", "Acme"));
@@ -131,7 +131,7 @@ class SupplierSectionModelTest {
         // given
         SupplierConnectionViewFactory viewFactory = mock(SupplierConnectionViewFactory.class);
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, true);
         when(viewFactory.views(any())).thenReturn(
                 new SupplierConnectionViewFactory.SupplierConnectionViews(List.of(), List.of(manual)));
         ConcurrentModel model = new ConcurrentModel();

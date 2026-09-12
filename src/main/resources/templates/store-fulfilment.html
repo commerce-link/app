@@ -347,6 +347,14 @@
                                 </div>
                             </div>
 
+                            <!-- Own connections are the only ones pulled on a schedule of this
+                                 store's own, so this block is shown and hidden by the same rule
+                                 as the credential fields above. -->
+                            <div class="field" id="supplier-schedule-wrap">
+                                <label class="label" th:text="#{store.supplier.feed.schedule}"></label>
+                                <div th:replace="~{fragments/schedule-field :: input('feedSchedule', '', ${scheduleMinIntervalMinutes})}"></div>
+                            </div>
+
                             <div class="field is-grouped mt-4">
                                 <div class="control">
                                     <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
@@ -361,6 +369,9 @@
                 </div>
                 <button class="modal-close is-large" aria-label="close" id="supplier-modal-close"></button>
             </div>
+
+            <script th:replace="~{fragments/schedule-field :: script}"></script>
+            <style th:replace="~{fragments/schedule-field :: style}"></style>
 
             <script th:inline="javascript">
                 (function () {
@@ -379,9 +390,12 @@
                     var title = document.getElementById('supplier-modal-title');
                     var pricing = document.getElementById('supplier-pricing');
                     var fulfilment = document.getElementById('supplier-fulfilment');
+                    var scheduleWrap = document.getElementById('supplier-schedule-wrap');
+                    var schedule = scheduleWrap.querySelector('.schedule-field');
                     var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
                     var editTitle = /*[[#{store.supplier.edit.modal.title}]]*/ '';
                     var selectPlaceholder = /*[[#{general.select}]]*/ '';
+                    var scheduleIncompleteMessage = /*[[#{schedule.at.nohours}]]*/ '';
                     var submitInFlight = false;
 
                     // Reads the row data straight out of the (possibly just-swapped) table instead
@@ -404,7 +418,9 @@
                             identity: identity,
                             mode: tr.dataset.mode,
                             includeInPricing: tr.dataset.includePricing === 'true',
-                            includeInFulfilment: tr.dataset.includeFulfilment === 'true'
+                            includeInFulfilment: tr.dataset.includeFulfilment === 'true',
+                            // absent attribute (a blank schedule) means the platform default
+                            feedSchedule: tr.dataset.feedSchedule || ''
                         };
                     }
 
@@ -447,6 +463,7 @@
                                 input.required = baseRequired && !(input.type === 'password' && hasStoredConfig);
                             });
                         });
+                        scheduleWrap.classList.toggle('is-hidden', !isOwn);
                         var row = rowFor(name);
                         var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
                         warning.classList.toggle('is-hidden', !leavingOwn);
@@ -511,6 +528,10 @@
                             pricing.checked = true;
                             fulfilment.checked = true;
                         }
+                        // One modal serves every supplier, so the schedule builder has to be
+                        // re-read from this row rather than parsed once at page load -- otherwise
+                        // it would keep showing whichever supplier was opened before.
+                        window.scheduleField.sync(schedule, row ? row.feedSchedule : '');
                         refreshModeVisibility();
                         refreshFields();
                         modal.classList.add('is-active');
@@ -565,6 +586,18 @@
                     supplierForm.addEventListener('submit', function (event) {
                         event.preventDefault();
                         if (submitInFlight) { return; }
+                        // The builder's only reachable invalid state is an "at" schedule with no
+                        // hour left selected. Blocking here is what keeps the screen honest: the
+                        // expression field would otherwise still hold the last good value and the
+                        // save would quietly store something other than what is on screen.
+                        if (mode.value === 'OWN' && !window.scheduleField.valid(schedule)) {
+                            var notification = document.createElement('div');
+                            notification.className = 'notification is-danger is-light';
+                            notification.textContent = scheduleIncompleteMessage;
+                            supplierFormError.innerHTML = '';
+                            supplierFormError.appendChild(notification);
+                            return;
+                        }
                         submitInFlight = true;
                         supplierSubmitButton.disabled = true;
                         clearFormError();

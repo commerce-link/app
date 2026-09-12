@@ -41,6 +41,40 @@ class SupplierConnectionViewFactoryTest {
     }
 
     @Test
+    void carriesTheStoredFeedScheduleOntoTheRow() {
+        // given -- the row is what the modal reads the current schedule back from
+        StoreSupplierConnection elko = connection("Elko", ConnectionMode.OWN);
+        elko.setFeedSchedule("0 5,17 * * ? *");
+        Store store = storeWith(elko);
+        when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
+        when(supplierRegistry.exists("Elko")).thenReturn(true);
+
+        // when
+        SupplierConnectionViewFactory.SupplierConnectionViews views = factory.views(store);
+
+        // then
+        SupplierConnectionView row = views.external().get(0);
+        assertThat(row.feedSchedule()).isEqualTo("0 5,17 * * ? *");
+        assertThat(row.hasSchedule()).isTrue();
+        assertThat(row.scheduleDescription().code()).isEqualTo("store.supplier.schedule.summary.at");
+    }
+
+    @Test
+    void aGlobalConnectionHasNoScheduleOfItsOwn() {
+        // given -- global connections ride the platform-wide feed
+        Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
+        when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
+        when(inventoryRepository.getLatestModifiedPerSupplier()).thenReturn(Map.of());
+        when(supplierRegistry.exists("Elko")).thenReturn(true);
+
+        // when
+        SupplierConnectionViewFactory.SupplierConnectionViews views = factory.views(store);
+
+        // then
+        assertThat(views.external().get(0).hasSchedule()).isFalse();
+    }
+
+    @Test
     void splitsExternalConnectionsFromManualOnes() {
         // given
         Store store = storeWith(connection("Elko", ConnectionMode.OWN),

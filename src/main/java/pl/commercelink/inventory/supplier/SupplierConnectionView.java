@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import pl.commercelink.scheduling.PollingScheduleDescription;
 import pl.commercelink.stores.ConnectionMode;
 
 import java.time.LocalDateTime;
@@ -18,7 +19,20 @@ public record SupplierConnectionView(
         boolean includeInFulfilment,
         boolean enabled,
         LocalDateTime feedLastModified,
+        String feedSchedule,
         boolean knownProvider) {
+
+    /**
+     * Only own connections pull a feed on this store's own schedule: a global connection rides the
+     * platform-wide feed and a manual one is uploaded by hand, so neither has one to show.
+     */
+    public boolean hasSchedule() {
+        return mode == ConnectionMode.OWN;
+    }
+
+    public PollingScheduleDescription scheduleDescription() {
+        return PollingScheduleDescription.of(feedSchedule);
+    }
 
     public boolean hasFeed() {
         return feedLastModified != null;

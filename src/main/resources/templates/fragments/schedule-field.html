@@ -2,63 +2,55 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
+<!--
+  Feed refresh schedule, built for a reusable modal: the markup is rendered once and re-filled for
+  whichever supplier is being edited, so the script exposes sync()/read() instead of parsing the
+  input once at page load.
+
+  The builder can only produce expressions that are valid by construction. "At" schedules pick a
+  set of hours and one minute, never a set of both: a cron's minute and hour fields are a cross
+  product, so allowing both would make combinations like 05:00 + 06:30 unrepresentable and leave
+  the operator staring at a conflict they cannot act on. Anything outside what the builder covers
+  stays reachable through the advanced expression below.
+-->
 <div th:fragment="input(inputName, value, minInterval)" class="schedule-field"
      th:attr="data-min-interval=${minInterval}">
 
-    <div class="field mb-1">
-        <label class="radio is-size-7">
-            <input type="radio" class="schedule-mode" value="default">
-            <span th:text="#{schedule.mode.default}"></span>
-        </label>
+    <div class="tabs is-toggle is-small schedule-modes mb-2">
+        <ul>
+            <li data-mode="default"><a><span th:text="#{schedule.mode.default}"></span></a></li>
+            <li data-mode="every"><a><span th:text="#{schedule.mode.every}"></span></a></li>
+            <li data-mode="at"><a><span th:text="#{schedule.mode.at}"></span></a></li>
+        </ul>
     </div>
 
-    <div class="field is-grouped is-align-items-center mb-1">
-        <div class="control">
-            <label class="radio is-size-7">
-                <input type="radio" class="schedule-mode" value="every">
-                <span th:text="#{schedule.mode.every}"></span>
-            </label>
-        </div>
-        <div class="control schedule-every">
-            <div class="select is-small"><select class="schedule-every-value"></select></div>
-            <div class="select is-small">
-                <select class="schedule-every-unit">
-                    <option value="minutes" th:text="#{schedule.unit.minutes}"></option>
-                    <option value="hours" th:text="#{schedule.unit.hours}"></option>
-                    <option value="days" th:text="#{schedule.unit.days}"></option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <div class="field is-grouped is-align-items-flex-start mb-1">
-        <div class="control">
-            <label class="radio is-size-7">
-                <input type="radio" class="schedule-mode" value="exact">
-                <span th:text="#{schedule.mode.exact}"></span>
-            </label>
-        </div>
-        <div class="control schedule-exact">
-            <div class="schedule-exact-times">
-                <div class="schedule-exact-time mb-1">
-                    <span class="is-size-7" th:text="#{schedule.exact.hour}"></span>
-                    <div class="select is-small"><select class="schedule-exact-hour"></select></div>
-                    <span class="is-size-7" th:text="#{schedule.exact.minute}"></span>
-                    <div class="select is-small"><select class="schedule-exact-minute"></select></div>
-                    <button type="button" class="delete is-small schedule-exact-remove" th:title="#{schedule.exact.remove}"></button>
+    <div class="schedule-pane" data-pane="every">
+        <div class="field is-grouped is-align-items-center">
+            <div class="control"><div class="select is-small"><select class="schedule-every-value"></select></div></div>
+            <div class="control">
+                <div class="select is-small">
+                    <select class="schedule-every-unit">
+                        <option value="minutes" th:text="#{schedule.unit.minutes}"></option>
+                        <option value="hours" th:text="#{schedule.unit.hours}"></option>
+                        <option value="days" th:text="#{schedule.unit.days}"></option>
+                    </select>
                 </div>
             </div>
-            <div class="mb-1">
-                <button type="button" class="button is-small is-light schedule-exact-add">
-                    <span class="has-text-weight-bold mr-1">+</span><span th:text="#{schedule.exact.add}"></span>
-                </button>
-            </div>
-            <div>
-                <span class="is-size-7" th:text="#{schedule.exact.day}"></span>
+        </div>
+    </div>
+
+    <div class="schedule-pane" data-pane="at">
+        <label class="label is-size-7 mb-1" th:text="#{schedule.at.hours}"></label>
+        <div class="buttons are-small schedule-hours"></div>
+        <div class="field is-grouped is-align-items-center is-flex-wrap-wrap">
+            <div class="control"><span class="is-size-7" th:text="#{schedule.at.minute}"></span></div>
+            <div class="control"><div class="select is-small"><select class="schedule-minute"></select></div></div>
+            <div class="control"><span class="is-size-7" th:text="#{schedule.at.day}"></span></div>
+            <div class="control">
                 <div class="select is-small">
-                    <select class="schedule-exact-day">
-                        <option value="every" th:text="#{schedule.exact.day.every}"></option>
-                        <option value="MON-FRI" th:text="#{schedule.exact.day.weekdays}"></option>
+                    <select class="schedule-day">
+                        <option value="every" th:text="#{schedule.at.day.every}"></option>
+                        <option value="MON-FRI" th:text="#{schedule.at.day.weekdays}"></option>
                         <option value="MON" th:text="#{schedule.day.mon}"></option>
                         <option value="TUE" th:text="#{schedule.day.tue}"></option>
                         <option value="WED" th:text="#{schedule.day.wed}"></option>
@@ -69,16 +61,16 @@
                     </select>
                 </div>
             </div>
-            <p class="schedule-exact-conflict is-size-7 has-text-danger" th:text="#{schedule.exact.conflict}"></p>
         </div>
     </div>
 
-    <p class="schedule-timezone is-size-7 has-text-grey" th:text="#{schedule.timezone}"></p>
+    <!-- The one thing the operator should read instead of the expression itself. -->
+    <p class="schedule-summary is-size-7 mt-2"></p>
     <p class="schedule-unsupported is-size-7 has-text-warning-dark" th:text="#{schedule.advanced.only}"></p>
 
-    <div class="schedule-advanced">
+    <div class="schedule-advanced mt-2">
         <a class="is-size-7 schedule-advanced-toggle" href="#">
-            <span class="schedule-advanced-caret">▸</span> <span th:text="#{schedule.advanced}"></span>
+            <span class="schedule-advanced-caret">&#9656;</span> <span th:text="#{schedule.advanced}"></span>
         </a>
         <div class="schedule-advanced-body mt-1">
             <input class="input is-small schedule-input" type="text" autocomplete="off" spellcheck="false"
@@ -88,216 +80,263 @@
     </div>
 </div>
 
-<script th:fragment="script">
-    (function () {
+<script th:fragment="script" th:inline="javascript">
+    window.scheduleField = (function () {
         var EVERY_VALUES = { minutes: [5, 10, 15, 20, 30], hours: [1, 2, 3, 4, 6, 8, 12], days: [2, 3, 7, 14] };
+        var MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
         var DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-        var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-        var range = function (n) { return Array.from({ length: n }, function (_, i) { return i; }); };
-        var byNumber = function (a, b) { return a - b; };
-        var instance = 0;
+
+        // The same message keys the server uses for the table cell (PollingScheduleDescription),
+        // so the summary shown while editing and the one shown in the row cannot disagree.
+        var TEXT = {
+            'default': /*[[#{store.supplier.schedule.summary.default}]]*/ '',
+            custom: /*[[#{store.supplier.schedule.summary.custom}]]*/ '',
+            'every.minutes': /*[[#{store.supplier.schedule.summary.every.minutes}]]*/ '',
+            'every.hours': /*[[#{store.supplier.schedule.summary.every.hours}]]*/ '',
+            'every.days': /*[[#{store.supplier.schedule.summary.every.days}]]*/ '',
+            'at': /*[[#{store.supplier.schedule.summary.at}]]*/ '',
+            'at.MON-FRI': /*[[#{store.supplier.schedule.summary.at.MON-FRI}]]*/ '',
+            'at.MON': /*[[#{store.supplier.schedule.summary.at.MON}]]*/ '',
+            'at.TUE': /*[[#{store.supplier.schedule.summary.at.TUE}]]*/ '',
+            'at.WED': /*[[#{store.supplier.schedule.summary.at.WED}]]*/ '',
+            'at.THU': /*[[#{store.supplier.schedule.summary.at.THU}]]*/ '',
+            'at.FRI': /*[[#{store.supplier.schedule.summary.at.FRI}]]*/ '',
+            'at.SAT': /*[[#{store.supplier.schedule.summary.at.SAT}]]*/ '',
+            'at.SUN': /*[[#{store.supplier.schedule.summary.at.SUN}]]*/ '',
+            timezone: /*[[#{schedule.timezone}]]*/ '',
+            noHours: /*[[#{schedule.at.nohours}]]*/ ''
+        };
+
+        function pad(n) { return (n < 10 ? '0' : '') + n; }
 
         function fill(select, values, label) {
             select.innerHTML = '';
-            values.forEach(function (v) {
-                var o = document.createElement('option');
-                o.value = String(v); o.textContent = label ? label(v) : String(v);
-                select.appendChild(o);
+            values.forEach(function (value) {
+                var option = document.createElement('option');
+                option.value = String(value);
+                option.textContent = label ? label(value) : String(value);
+                select.appendChild(option);
             });
         }
 
-        function bind(field) {
-            instance += 1;
+        function format(template, value) {
+            return String(template).replace('{0}', value);
+        }
+
+        function controller(field) {
             var minInterval = parseInt(field.getAttribute('data-min-interval'), 10) || 1;
-            var q = function (sel) { return field.querySelector(sel); };
-            var qa = function (sel) { return Array.prototype.slice.call(field.querySelectorAll(sel)); };
+            var q = function (selector) { return field.querySelector(selector); };
             var input = q('.schedule-input');
-            var modes = qa('.schedule-mode');
+            var tabs = Array.prototype.slice.call(field.querySelectorAll('.schedule-modes li'));
+            var panes = Array.prototype.slice.call(field.querySelectorAll('.schedule-pane'));
             var everyValue = q('.schedule-every-value');
             var everyUnit = q('.schedule-every-unit');
-            var times = q('.schedule-exact-times');
-            var timeTemplate = q('.schedule-exact-time').cloneNode(true);
-            var exactDay = q('.schedule-exact-day');
-            var conflict = q('.schedule-exact-conflict');
+            var hourButtons = q('.schedule-hours');
+            var minute = q('.schedule-minute');
+            var day = q('.schedule-day');
+            var summary = q('.schedule-summary');
             var unsupported = q('.schedule-unsupported');
             var advancedBody = q('.schedule-advanced-body');
             var caret = q('.schedule-advanced-caret');
-            var everyBox = q('.schedule-every');
-            var exactBox = q('.schedule-exact');
-            var timezoneNote = q('.schedule-timezone');
+            var mode = 'default';
+            var supported = true;
 
-            modes.forEach(function (r) { r.name = 'schedule-mode-' + instance; });
+            fill(minute, MINUTES, pad);
+            for (var hour = 0; hour < 24; hour++) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'button is-small';
+                button.setAttribute('data-hour', String(hour));
+                button.textContent = pad(hour);
+                hourButtons.appendChild(button);
+            }
 
-            function fillEveryValues(unit, keep) {
+            function everyOptions(unit, keep) {
                 var values = EVERY_VALUES[unit].filter(function (v) { return unit !== 'minutes' || v >= minInterval; });
                 fill(everyValue, values);
                 if (keep && values.indexOf(parseInt(keep, 10)) >= 0) { everyValue.value = String(keep); }
             }
-            fillEveryValues('minutes'); everyValue.value = '30';
 
-            function timeRows() { return qa('.schedule-exact-time'); }
-            function refreshRemoveButtons() {
-                var rows = timeRows();
-                rows.forEach(function (r) { r.querySelector('.schedule-exact-remove').style.visibility = rows.length > 1 ? '' : 'hidden'; });
+            function hours() {
+                return Array.prototype.slice.call(hourButtons.querySelectorAll('.is-link'))
+                        .map(function (b) { return parseInt(b.getAttribute('data-hour'), 10); })
+                        .sort(function (a, b) { return a - b; });
             }
-            function addTime(hour, minute) {
-                var row = timeTemplate.cloneNode(true);
-                var h = row.querySelector('.schedule-exact-hour'), m = row.querySelector('.schedule-exact-minute');
-                fill(h, range(24), pad); fill(m, range(60), pad);
-                h.value = String(hour); m.value = String(minute);
-                [h, m].forEach(function (el) { el.addEventListener('change', fromBuilder); });
-                row.querySelector('.schedule-exact-remove').addEventListener('click', function () {
-                    if (timeRows().length > 1) { row.remove(); refreshRemoveButtons(); fromBuilder(); }
+
+            function setHours(list) {
+                Array.prototype.slice.call(hourButtons.children).forEach(function (b) {
+                    var on = list.indexOf(parseInt(b.getAttribute('data-hour'), 10)) >= 0;
+                    b.classList.toggle('is-link', on);
                 });
-                times.appendChild(row);
-                refreshRemoveButtons();
-            }
-            function setTimes(list) {
-                times.innerHTML = '';
-                list.forEach(function (t) { addTime(t[0], t[1]); });
-            }
-            function chosenTimes() {
-                var seen = {}, list = [];
-                timeRows().forEach(function (r) {
-                    var h = parseInt(r.querySelector('.schedule-exact-hour').value, 10);
-                    var m = parseInt(r.querySelector('.schedule-exact-minute').value, 10);
-                    if (!seen[h + ':' + m]) { seen[h + ':' + m] = true; list.push([h, m]); }
-                });
-                return list;
-            }
-            function exactFields() {
-                var list = chosenTimes(), hours = [], minutes = [];
-                list.forEach(function (t) {
-                    if (hours.indexOf(t[0]) < 0) { hours.push(t[0]); }
-                    if (minutes.indexOf(t[1]) < 0) { minutes.push(t[1]); }
-                });
-                if (hours.length * minutes.length !== list.length) { return null; }
-                return { minutes: minutes.sort(byNumber).join(','), hours: hours.sort(byNumber).join(',') };
             }
 
-            q('.schedule-exact-add').addEventListener('click', function () {
-                var last = chosenTimes().slice(-1)[0] || [5, 0];
-                addTime((last[0] + 1) % 24, last[1]);
-                fromBuilder();
-            });
-
-            function mode() { var r = modes.filter(function (x) { return x.checked; })[0]; return r ? r.value : 'default'; }
-            function setMode(m) { modes.forEach(function (r) { r.checked = r.value === m; }); }
-
-            var advancedOpen = false;
-            function setAdvanced(open) {
-                advancedOpen = open;
-                advancedBody.style.display = open ? '' : 'none';
-                caret.textContent = open ? '▾' : '▸';
+            function setMode(next) {
+                mode = next;
+                tabs.forEach(function (tab) { tab.classList.toggle('is-active', tab.getAttribute('data-mode') === next); });
+                panes.forEach(function (pane) { pane.hidden = pane.getAttribute('data-pane') !== next; });
             }
-            q('.schedule-advanced-toggle').addEventListener('click', function (e) { e.preventDefault(); setAdvanced(!advancedOpen); });
 
+            // Returns null only when the operator has cleared every hour, which is the single
+            // invalid state the builder can reach; the caller blocks the save on it.
             function build() {
-                var m = mode();
-                if (m === 'default') { return ''; }
-                if (m === 'every') {
-                    var n = parseInt(everyValue.value, 10), unit = everyUnit.value;
-                    if (unit === 'minutes') { return '0/' + n + ' * * * ? *'; }
-                    if (unit === 'hours') { return '0 ' + (n === 1 ? '*' : '0/' + n) + ' * * ? *'; }
+                // No mode is selected while the operator is writing an advanced expression by
+                // hand; that expression is the value, and only the server judges it.
+                if (mode === null) { return input.value; }
+                if (mode === 'default') { return ''; }
+                if (mode === 'every') {
+                    var n = parseInt(everyValue.value, 10);
+                    if (everyUnit.value === 'minutes') { return '0/' + n + ' * * * ? *'; }
+                    if (everyUnit.value === 'hours') { return '0 ' + (n === 1 ? '*' : '0/' + n) + ' * * ? *'; }
                     return '0 0 1/' + n + ' * ? *';
                 }
-                var f = exactFields();
-                if (!f) { return null; }
-                var day = exactDay.value;
-                if (day === 'every') { return f.minutes + ' ' + f.hours + ' * * ? *'; }
-                return f.minutes + ' ' + f.hours + ' ? * ' + day + ' *';
+                var chosen = hours();
+                if (chosen.length === 0) { return null; }
+                var expression = minute.value + ' ' + chosen.join(',');
+                return day.value === 'every'
+                        ? expression + ' * * ? *'
+                        : expression + ' ? * ' + day.value + ' *';
             }
 
-            function parseList(text, max) {
-                var out = [];
-                var values = text.split(',');
-                for (var i = 0; i < values.length; i++) {
-                    if (!/^\d{1,2}$/.test(values[i])) { return null; }
-                    var v = parseInt(values[i], 10);
-                    if (v >= max || out.indexOf(v) >= 0) { return null; }
-                    out.push(v);
+            function describe() {
+                if (!supported) { return TEXT.custom; }
+                if (mode === 'default') { return TEXT['default']; }
+                if (mode === 'every') {
+                    return format(TEXT['every.' + everyUnit.value], everyValue.value) + ' ' + TEXT.timezone;
                 }
-                return out;
+                var chosen = hours();
+                if (chosen.length === 0) { return null; }
+                var times = chosen.map(function (h) { return pad(h) + ':' + pad(parseInt(minute.value, 10)); }).join(', ');
+                var key = day.value === 'every' ? 'at' : 'at.' + day.value;
+                return format(TEXT[key], times) + ' ' + TEXT.timezone;
             }
 
-            function parse(cron) {
-                var v = (cron || '').trim().replace(/\s+/g, ' ').toUpperCase();
-                if (v === '') { setMode('default'); return true; }
-                var p = v.split(' '), m;
-                if (p.length !== 6 || p[3] !== '*' || p[5] !== '*') { return false; }
-                if ((m = /^0\/(\d+)$/.exec(p[0])) && p[1] === '*' && p[2] === '*' && p[4] === '?') {
-                    if (EVERY_VALUES.minutes.indexOf(parseInt(m[1], 10)) < 0) { return false; }
-                    setMode('every'); everyUnit.value = 'minutes'; fillEveryValues('minutes', m[1]); return everyValue.value === m[1];
-                }
-                if (p[0] === '0' && (m = /^0\/(\d+)$/.exec(p[1])) && p[2] === '*' && p[4] === '?') {
-                    if (EVERY_VALUES.hours.indexOf(parseInt(m[1], 10)) < 0) { return false; }
-                    setMode('every'); everyUnit.value = 'hours'; fillEveryValues('hours', m[1]); return everyValue.value === m[1];
-                }
-                if (p[0] === '0' && p[1] === '*' && p[2] === '*' && p[4] === '?') {
-                    setMode('every'); everyUnit.value = 'hours'; fillEveryValues('hours', '1'); return true;
-                }
-                if (p[0] === '0' && p[1] === '0' && (m = /^1\/(\d+)$/.exec(p[2])) && p[4] === '?') {
-                    if (EVERY_VALUES.days.indexOf(parseInt(m[1], 10)) < 0) { return false; }
-                    setMode('every'); everyUnit.value = 'days'; fillEveryValues('days', m[1]); return everyValue.value === m[1];
-                }
-                var minutes = parseList(p[0], 60), hours = parseList(p[1], 24);
-                if (minutes && hours) {
-                    var day = null;
-                    if (p[2] === '*' && p[4] === '?') { day = 'every'; }
-                    else if (p[2] === '?' && (p[4] === 'MON-FRI' || DAYS.indexOf(p[4]) >= 0)) { day = p[4]; }
-                    if (!day) { return false; }
-                    var list = [];
-                    hours.sort(byNumber).forEach(function (h) { minutes.sort(byNumber).forEach(function (mi) { list.push([h, mi]); }); });
-                    setMode('exact'); setTimes(list); exactDay.value = day;
-                    return true;
-                }
-                return false;
-            }
-
-            function refresh(supported) {
-                var m = mode();
-                timezoneNote.style.display = m === 'default' ? 'none' : '';
-                everyBox.style.display = m === 'every' ? '' : 'none';
-                exactBox.style.display = m === 'exact' ? '' : 'none';
-                unsupported.style.display = supported ? 'none' : '';
-                modes.forEach(function (r) { r.disabled = !supported; });
+            function render() {
+                var text = describe();
+                summary.textContent = text === null ? TEXT.noHours : text;
+                summary.classList.toggle('has-text-danger', text === null);
+                summary.classList.toggle('has-text-grey', text !== null);
+                unsupported.hidden = supported;
             }
 
             function fromBuilder() {
-                var cron = build();
-                conflict.style.display = cron === null ? '' : 'none';
-                if (cron !== null) { input.value = cron; }
-                refresh(true);
-            }
-            function fromInput() {
-                var ok = parse(input.value);
-                if (!ok) { modes.forEach(function (r) { r.checked = false; }); }
-                conflict.style.display = 'none';
-                refresh(ok);
+                var expression = build();
+                if (expression !== null) { input.value = expression; }
+                render();
             }
 
-            modes.forEach(function (r) { r.addEventListener('change', fromBuilder); });
-            everyUnit.addEventListener('change', function () { fillEveryValues(everyUnit.value); fromBuilder(); });
-            [everyValue, exactDay].forEach(function (el) { el.addEventListener('change', fromBuilder); });
-            input.addEventListener('input', fromInput);
+            function parse(expression) {
+                var value = String(expression || '').trim().replace(/\s+/g, ' ').toUpperCase();
+                if (value === '') { setMode('default'); return true; }
+                var f = value.split(' '), m;
+                if (f.length !== 6 || f[3] !== '*' || f[5] !== '*') { return false; }
+                if (f[2] === '*' && f[4] === '?') {
+                    if ((m = /^0\/(\d{1,2})$/.exec(f[0])) && f[1] === '*') {
+                        if (EVERY_VALUES.minutes.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                        setMode('every'); everyUnit.value = 'minutes'; everyOptions('minutes', m[1]);
+                        return everyValue.value === m[1];
+                    }
+                    if (f[0] === '0' && f[1] === '*') {
+                        setMode('every'); everyUnit.value = 'hours'; everyOptions('hours', '1');
+                        return true;
+                    }
+                    if (f[0] === '0' && (m = /^0\/(\d{1,2})$/.exec(f[1]))) {
+                        if (EVERY_VALUES.hours.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                        setMode('every'); everyUnit.value = 'hours'; everyOptions('hours', m[1]);
+                        return everyValue.value === m[1];
+                    }
+                }
+                if (f[0] === '0' && f[1] === '0' && (m = /^1\/(\d{1,2})$/.exec(f[2])) && f[4] === '?') {
+                    if (EVERY_VALUES.days.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                    setMode('every'); everyUnit.value = 'days'; everyOptions('days', m[1]);
+                    return everyValue.value === m[1];
+                }
+                // A single minute and a list of hours: the only "at" shape this builder writes.
+                // Anything wider (several minutes, ranges, steps) belongs to the advanced field.
+                if (!/^\d{1,2}$/.test(f[0]) || !/^\d{1,2}(,\d{1,2})*$/.test(f[1])) { return false; }
+                var chosenDay = null;
+                if (f[2] === '*' && f[4] === '?') { chosenDay = 'every'; }
+                else if (f[2] === '?' && (f[4] === 'MON-FRI' || DAYS.indexOf(f[4]) >= 0)) { chosenDay = f[4]; }
+                if (chosenDay === null || MINUTES.indexOf(parseInt(f[0], 10)) < 0) { return false; }
+                var chosen = f[1].split(',').map(Number);
+                if (chosen.some(function (h) { return h > 23; })) { return false; }
+                setMode('at');
+                setHours(chosen);
+                minute.value = String(parseInt(f[0], 10));
+                day.value = chosenDay;
+                return true;
+            }
 
-            setTimes([ [5, 0] ]);
-            var supported = parse(input.value);
-            setAdvanced(!supported);
-            conflict.style.display = 'none';
-            refresh(supported);
+            function setAdvanced(open) {
+                advancedBody.hidden = !open;
+                caret.textContent = open ? '▾' : '▸';
+            }
+
+            function sync(value) {
+                input.value = value || '';
+                setHours([5]);
+                minute.value = '0';
+                day.value = 'every';
+                everyUnit.value = 'minutes';
+                everyOptions('minutes');
+                supported = parse(input.value);
+                if (!supported) { setMode(null); }
+                setAdvanced(!supported);
+                render();
+            }
+
+            tabs.forEach(function (tab) {
+                tab.querySelector('a').addEventListener('click', function (event) {
+                    event.preventDefault();
+                    supported = true;
+                    setMode(tab.getAttribute('data-mode'));
+                    fromBuilder();
+                });
+            });
+            hourButtons.addEventListener('click', function (event) {
+                var button = event.target.closest('[data-hour]');
+                if (!button) { return; }
+                button.classList.toggle('is-link');
+                fromBuilder();
+            });
+            everyUnit.addEventListener('change', function () { everyOptions(everyUnit.value); fromBuilder(); });
+            [everyValue, minute, day].forEach(function (el) { el.addEventListener('change', fromBuilder); });
+            input.addEventListener('input', function () {
+                supported = parse(input.value);
+                if (!supported) { setMode(null); }
+                render();
+            });
+            q('.schedule-advanced-toggle').addEventListener('click', function (event) {
+                event.preventDefault();
+                setAdvanced(advancedBody.hidden);
+            });
+
+            sync(input.value);
+            return {
+                sync: sync,
+                read: function () { return input.value; },
+                valid: function () { return build() !== null; }
+            };
         }
 
-        document.querySelectorAll('.schedule-field').forEach(bind);
+        function of(field) {
+            if (!field.scheduleController) { field.scheduleController = controller(field); }
+            return field.scheduleController;
+        }
+
+        return {
+            init: function (field) { return of(field); },
+            sync: function (field, value) { of(field).sync(value); },
+            valid: function (field) { return of(field).valid(); }
+        };
     })();
 </script>
 
 <style th:fragment="style">
-    .schedule-field .select + .select { margin-left: .25rem; }
-    .schedule-field .schedule-exact .select { vertical-align: middle; margin-right: .5rem; }
-    .schedule-field .schedule-exact span.is-size-7 { margin-right: .25rem; }
-    .schedule-field .schedule-exact-remove { vertical-align: middle; }
+    .schedule-field .schedule-hours { gap: .25rem; }
+    .schedule-field .schedule-hours .button { min-width: 2.4rem; }
     .schedule-field .field.is-grouped .control + .control { margin-left: .5rem; }
+    .schedule-field .tabs.is-toggle { margin-bottom: .5rem; }
+    .schedule-field .tabs.is-toggle ul { border-bottom: 0; }
 </style>
 
 </body>

@@ -489,6 +489,26 @@ class StoreSupplierConnectionServiceTest {
         assertThat(persistedConnection("Acme").getFeedSchedule()).isNull();
     }
 
+    @Test
+    void changingOnlyTheScheduleStillReachesThePersisterAsAChange() {
+        // given -- the persister works out what to reschedule by diffing the store's current
+        // configuration against the submitted one, so the submitted copy must carry the new
+        // expression while the store still holds the old one
+        StoreSupplierConnection stored = new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true);
+        stored.setFeedSchedule("0 5 * * ? *");
+        Store store = storeWith(true, stored);
+        SupplierSelectionForm selection = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true, "0 7 * * ? *");
+        whenPersistSucceeds();
+
+        // when
+        service.connectOrUpdate(store, selection, Map.of());
+
+        // then
+        assertEquals("0 7 * * ? *", persistedConnection("Elko").getFeedSchedule());
+        assertEquals("0 5 * * ? *",
+                store.getFulfilmentConfiguration().getSupplierConnections().get(0).getFeedSchedule());
+    }
+
     private void whenPersistSucceeds() {
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
