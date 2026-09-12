@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
 <head>
     <title th:text="#{general.title}"></title>
 
@@ -100,7 +100,7 @@
 
 <a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>
 
-<div class="cl-shell" th:classappend="${showNavbar == false} ? 'cl-shell-bare' : ''">
+<div class="cl-shell" th:classappend="${showNavbar == false or navigation == null} ? 'cl-shell-bare' : ''">
 
     <th:block th:if="${showNavbar != false and navigation != null}">
         <div th:replace="~{fragments/navigation :: sidebar}"></div>

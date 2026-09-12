@@ -41,7 +41,7 @@
     min-height: 100vh;
 }
 
-.cl-shell-bare {
+.cl-shell.cl-shell-bare {
     grid-template-columns: 1fr;
 }
 
