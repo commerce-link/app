@@ -66,7 +66,7 @@ class LayoutShellTemplateTest {
     }
 
     @Test
-    void pinsEveryExternalStylesheetAndScriptToAVersion() throws Exception {
+    void pinsTheTimelineStylesheetInsteadOfTrackingLatest() throws Exception {
         // when
         String html = layout();
 
