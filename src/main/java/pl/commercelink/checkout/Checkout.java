@@ -101,11 +101,12 @@ public class Checkout {
     private List<PaymentLineItem> buildPaymentLineItems(Store store, Basket basket) {
         InvoicingConfiguration invoicingConfiguration = store.getInvoicingConfiguration();
 
-        List<BasketItem> consolidatedItems = basket.getBasketItems().stream()
+        List<BasketItem> effectiveItems = basket.getEffectiveBasketItems();
+        List<BasketItem> consolidatedItems = effectiveItems.stream()
                 .filter(BasketItem::isConsolidated)
                 .filter(i -> !i.isShippingItem())
                 .toList();
-        List<BasketItem> nonConsolidatedItems = basket.getBasketItems().stream()
+        List<BasketItem> nonConsolidatedItems = effectiveItems.stream()
                 .filter(i -> !i.isConsolidated())
                 .filter(i -> !i.isShippingItem())
                 .toList();
