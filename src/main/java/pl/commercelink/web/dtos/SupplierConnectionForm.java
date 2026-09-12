@@ -11,6 +11,7 @@ public class SupplierConnectionForm {
     private ConnectionMode mode = ConnectionMode.OWN;
     private boolean includeInPricing;
     private boolean includeInFulfilment;
+    private String feedSchedule;
     private Map<String, String> configuration = new HashMap<>();
 
     public String getSupplierName() {
@@ -43,6 +44,14 @@ public class SupplierConnectionForm {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public String getFeedSchedule() {
+        return feedSchedule;
+    }
+
+    public void setFeedSchedule(String feedSchedule) {
+        this.feedSchedule = feedSchedule;
     }
 
     public Map<String, String> getConfiguration() {

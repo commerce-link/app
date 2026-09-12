@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -70,6 +71,9 @@ public class StoreSupplierConnectionService {
         StoreSupplierConnection edited = new StoreSupplierConnection(
                 selection.getSupplierName(), mode,
                 selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+        if (mode == ConnectionMode.OWN) {
+            edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
+        }
 
         List<StoreSupplierConnection> connections = connectionsWithout(existingStore, selection.getSupplierName());
         connections.add(edited);
@@ -107,7 +111,7 @@ public class StoreSupplierConnectionService {
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
     private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
@@ -117,7 +121,7 @@ public class StoreSupplierConnectionService {
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
     // Case-insensitive on purpose: identities here always come from the supplier registry, which
@@ -154,13 +158,14 @@ public class StoreSupplierConnectionService {
         return !configurationManager.loadConfiguration(existingStore, supplierName).isEmpty();
     }
 
-    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {
+    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed,
+                                         Set<String> rescheduled) {
         static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
-            return new ConnectionUpdateResult(errors, Set.of(), Set.of());
+            return new ConnectionUpdateResult(errors, Set.of(), Set.of(), Set.of());
         }
 
-        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed) {
-            return new ConnectionUpdateResult(List.of(), added, removed);
+        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed, Set<String> rescheduled) {
+            return new ConnectionUpdateResult(List.of(), added, removed, rescheduled);
         }
 
         public boolean hasErrors() {

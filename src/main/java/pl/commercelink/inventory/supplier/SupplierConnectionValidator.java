@@ -1,7 +1,10 @@
 package pl.commercelink.inventory.supplier;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.scheduling.InvalidScheduleException;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.StoreSupplierConnection;
 
@@ -14,6 +17,12 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 public class SupplierConnectionValidator {
+
+    private final int minIntervalMinutes;
+
+    public SupplierConnectionValidator(@Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
+        this.minIntervalMinutes = minIntervalMinutes;
+    }
 
     public List<ErrorMessage> validate(boolean canUseGlobalSuppliers,
                                        List<StoreSupplierConnection> connections,
@@ -44,8 +53,24 @@ public class SupplierConnectionValidator {
                         errors.add(ErrorMessage.of("store.supplier.connection.error.requires.field", name, field.label()));
                     }
                 }
+                validateSchedule(name, connection.getFeedSchedule(), errors);
             }
         }
         return errors;
+    }
+
+    private void validateSchedule(String supplierName, String feedSchedule, List<ErrorMessage> errors) {
+        if (isBlank(feedSchedule)) {
+            return;
+        }
+        try {
+            PollingSchedule.parse(feedSchedule, minIntervalMinutes);
+        } catch (InvalidScheduleException e) {
+            if (e.getReason() == InvalidScheduleException.Reason.TOO_FREQUENT) {
+                errors.add(ErrorMessage.of("store.supplier.connection.error.schedule.too.frequent", supplierName, minIntervalMinutes));
+            } else {
+                errors.add(ErrorMessage.of("store.supplier.connection.error.invalid.schedule", supplierName, feedSchedule));
+            }
+        }
     }
 }

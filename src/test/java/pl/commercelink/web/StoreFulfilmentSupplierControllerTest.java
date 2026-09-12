@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -15,6 +16,7 @@ import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.SupplierSelectionForm;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.SupplierConnectionForm;
@@ -75,11 +77,36 @@ class StoreFulfilmentSupplierControllerTest {
     }
 
     @Test
+    void theSubmittedFeedScheduleReachesTheService() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of()));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        stubEmptyViews();
+        SupplierConnectionForm form = form();
+        form.setFeedSchedule("0 5,17 * * ? *");
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.save(form, Locale.ENGLISH, new ConcurrentModel(), new MockHttpServletResponse());
+
+            // then
+            ArgumentCaptor<SupplierSelectionForm> captor = ArgumentCaptor.forClass(SupplierSelectionForm.class);
+            verify(storeSupplierConnectionService).connectOrUpdate(any(), captor.capture(), anyMap());
+            assertThat(captor.getValue().getFeedSchedule()).isEqualTo("0 5,17 * * ? *");
+        }
+    }
+
+    @Test
     void savingASupplierDelegatesToTheServiceAndReturnsTheExternalSectionFragment() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -108,7 +135,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
                         List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")),
-                        Set.of(), Set.of()));
+                        Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("missing field");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -132,7 +159,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -156,7 +183,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -183,7 +210,7 @@ class StoreFulfilmentSupplierControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko")));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();

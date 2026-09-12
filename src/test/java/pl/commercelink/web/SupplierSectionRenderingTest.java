@@ -40,7 +40,7 @@ class SupplierSectionRenderingTest {
     void rendersTheExternalSectionExactlyAsStoreFulfilmentSupplierControllerBuildsIt() {
         // given -- the same argument shape SupplierSectionModel.renderExternalSection returns
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
@@ -77,7 +77,7 @@ class SupplierSectionRenderingTest {
         // and fail the second assertion, exactly the class of bug that let a stale `required`
         // survive a same-session save in the real page.
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, true);
         String args = "${sectionRows}, false, ${sectionShowMode}, "
                 + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
                 + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, "
@@ -110,7 +110,7 @@ class SupplierSectionRenderingTest {
     void rendersTheManualSectionExactlyAsManualSupplierControllerBuildsIt() {
         // given -- the same argument shape SupplierSectionModel.renderManualSection returns
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
         context.setVariable("sectionSuccessMessage", null);
@@ -135,7 +135,7 @@ class SupplierSectionRenderingTest {
         // given -- exactly the model attributes SupplierSectionModel.renderExternalSection sets,
         // and the no-argument selector it now returns as the view name
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
@@ -162,7 +162,7 @@ class SupplierSectionRenderingTest {
     void theManualSectionWrapperRendersTheSameMarkupAsTheParameterizedFragment() {
         // given -- exactly the model attributes SupplierSectionModel.renderManualSection sets
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
         context.setVariable("sectionSuccessMessage", null);
@@ -177,6 +177,69 @@ class SupplierSectionRenderingTest {
         assertThat(html).contains("id=\"manual-add-button\"");
         assertThat(html).contains("Hurtownia X");
         assertThat(html).doesNotContain("data-success-message");
+    }
+
+    @Test
+    void theScheduleColumnSummarisesAnOwnConnectionAndCarriesTheExpressionForTheModal() {
+        // given
+        SupplierConnectionView elko = new SupplierConnectionView(
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, "0 5,17 * * ? *", true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(elko));
+        context.setVariable("sectionShowMode", true);
+        context.setVariable("sectionAvailableSuppliers", List.of());
+        context.setVariable("sectionSuccessMessage", null);
+        context.setVariable("sectionSuppliersWithStoredConfig", "");
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: externalSection}\"></div>", context);
+
+        // then
+        assertThat(html).doesNotContain("??store.supplier");
+        assertThat(html).contains("Schedule");
+        assertThat(html).contains("Daily at 05:00, 17:00");
+        // the modal reads the expression itself straight off the row, so it has to survive a swap
+        assertThat(html).contains("data-feed-schedule=\"0 5,17 * * ? *\"");
+    }
+
+    @Test
+    void theScheduleColumnSaysNothingForAGlobalConnection() {
+        // given -- a global connection rides the platform-wide feed, which this store does not schedule
+        SupplierConnectionView acme = new SupplierConnectionView(
+                "Acme", "Acme", "Acme", ConnectionMode.GLOBAL, true, true, true, null, null, true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(acme));
+        context.setVariable("sectionShowMode", true);
+        context.setVariable("sectionAvailableSuppliers", List.of());
+        context.setVariable("sectionSuccessMessage", null);
+        context.setVariable("sectionSuppliersWithStoredConfig", "");
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: externalSection}\"></div>", context);
+
+        // then
+        assertThat(html).contains("&mdash;");
+        assertThat(html).doesNotContain("Default — once a night");
+        assertThat(html).doesNotContain("data-feed-schedule");
+    }
+
+    @Test
+    void theManualSectionHasNoScheduleColumn() {
+        // given -- manual feeds are uploaded by hand, so there is nothing to schedule
+        SupplierConnectionView manual = new SupplierConnectionView(
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(manual));
+        context.setVariable("sectionSuccessMessage", null);
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: manualSection}\"></div>", context);
+
+        // then
+        assertThat(html).doesNotContain("Schedule");
     }
 
     @Test

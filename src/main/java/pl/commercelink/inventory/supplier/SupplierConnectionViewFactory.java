@@ -77,6 +77,7 @@ public class SupplierConnectionViewFactory {
                 connection.isIncludeInFulfilment(),
                 manual ? connection.isEnabled() : true,
                 feed,
+                connection.getFeedSchedule(),
                 manual || supplierRegistry.exists(identity));
     }
 

@@ -41,6 +41,9 @@ import java.util.stream.Collectors;
 @Controller
 public class StoreController {
 
+    @Value("${scheduling.min-interval-minutes}")
+    private int scheduleMinIntervalMinutes;
+
     @Autowired
     private StoresRepository storesRepository;
 
@@ -435,6 +438,7 @@ public class StoreController {
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
 
         SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
         model.addAttribute("externalConnections", views.external());

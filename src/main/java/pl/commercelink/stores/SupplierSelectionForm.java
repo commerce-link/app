@@ -6,16 +6,23 @@ public class SupplierSelectionForm {
     private ConnectionMode mode = ConnectionMode.GLOBAL;
     private boolean includeInPricing = true;
     private boolean includeInFulfilment = true;
+    private String feedSchedule;
 
     public SupplierSelectionForm() {
     }
 
     public SupplierSelectionForm(String supplierName, ConnectionMode mode,
                                  boolean includeInPricing, boolean includeInFulfilment) {
+        this(supplierName, mode, includeInPricing, includeInFulfilment, null);
+    }
+
+    public SupplierSelectionForm(String supplierName, ConnectionMode mode,
+                                 boolean includeInPricing, boolean includeInFulfilment, String feedSchedule) {
         this.supplierName = supplierName;
         this.mode = mode;
         this.includeInPricing = includeInPricing;
         this.includeInFulfilment = includeInFulfilment;
+        this.feedSchedule = feedSchedule;
     }
 
     public String getSupplierName() {
@@ -48,5 +55,13 @@ public class SupplierSelectionForm {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public String getFeedSchedule() {
+        return feedSchedule;
+    }
+
+    public void setFeedSchedule(String feedSchedule) {
+        this.feedSchedule = feedSchedule;
     }
 }

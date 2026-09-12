@@ -27,6 +27,36 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
+    void buildsTheFeedScheduleInsideTheSupplierModalRatherThanPerRow() throws Exception {
+        // one modal serves every supplier, so the builder is rendered once and re-filled on open;
+        // the old screen rendered one per supplier inside the checkbox list instead
+        String html = template();
+        assertThat(html).contains("~{fragments/schedule-field :: input('feedSchedule', ''");
+        assertThat(html).contains("id=\"supplier-schedule-wrap\"");
+        assertThat(html).containsOnlyOnce("fragments/schedule-field :: input");
+    }
+
+    @Test
+    void refillsTheScheduleBuilderEveryTimeTheSupplierModalOpens() throws Exception {
+        // without this the builder would keep showing the schedule of whichever supplier was
+        // opened before, because the modal itself is never re-rendered
+        assertThat(template()).contains("window.scheduleField.sync(schedule, row ? row.feedSchedule : '')");
+    }
+
+    @Test
+    void blocksTheSaveWhileTheScheduleBuilderHasNoHourSelected() throws Exception {
+        // the expression field still holds the last good value in that state, so submitting would
+        // store something other than what the operator sees
+        assertThat(template()).contains("!window.scheduleField.valid(schedule)");
+    }
+
+    @Test
+    void showsTheScheduleBuilderOnlyForOwnConnections() throws Exception {
+        // a global connection rides the platform-wide feed; it has no schedule of this store's own
+        assertThat(template()).contains("scheduleWrap.classList.toggle('is-hidden', !isOwn)");
+    }
+
+    @Test
     void noLongerRendersAPageLevelSettingsFormOrSaveCancelButtons() throws Exception {
         // the settings section now saves through its own modal, asynchronously, like every other
         // section on this screen -- a page-level Save/Cancel pair (and the form wrapper that only

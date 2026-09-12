@@ -139,7 +139,7 @@ class StoreSupplierConnectionServiceTest {
                 new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of(), Set.of()));
 
         // when
         service.connectOrUpdate(store,
@@ -160,7 +160,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.connectOrUpdate(store,
@@ -180,7 +180,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(false);
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
         // when
         service.connectOrUpdate(store,
@@ -200,7 +200,7 @@ class StoreSupplierConnectionServiceTest {
                 new StoreSupplierConnection("Broken", ConnectionMode.OWN, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
         // when
         service.connectOrUpdate(store,
@@ -240,7 +240,7 @@ class StoreSupplierConnectionServiceTest {
         store.setStoreId("store-1");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
         // when
         StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
@@ -265,7 +265,7 @@ class StoreSupplierConnectionServiceTest {
         when(configurationManager.loadConfiguration(store, "Elko")).thenReturn(Map.of("login", "u"));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when: re-saving with a blank password, as the "leave blank to keep the current value" field does
         service.connectOrUpdate(store,
@@ -285,7 +285,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.GLOBAL, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.connectOrUpdate(store,
@@ -334,7 +334,7 @@ class StoreSupplierConnectionServiceTest {
                 new StoreSupplierConnection("Kosatec", ConnectionMode.OWN, true, true),
                 new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of("Elko")));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of("Elko"), Set.of()));
 
         // when
         service.disconnect(store, "Elko");
@@ -356,7 +356,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         submitted.setOrderAssemblyDays(7);
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.applyStoreSettings(store, submitted, true);
@@ -376,7 +376,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(false);
         FulfilmentConfiguration submitted = configWith(true);
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.applyStoreSettings(store, submitted, false);
@@ -396,7 +396,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         submitted.setEnabledProductGroups(List.of("Ignored"));
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.applyStoreSettings(store, submitted, true);
@@ -415,7 +415,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         submitted.setEnabledCategories(null);
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.applyStoreSettings(store, submitted, true);
@@ -436,7 +436,7 @@ class StoreSupplierConnectionServiceTest {
         FulfilmentConfiguration submitted = configWith(true);
         submitted.setEnabledCategories(new ArrayList<>());
         when(persister.persist(any(), any(), anyMap()))
-                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of()));
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
         service.applyStoreSettings(store, submitted, true);
@@ -445,5 +445,81 @@ class StoreSupplierConnectionServiceTest {
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
         verify(persister).persist(any(), captor.capture(), anyMap());
         assertThat(captor.getValue().getEnabledCategories()).isEmpty();
+    }
+
+    @Test
+    void connectOrUpdateKeepsNormalizedScheduleForOwnMode() {
+        // given
+        Store store = storeWith(true);
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "  0/30  9-17 * * ? * ");
+        whenPersistSucceeds();
+
+        // when
+        service.connectOrUpdate(store, selection, Map.of());
+
+        // then
+        assertEquals("0/30 9-17 * * ? *", persistedConnection("Acme").getFeedSchedule());
+    }
+
+    @Test
+    void connectOrUpdateDropsScheduleForGlobalMode() {
+        // given
+        Store store = storeWith(true);
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.GLOBAL, true, true, "0 5 * * ? *");
+        whenPersistSucceeds();
+
+        // when
+        service.connectOrUpdate(store, selection, Map.of());
+
+        // then
+        assertThat(persistedConnection("Acme").getFeedSchedule()).isNull();
+    }
+
+    @Test
+    void connectOrUpdateStoresNullForBlankSchedule() {
+        // given
+        Store store = storeWith(true);
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "   ");
+        whenPersistSucceeds();
+
+        // when
+        service.connectOrUpdate(store, selection, Map.of());
+
+        // then
+        assertThat(persistedConnection("Acme").getFeedSchedule()).isNull();
+    }
+
+    @Test
+    void changingOnlyTheScheduleStillReachesThePersisterAsAChange() {
+        // given -- the persister works out what to reschedule by diffing the store's current
+        // configuration against the submitted one, so the submitted copy must carry the new
+        // expression while the store still holds the old one
+        StoreSupplierConnection stored = new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true);
+        stored.setFeedSchedule("0 5 * * ? *");
+        Store store = storeWith(true, stored);
+        SupplierSelectionForm selection = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true, "0 7 * * ? *");
+        whenPersistSucceeds();
+
+        // when
+        service.connectOrUpdate(store, selection, Map.of());
+
+        // then
+        assertEquals("0 7 * * ? *", persistedConnection("Elko").getFeedSchedule());
+        assertEquals("0 5 * * ? *",
+                store.getFulfilmentConfiguration().getSupplierConnections().get(0).getFeedSchedule());
+    }
+
+    private void whenPersistSucceeds() {
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
+    }
+
+    private StoreSupplierConnection persistedConnection(String supplierName) {
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        return captor.getValue().getSupplierConnections().stream()
+                .filter(connection -> connection.getSupplierName().equals(supplierName))
+                .findFirst()
+                .orElseThrow();
     }
 }

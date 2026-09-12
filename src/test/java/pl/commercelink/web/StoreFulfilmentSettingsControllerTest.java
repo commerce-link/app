@@ -73,7 +73,7 @@ class StoreFulfilmentSettingsControllerTest {
         // connectOrUpdate/disconnect, only applyStoreSettings
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -106,7 +106,7 @@ class StoreFulfilmentSettingsControllerTest {
         store.getFulfilmentConfiguration().setCanUseGlobalSuppliers(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -134,7 +134,7 @@ class StoreFulfilmentSettingsControllerTest {
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     store.getFulfilmentConfiguration().setCanUseGlobalSuppliers(true);
-                    return new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of());
+                    return new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of());
                 });
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         ConcurrentModel model = new ConcurrentModel();
@@ -158,7 +158,7 @@ class StoreFulfilmentSettingsControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
-                        List.of(ErrorMessage.of("store.supplier.connection.error.update.failed")), Set.of(), Set.of()));
+                        List.of(ErrorMessage.of("store.supplier.connection.error.update.failed")), Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Update failed.");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -182,7 +182,7 @@ class StoreFulfilmentSettingsControllerTest {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of()));
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
