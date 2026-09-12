@@ -1,22 +1,19 @@
 package pl.commercelink.web.nav;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import pl.commercelink.starter.security.UserRole;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class NavigationModel {
 
     private final List<NavSection> sections;
     private final List<NavItem> footer;
     private final NavItem active;
-
-    private NavigationModel(List<NavSection> sections, List<NavItem> footer, NavItem active) {
-        this.sections = sections;
-        this.footer = footer;
-        this.active = active;
-    }
 
     public static NavigationModel forRoleAndPath(UserRole role, String path) {
         List<NavSection> sections = NavigationCatalog.sections().stream()
