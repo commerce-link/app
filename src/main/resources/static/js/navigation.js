@@ -11,10 +11,16 @@
 
     let lastFocused = null;
 
+    function applyDrawerLabel(open) {
+        drawerToggle.setAttribute('aria-label',
+            open ? drawerToggle.dataset.closeLabel : drawerToggle.dataset.openLabel);
+    }
+
     function openDrawer() {
         lastFocused = document.activeElement;
         document.body.classList.add('cl-drawer-open');
         drawerToggle.setAttribute('aria-expanded', 'true');
+        applyDrawerLabel(true);
         const first = sidebar.querySelector('.cl-nav-item');
         if (first) {
             first.focus();
@@ -27,6 +33,7 @@
         }
         document.body.classList.remove('cl-drawer-open');
         drawerToggle.setAttribute('aria-expanded', 'false');
+        applyDrawerLabel(false);
         if (lastFocused) {
             lastFocused.focus();
             lastFocused = null;
@@ -61,6 +68,7 @@
     }
 
     if (drawerToggle && sidebar) {
+        applyDrawerLabel(false);
         drawerToggle.addEventListener('click', function () {
             document.body.classList.contains('cl-drawer-open') ? closeDrawer() : openDrawer();
         });

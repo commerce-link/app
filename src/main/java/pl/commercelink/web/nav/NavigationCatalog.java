@@ -39,7 +39,7 @@ public final class NavigationCatalog {
                     new NavItem("payments", "nav.payments", "/dashboard/payments", "fa-credit-card", Set.of(ADMIN)),
                     new NavItem("reports", "nav.reports", "/dashboard/reports", "fa-chart-bar", Set.of(ADMIN)))),
             new NavSection("nav.group.administration", List.of(
-                    new NavItem("stores", "nav.stores", "/dashboard/stores", "fa-store", Set.of(SUPER_ADMIN)),
+                    new NavItem("stores", "nav.stores", "/dashboard/stores", "fa-shopping-bag", Set.of(SUPER_ADMIN)),
                     new NavItem("rmaCenters", "nav.rma.centers", "/dashboard/store/rma-centers", "fa-building",
                             Set.of(SUPER_ADMIN)))));
 

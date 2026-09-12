@@ -13,14 +13,7 @@
             <p class="cl-nav-group-title" th:text="#{${section.messageKey()}}"></p>
             <ul>
                 <li th:each="item : ${section.items()}">
-                    <a class="cl-nav-item"
-                       th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
-                       th:href="@{${item.path()}}"
-                       th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
-                                aria-label=#{${item.messageKey()}}">
-                        <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
-                        <span class="cl-nav-label" th:text="#{${item.messageKey()}}"></span>
-                    </a>
+                    <a th:replace="~{:: navItem(${item})}"></a>
                 </li>
             </ul>
         </div>
@@ -29,22 +22,27 @@
     <div class="cl-nav-foot" th:if="${!navigation.footer().isEmpty()}">
         <ul>
             <li th:each="item : ${navigation.footer()}">
-                <a class="cl-nav-item"
-                   th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
-                   th:href="@{${item.path()}}"
-                   th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
-                            aria-label=#{${item.messageKey()}}">
-                    <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
-                    <span class="cl-nav-label" th:text="#{${item.messageKey()}}"></span>
-                </a>
+                <a th:replace="~{:: navItem(${item})}"></a>
             </li>
         </ul>
     </div>
 </aside>
 
+<a th:fragment="navItem(item)" class="cl-nav-item"
+   th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
+   th:href="@{${item.path()}}"
+   th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
+            aria-label=#{${item.messageKey()}}">
+    <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
+    <span class="cl-nav-label" th:text="#{${item.messageKey()}}"></span>
+</a>
+
 <header th:fragment="topbar" class="cl-topbar">
     <button type="button" class="cl-icon-button cl-drawer-toggle" id="clDrawerToggle"
-            aria-expanded="false" aria-controls="clSidebar" th:attr="aria-label=#{nav.menu.open}">
+            aria-expanded="false" aria-controls="clSidebar"
+            th:attr="aria-label=#{nav.menu.open},
+                     data-open-label=#{nav.menu.open},
+                     data-close-label=#{nav.menu.close}">
         <span class="icon"><i class="fas fa-bars"></i></span>
     </button>
 
@@ -55,11 +53,13 @@
         <span class="icon"><i class="fas fa-columns"></i></span>
     </button>
 
+    <span class="cl-brand-mark cl-topbar-brand-mark">CL</span>
+
     <nav class="cl-crumbs" th:attr="aria-label=#{nav.aria.breadcrumb}"
          th:if="${navigation != null and navigation.active() != null}">
-        <span th:if="${navigation.activeSectionMessageKey() != null}"
+        <span class="cl-crumbs-section" th:if="${navigation.activeSectionMessageKey() != null}"
               th:text="#{${navigation.activeSectionMessageKey()}}"></span>
-        <span th:if="${navigation.activeSectionMessageKey() != null}">/</span>
+        <span class="cl-crumbs-sep" th:if="${navigation.activeSectionMessageKey() != null}">/</span>
         <strong th:text="#{${navigation.activeMessageKey()}}"></strong>
     </nav>
 
