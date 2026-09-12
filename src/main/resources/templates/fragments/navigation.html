@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<aside th:fragment="sidebar" class="cl-sidebar" id="clSidebar">
+    <div class="cl-brand">
+        <span class="cl-brand-mark">CL</span>
+        <span class="cl-brand-name">CommerceLink</span>
+    </div>
+
+    <nav class="cl-nav" th:attr="aria-label=#{nav.aria.main}">
+        <div class="cl-nav-group" th:each="section : ${navigation.sections()}">
+            <p class="cl-nav-group-title" th:text="#{${section.messageKey()}}"></p>
+            <ul>
+                <li th:each="item : ${section.items()}">
+                    <a class="cl-nav-item"
+                       th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
+                       th:href="${item.path()}"
+                       th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
+                                aria-label=#{${item.messageKey()}}">
+                        <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
+                        <span class="cl-nav-label" th:text="#{${item.messageKey()}}"></span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="cl-nav-foot" th:if="${!navigation.footer().isEmpty()}">
+        <ul>
+            <li th:each="item : ${navigation.footer()}">
+                <a class="cl-nav-item"
+                   th:classappend="${navigation.isActive(item)} ? 'is-active' : ''"
+                   th:href="${item.path()}"
+                   th:attr="aria-current=${navigation.isActive(item)} ? 'page' : null,
+                            aria-label=#{${item.messageKey()}}">
+                    <span class="icon"><i class="fas" th:classappend="${item.icon()}"></i></span>
+                    <span class="cl-nav-label" th:text="#{${item.messageKey()}}"></span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</aside>
+
+</body>
+</html>
