@@ -600,28 +600,30 @@
             <h2 class="subtitle" th:text="#{order.shipments}"></h2>
 
             <div class="box">
-                <table class="table is-fullwidth">
-                    <thead>
-                    <tr>
-                        <th th:text="#{order.shipment.type}"></th>
-                        <th th:text="#{order.shipment.tracking.no}"></th>
-                        <th th:text="#{order.shipment.carrier}"></th>
-                        <th th:text="#{order.shipment.shipped.at}"></th>
-                        <th th:text="#{order.shipment.delivered.at}"></th>
-                    </tr>
-                    </thead>
+                <div class="table-container">
+                    <table class="table is-fullwidth">
+                        <thead>
+                        <tr>
+                            <th th:text="#{order.shipment.type}"></th>
+                            <th th:text="#{order.shipment.tracking.no}"></th>
+                            <th th:text="#{order.shipment.carrier}"></th>
+                            <th th:text="#{order.shipment.shipped.at}"></th>
+                            <th th:text="#{order.shipment.delivered.at}"></th>
+                        </tr>
+                        </thead>
 
-                    <tbody>
-                    <tr th:each="shipment : ${rma.shipments}">
-                        <td th:text="${shipment.type}"></td>
-                        <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank"></a></td>
-                        <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
-                        <td th:text="${shipment.carrier}"></td>
-                        <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
-                        <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+                        <tbody>
+                        <tr th:each="shipment : ${rma.shipments}">
+                            <td th:text="${shipment.type}"></td>
+                            <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank"></a></td>
+                            <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
+                            <td th:text="${shipment.carrier}"></td>
+                            <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                            <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="field is-grouped mt-3">
                     <div class="control">
