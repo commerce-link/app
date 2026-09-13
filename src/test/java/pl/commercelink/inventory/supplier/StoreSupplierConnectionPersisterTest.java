@@ -13,6 +13,7 @@ import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -65,6 +66,39 @@ class StoreSupplierConnectionPersisterTest {
         store.setStoreId("store-1");
         store.setFulfilmentConfiguration(config);
         return store;
+    }
+
+    @Test
+    void persistEnablesClientAddressChangeNotificationsWhenFeatureTurnedOn() {
+        // given
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setClientOrderPageEnabled(true);
+        submitted.setClientShippingAddressChangeEnabled(true);
+
+        // when
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
+
+        // then
+        assertTrue(outcome.success());
+        assertThat(existing.supportsNotification(EmailNotificationType.CLIENT_VERIFICATION_CODE)).isTrue();
+        assertThat(existing.supportsNotification(EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED)).isTrue();
+        assertThat(existing.getClientNotificationsConfiguration().getTemplateName(EmailNotificationType.CLIENT_VERIFICATION_CODE))
+                .isEqualTo("ClientVerificationCodeTemplate");
+        verify(storesRepository).save(existing);
+    }
+
+    @Test
+    void persistLeavesNotificationsUntouchedWhenFeatureStaysOff() {
+        // given
+        Store existing = storeWith(true);
+        FulfilmentConfiguration submitted = configWith(true);
+
+        // when
+        persister.persist(existing, submitted, Map.of());
+
+        // then
+        assertThat(existing.supportsNotification(EmailNotificationType.CLIENT_VERIFICATION_CODE)).isFalse();
     }
 
     private FulfilmentConfiguration configWith(boolean canUseGlobal, StoreSupplierConnection... connections) {

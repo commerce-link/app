@@ -11,7 +11,6 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.stores.BankAccount;
-import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.CategoryLocalizer;
 
@@ -20,8 +19,6 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 /**
  * Everything the public order status page shows, resolved once in the controller so the template carries
@@ -58,8 +55,10 @@ public class ClientOrderView {
     private final double overpaidAmount;
     private final BankAccount bankAccount;
     private final String contactEmail;
+    private final boolean shippingAddressEditable;
 
-    private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {
+    private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
+                            boolean shippingAddressEditable) {
         this.orderId = order.getOrderId();
         this.shortOrderId = order.getShortenedOrderId();
         this.orderedAt = order.getOrderedAt();
@@ -99,11 +98,17 @@ public class ClientOrderView {
         this.unpaidAmount = Math.max(0, order.getUnpaidAmount());
         this.overpaidAmount = Math.max(0, -order.getUnpaidAmount());
         this.bankAccount = store.getDefaultBankAccount();
-        this.contactEmail = resolveContactEmail(store);
+        this.contactEmail = store.getClientContactEmail();
+        this.shippingAddressEditable = shippingAddressEditable;
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer);
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false);
+    }
+
+    public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
+                                       boolean shippingAddressEditable) {
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, shippingAddressEditable);
     }
 
     public int getProductCount() {
@@ -186,17 +191,6 @@ public class ClientOrderView {
     }
 
     public record PickupAddress(String companyName, String streetAndNumber, String postalCode, String city) {
-    }
-
-    private static String resolveContactEmail(Store store) {
-        ClientNotificationsConfiguration notifications = store.getClientNotificationsConfiguration();
-        if (notifications != null && isNotBlank(notifications.getReplyToEmail())) {
-            return notifications.getReplyToEmail();
-        }
-        if (store.getBillingDetails() != null && isNotBlank(store.getBillingDetails().getEmail())) {
-            return store.getBillingDetails().getEmail();
-        }
-        return null;
     }
 
     public record ClientOrderItemView(String name, String category, int qty, ClientOrderItemStatus status) {
