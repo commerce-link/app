@@ -79,7 +79,8 @@ class NotificationsControllerTest {
     void rendersTheUnreadNotificationsOfTheAdminsStoreByDefault() {
         // given
         NotificationPage page = new NotificationPage(
-                List.of(record("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace")), 1, 1, 1, 1);
+                List.of(record("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace")), 1, 1, 1, 1,
+                List.of(StoreNotificationType.UNAUTHENTICATED));
         when(notificationService.list("store-1", new NotificationFilter(true, null), 1, 50)).thenReturn(page);
         Model model = new ExtendedModelMap();
 
@@ -94,7 +95,7 @@ class NotificationsControllerTest {
         assertThat(model.getAttribute("selectedType")).isNull();
         assertThat((List<NotificationView>) model.getAttribute("notifications")).extracting(NotificationView::openHref)
                 .containsExactly("/dashboard/notifications/UNAUTHENTICATED:allegro_marketplace/open");
-        assertThat(model.getAttribute("types")).isEqualTo(StoreNotificationType.values());
+        assertThat(model.getAttribute("types")).isEqualTo(List.of(StoreNotificationType.UNAUTHENTICATED));
         assertThat(model.getAttribute("unreadTabHref")).isEqualTo("/dashboard/notifications?filter=unread");
         assertThat(model.getAttribute("allTabHref")).isEqualTo("/dashboard/notifications?filter=all");
         assertThat(model.getAttribute("pageHref")).isEqualTo("/dashboard/notifications?filter=unread");
@@ -106,7 +107,8 @@ class NotificationsControllerTest {
     @Test
     void keepsTheFilterTypeAndPageInEveryLinkOfTheSuperAdminsStoreView() {
         // given
-        NotificationPage page = new NotificationPage(List.of(), 2, 3, 120, 0);
+        NotificationPage page = new NotificationPage(List.of(), 2, 3, 120, 0,
+                List.of(StoreNotificationType.UNAUTHENTICATED, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
         when(notificationService.list("store-9",
                 new NotificationFilter(false, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED), 2, 50)).thenReturn(page);
         Model model = new ExtendedModelMap();
@@ -118,6 +120,8 @@ class NotificationsControllerTest {
         assertThat(view).isEqualTo("notifications");
         assertThat(model.getAttribute("basePath")).isEqualTo("/dashboard/store/store-9/notifications");
         assertThat(model.getAttribute("selectedType")).isEqualTo("MARKETPLACE_RETURN_UNMATCHED");
+        assertThat(model.getAttribute("types")).isEqualTo(
+                List.of(StoreNotificationType.UNAUTHENTICATED, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
         assertThat(model.getAttribute("unreadTabHref"))
                 .isEqualTo("/dashboard/store/store-9/notifications?filter=unread&type=MARKETPLACE_RETURN_UNMATCHED");
         assertThat(model.getAttribute("pageHref"))
@@ -131,7 +135,7 @@ class NotificationsControllerTest {
     void ignoresAnUnknownTypeInsteadOfFailing() {
         // given
         when(notificationService.list("store-1", new NotificationFilter(true, null), 1, 50))
-                .thenReturn(new NotificationPage(List.of(), 1, 1, 0, 0));
+                .thenReturn(new NotificationPage(List.of(), 1, 1, 0, 0, List.of()));
         Model model = new ExtendedModelMap();
 
         // when
@@ -139,6 +143,22 @@ class NotificationsControllerTest {
 
         // then
         assertThat(model.getAttribute("selectedType")).isNull();
+    }
+
+    @Test
+    void keepsTheSelectedTypeOfferedWhenTheStoreNoLongerHasIt() {
+        // given
+        when(notificationService.list("store-1", new NotificationFilter(false, StoreNotificationType.MARKETPLACE_RETURN_REFUNDED), 1, 50))
+                .thenReturn(new NotificationPage(List.of(), 1, 1, 0, 0,
+                        List.of(StoreNotificationType.UNAUTHENTICATED, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.notifications("all", "MARKETPLACE_RETURN_REFUNDED", 1, model);
+
+        // then
+        assertThat(model.getAttribute("types")).isEqualTo(List.of(StoreNotificationType.UNAUTHENTICATED,
+                StoreNotificationType.MARKETPLACE_RETURN_REFUNDED, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED));
     }
 
     @Test

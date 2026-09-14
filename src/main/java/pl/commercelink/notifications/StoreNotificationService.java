@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -59,7 +60,13 @@ public class StoreNotificationService {
         int currentPage = Math.min(Math.max(page, 1), totalPages);
         int from = (currentPage - 1) * pageSize;
         List<StoreNotificationRecord> items = matching.subList(from, Math.min(from + pageSize, matching.size()));
-        return new NotificationPage(items, currentPage, totalPages, matching.size(), unreadCount);
+        List<StoreNotificationType> types = active.stream()
+                .map(StoreNotificationRecord::getType)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        return new NotificationPage(items, currentPage, totalPages, matching.size(), unreadCount, types);
     }
 
     public Optional<StoreNotificationRecord> find(String storeId, String notificationId) {

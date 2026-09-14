@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Controller
 @RequiredArgsConstructor
@@ -147,7 +148,7 @@ public class NotificationsController {
         model.addAttribute("notifications", viewFactory.toViews(result.items(), role));
         model.addAttribute("unreadOnly", unreadOnly);
         model.addAttribute("selectedType", selectedType == null ? null : selectedType.name());
-        model.addAttribute("types", StoreNotificationType.values());
+        model.addAttribute("types", offeredTypes(result.types(), selectedType));
         model.addAttribute("unreadTabHref", listHref(basePath, true, selectedType, 1));
         model.addAttribute("allTabHref", listHref(basePath, false, selectedType, 1));
         model.addAttribute("pageHref", listHref(basePath, unreadOnly, selectedType, result.page()));
@@ -155,6 +156,15 @@ public class NotificationsController {
         model.addAttribute("hasNextPage", result.page() < result.totalPages());
         model.addAttribute("paginationParams", paginationParams(unreadOnly, selectedType));
         return "notifications";
+    }
+
+    // a type from the URL the store no longer has stays offered, otherwise the list would read "all types" while filtering
+    private static List<StoreNotificationType> offeredTypes(List<StoreNotificationType> storeTypes,
+                                                            StoreNotificationType selectedType) {
+        if (selectedType == null || storeTypes.contains(selectedType)) {
+            return storeTypes;
+        }
+        return Stream.concat(storeTypes.stream(), Stream.of(selectedType)).sorted().toList();
     }
 
     private String renderDropdown(UserRole role, String storeId, Model model) {

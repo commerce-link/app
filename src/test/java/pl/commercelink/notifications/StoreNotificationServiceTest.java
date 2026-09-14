@@ -172,6 +172,22 @@ class StoreNotificationServiceTest {
     }
 
     @Test
+    void listOffersOnlyTheTypesTheStoreHasInDeclarationOrderWhateverTheFilter() {
+        // given
+        when(repository.findAll(STORE_ID)).thenReturn(List.of(
+                record("R:1", MARKETPLACE_RETURN_UNMATCHED, NOW.minusHours(1), NOW.minusHours(1)),
+                record("U:1", UNAUTHENTICATED, NOW.minusHours(2), null),
+                record("U:2", MARKETPLACE_RETURN_UNMATCHED, NOW.minusHours(3), null),
+                record("EXPIRED:1", WELCOME, NOW.minusDays(120), NOW.minusDays(91))));
+
+        // when
+        NotificationPage unreadUnauthenticated = service.list(STORE_ID, new NotificationFilter(true, UNAUTHENTICATED), 1, 50);
+
+        // then
+        assertThat(unreadUnauthenticated.types()).containsExactly(UNAUTHENTICATED, MARKETPLACE_RETURN_UNMATCHED);
+    }
+
+    @Test
     void listCutsTheResultIntoPagesAndKeepsTheRequestedPageWithinRange() {
         // given
         when(repository.findAll(STORE_ID)).thenReturn(IntStream.range(0, 5)
@@ -208,6 +224,7 @@ class StoreNotificationServiceTest {
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.totalPages()).isEqualTo(1);
         assertThat(page.totalItems()).isZero();
+        assertThat(page.types()).isEmpty();
     }
 
     @Test

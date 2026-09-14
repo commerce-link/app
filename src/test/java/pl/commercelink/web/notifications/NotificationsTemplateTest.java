@@ -40,10 +40,11 @@ class NotificationsTemplateTest {
         variables.put("navigation", null);
         variables.put("basePath", "/dashboard/notifications");
         variables.put("notifications", notifications);
-        variables.put("notificationPage", new NotificationPage(List.of(), currentPage, totalPages, notifications.size(), unreadCount));
+        variables.put("notificationPage", new NotificationPage(List.of(), currentPage, totalPages, notifications.size(), unreadCount,
+                List.of(StoreNotificationType.values())));
         variables.put("unreadOnly", unreadOnly);
         variables.put("selectedType", null);
-        variables.put("types", StoreNotificationType.values());
+        variables.put("types", List.of(StoreNotificationType.values()));
         variables.put("unreadTabHref", "/dashboard/notifications?filter=unread");
         variables.put("allTabHref", "/dashboard/notifications?filter=all");
         variables.put("pageHref", unreadOnly ? "/dashboard/notifications?filter=unread" : "/dashboard/notifications?filter=all");
@@ -153,6 +154,20 @@ class NotificationsTemplateTest {
         assertThat(unread).contains("Brak nieprzeczytanych powiadomień");
         assertThat(unread).doesNotContain("notificationsBulk").doesNotContain("read-all");
         assertThat(all).contains("Brak powiadomień");
+    }
+
+    @Test
+    void hidesTheTypeFilterWhenTheStoreHasNoNotifications() {
+        // given
+        Map<String, Object> variables = page(List.of(), false, 1, 1, 0);
+        variables.put("types", List.of());
+
+        // when
+        String html = SettingsTemplateRenderer.render("notifications", variables);
+
+        // then
+        assertThat(html).doesNotContain("notificationType").doesNotContain("Wszystkie typy");
+        assertThat(html).contains("href=\"/dashboard/notifications?filter=unread\"");
     }
 
     @Test

@@ -35,7 +35,7 @@
                        th:attr="aria-current=${!unreadOnly} ? 'page' : null"
                        th:text="#{notifications.filter.all}"></a>
                 </nav>
-                <form method="get" class="cl-notifications-type" th:action="@{${basePath}}">
+                <form th:unless="${#lists.isEmpty(types)}" method="get" class="cl-notifications-type" th:action="@{${basePath}}">
                     <input type="hidden" name="filter" th:value="${unreadOnly} ? 'unread' : 'all'">
                     <label for="notificationType" th:text="#{notifications.filter.type}"></label>
                     <select id="notificationType" name="type" data-filter-auto-submit>
