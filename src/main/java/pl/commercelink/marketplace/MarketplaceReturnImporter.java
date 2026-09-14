@@ -136,6 +136,8 @@ public class MarketplaceReturnImporter {
         fillFromMarketplaceReturn(rma, order, marketplace, ret, rmaItems);
         rmaItemsRepository.batchSave(rmaItems);
         rmaRepository.save(rma);
+        // an RMA now exists for this return, so a stale "could not be matched" warning from an earlier poll must go
+        notificationService.resolve(store.getStoreId(), StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, ret.externalReturnId());
     }
 
     /** What an imported RMA inherits from the order and what it takes from the marketplace return. */
@@ -164,10 +166,13 @@ public class MarketplaceReturnImporter {
                         + "rest could not be matched and needs a manual refund in the marketplace panel"
                 : marketplace + " return " + referenceOf(ret)
                         + " could not be matched to an order in the application — handle it in the marketplace panel";
+        // a partial match still creates an RMA, so it must not share the plain externalReturnId identity: that
+        // id is reserved for the "no RMA at all" warning and gets resolved once any RMA exists for this return
+        String object = partiallyMatched ? ret.externalReturnId() + ":partial" : ret.externalReturnId();
         notificationService.publish(store.getStoreId(), new StoreNotification(
                 StoreNotificationSeverity.WARNING,
                 StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED,
-                ret.externalReturnId(),
+                object,
                 message));
     }
 

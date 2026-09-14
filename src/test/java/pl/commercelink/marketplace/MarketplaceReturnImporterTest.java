@@ -172,9 +172,11 @@ class MarketplaceReturnImporterTest {
         assertEquals("NOT_AS_DESCRIBED: wrong colour", rmaItem.getReason());
         assertEquals("SKU-1", rmaItem.getMfn());
 
-        InOrder inOrder = inOrder(rmaItemsRepository, rmaRepository);
+        InOrder inOrder = inOrder(rmaItemsRepository, rmaRepository, notificationService);
         inOrder.verify(rmaItemsRepository).batchSave(anyList());
         inOrder.verify(rmaRepository).save(any());
+        // a return matched on the very first poll never had a stale warning, so this resolve is a harmless no-op
+        inOrder.verify(notificationService).resolve(STORE_ID, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, "r-1");
     }
 
     @Test
@@ -390,6 +392,44 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
+    void resolvesTheStaleUnmatchedWarningWhenALaterPollPartiallyMatches() {
+        // given: the first poll finds no order at all, so it warns that the return needs manual handling
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, EXTERNAL_ORDER_ID)).thenReturn(null);
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 5)));
+
+        // given: the order now exists, but only 3 of the 5 requested units match it (the default order item)
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, EXTERNAL_ORDER_ID)).thenReturn(order);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 5)));
+
+        // then: the stale "could not be matched" warning is cleared, and the partial-match warning gets its own identity
+        verify(notificationService).resolve(STORE_ID, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, "r-1");
+        ArgumentCaptor<StoreNotification> published = ArgumentCaptor.forClass(StoreNotification.class);
+        verify(notificationService, times(2)).publish(eq(STORE_ID), published.capture());
+        assertEquals("r-1:partial", published.getAllValues().get(1).getObject());
+    }
+
+    @Test
+    void resolvesTheStaleUnmatchedWarningWhenALaterPollFullyMatches() {
+        // given: the first poll finds no order at all, so it warns that the return needs manual handling
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, EXTERNAL_ORDER_ID)).thenReturn(null);
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 2)));
+
+        // given: the order now exists and the full return matches it (the default order item has qty 3)
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, EXTERNAL_ORDER_ID)).thenReturn(order);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("SKU-1", 2)));
+
+        // then: the stale warning is cleared; a full match never publishes a second (partial) notification
+        verify(notificationService).resolve(STORE_ID, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, "r-1");
+        verify(notificationService, times(1)).publish(eq(STORE_ID), any(StoreNotification.class));
+    }
+
+    @Test
     void skipsWhenOrderIsUnknownOrCancelled() {
         // given
         when(rmaRepository.findByExternalReturnId(eq(STORE_ID), eq(MARKETPLACE), any())).thenReturn(null);
@@ -532,5 +572,21 @@ class MarketplaceReturnImporterTest {
         InOrder inOrder = inOrder(notificationService, rmaRepository);
         inOrder.verify(notificationService).publish(eq(STORE_ID), any(StoreNotification.class));
         inOrder.verify(rmaRepository).save(existing);
+    }
+
+    @Test
+    void propagatesAFailedRefundPublishInsteadOfSwallowingIt() {
+        // given: unlike the auth-lost hook (Ruling B5), a failed publish on this path must not be swallowed
+        RMA existing = new RMA(STORE_ID);
+        existing.setExternalReturnId("r-1");
+        existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
+        doThrow(new IllegalStateException("DynamoDB unavailable"))
+                .when(notificationService).publish(eq(STORE_ID), any(StoreNotification.class));
+
+        // when / then: the exception reaches the caller (SQS redelivery), and nothing gets persisted on this attempt
+        assertThrows(IllegalStateException.class, () -> importer.importReturn(store, MARKETPLACE,
+                marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1))));
+        verify(rmaRepository, never()).save(any());
     }
 }
