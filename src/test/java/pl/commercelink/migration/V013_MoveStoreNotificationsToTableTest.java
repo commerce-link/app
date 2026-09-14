@@ -11,23 +11,30 @@ import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
 import com.amazonaws.services.dynamodbv2.model.PutItemResult;
+import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.ScanRequest;
 import com.amazonaws.services.dynamodbv2.model.ScanResult;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -43,8 +50,41 @@ class V013_MoveStoreNotificationsToTableTest {
 
     @Mock
     private AmazonDynamoDB dynamoDB;
-    @InjectMocks
     private V013_MoveStoreNotificationsToTable migration;
+
+    @BeforeEach
+    void setUp() {
+        // no-op pause so the wait-for-ACTIVE loop never sleeps for real in tests
+        migration = new V013_MoveStoreNotificationsToTable(dynamoDB, millis -> { });
+    }
+
+    // advances on every clock read so a deadline test can pass it without any real waiting
+    private static final class AdvancingClock extends Clock {
+        private Instant instant;
+        private final Duration step;
+
+        AdvancingClock(Instant start, Duration step) {
+            this.instant = start;
+            this.step = step;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            Instant current = instant;
+            instant = instant.plus(step);
+            return current;
+        }
+    }
 
     private static AttributeValue string(String value) {
         return new AttributeValue().withS(value);
@@ -199,5 +239,51 @@ class V013_MoveStoreNotificationsToTableTest {
         assertThat(V013_MoveStoreNotificationsToTable.isActive(table("ACTIVE", "ACTIVE"))).isTrue();
         assertThat(V013_MoveStoreNotificationsToTable.isActive(table("ACTIVE", "CREATING"))).isFalse();
         assertThat(V013_MoveStoreNotificationsToTable.isActive(table("CREATING", "CREATING"))).isFalse();
+    }
+
+    @Test
+    void skipsAMalformedNotificationEntryButMovesTheValidOnesAndRemovesTheList() {
+        // given
+        Map<String, AttributeValue> store = store(
+                notification("WARNING", "BOGUS_TYPE", "obj-1", "Unknown type"),
+                notification("WARNING", "UNAUTHENTICATED", "allegro_marketplace", "Expired"));
+        ArgumentCaptor<PutItemRequest> put = ArgumentCaptor.forClass(PutItemRequest.class);
+
+        // when
+        migration.moveNotifications(store, MIGRATED_AT);
+
+        // then
+        verify(dynamoDB).putItem(put.capture());
+        assertThat(put.getValue().getItem().get("notificationId").getS()).isEqualTo("UNAUTHENTICATED:allegro_marketplace");
+        verify(dynamoDB).updateItem(any(UpdateItemRequest.class));
+    }
+
+    @Test
+    void resumesWaitingForActiveWhenDescribeTableCannotSeeTheNewTableYet() {
+        // given
+        when(dynamoDB.describeTable("StoreNotifications"))
+                .thenThrow(new ResourceNotFoundException("not visible yet"))
+                .thenReturn(new DescribeTableResult().withTable(table("ACTIVE", "ACTIVE")));
+        when(dynamoDB.scan(any(ScanRequest.class))).thenReturn(new ScanResult().withItems(List.of()));
+
+        // when
+        migration.execute();
+
+        // then
+        verify(dynamoDB, times(2)).describeTable("StoreNotifications");
+    }
+
+    @Test
+    void stopsWaitingForActiveOnceTheDeadlinePasses() {
+        // given
+        when(dynamoDB.describeTable("StoreNotifications"))
+                .thenReturn(new DescribeTableResult().withTable(table("CREATING", "CREATING")));
+        V013_MoveStoreNotificationsToTable migrationWithFastDeadline = new V013_MoveStoreNotificationsToTable(
+                dynamoDB, millis -> { }, new AdvancingClock(Instant.EPOCH, Duration.ofMinutes(11)));
+
+        // when / then
+        assertThatThrownBy(migrationWithFastDeadline::execute)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("did not become active");
     }
 }
