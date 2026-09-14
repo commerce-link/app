@@ -11,7 +11,6 @@
             <li th:each="item : ${section.tiles()}">
                 <a class="cl-tile" th:href="@{${item.href()}}">
                     <span class="cl-tile-icon" aria-hidden="true"><i class="fas" th:classappend="${item.tile().icon()}"></i></span>
-                    <span class="cl-tile-chevron" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
                     <span class="cl-tile-title" th:text="#{${item.tile().titleKey()}}"></span>
                     <span class="cl-tile-desc" th:text="#{${item.tile().descriptionKey()}}"></span>
                 </a>

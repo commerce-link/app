@@ -697,14 +697,13 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 .cl-page .cl-tile {
-    position: relative;
     height: 100%;
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr);
     align-content: start;
     column-gap: 14px;
     row-gap: 4px;
-    padding: 16px 36px 16px 16px;
+    padding: 16px;
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
     background: var(--cl-surface);
@@ -734,21 +733,6 @@ body.cl-drawer-open .cl-sidebar {
     background: var(--cl-accent-soft);
     color: var(--cl-accent);
     font-size: 17px;
-}
-
-.cl-page .cl-tile-chevron {
-    position: absolute;
-    top: 16px;
-    right: 14px;
-    font-size: 12px;
-    color: var(--cl-accent);
-    opacity: 0;
-    transition: opacity .15s ease;
-}
-
-.cl-page .cl-tile:hover .cl-tile-chevron,
-.cl-page .cl-tile:focus-visible .cl-tile-chevron {
-    opacity: 1;
 }
 
 .cl-page .cl-tile-title {
@@ -803,8 +787,7 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .cl-page .cl-tile,
-    .cl-page .cl-tile-chevron {
+    .cl-page .cl-tile {
         transition: none;
     }
 }
@@ -1225,7 +1208,7 @@ body.cl-drawer-open .cl-sidebar {
         padding: 0;
     }
 
-    .cl-page .cl-back, .cl-page .cl-page-actions, .cl-page .cl-tile-chevron {
+    .cl-page .cl-back, .cl-page .cl-page-actions {
         display: none !important;
     }
 
