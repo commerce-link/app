@@ -219,6 +219,28 @@ class ManualSupplierServiceTest {
     }
 
     @Test
+    void createFailsExplicitlyWhenEveryGeneratedIdentityCollides() {
+        // given -- a generator stuck on one token, so all five attempts hit the existing connection
+        Store store = storeWith(new StoreSupplierConnection("manual-aaaaaaaa", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        ManualSupplierService colliding = new ManualSupplierService(
+                storesRepository, storeFeedRepository, storeInventoryCache) {
+            @Override
+            String newIdentity() {
+                return "manual-aaaaaaaa";
+            }
+        };
+
+        // when
+        ManualSupplierService.Result result = colliding.create("store-1", "Hurtownia B");
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.supplier.connection.error.identity.exhausted", result.messageCode());
+        verify(storesRepository, never()).save(store);
+    }
+
+    @Test
     void applySelectionsRejectsAnInvalidLabelInsteadOfDroppingIt() {
         // given
         StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);

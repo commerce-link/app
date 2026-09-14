@@ -519,6 +519,29 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void anOwnCreateFailsExplicitlyWhenEveryGeneratedIdentityCollides() {
+        // given -- a generator stuck on one token, so all five attempts hit the existing connection
+        Store store = storeWith(true, new StoreSupplierConnection("Stub-aaaaaaaa", ConnectionMode.OWN, true, true));
+        registryHas("Stub");
+        StoreSupplierConnectionService colliding = new StoreSupplierConnectionService(
+                supplierProviderFactory, configurationManager, validator, persister) {
+            @Override
+            String newIdentity(String type) {
+                return "Stub-aaaaaaaa";
+            }
+        };
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                colliding.connectOrUpdate(store, ownSelection("Stub", "x"), Map.of());
+
+        // then -- refused, instead of silently replacing the existing connection and its secret
+        assertThat(result.errors().get(0).code())
+                .isEqualTo("store.supplier.connection.error.identity.exhausted");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
     void labelErrorsFromTheValidatorBlockTheSave() {
         // given
         Store store = storeWith(true);

@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ManualSupplierService {
 
     private static final int MAX_LABEL_LENGTH = 60;
+    private static final int IDENTITY_ATTEMPTS = 5;
 
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
@@ -62,9 +63,9 @@ public class ManualSupplierService {
         if (labelTaken(store, trimmed, null)) {
             return Result.error("store.manual.error.name.taken");
         }
-        String identity = SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
-        while (alreadyExists(store, identity)) {
-            identity = SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
+        String identity = freshIdentity(store);
+        if (identity == null) {
+            return Result.error("store.supplier.connection.error.identity.exhausted");
         }
         StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
         connection.setLabel(trimmed);
@@ -73,6 +74,23 @@ public class ManualSupplierService {
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
         return Result.created(identity);
+    }
+
+    // Bounded rather than an unbounded retry loop: a stuck token generator would otherwise spin
+    // forever inside a request thread.
+    private String freshIdentity(Store store) {
+        for (int attempt = 0; attempt < IDENTITY_ATTEMPTS; attempt++) {
+            String candidate = newIdentity();
+            if (!alreadyExists(store, candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** Seam for tests that need a deterministic collision. */
+    String newIdentity() {
+        return SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
     }
 
     // Labels are unique across every connection of the store, whatever its mode, so the operator
