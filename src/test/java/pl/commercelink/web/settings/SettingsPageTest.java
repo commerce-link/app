@@ -53,4 +53,24 @@ class SettingsPageTest {
         // when / then
         assertThat(SettingsPage.forRequest(UserRole.ADMIN, "/dashboard/store/store-1/warehouse")).isNull();
     }
+
+    @Test
+    void buildsTheSettingsPageForAStoreAdminByTile() {
+        // when
+        SettingsPage page = SettingsPage.forTile("/shipping", UserRole.ADMIN, "store-1");
+
+        // then
+        assertThat(page.tile().key()).isEqualTo("shipping");
+        assertThat(page.homeHref()).isEqualTo("/dashboard/store");
+    }
+
+    @Test
+    void buildsTheSettingsPageForASuperAdminByTile() {
+        // when
+        SettingsPage page = SettingsPage.forTile("/shipping", UserRole.SUPER_ADMIN, "store-1");
+
+        // then
+        assertThat(page.tile().key()).isEqualTo("shipping");
+        assertThat(page.homeHref()).isEqualTo("/dashboard/store/store-1");
+    }
 }

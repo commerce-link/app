@@ -28,6 +28,7 @@ import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.*;
+import pl.commercelink.web.settings.SettingsPage;
 import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
@@ -724,6 +725,10 @@ public class StoreController {
                 .collect(Collectors.toList());
 
         model.addAttribute("availableCarriers", selections);
+        // Renders under a non-tile URL, so SettingsPageAdvice cannot recognise it from the request path;
+        // set it explicitly (a handler's model attribute overrides the advice's value).
+        model.addAttribute("settingsPage", SettingsPage.forTile("/shipping",
+                isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN, storeId));
         return renderStoreShipping(storeId, model);
     }
 

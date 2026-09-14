@@ -6,6 +6,12 @@ import pl.commercelink.web.nav.StorePath;
 /** The settings page being rendered, as the tile that leads to it and the settings home to return to. */
 public record SettingsPage(SettingsTile tile, String homeHref) {
 
+    public static SettingsPage forTile(String relativePath, UserRole role, String storeId) {
+        SettingsTile tile = StoreSettingsCatalog.tileAt(relativePath).orElseThrow();
+        String homeHref = StoreSettingsCatalog.homeHref(role, storeId);
+        return new SettingsPage(tile, homeHref);
+    }
+
     public static SettingsPage forRequest(UserRole role, String path) {
         if (role == null || path == null || !path.startsWith(StoreSettingsCatalog.HOME_PATH + "/")) {
             return null;
