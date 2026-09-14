@@ -1076,7 +1076,18 @@ body.cl-drawer-open .cl-sidebar {
 .cl-page .cl-notification-select {
     width: 18px;
     height: 18px;
-    margin-top: 3px;
+}
+
+/* The checkbox stays 18px visually; the label around it is inflated to a 44x44 hit area and pulled
+   back in with a negative margin so the grid column (and the row's height) keep the same footprint. */
+.cl-page .cl-notification-select-hit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -13px;
+    cursor: pointer;
 }
 
 .cl-page .cl-notification-main {

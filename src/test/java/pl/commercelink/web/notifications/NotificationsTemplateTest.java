@@ -127,6 +127,23 @@ class NotificationsTemplateTest {
     }
 
     @Test
+    void wrapsEachRowCheckboxInAFortyFourPixelTouchTargetLabel() {
+        // given
+        List<NotificationView> notifications = List.of(unreadExpiredConnection(), readUnmatchedReturn());
+
+        // when
+        String html = SettingsTemplateRenderer.render("notifications", page(notifications, false, 1, 1, 1));
+        String normalized = html.replaceAll("\\s+", " ");
+
+        // then
+        assertThat(html.split("class=\"cl-notification-select-hit\"", -1)).hasSize(3);
+        assertThat(normalized)
+                .contains("<label class=\"cl-notification-select-hit\"> <input type=\"checkbox\" name=\"ids\" "
+                        + "form=\"notificationsBulk\" class=\"cl-notification-select\"")
+                .contains("</label> <span class=\"cl-notification-dot\"");
+    }
+
+    @Test
     void showsTheEmptyStateOfTheSelectedFilter() {
         // when
         String unread = SettingsTemplateRenderer.render("notifications", page(List.of(), true, 1, 1, 0));

@@ -67,9 +67,11 @@
                 <ul class="cl-notification-list">
                     <li th:each="notification : ${notifications}" class="cl-notification-item"
                         th:classappend="${notification.unread()} ? 'is-unread' : ''">
-                        <input type="checkbox" name="ids" form="notificationsBulk" class="cl-notification-select"
-                               th:value="${notification.id()}"
-                               th:attr="aria-label=${#messages.msg('notifications.select.item', #messages.msg(notification.titleKey()))}">
+                        <label class="cl-notification-select-hit">
+                            <input type="checkbox" name="ids" form="notificationsBulk" class="cl-notification-select"
+                                   th:value="${notification.id()}"
+                                   th:attr="aria-label=${#messages.msg('notifications.select.item', #messages.msg(notification.titleKey()))}">
+                        </label>
                         <span class="cl-notification-dot" aria-hidden="true"></span>
                         <span class="cl-notification-icon icon" th:classappend="${notification.cssClass()}" aria-hidden="true">
                             <i class="fas" th:classappend="${notification.icon()}"></i>
