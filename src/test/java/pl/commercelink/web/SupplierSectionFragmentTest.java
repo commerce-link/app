@@ -23,7 +23,7 @@ class SupplierSectionFragmentTest {
         assertThat(fragment()).contains(
                 "th:fragment=\"supplierSection(rows, manual, showMode, titleKey, addButtonId, "
                         + "addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage, "
-                        + "storedConfigSuppliers)\"");
+                        + "storedConfigSuppliers, configurations)\"");
     }
 
     @Test
@@ -36,7 +36,8 @@ class SupplierSectionFragmentTest {
         assertThat(html).contains("th:id=\"${addButtonId}\"");
         assertThat(html).contains("#{${addButtonLabelKey}}");
         assertThat(html).contains(
-                "th:replace=\"~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode})}\"");
+                "th:replace=\"~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode}, "
+                        + "${configurations})}\"");
     }
 
     @Test
@@ -62,12 +63,12 @@ class SupplierSectionFragmentTest {
                         + "${sectionShowMode}, 'store.supplier.section.title', 'supplier-add-button', "
                         + "'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, "
                         + "'store.supplier.add.none', ${sectionSuccessMessage}, "
-                        + "${sectionSuppliersWithStoredConfig})}\">");
+                        + "${sectionSuppliersWithStoredConfig}, ${sectionConfigurations})}\">");
         assertThat(html).contains(
                 "th:fragment=\"manualSection\"\n"
                         + "     th:replace=\"~{fragments/supplier-section :: supplierSection(${sectionRows}, true, "
                         + "false, 'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', "
-                        + "false, null, ${sectionSuccessMessage}, '')}\">");
+                        + "false, null, ${sectionSuccessMessage}, '', null)}\">");
     }
 
     @Test

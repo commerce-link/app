@@ -13,6 +13,7 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,7 +76,8 @@ class SupplierSectionModelTest {
 
             // when
             String view = SupplierSectionModel.renderExternalSection(
-                    viewFactory, registry, store(), Set.of("Elko"), "Saved.", model);
+                    viewFactory, registry, store(), Set.of("Elko"),
+                    Map.of("Elko", Map.of("login", "elko-login")), "Saved.", model);
 
             // then -- a no-argument view name: ThymeleafView rejects positional fragment parameters
             // in a view specification, so a regression back to the parameterized selector (with or
@@ -89,6 +91,10 @@ class SupplierSectionModelTest {
             assertThat(model.getAttribute("sectionAvailableSuppliers")).isEqualTo(List.of("Elko", "Acme"));
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("Saved.");
             assertThat(model.getAttribute("sectionSuppliersWithStoredConfig")).isEqualTo("Elko");
+            // The credential values travel per connection identity as a JSON blob, because the
+            // modal's field group is per supplier TYPE and one type may be connected several times.
+            assertThat(model.getAttribute("sectionConfigurations"))
+                    .isEqualTo(Map.of("Elko", "{\"login\":\"elko-login\"}"));
         }
     }
 
@@ -113,13 +119,13 @@ class SupplierSectionModelTest {
             // when -- simulates the page before any credentials were ever saved for Elko ...
             ConcurrentModel beforeSave = new ConcurrentModel();
             SupplierSectionModel.renderExternalSection(
-                    viewFactory, registry, store(), Set.of(), null, beforeSave);
+                    viewFactory, registry, store(), Set.of(), Map.of(), null, beforeSave);
 
             // ... and the very next request in the same page session, right after the operator
             // connected Elko with credentials -- no reload, same modal markup
             ConcurrentModel afterSave = new ConcurrentModel();
             SupplierSectionModel.renderExternalSection(
-                    viewFactory, registry, store(), Set.of("Elko"), "Supplier Elko saved.", afterSave);
+                    viewFactory, registry, store(), Set.of("Elko"), Map.of(), "Supplier Elko saved.", afterSave);
 
             // then
             assertThat(beforeSave.getAttribute("sectionSuppliersWithStoredConfig")).isEqualTo("");

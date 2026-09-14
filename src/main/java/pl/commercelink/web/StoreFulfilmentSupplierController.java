@@ -92,7 +92,8 @@ public class StoreFulfilmentSupplierController {
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.saved", new Object[]{savedLabel}, locale);
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), successMessage, model);
     }
 
     private String doDisconnect(String storeId, String identity, Locale locale, Model model,
@@ -116,7 +117,8 @@ public class StoreFulfilmentSupplierController {
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.disconnected", new Object[]{label}, locale);
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), successMessage, model);
     }
 
     @GetMapping("/dashboard/store/fulfilment/supplier/section")
@@ -144,6 +146,7 @@ public class StoreFulfilmentSupplierController {
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), null, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), null, model);
     }
 }

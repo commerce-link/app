@@ -279,7 +279,7 @@
                                    ${settings.canUseGlobalSuppliers},
                                    'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button',
                                    ${availableSuppliers.isEmpty()}, 'store.supplier.add.none', null,
-                                   ${suppliersWithStoredConfigJoined})}"></div>
+                                   ${suppliersWithStoredConfigJoined}, ${supplierConfigurations})}"></div>
             </div>
 
             <div id="supplierModal" class="modal">
@@ -372,8 +372,10 @@
                                         <span th:text="${cf.label()}"></span>
                                         <!-- Shown for every required field regardless of type or connection state:
                                              a blank required password on an already-connected supplier is still a
-                                             mandatory field, it just does not need retyping (see the HTML required
-                                             attribute below, which is withheld only in that one case). -->
+                                             mandatory field, it just does not need retyping. The HTML required
+                                             attribute below never covers a password: whether blank is acceptable
+                                             depends on the connection being edited, which only refreshFields()
+                                             knows (this markup is rendered once, before any identity is picked). -->
                                         <span th:if="${cf.required()}" class="has-text-danger ml-1"
                                               th:title="#{store.supplier.field.required.tooltip}"
                                               th:text="#{store.supplier.field.required.marker}"></span>
@@ -382,12 +384,9 @@
                                         <input class="input"
                                                th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
                                                th:name="'configuration[' + ${cf.key()} + ']'"
-                                               th:value="${cf.type().name() == 'PASSWORD'
-                                                          ? ''
-                                                          : (form.supplierConfiguration.get(entry.key) != null
-                                                             ? form.supplierConfiguration.get(entry.key).get(cf.key()) : '')}"
+                                               value=""
                                                th:placeholder="${cf.placeholder()}"
-                                               th:required="${cf.required() and !(cf.type().name() == 'PASSWORD' and suppliersWithStoredConfig.contains(entry.key))}"
+                                               th:required="${cf.required() and cf.type().name() != 'PASSWORD'}"
                                                th:attr="data-required=${cf.required()}"
                                                disabled />
                                     </div>
@@ -486,14 +485,47 @@
                             providerName: tr.dataset.providerName || '',
                             label: tr.dataset.label || '',
                             billingShortcut: tr.dataset.billingShortcut || '',
-                            canSwitchMode: tr.dataset.canSwitchMode !== 'false'
+                            canSwitchMode: tr.dataset.canSwitchMode !== 'false',
+                            // This connection's stored credential values (passwords blanked
+                            // server-side). Read off the row, like everything else here, so it
+                            // survives an async section swap.
+                            configuration: parseConfiguration(tr.dataset.configuration)
                         };
                     }
 
+                    function parseConfiguration(raw) {
+                        if (!raw) { return {}; }
+                        try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+                    }
+
                     // hiddenName now carries the supplier *type* (not the identity) once a row is
-                    // being edited, since the select is hidden and disabled in that case.
+                    // being edited, since the select is hidden and disabled in that case. This is
+                    // the supplier TYPE, which picks the supplier-fields-{type} group -- never use
+                    // it as a key for anything per-connection, that is activeIdentity() below.
                     function activeName() {
                         return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
+                    }
+
+                    // The connection being edited. Everything per-connection -- stored values,
+                    // whether a secret already exists, which row the modal belongs to -- is keyed by
+                    // this, not by the type: one type may be connected several times, and keying by
+                    // type made an edit render the other instance's values and post them back over
+                    // this instance's secret.
+                    function activeIdentity() {
+                        return identityInput.value || select.value;
+                    }
+
+                    // Fills the active type's credential group with the values of ONE connection.
+                    // Passwords always start blank and keep their "leave empty to keep" semantics.
+                    function applyConfiguration(values) {
+                        var group = document.getElementById('supplier-fields-' + activeName());
+                        if (!group) { return; }
+                        group.querySelectorAll('input').forEach(function (input) {
+                            if (input.type === 'password') { input.value = ''; return; }
+                            var key = input.name.replace(/^configuration\[(.*)\]$/, '$1');
+                            var value = values ? values[key] : null;
+                            input.value = value == null ? '' : value;
+                        });
                     }
 
                     // Reads canUseGlobalSuppliers fresh off the (possibly just-swapped) section
@@ -510,6 +542,7 @@
 
                     function refreshFields() {
                         var name = activeName();
+                        var identity = activeIdentity();
                         var isOwn = mode.value === 'OWN';
                         labelWrap.classList.toggle('is-hidden', !isOwn);
                         labelInput.required = isOwn;
@@ -522,7 +555,7 @@
                         var root = externalSection.firstElementChild;
                         var storedConfigSuppliers = (root && root.getAttribute('data-suppliers-with-stored-config') || '')
                                 .split(';').filter(function (s) { return s.length > 0; });
-                        var hasStoredConfig = storedConfigSuppliers.indexOf(name) !== -1;
+                        var hasStoredConfig = storedConfigSuppliers.indexOf(identity) !== -1;
                         document.querySelectorAll('.supplier-fields').forEach(function (group) {
                             var active = group.id === 'supplier-fields-' + name && isOwn;
                             group.style.display = active ? '' : 'none';
@@ -537,7 +570,7 @@
                             });
                         });
                         scheduleWrap.classList.toggle('is-hidden', !isOwn);
-                        var row = rowFor(name);
+                        var row = rowFor(identity);
                         var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
                         warning.classList.toggle('is-hidden', !leavingOwn);
                     }
@@ -616,6 +649,8 @@
                         window.scheduleField.sync(schedule, row ? row.feedSchedule : '');
                         refreshModeVisibility();
                         refreshFields();
+                        // After refreshFields(), which is what decides which group is active.
+                        applyConfiguration(row ? row.configuration : null);
                         modal.classList.add('is-active');
                     }
 
@@ -659,7 +694,12 @@
                         }
                     });
 
-                    select.addEventListener('change', refreshFields);
+                    select.addEventListener('change', function () {
+                        refreshFields();
+                        // A new connection starts blank, and switching type must not leave the
+                        // previous type's group holding what the operator typed into it.
+                        applyConfiguration(null);
+                    });
                     mode.addEventListener('change', refreshFields);
                     document.getElementById('supplier-modal-cancel').addEventListener('click', close);
                     document.getElementById('supplier-modal-close').addEventListener('click', close);
