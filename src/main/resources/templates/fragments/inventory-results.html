@@ -1,0 +1,175 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="emptyState" class="cl-inv-results" data-inventory-fragment="results">
+    <div class="cl-inv-empty" th:attr="data-announce=#{inventory.empty.title}">
+        <span class="cl-inv-empty-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+        <h2 class="cl-inv-empty-title" tabindex="-1" data-inventory-results-heading th:text="#{inventory.empty.title}"></h2>
+        <p th:text="#{inventory.empty.text}"></p>
+    </div>
+</div>
+
+<div th:fragment="productHeader(product, matchedBy)" class="cl-inv-product">
+    <div class="cl-inv-product-main">
+        <h2 class="cl-inv-product-name" tabindex="-1" data-inventory-results-heading
+            th:text="${product.name() != null} ? ${product.name()} : #{inventory.product.unnamed}"></h2>
+        <dl class="cl-inv-codes">
+            <div th:if="${product.brand() != null}"><dt th:text="#{inventory.code.brand}"></dt><dd th:text="${product.brand()}"></dd></div>
+            <div th:if="${product.ean() != null}"><dt th:text="#{inventory.code.ean}"></dt><dd th:text="${product.ean()}"></dd></div>
+            <div th:if="${product.mfn() != null}"><dt th:text="#{inventory.code.mfn}"></dt><dd th:text="${product.mfn()}"></dd></div>
+        </dl>
+    </div>
+    <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
+</div>
+
+<div th:fragment="results" class="cl-inv-results" data-inventory-fragment="results">
+
+    <div th:if="${validationError}" class="cl-inv-state" th:attr="data-announce=#{inventory.search.tooShort}">
+        <p class="cl-inv-field-error" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+            <span th:text="#{inventory.search.tooShort}"></span>
+        </p>
+    </div>
+
+    <div th:if="${result != null and result.kind().name() == 'NOT_FOUND'}" class="cl-inv-empty"
+         th:attr="data-announce=#{inventory.notFound.title(${result.query()})}">
+        <span class="cl-inv-empty-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+        <h2 class="cl-inv-empty-title" tabindex="-1" data-inventory-results-heading
+            th:text="#{inventory.notFound.title(${result.query()})}"></h2>
+        <p th:text="${superAdmin} ? #{inventory.notFound.global} : #{inventory.notFound.text}"></p>
+        <ul class="cl-inv-tips">
+            <li th:text="#{inventory.notFound.tip.typo}"></li>
+            <li th:text="#{inventory.notFound.tip.ean}"></li>
+            <li th:unless="${superAdmin}" th:text="#{inventory.notFound.tip.disabled}"></li>
+        </ul>
+    </div>
+
+    <div th:if="${result != null and result.kind().name() == 'KNOWN_WITHOUT_OFFERS'}" class="cl-inv-known"
+         th:attr="data-announce=#{inventory.known.title}">
+        <div th:replace="~{fragments/inventory-results :: productHeader(${result.product()}, ${result.matchedBy()})}"></div>
+        <div class="cl-inv-empty">
+            <h3 class="cl-inv-empty-title" th:text="#{inventory.known.title}"></h3>
+            <p th:unless="${superAdmin}" th:text="#{inventory.known.text}"></p>
+            <a th:if="${canManageSuppliers}" class="cl-inv-button" th:href="${manageSuppliersUrl}">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span th:text="#{inventory.known.manage}"></span>
+            </a>
+        </div>
+    </div>
+
+    <div th:if="${result != null and result.kind().name() == 'FOUND'}" class="cl-inv-found"
+         th:with="prices=${result.prices()}"
+         th:attr="data-announce=#{inventory.results.announce(${result.supplierOffers().size()})}">
+        <div th:replace="~{fragments/inventory-results :: productHeader(${result.product()}, ${result.matchedBy()})}"></div>
+
+        <dl class="cl-inv-figures">
+            <div class="cl-inv-figure">
+                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.lowest}"></dt>
+                <dd class="cl-inv-figure-value is-ok"
+                    th:text="${prices.hasSupplierOffers()} ? (${#numbers.formatDecimal(prices.lowestGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN') : '—'"></dd>
+                <dd class="cl-inv-hint" th:if="${prices.lowestSupplierLabel() != null}" th:text="${prices.lowestSupplierLabel()}"></dd>
+            </div>
+            <div class="cl-inv-figure">
+                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.median}"></dt>
+                <dd class="cl-inv-figure-value"
+                    th:text="${prices.hasSupplierOffers()} ? (${#numbers.formatDecimal(prices.medianGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN') : '—'"></dd>
+                <dd class="cl-inv-hint" th:text="#{inventory.figure.median.hint(${prices.offerCount()})}"></dd>
+            </div>
+            <div class="cl-inv-figure">
+                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.available}"></dt>
+                <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.supplierQty()})}"></dd>
+                <dd class="cl-inv-hint" th:text="#{inventory.figure.available.hint(${prices.suppliersWithStock()}, ${prices.supplierCount()})}"></dd>
+            </div>
+            <div class="cl-inv-figure" th:unless="${superAdmin}">
+                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.warehouse}"></dt>
+                <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.warehouseInStockQty()})}"></dd>
+                <dd class="cl-inv-hint" th:if="${prices.warehouseInDeliveryQty() > 0}"
+                    th:text="#{inventory.figure.warehouse.hint(${prices.warehouseInDeliveryQty()})}"></dd>
+            </div>
+        </dl>
+
+        <div class="cl-inv-table-wrap">
+            <table class="cl-inv-table cl-inv-offers" data-inventory-offers>
+                <caption class="cl-inv-visually-hidden" th:text="#{inventory.table.caption}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" aria-sort="none">
+                        <button type="button" class="cl-inv-sort" data-sort-key="source">
+                            <span th:text="#{inventory.table.source}"></span> <i class="fas fa-sort" aria-hidden="true"></i>
+                        </button>
+                    </th>
+                    <th scope="col" th:text="#{inventory.table.code}"></th>
+                    <th scope="col" class="is-numeric" aria-sort="ascending">
+                        <button type="button" class="cl-inv-sort" data-sort-key="price">
+                            <span th:text="#{inventory.table.price}"></span> <i class="fas fa-sort" aria-hidden="true"></i>
+                        </button>
+                    </th>
+                    <th scope="col" class="is-numeric" aria-sort="none">
+                        <button type="button" class="cl-inv-sort" data-sort-key="qty">
+                            <span th:text="#{inventory.table.qty}"></span> <i class="fas fa-sort" aria-hidden="true"></i>
+                        </button>
+                    </th>
+                </tr>
+                </thead>
+
+                <tbody th:unless="${result.warehouseRows().isEmpty()}" class="cl-inv-group">
+                <tr><th scope="rowgroup" colspan="4" th:text="#{inventory.table.group.warehouse}"></th></tr>
+                </tbody>
+                <tbody th:unless="${result.warehouseRows().isEmpty()}">
+                <tr th:each="row : ${result.warehouseRows()}" class="cl-inv-offer is-warehouse">
+                    <td th:attr="data-label=#{inventory.table.source}">
+                        <strong th:text="#{inventory.table.warehouse}"></strong>
+                        <span class="cl-status" th:classappend="${row.inDelivery()} ? 'is-info' : 'is-ok'"
+                              th:text="${row.inDelivery()} ? #{inventory.table.inDelivery} : #{inventory.table.inStock}"></span>
+                        <span th:if="${row.hasSpecialCondition()}" class="cl-status is-warn"
+                              th:text="#{${'ItemCondition.' + row.condition().name()}}"></span>
+                    </td>
+                    <td class="cl-inv-muted" th:attr="data-label=#{inventory.table.code}" th:text="${row.productCode()}"></td>
+                    <td class="is-numeric" th:attr="data-label=#{inventory.table.price}">
+                        <span class="cl-inv-price" th:text="${#numbers.formatDecimal(row.grossUnitCost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
+                        <span class="cl-inv-hint" th:text="#{inventory.table.purchaseCost}"></span>
+                    </td>
+                    <td class="is-numeric" th:attr="data-label=#{inventory.table.qty}" th:text="${row.qty()}"></td>
+                </tr>
+                </tbody>
+
+                <tbody class="cl-inv-group">
+                <tr><th scope="rowgroup" colspan="4" th:text="#{inventory.table.group.suppliers}"></th></tr>
+                </tbody>
+                <tbody data-inventory-sortable>
+                <tr th:if="${result.supplierOffers().isEmpty()}">
+                    <td colspan="4" class="cl-inv-muted" th:text="#{inventory.table.noOffers}"></td>
+                </tr>
+                <tr th:each="offer : ${result.supplierOffers()}" class="cl-inv-offer"
+                    th:classappend="${offer.cheapest() ? 'is-cheapest' : ''} + ' ' + ${offer.hasStock() ? '' : 'is-dim'}"
+                    th:data-sort-source="${offer.supplierLabel()}"
+                    th:data-sort-price="${offer.hasPrice() ? offer.grossPrice() : 999999999}"
+                    th:data-sort-qty="${offer.qty()}">
+                    <td th:attr="data-label=#{inventory.table.source}">
+                        <strong th:text="${offer.supplierLabel()}"></strong>
+                        <span th:if="${offer.mode() != null}" class="cl-inv-mode"
+                              th:text="#{${'inventory.mode.' + offer.mode().name()}}"></span>
+                        <span th:if="${offer.cheapest()}" class="cl-status is-ok" th:text="#{inventory.table.cheapest}"></span>
+                    </td>
+                    <td class="cl-inv-muted" th:attr="data-label=#{inventory.table.code}" th:text="${offer.productCode()}"></td>
+                    <td class="is-numeric" th:attr="data-label=#{inventory.table.price}">
+                        <span th:if="${offer.hasPrice()}" class="cl-inv-price"
+                              th:text="${#numbers.formatDecimal(offer.grossPrice(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
+                        <span th:unless="${offer.hasPrice()}" class="cl-inv-muted" th:text="#{inventory.table.noPrice}"></span>
+                        <span th:if="${offer.percentAboveCheapest() != null}" class="cl-inv-hint"
+                              th:text="#{inventory.table.percent(${#numbers.formatDecimal(offer.percentAboveCheapest(), 1, 1, 'COMMA')})}"></span>
+                    </td>
+                    <td class="is-numeric" th:attr="data-label=#{inventory.table.qty}">
+                        <span th:text="${offer.qty()}"></span>
+                        <span th:unless="${offer.hasStock()}" class="cl-inv-hint" th:text="#{inventory.table.noStock}"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
