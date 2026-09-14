@@ -22,7 +22,7 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 /** Renders real templates with the Polish message bundle, the way the settings pages are served. */
-final class SettingsTemplateRenderer {
+public final class SettingsTemplateRenderer {
 
     private static final Locale POLISH = Locale.forLanguageTag("pl");
     private static final TemplateEngine ENGINE = templateEngine();
@@ -30,7 +30,7 @@ final class SettingsTemplateRenderer {
     private SettingsTemplateRenderer() {
     }
 
-    static String render(String templateOrMarkup, Map<String, Object> variables) {
+    public static String render(String templateOrMarkup, Map<String, Object> variables) {
         JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
         IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
         WebContext context = new WebContext(exchange, POLISH);

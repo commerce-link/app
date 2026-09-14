@@ -1,0 +1,130 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+
+    <section class="cl-page">
+        <div class="cl-page-body">
+
+            <header class="cl-page-header">
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{notifications.title}"></h1>
+                    <span th:if="${notificationPage.unreadCount() > 0}" class="cl-status is-warn"
+                          th:text="#{notifications.unreadBadge(${notificationPage.unreadCount()})}"></span>
+                    <div class="cl-page-actions" th:if="${notificationPage.unreadCount() > 0}">
+                        <form method="post" th:action="@{${basePath + '/read-all'}}">
+                            <input type="hidden" name="redirect" th:value="${pageHref}">
+                            <button type="submit" class="cl-button">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
+                                <span th:text="#{notifications.markAllRead}"></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            <div class="cl-notifications-toolbar">
+                <nav class="cl-notifications-tabs" th:attr="aria-label=#{notifications.filter.aria}">
+                    <a th:href="@{${unreadTabHref}}" th:classappend="${unreadOnly} ? 'is-current' : ''"
+                       th:attr="aria-current=${unreadOnly} ? 'page' : null"
+                       th:text="#{notifications.filter.unread}"></a>
+                    <a th:href="@{${allTabHref}}" th:classappend="${!unreadOnly} ? 'is-current' : ''"
+                       th:attr="aria-current=${!unreadOnly} ? 'page' : null"
+                       th:text="#{notifications.filter.all}"></a>
+                </nav>
+                <form method="get" class="cl-notifications-type" th:action="@{${basePath}}">
+                    <input type="hidden" name="filter" th:value="${unreadOnly} ? 'unread' : 'all'">
+                    <label for="notificationType" th:text="#{notifications.filter.type}"></label>
+                    <select id="notificationType" name="type">
+                        <option value="" th:text="#{notifications.filter.allTypes}"></option>
+                        <option th:each="type : ${types}" th:value="${type.name()}"
+                                th:selected="${type.name() == selectedType}"
+                                th:text="#{${'store.notification.type.' + type.name()}}"></option>
+                    </select>
+                    <button type="submit" class="cl-button" th:text="#{notifications.filter.apply}"></button>
+                </form>
+            </div>
+
+            <div th:if="${#lists.isEmpty(notifications)}" class="cl-notifications-empty"
+                 th:text="${unreadOnly} ? #{notifications.empty.unread} : #{notifications.empty.all}"></div>
+
+            <th:block th:unless="${#lists.isEmpty(notifications)}">
+                <form method="post" id="notificationsBulk" class="cl-notifications-bulk" th:action="@{${basePath + '/read'}}">
+                    <input type="hidden" name="redirect" th:value="${pageHref}">
+                    <label class="cl-notifications-check">
+                        <input type="checkbox" data-select-all>
+                        <span th:text="#{notifications.selectAll}"></span>
+                    </label>
+                    <button type="submit" class="cl-button" th:formaction="@{${basePath + '/read'}}"
+                            th:text="#{notifications.markRead}"></button>
+                    <button type="submit" class="cl-button" th:formaction="@{${basePath + '/unread'}}"
+                            th:text="#{notifications.markUnread}"></button>
+                </form>
+
+                <ul class="cl-notification-list">
+                    <li th:each="notification : ${notifications}" class="cl-notification-item"
+                        th:classappend="${notification.unread()} ? 'is-unread' : ''">
+                        <input type="checkbox" name="ids" form="notificationsBulk" class="cl-notification-select"
+                               th:value="${notification.id()}"
+                               th:attr="aria-label=${#messages.msg('notifications.select.item', #messages.msg(notification.titleKey()))}">
+                        <span class="cl-notification-dot" aria-hidden="true"></span>
+                        <span class="cl-notification-icon icon" th:classappend="${notification.cssClass()}" aria-hidden="true">
+                            <i class="fas" th:classappend="${notification.icon()}"></i>
+                        </span>
+                        <div class="cl-notification-main">
+                            <div class="cl-notification-head">
+                                <span class="cl-notification-title" th:text="#{${notification.titleKey()}}"></span>
+                                <span class="is-sr-only" th:if="${notification.unread()}" th:text="#{notifications.unread.sr}"></span>
+                                <span class="cl-notification-date" th:text="${notification.createdAtText()}"></span>
+                            </div>
+                            <div class="cl-notification-message" th:text="${notification.message()}"></div>
+                            <div class="cl-notification-actions">
+                                <form th:if="${notification.actionKey() != null}" method="post"
+                                      th:action="@{${notification.openHref()}}">
+                                    <button type="submit" class="cl-link-button">
+                                        <span th:text="#{${notification.actionKey()}}"></span>
+                                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+                                    </button>
+                                </form>
+                                <form method="post" th:action="@{${basePath + (notification.unread() ? '/read' : '/unread')}}">
+                                    <input type="hidden" name="ids" th:value="${notification.id()}">
+                                    <input type="hidden" name="redirect" th:value="${pageHref}">
+                                    <button type="submit" class="cl-button"
+                                            th:text="${notification.unread()} ? #{notifications.markRead} : #{notifications.markUnread}"></button>
+                                </form>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <th:block th:if="${notificationPage.totalPages() > 1}">
+                    <div th:replace="~{fragments/pagination :: pagination(${basePath}, ${currentPage}, ${hasNextPage}, ${paginationParams})}"></div>
+                    <div class="cl-notifications-pagination-label"
+                         th:text="#{notifications.pagination.label(${notificationPage.page()}, ${notificationPage.totalPages()})}"></div>
+                </th:block>
+            </th:block>
+
+            <script>
+                (function () {
+                    var selectAll = document.querySelector('[data-select-all]');
+                    if (!selectAll) {
+                        return;
+                    }
+                    selectAll.addEventListener('change', function () {
+                        document.querySelectorAll('.cl-notification-select').forEach(function (box) {
+                            box.checked = selectAll.checked;
+                        });
+                    });
+                })();
+            </script>
+
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

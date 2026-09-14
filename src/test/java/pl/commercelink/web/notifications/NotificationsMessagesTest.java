@@ -13,6 +13,14 @@ class NotificationsMessagesTest {
     private static final List<String> FLASH_KEYS = List.of(
             "notifications.flash.markedRead", "notifications.flash.markedUnread", "notifications.flash.nothingSelected");
 
+    private static final List<String> PAGE_KEYS = List.of(
+            "notifications.title", "notifications.markAllRead", "notifications.markAllRead.short", "notifications.viewAll",
+            "notifications.empty.all", "notifications.empty.unread", "notifications.filter.aria",
+            "notifications.filter.unread", "notifications.filter.all", "notifications.filter.type",
+            "notifications.filter.allTypes", "notifications.filter.apply", "notifications.selectAll",
+            "notifications.select.item", "notifications.markRead", "notifications.markUnread",
+            "notifications.unreadBadge", "notifications.unread.sr", "notifications.pagination.label");
+
     private static void assertTranslated(List<String> keys) {
         for (String language : List.of("pl", "en")) {
             // given
@@ -27,5 +35,11 @@ class NotificationsMessagesTest {
     void translatesTheBulkActionMessagesInBothLanguages() {
         // when / then
         assertTranslated(FLASH_KEYS);
+    }
+
+    @Test
+    void translatesThePageAndDropdownTextsInBothLanguages() {
+        // when / then
+        assertTranslated(PAGE_KEYS);
     }
 }
