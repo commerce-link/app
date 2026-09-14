@@ -10,6 +10,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.scheduling.InvalidScheduleException;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.PaginationUtil;
@@ -69,6 +71,9 @@ public class ProductCatalogController {
     @Value("${application.env}")
     private String env;
 
+    @Value("${scheduling.min-interval-minutes}")
+    private int scheduleMinIntervalMinutes;
+
     @Autowired
     private MessageSource messageSource;
     private static final int CATALOGS_PAGE_SIZE = 25;
@@ -95,6 +100,7 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
+        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
         return "catalogDetails";
     }
 
@@ -110,16 +116,34 @@ public class ProductCatalogController {
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}")
-    public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog, Model model) {
+    public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog,
+                                     RedirectAttributes redirectAttributes) {
+        String schedule = PollingSchedule.normalizeOrNull(productCatalog.getPricelistSchedule());
+        if (schedule != null) {
+            try {
+                PollingSchedule.parse(schedule, scheduleMinIntervalMinutes);
+            } catch (InvalidScheduleException e) {
+                String code = e.getReason() == InvalidScheduleException.Reason.TOO_FREQUENT
+                        ? "catalog.pricelist.schedule.error.too.frequent"
+                        : "catalog.pricelist.schedule.error.invalid";
+                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code,
+                        new Object[]{schedule, scheduleMinIntervalMinutes}, LocaleContextHolder.getLocale()));
+                return "redirect:/dashboard/catalogs/" + catalogId;
+            }
+        }
+
         ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
         if (catalog == null) {
-            pricelistEventScheduler.createRecurringSchedule(getStoreId(), catalogId);
+            pricelistEventScheduler.schedule(getStoreId(), catalogId, schedule);
 
             catalog = productCatalog;
+        } else if (!Objects.equals(schedule, catalog.getPricelistSchedule())) {
+            pricelistEventScheduler.schedule(getStoreId(), catalogId, schedule);
         }
 
         catalog.setName(productCatalog.getName());
         catalog.setDeletionProtection(productCatalog.isDeletionProtection());
+        catalog.setPricelistSchedule(schedule);
 
         productCatalogRepository.save(catalog);
 
