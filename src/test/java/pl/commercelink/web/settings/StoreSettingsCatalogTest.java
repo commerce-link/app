@@ -17,6 +17,7 @@ class StoreSettingsCatalogTest {
 
     @Test
     void listsTheSectionsInTheOrderANewStoreIsSetUp() {
+        // when / then
         assertThat(StoreSettingsCatalog.sections()).extracting(SettingsSection::messageKey).containsExactly(
                 "store.settings.group.company", "store.settings.group.finance", "store.settings.group.sales",
                 "store.settings.group.fulfilment", "store.settings.group.returns", "store.settings.group.communication");
@@ -49,6 +50,7 @@ class StoreSettingsCatalogTest {
 
     @Test
     void findsATileOnlyByItsExactRelativePath() {
+        // when / then
         assertThat(StoreSettingsCatalog.tileAt("/warehouse")).map(SettingsTile::key).contains("warehouse");
         assertThat(StoreSettingsCatalog.tileAt("/rma-centers/new")).isEmpty();
         assertThat(StoreSettingsCatalog.tileAt("")).isEmpty();
@@ -56,6 +58,7 @@ class StoreSettingsCatalogTest {
 
     @Test
     void pointsTheSuperAdminAtTheSettingsOfTheStoreTheyWorkIn() {
+        // when / then
         assertThat(StoreSettingsCatalog.homeHref(UserRole.ADMIN, "store-1")).isEqualTo("/dashboard/store");
         assertThat(StoreSettingsCatalog.homeHref(UserRole.SUPER_ADMIN, "store-1")).isEqualTo("/dashboard/store/store-1");
     }
