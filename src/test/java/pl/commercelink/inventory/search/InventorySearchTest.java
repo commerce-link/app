@@ -216,7 +216,7 @@ class InventorySearchTest {
     }
 
     @Test
-    void cheapestAndPercentagesIgnoreWarehouseCostAndZeroPrices() {
+    void cheapestIgnoresWarehouseCostAndZeroPrices() {
         // given
         when(view.findByEan(EAN)).thenReturn(offers(
                 offer("AB", 110.0, 80), offer("Nowak", 0.0, 0), offer("Elko", 100.0, 58)));
@@ -230,12 +230,10 @@ class InventorySearchTest {
         // then
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko", "AB", "Nowak");
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, false, false);
-        assertThat(found.supplierOffers()).extracting(OfferRow::percentAboveCheapest).containsExactly(null, 10.0, null);
         assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
-        assertThat(found.prices().lowestNet()).isEqualTo(100.0);
-        assertThat(found.supplierOffers().get(0).netPrice()).isEqualTo(100.0);
+        assertThat(found.supplierOffers().get(0).grossPrice()).isEqualTo(Price.fromNet(100.0).grossValue());
         assertThat(found.supplierOffers().get(0).deliveryDays()).isEqualTo(3);
-        assertThat(found.warehouseRows().get(0).netUnitCost()).isEqualTo(50.0);
+        assertThat(found.warehouseRows().get(0).grossUnitCost()).isEqualTo(Price.fromNet(50.0).grossValue());
         assertThat(found.prices().lowestSupplierLabel()).isEqualTo("Elko");
         assertThat(found.prices().suppliersWithStock()).isEqualTo(2);
         assertThat(found.prices().supplierCount()).isEqualTo(3);
@@ -324,7 +322,6 @@ class InventorySearchTest {
         // then
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko", "AB", "Kosatec");
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, true, false);
-        assertThat(found.supplierOffers()).extracting(OfferRow::percentAboveCheapest).containsExactly(null, null, 10.0);
     }
 
     @Test

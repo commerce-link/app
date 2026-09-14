@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.ToDoubleFunction;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
@@ -121,12 +120,10 @@ public class InventorySearch {
                         modeOf.apply(item.supplier()),
                         item.ean(),
                         item.mfn(),
-                        item.netPrice(),
                         Price.fromNet(item.netPrice()).grossValue(),
                         item.qty(),
                         deliveryDays(item),
-                        item.netPrice() > 0 && item.netPrice() == lowestNet,
-                        percentAbove(item.netPrice(), lowestNet)))
+                        item.netPrice() > 0 && item.netPrice() == lowestNet))
                 .toList();
     }
 
@@ -135,18 +132,10 @@ public class InventorySearch {
         return item.leadTimeDays() + supplierRegistry.get(item.supplier()).shippingTermsFor("PL").arrivalDays();
     }
 
-    private static Double percentAbove(double netPrice, double lowestNet) {
-        if (netPrice <= 0 || lowestNet <= 0 || netPrice == lowestNet) {
-            return null;
-        }
-        return Math.round((netPrice - lowestNet) / lowestNet * 1000) / 10.0;
-    }
-
     private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items) {
         return items.stream()
                 .sorted(Comparator.comparing(WarehouseItemView::isInDelivery))
-                .map(item -> new WarehouseRow(item.getEan(), item.getMfn(), item.getPrice().netValue(),
-                        item.getPrice().grossValue(), item.getQty(),
+                .map(item -> new WarehouseRow(item.getEan(), item.getMfn(), item.getPrice().grossValue(), item.getQty(),
                         item.isInDelivery(), item.getCondition()))
                 .toList();
     }
@@ -154,13 +143,10 @@ public class InventorySearch {
     private static PriceSummary prices(List<OfferRow> offers, List<WarehouseRow> rows) {
         int inStock = rows.stream().filter(row -> !row.inDelivery()).mapToInt(WarehouseRow::qty).sum();
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
-        double medianNet = medianNet(offers);
         return new PriceSummary(
-                lowest(offers, OfferRow::netPrice),
-                lowest(offers, OfferRow::grossPrice),
+                offers.stream().filter(OfferRow::cheapest).mapToDouble(OfferRow::grossPrice).findFirst().orElse(0),
                 offers.stream().filter(OfferRow::cheapest).map(OfferRow::supplierLabel).findFirst().orElse(null),
-                medianNet,
-                medianNet > 0 ? Price.fromNet(medianNet).grossValue() : 0,
+                medianGross(offers),
                 offers.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),
                 (int) offers.stream().filter(OfferRow::hasStock).map(OfferRow::supplier).distinct().count(),
@@ -169,16 +155,12 @@ public class InventorySearch {
                 inDelivery);
     }
 
-    private static double lowest(List<OfferRow> offers, ToDoubleFunction<OfferRow> price) {
-        return offers.stream().filter(OfferRow::cheapest).mapToDouble(price).findFirst().orElse(0);
-    }
-
-    private static double medianNet(List<OfferRow> offers) {
+    private static double medianGross(List<OfferRow> offers) {
         // listed offers, not warehouse stock, drive the summary price; MatchedInventory's own
         // lowest/median can disagree with the cheapest row (skips qty==1) or blow up on an all-zero-price match
         List<Double> pricedOffers = offers.stream()
                 .filter(OfferRow::hasPrice)
-                .map(OfferRow::netPrice)
+                .map(OfferRow::grossPrice)
                 .sorted()
                 .toList();
         if (pricedOffers.isEmpty()) {

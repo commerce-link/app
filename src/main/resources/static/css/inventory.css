@@ -716,9 +716,9 @@
     overflow-x: auto;
 }
 
-/* the offers table is readable without horizontal scroll from 720px up; an overflow container would stop the
-   header from sticking under the top bar, so the wrapper only scrolls on narrower screens */
-@media screen and (min-width: 720px) {
+/* from 900px the offers render as a table; an overflow container would stop the header from sticking under the
+   top bar, so the wrapper only scrolls on narrower screens (where offers are cards anyway) */
+@media screen and (min-width: 900px) {
     .cl-inv-table-wrap {
         overflow: visible;
     }
@@ -836,20 +836,28 @@
     table-layout: fixed;
 }
 
+.cl-inv-col-ean {
+    width: 150px;
+}
+
 .cl-inv-col-code {
-    width: 220px;
-}
-
-.cl-inv-col-delivery {
-    width: 130px;
-}
-
-.cl-inv-col-price {
     width: 180px;
 }
 
+.cl-inv-col-delivery {
+    width: 110px;
+}
+
+.cl-inv-col-price {
+    width: 140px;
+}
+
 .cl-inv-col-qty {
-    width: 100px;
+    width: 90px;
+}
+
+.cl-inv-page .cl-inv-offers tbody.is-after-warehouse tr:first-child td {
+    border-top: 2px solid var(--cl-line);
 }
 
 .cl-inv-page .cl-inv-table .cl-inv-code {
@@ -946,20 +954,24 @@
         height: 44px;
     }
 
+    .cl-inv-col-ean {
+        width: 125px;
+    }
+
     .cl-inv-col-code {
-        width: 150px;
+        width: 130px;
     }
 
     .cl-inv-col-delivery {
-        width: 100px;
+        width: 90px;
     }
 
     .cl-inv-col-price {
-        width: 150px;
+        width: 115px;
     }
 
     .cl-inv-col-qty {
-        width: 80px;
+        width: 75px;
     }
 
     .cl-inv-clear {
@@ -1008,7 +1020,10 @@
     .cl-inv-figure-value {
         font-size: 17px;
     }
+}
 
+/* six columns stop being readable as a table on narrow tablets, so offers switch to cards below 900px */
+@media screen and (max-width: 899px) {
     .cl-inv-page .cl-inv-offers thead {
         position: absolute;
         width: 1px;
@@ -1049,15 +1064,16 @@
         grid-column: 1 / -1;
     }
 
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(4) {
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(5) {
         grid-column: 2;
-        grid-row: 2 / span 3;
+        grid-row: 2 / span 4;
         text-align: right;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(2)::before,
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(3)::before,
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(5)::before {
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(4)::before,
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(6)::before {
         content: attr(data-label) ": ";
         color: var(--cl-ink-3);
         font-size: 12px;

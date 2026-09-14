@@ -3,15 +3,14 @@ package pl.commercelink.inventory.search;
 import pl.commercelink.stores.ConnectionMode;
 
 public record OfferRow(String supplier, String supplierLabel, ConnectionMode mode, String productEan, String productCode,
-                       double netPrice, double grossPrice, int qty, int deliveryDays, boolean cheapest,
-                       Double percentAboveCheapest) {
+                       double grossPrice, int qty, int deliveryDays, boolean cheapest) {
 
     public boolean hasStock() {
         return qty > 0;
     }
 
     public boolean hasPrice() {
-        return netPrice > 0;
+        return grossPrice > 0;
     }
 
     public boolean hasDeliveryDays() {
