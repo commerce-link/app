@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -121,5 +124,83 @@ class SupplierSectionFragmentTest {
         assertThat(html).contains("th:fragment=\"sectionError\"");
         assertThat(html).contains("class=\"notification is-danger\"");
         assertThat(html).contains("th:text=\"${errorMessage}\"");
+    }
+
+    /**
+     * Thymeleaf only notices an arity mismatch at render time, and by then the response is half
+     * written: the page comes back truncated with a 200, which is exactly how this was found (the
+     * manual section of store-fulfilment.html still passed ten arguments after the fragment grew an
+     * eleventh). A fragment-only test cannot see that, so this walks every call site in every
+     * template and compares the argument count against the declared signature.
+     */
+    @Test
+    void everyCallSiteOfTheSupplierFragmentsPassesTheDeclaredNumberOfArguments() throws Exception {
+        // given / when / then
+        assertArityMatchesEverywhere("supplierSection", FRAGMENT);
+        assertArityMatchesEverywhere("supplierTable",
+                Path.of("src/main/resources/templates/fragments/supplier-table.html"));
+    }
+
+    private void assertArityMatchesEverywhere(String fragmentName, Path declaringFile) throws Exception {
+        String declaration = Files.readString(declaringFile, StandardCharsets.UTF_8);
+        int declared = argumentCount(declaration, declaration.indexOf("th:fragment=\"" + fragmentName + "("));
+        assertThat(declared).as("declared parameters of %s", fragmentName).isGreaterThan(0);
+
+        List<String> checked = new ArrayList<>();
+        try (Stream<Path> templates = Files.walk(Path.of("src/main/resources/templates"))) {
+            for (Path template : templates.filter(p -> p.toString().endsWith(".html")).toList()) {
+                String html = Files.readString(template, StandardCharsets.UTF_8);
+                int at = html.indexOf(fragmentName + "(");
+                while (at >= 0) {
+                    // skip the declaration itself, which is what `declared` was read from
+                    if (!html.startsWith("th:fragment=\"" + fragmentName + "(", at - ("th:fragment=\"").length())) {
+                        assertThat(argumentCount(html, at))
+                                .as("arguments passed to %s in %s", fragmentName, template)
+                                .isEqualTo(declared);
+                        checked.add(template.getFileName().toString());
+                    }
+                    at = html.indexOf(fragmentName + "(", at + 1);
+                }
+            }
+        }
+        assertThat(checked).as("call sites of %s", fragmentName).isNotEmpty();
+    }
+
+    /** Number of top-level arguments in the parenthesised list that starts at or after `from`. */
+    private int argumentCount(String text, int from) {
+        int open = text.indexOf('(', from);
+        if (open < 0) {
+            return 0;
+        }
+        int depth = 0;
+        int arguments = 1;
+        char quote = 0;
+        for (int i = open; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            switch (c) {
+                case '\'' -> quote = c;
+                case '(', '{', '[' -> depth++;
+                case ')', '}', ']' -> {
+                    depth--;
+                    if (depth == 0) {
+                        return arguments;
+                    }
+                }
+                case ',' -> {
+                    if (depth == 1) {
+                        arguments++;
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+        throw new IllegalStateException("unbalanced argument list at " + from);
     }
 }
