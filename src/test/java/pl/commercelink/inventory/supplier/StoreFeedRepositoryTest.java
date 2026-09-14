@@ -117,4 +117,16 @@ class StoreFeedRepositoryTest {
         // then
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void storeKeepsTheDashOfATokenedIdentityInTheKey() {
+        // given
+        byte[] data = "rows".getBytes();
+
+        // when
+        repository.store("oh4d5y15it", "Kosatec-k7f3a9c2", data, "csv");
+
+        // then
+        verify(fileStorage).put("commercelink-stores", "oh4d5y15it/supplier-feeds/kosatec-k7f3a9c2-feed.csv", data);
+    }
 }
