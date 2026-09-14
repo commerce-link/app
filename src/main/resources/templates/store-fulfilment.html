@@ -338,6 +338,15 @@
                                 </label>
                             </div>
 
+                            <div class="field">
+                                <label class="label" th:text="#{store.supplier.external.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="externalSupplierId" id="supplier-external-id"
+                                           th:placeholder="#{store.supplier.external.id.placeholder}" />
+                                </div>
+                                <p class="help" th:text="#{store.supplier.external.id.description}"></p>
+                            </div>
+
                             <div th:each="entry : ${supplierFields}"
                                  th:id="'supplier-fields-' + ${entry.key}" class="supplier-fields">
                                 <div class="field" th:each="cf : ${entry.value}">
@@ -412,6 +421,7 @@
                     var title = document.getElementById('supplier-modal-title');
                     var pricing = document.getElementById('supplier-pricing');
                     var fulfilment = document.getElementById('supplier-fulfilment');
+                    var externalId = document.getElementById('supplier-external-id');
                     var scheduleWrap = document.getElementById('supplier-schedule-wrap');
                     var schedule = scheduleWrap.querySelector('.schedule-field');
                     var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
@@ -442,7 +452,8 @@
                             includeInPricing: tr.dataset.includePricing === 'true',
                             includeInFulfilment: tr.dataset.includeFulfilment === 'true',
                             // absent attribute (a blank schedule) means the platform default
-                            feedSchedule: tr.dataset.feedSchedule || ''
+                            feedSchedule: tr.dataset.feedSchedule || '',
+                            externalSupplierId: tr.dataset.externalSupplierId || ''
                         };
                     }
 
@@ -544,11 +555,13 @@
                             mode.value = row.mode;
                             pricing.checked = row.includeInPricing;
                             fulfilment.checked = row.includeInFulfilment;
+                            externalId.value = row.externalSupplierId;
                         } else {
                             select.value = identity || '';
                             mode.value = 'OWN';
                             pricing.checked = true;
                             fulfilment.checked = true;
+                            externalId.value = '';
                         }
                         // One modal serves every supplier, so the schedule builder has to be
                         // re-read from this row rather than parsed once at page load -- otherwise
@@ -729,6 +742,14 @@
                                 </label>
                             </div>
                             <div class="field">
+                                <label class="label" th:text="#{store.supplier.external.id}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="externalSupplierId" id="manual-config-external-id"
+                                           th:placeholder="#{store.supplier.external.id.placeholder}" />
+                                </div>
+                                <p class="help" th:text="#{store.supplier.external.id.description}"></p>
+                            </div>
+                            <div class="field">
                                 <button type="button" class="button is-link is-light is-small"
                                         id="manual-config-upload" th:text="#{store.manual.upload.open}"></button>
                                 <span class="icon has-text-grey ml-1 cl-tooltip"
@@ -784,6 +805,7 @@
                     var configHint = document.getElementById('manual-config-hint');
                     var configPricing = document.getElementById('manual-config-pricing');
                     var configFulfilment = document.getElementById('manual-config-fulfilment');
+                    var configExternalId = document.getElementById('manual-config-external-id');
                     var configUpload = document.getElementById('manual-config-upload');
                     var configFile = document.getElementById('manual-config-file');
                     var configFileInput = document.getElementById('manual-config-file-input');
@@ -810,7 +832,8 @@
                             enabled: tr.dataset.enabled === 'true',
                             includeInPricing: tr.dataset.includePricing === 'true',
                             includeInFulfilment: tr.dataset.includeFulfilment === 'true',
-                            feedLastModified: tr.dataset.feedLastModified || null
+                            feedLastModified: tr.dataset.feedLastModified || null,
+                            externalSupplierId: tr.dataset.externalSupplierId || ''
                         };
                     }
 
@@ -958,6 +981,7 @@
                         configHint.classList.toggle('is-hidden', fileUploaded);
                         configPricing.checked = row.includeInPricing;
                         configFulfilment.checked = row.includeInFulfilment;
+                        configExternalId.value = row.externalSupplierId;
                         configFile.textContent = fileUploaded ? feedPresentLabel : feedMissingLabel;
                         configFileInput.value = '';
                         configError.classList.add('is-hidden');

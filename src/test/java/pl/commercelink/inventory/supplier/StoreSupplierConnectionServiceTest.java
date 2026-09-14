@@ -25,6 +25,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -191,6 +193,29 @@ class StoreSupplierConnectionServiceTest {
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
         verify(persister).persist(any(), captor.capture(), anyMap());
         assertEquals(ConnectionMode.OWN, captor.getValue().getSupplierConnections().get(0).getMode());
+    }
+
+    @Test
+    void connectOrUpdateStoresTheTrimmedExternalSupplierIdAndDropsABlankOne() {
+        // given
+        Store store = storeWith(true);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
+        SupplierSelectionForm withId = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true);
+        withId.setExternalSupplierId(" 2 ");
+        SupplierSelectionForm blankId = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true);
+        blankId.setExternalSupplierId("   ");
+
+        // when
+        service.connectOrUpdate(store, withId, Map.of("login", "u"));
+        service.connectOrUpdate(store, blankId, Map.of("login", "u"));
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister, times(2)).persist(any(), captor.capture(), anyMap());
+        assertEquals("2", captor.getAllValues().get(0).getSupplierConnections().get(0).getExternalSupplierId());
+        assertNull(captor.getAllValues().get(1).getSupplierConnections().get(0).getExternalSupplierId());
     }
 
     @Test

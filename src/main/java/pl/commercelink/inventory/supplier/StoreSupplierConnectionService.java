@@ -72,6 +72,7 @@ public class StoreSupplierConnectionService {
         StoreSupplierConnection edited = new StoreSupplierConnection(
                 selection.getSupplierName(), mode,
                 selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+        edited.setExternalSupplierId(StringUtils.trimToNull(selection.getExternalSupplierId()));
         if (mode == ConnectionMode.OWN) {
             edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
         }

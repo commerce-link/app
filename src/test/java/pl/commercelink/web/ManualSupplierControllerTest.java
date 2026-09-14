@@ -83,6 +83,28 @@ class ManualSupplierControllerTest {
     }
 
     @Test
+    void theSubmittedExternalSupplierIdReachesTheManualSelection() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.saveSelection(IDENTITY, true, true, false, "12345", Locale.ENGLISH, model, response);
+
+            // then
+            verify(manualSupplierService).applySelections(eq(STORE_ID),
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, "12345"))));
+        }
+    }
+
+    @Test
     void theSuperAdminSaveVariantRendersTheSectionForTheStoreFromThePath() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());

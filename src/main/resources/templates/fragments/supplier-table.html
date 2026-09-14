@@ -12,6 +12,7 @@
                 <th th:if="${manual}" th:text="#{store.supplier.column.enabled}"></th>
                 <th th:text="#{store.supplier.column.pricing}"></th>
                 <th th:text="#{store.supplier.column.fulfilment}"></th>
+                <th th:text="#{store.supplier.column.externalId}"></th>
                 <th th:text="${manual} ? #{store.supplier.column.file} : #{store.supplier.column.feed}"></th>
                 <th th:unless="${manual}" th:text="#{store.supplier.column.schedule}"></th>
                 <th th:text="#{general.actions}"></th>
@@ -22,7 +23,7 @@
                 th:attr="data-mode=${row.mode()},data-include-pricing=${row.includeInPricing()},
                          data-include-fulfilment=${row.includeInFulfilment()},data-label=${row.label()},
                          data-enabled=${row.enabled()},data-feed-last-modified=${row.feedLastModified()},
-                         data-feed-schedule=${row.feedSchedule()}">
+                         data-feed-schedule=${row.feedSchedule()},data-external-supplier-id=${row.externalSupplierId()}">
                 <td>
                     <span th:text="${row.label()}">name</span>
                     <span class="tag is-warning is-light ml-2" th:if="${!row.knownProvider()}"
@@ -50,6 +51,7 @@
                     <span class="tag is-light" th:unless="${row.includeInFulfilment()}"
                           th:text="#{store.supplier.flag.no}"></span>
                 </td>
+                <td><span th:if="${row.hasExternalSupplierId()}" th:text="${row.externalSupplierId()}"></span><span th:unless="${row.hasExternalSupplierId()}" class="has-text-grey">&mdash;</span></td>
                 <td>
                     <span th:if="${row.hasFeed()}"
                           th:text="${#temporals.format(row.feedLastModified(), 'dd.MM.yyyy HH:mm')}"></span>

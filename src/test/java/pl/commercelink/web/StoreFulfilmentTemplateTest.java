@@ -598,4 +598,21 @@ class StoreFulfilmentTemplateTest {
         // no element to read the default from or swap the text of
         assertThat(html).doesNotContain("<p th:text=\"#{confirm.delete}\">");
     }
+
+    @Test
+    void rendersTheMarketplaceIdFieldInBothSupplierModalsAndRefillsItOnOpen() throws Exception {
+        String html = template();
+        assertThat(html).contains("id=\"supplier-external-id\"");
+        assertThat(html).contains("id=\"manual-config-external-id\"");
+        assertThat(html).contains("name=\"externalSupplierId\" id=\"supplier-external-id\"");
+        assertThat(html).contains("name=\"externalSupplierId\" id=\"manual-config-external-id\"");
+
+        // the field is refilled from the row on every open, not left stuck from the previous one
+        assertThat(html).contains("externalId.value = row.externalSupplierId;");
+        assertThat(html).contains("configExternalId.value = row.externalSupplierId;");
+
+        // both rowFor() functions read it straight off the (possibly just-swapped) row instead of
+        // a stale page-load snapshot
+        assertThat(countOccurrences(html, "tr.dataset.externalSupplierId")).isEqualTo(2);
+    }
 }

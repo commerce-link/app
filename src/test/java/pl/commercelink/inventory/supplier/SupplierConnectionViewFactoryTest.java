@@ -60,6 +60,24 @@ class SupplierConnectionViewFactoryTest {
     }
 
     @Test
+    void carriesTheStoredExternalSupplierIdOntoTheRow() {
+        // given -- the row is what the modal reads the current marketplace id back from
+        StoreSupplierConnection elko = connection("Elko", ConnectionMode.OWN);
+        elko.setExternalSupplierId("12345");
+        Store store = storeWith(elko);
+        when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
+        when(supplierRegistry.exists("Elko")).thenReturn(true);
+
+        // when
+        SupplierConnectionViewFactory.SupplierConnectionViews views = factory.views(store);
+
+        // then
+        SupplierConnectionView row = views.external().get(0);
+        assertThat(row.externalSupplierId()).isEqualTo("12345");
+        assertThat(row.hasExternalSupplierId()).isTrue();
+    }
+
+    @Test
     void aGlobalConnectionHasNoScheduleOfItsOwn() {
         // given -- global connections ride the platform-wide feed
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
