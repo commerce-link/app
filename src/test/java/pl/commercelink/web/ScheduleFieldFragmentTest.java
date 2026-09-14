@@ -83,7 +83,7 @@ class ScheduleFieldFragmentTest {
 
         // then -- javascript inlining escapes non-ASCII, so the em dash arrives as —
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("Default \\u2014 once a night");
+        assertThat(html).contains("Default \\u2014 once a day");
         assertThat(html).contains("Every {0} min");
         assertThat(html).contains("On weekdays at {0}");
         // a stored expression the builder cannot show is named, with the expression itself

@@ -221,7 +221,7 @@ class SupplierSectionRenderingTest {
 
         // then
         assertThat(html).contains("&mdash;");
-        assertThat(html).doesNotContain("Default — once a night");
+        assertThat(html).doesNotContain("Default — once a day");
         assertThat(html).doesNotContain("data-feed-schedule");
     }
 
