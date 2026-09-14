@@ -775,6 +775,10 @@
     margin-left: 6px;
 }
 
+.cl-inv-page .cl-inv-table td .cl-status {
+    white-space: nowrap;
+}
+
 .cl-inv-sort {
     display: inline-flex;
     align-items: center;
@@ -845,7 +849,7 @@
 }
 
 .cl-inv-col-delivery {
-    width: 110px;
+    width: 120px;
 }
 
 .cl-inv-col-price {
