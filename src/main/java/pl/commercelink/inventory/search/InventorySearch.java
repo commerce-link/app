@@ -74,7 +74,8 @@ public class InventorySearch {
                 match == null ? warehouseHeader(query, warehouseItems) : header(match.inventory()),
                 offers,
                 rows,
-                prices(offers, rows));
+                prices(offers, rows),
+                stock != null);
     }
 
     private Match firstMatch(String query, InventoryView view) {

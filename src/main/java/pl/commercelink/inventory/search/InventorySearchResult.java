@@ -13,7 +13,7 @@ public sealed interface InventorySearchResult {
     Kind kind();
 
     record Found(MatchedBy matchedBy, ProductHeader product, List<OfferRow> supplierOffers,
-                 List<WarehouseRow> warehouseRows, PriceSummary prices) implements InventorySearchResult {
+                 List<WarehouseRow> warehouseRows, PriceSummary prices, boolean warehouseChecked) implements InventorySearchResult {
         @Override
         public Kind kind() {
             return Kind.FOUND;

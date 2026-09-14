@@ -34,13 +34,18 @@ class InventoryResultsRenderingTest {
     }
 
     private InventorySearchResult.Found found() {
+        return found(true);
+    }
+
+    private InventorySearchResult.Found found(boolean warehouseChecked) {
         return new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
                 List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 389.0, 58, true, null),
                         new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false, 4.1),
                         new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 439.9, 0, false, 13.1)),
                 List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed),
                         new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged)),
-                new PriceSummary(389.0, "Elko", 412.5, 3, 138, 2, 3, 3, 2));
+                new PriceSummary(389.0, "Elko", 412.5, 3, 138, 2, 3, 3, 2),
+                warehouseChecked);
     }
 
     @Test
@@ -59,6 +64,16 @@ class InventoryResultsRenderingTest {
         assertThat(html).contains("+4,1%").contains("+13,1%");
         assertThat(html).contains("data-sort-price=\"405.0\"").contains("data-inventory-sortable");
         assertThat(html).contains("global").contains("manual");
+    }
+
+    @Test
+    void omitsTheWarehouseFigureWhenTheBuiltInWarehouseWasNotQueried() {
+        // when
+        String html = engine.process(RESULTS, context(found(false), true));
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).doesNotContain("In warehouse").doesNotContain("+2 in transit");
     }
 
     @Test

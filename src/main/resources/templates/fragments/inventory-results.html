@@ -81,7 +81,7 @@
                 <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.supplierQty()})}"></dd>
                 <dd class="cl-inv-hint" th:text="#{inventory.figure.available.hint(${prices.suppliersWithStock()}, ${prices.supplierCount()})}"></dd>
             </div>
-            <div class="cl-inv-figure" th:unless="${superAdmin}">
+            <div class="cl-inv-figure" th:if="${!superAdmin and result.warehouseChecked()}">
                 <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.warehouse}"></dt>
                 <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.warehouseInStockQty()})}"></dd>
                 <dd class="cl-inv-hint" th:if="${prices.warehouseInDeliveryQty() > 0}"
