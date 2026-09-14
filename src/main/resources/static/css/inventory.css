@@ -12,6 +12,7 @@
     --cl-info-soft: #e6edfb;
     --cl-bad: #a61b1b;
     --cl-bad-soft: #fbe7e7;
+    --cl-ok-tint: #f3f8f5;
 }
 
 .cl-status {
@@ -52,8 +53,8 @@
 }
 
 .cl-status.is-info {
-    color: var(--cl-accent-ink);
-    background: var(--cl-accent-soft);
+    color: var(--cl-info);
+    background: var(--cl-info-soft);
 }
 
 .cl-inv-page {
@@ -67,6 +68,18 @@
     list-style: none;
     margin: 0;
     padding: 0;
+}
+
+/* Beat Bulma's .content ul/dl:not(:last-child) and h2/h3:not(:first-child) margins: equal specificity,
+   later in the cascade (inventory.css is linked after Bulma). */
+.cl-inv-page ul:not(:last-child),
+.cl-inv-page dl:not(:last-child) {
+    margin-bottom: 0;
+}
+
+.cl-inv-page h2:not(:first-child),
+.cl-inv-page h3:not(:first-child) {
+    margin-top: 0;
 }
 
 .cl-inv-page li + li {
@@ -182,7 +195,7 @@
 .cl-inv-skeleton {
     display: block;
     border-radius: 6px;
-    background: linear-gradient(90deg, #e6ebf2 0%, #f3f6fa 50%, #e6ebf2 100%);
+    background: linear-gradient(90deg, var(--cl-line) 0%, var(--cl-surface-2) 50%, var(--cl-line) 100%);
     background-size: 200% 100%;
     animation: cl-inv-shimmer 1.2s ease-in-out infinite;
 }
@@ -240,7 +253,7 @@
 .cl-inv-more {
     margin-left: 4px;
     font-weight: 600;
-    color: var(--cl-accent-ink);
+    color: var(--cl-ink-2);
 }
 
 .cl-inv-sources-actions {
@@ -391,7 +404,7 @@
 .cl-inv-button.is-primary {
     border-color: var(--cl-accent);
     background: var(--cl-accent);
-    color: #fff;
+    color: var(--cl-surface);
 }
 
 .cl-inv-button.is-primary:hover {
@@ -550,6 +563,12 @@
     font-size: 13.5px;
 }
 
+/* Higher specificity than both Bulma's and the generic .cl-inv-page ul:not(:last-child) reset above,
+   so the 12px top margin this list needs stays effective regardless of source order. */
+.cl-inv-page .cl-inv-tips:not(:last-child) {
+    margin-bottom: 0;
+}
+
 .cl-inv-page .cl-inv-empty .cl-inv-button {
     margin-top: 14px;
 }
@@ -700,7 +719,7 @@
 }
 
 .cl-inv-page .cl-inv-offer.is-cheapest td {
-    background: #f3f8f5;
+    background: var(--cl-ok-tint);
 }
 
 .cl-inv-page .cl-inv-offer.is-dim td,
@@ -768,6 +787,16 @@
         width: 44px;
         height: 44px;
     }
+
+    .cl-inv-clear {
+        width: 44px;
+        height: 44px;
+        right: 0;
+    }
+
+    .cl-inv-input {
+        padding-right: 48px;
+    }
 }
 
 @media screen and (max-width: 719px) {
@@ -811,6 +840,7 @@
         width: 1px;
         height: 1px;
         overflow: hidden;
+        visibility: hidden;
         clip: rect(0 0 0 0);
     }
 
@@ -838,7 +868,7 @@
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer.is-cheapest {
-        background: #f3f8f5;
+        background: var(--cl-ok-tint);
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(1) {

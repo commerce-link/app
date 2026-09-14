@@ -38,12 +38,21 @@ class InventoryScriptContractTest {
 
     @Test
     void styleSheetDefinesTheStatusTokensSharedWithTheSettingsPages() throws Exception {
-        // given / when
+        // given
         String css = read("src/main/resources/static/css/inventory.css");
 
-        // then
+        // when / then
         assertThat(css)
                 .contains("--cl-ok: #1d6b45").contains("--cl-warn: #8a4b00").contains(".cl-status.is-ok")
                 .contains("prefers-reduced-motion").contains("@media screen and (max-width: 719px)");
+    }
+
+    @Test
+    void styleSheetKeepsInfoStatusOnTokensAndDefinesTheCheapestRowTint() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+
+        // when / then
+        assertThat(css).contains(".cl-status.is-info").contains("var(--cl-info)").contains("--cl-ok-tint");
     }
 }

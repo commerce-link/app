@@ -61,7 +61,7 @@
                     <span data-when-idle th:text="#{inventory.search.submit}"></span>
                     <span data-when-busy hidden th:text="#{inventory.search.loading}"></span>
                 </button>
-                <p id="inventory-q-error" class="cl-inv-field-error" data-inventory-field-error hidden>
+                <p id="inventory-q-error" class="cl-inv-field-error" role="alert" data-inventory-field-error hidden>
                     <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span th:text="#{inventory.search.tooShort}"></span>
                 </p>
