@@ -75,7 +75,10 @@ abstract class OrderFulfilment {
         ordersRepository.save(order);
         orderItemsRepository.batchSave(fulfilledProducts);
 
-        if (fulfilledProducts.stream().allMatch(Item::isDelivered)) {
+        // Stock already on the shelf makes an item Delivered; stock still travelling to us on a confirmed
+        // delivery makes it Ordered. Either way this batch is fulfilled and the order's status must be
+        // recomputed - without this, an order fulfilled entirely from in-transit stock never reaches Assembly.
+        if (fulfilledProducts.stream().allMatch(i -> i.isDelivered() || i.isOrdered())) {
             orderLifecycle.update(order);
         }
     }

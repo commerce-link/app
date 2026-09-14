@@ -1,230 +1,77 @@
 <!DOCTYPE HTML>
-<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
 <head>
     <title th:text="#{general.title}"></title>
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@latest/dist/css/bulma-timeline.min.css">
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('cl.nav.collapsed') === '1') {
+                    document.documentElement.classList.add('cl-nav-collapsed');
+                }
+            } catch (error) {
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css">
+    <link rel="stylesheet" th:href="@{/css/commercelink.css}">
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
-    <style>
-        .navbar-logo {
-            min-height: 6.25rem;
-            min-width: 200px ;
-            padding: 10px 10px 10px 10px;
-        }
-        .navbar-item, .navbar-link {
-            padding-right: 38px;
-            padding-left: 5px;
-        }
-        @media screen and (min-width: 768px) {
-            .navbar-brand {
-                display: none;
-            }
-            .navbar-menu {
-                display: flex !important;
-                flex-shrink: 1;
-                min-width: 0;
-            }
-            .navbar-menu .navbar-start {
-                overflow-x: auto;
-                overflow-y: hidden;
-                flex: 1 1 auto;
-                min-width: 0;
-                margin-right: 0;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
-            }
-            .navbar-menu .navbar-start::-webkit-scrollbar {
-                display: none;
-            }
-            .navbar-menu .navbar-end {
-                display: flex;
-                align-items: center;
-                flex: 0 0 auto;
-            }
-        }
-        @media screen and (max-width: 767px) {
-            .navbar-menu {
-                display: none;
-            }
-            .navbar-menu.is-active {
-                display: block;
-            }
-            .navbar-menu.is-active .is-flex {
-                display: block !important;
-            }
-        }
-        .cl-tooltip {
-            position: relative;
-            cursor: help;
-        }
-        .cl-tooltip::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%) translateY(4px);
-            width: max-content;
-            max-width: 320px;
-            background: #1f2937;
-            color: #fff;
-            text-align: left;
-            padding: 8px 11px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            line-height: 1.4;
-            font-weight: 400;
-            white-space: normal;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity 0.15s ease, transform 0.15s ease;
-            z-index: 40;
-        }
-        .cl-tooltip::before {
-            content: "";
-            position: absolute;
-            bottom: calc(100% + 3px);
-            left: 50%;
-            transform: translateX(-50%);
-            border: 5px solid transparent;
-            border-top-color: #1f2937;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity 0.15s ease;
-            z-index: 40;
-        }
-        .cl-tooltip:hover::after,
-        .cl-tooltip:focus::after {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(0);
-        }
-        .cl-tooltip:hover::before,
-        .cl-tooltip:focus::before {
-            opacity: 1;
-            visibility: visible;
-        }
-        .cl-toast {
-            display: none;
-            position: fixed;
-            top: 32px;
-            right: 32px;
-            z-index: 9999;
-            padding: 16px 32px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            font-size: 1.1em;
-            color: #fff;
-            background: #48c774;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .cl-toast.is-danger { background: #f14668; }
-        .cl-toast.is-info { background: #3e8ed0; }
-    </style>
 </head>
 <body>
 <th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
 
-<div th:if="${showNavbar != false}">
-    <nav class="navbar" role="navigation" aria-label="main navigation">
-    <div class="navbar-brand">
-        <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-        </a>
-    </div>
+<a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>
 
-    <div id="navbarBasicExample" class="navbar-menu ml-5 mr-5">
-        <div class="navbar-start">
-            <div class="is-flex" sec:authorize="hasRole('USER')">
-                <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
-                <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
-                <a class="navbar-item" href="/dashboard/rma" th:text="#{nav.rma}"></a>
-                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries}"></a>
-                <a class="navbar-item" href="/dashboard/warehouse" th:text="#{nav.warehouse}"></a>
-                <a class="navbar-item" href="/dashboard/warehouse-documents" th:text="#{nav.warehouse.documents}"></a>
-                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
-                <a class="navbar-item" href="/dashboard/clients" th:text="#{nav.clients}"></a>
-            </div>
+<div class="cl-shell" th:classappend="${showNavbar == false or navigation == null} ? 'cl-shell-bare' : ''">
 
-            <div class="is-flex" sec:authorize="hasRole('ADMIN')">
-                <a class="navbar-item" href="/dashboard/offers" th:text="#{nav.offer}"></a>
-                <a class="navbar-item" href="/dashboard/orders" th:text="#{nav.orders}"></a>
-                <a class="navbar-item" href="/dashboard/rma" th:text="#{nav.rma}"></a>
-                <a class="navbar-item" href="/dashboard/fulfilment/queue" th:text="#{nav.fulfilment}"></a>
-                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries}"></a>
-                <a class="navbar-item" href="/dashboard/payments" th:text="#{nav.payments}"></a>
-                <a class="navbar-item" href="/dashboard/warehouse" th:text="#{nav.warehouse}"></a>
-                <a class="navbar-item" href="/dashboard/warehouse-documents" th:text="#{nav.warehouse.documents}"></a>
-                <a class="navbar-item" href="/dashboard/catalogs" th:text="#{nav.product.catalog}"></a>
-                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
-                <a class="navbar-item" href="/dashboard/clients" th:text="#{nav.clients}"></a>
-                <a class="navbar-item" href="/dashboard/reports" th:text="#{nav.reports}"></a>
-                <a class="navbar-item" href="/dashboard/store" th:text="#{nav.settings}"></a>
-            </div>
+    <th:block th:if="${showNavbar != false and navigation != null}">
+        <div th:replace="~{fragments/navigation :: sidebar}"></div>
+        <div class="cl-scrim" id="clScrim"></div>
+    </th:block>
 
-            <div class="is-flex" sec:authorize="hasRole('SUPER_ADMIN')">
-                <a class="navbar-item" href="/dashboard/fulfilment/queue" th:text="#{nav.fulfilment.queue}"></a>
-                <a class="navbar-item" href="/dashboard/deliveries" th:text="#{nav.deliveries.queue}"></a>
-                <a class="navbar-item" href="/dashboard/inventory" th:text="#{nav.inventory}"></a>
-                <a class="navbar-item" href="/dashboard/stores" th:text="#{nav.stores}"></a>
-                <a class="navbar-item" href="/dashboard/store/rma-centers" th:text="#{nav.rma.centers}"></a>
-            </div>
+    <div class="cl-main">
+        <th:block th:if="${showNavbar != false and navigation != null}">
+            <div th:replace="~{fragments/navigation :: topbar}"></div>
+        </th:block>
+
+        <div th:if="${successMessage}" class="notification is-success is-small has-text-centered">
+            <button class="delete" onclick="hideNotification(this)"></button>
+            <span th:text="${successMessage}"></span>
         </div>
-        <div class="navbar-end">
-            <!-- Language switcher -->
-            <div class="navbar-item">
-                <div class="buttons">
-                    <a class="button is-small" th:href="${currentUri + '?' + currentQuery + 'lang=en'}">EN</a>
-                    <a class="button is-small" th:href="${currentUri + '?' + currentQuery + 'lang=pl'}">PL</a>
+
+        <div th:if="${errorMessage}" class="notification is-danger is-small has-text-centered">
+            <button class="delete" onclick="hideNotification(this)"></button>
+            <span th:text="${errorMessage}"></span>
+        </div>
+
+        <div th:if="${warningMessage}" class="notification is-warning is-small has-text-centered">
+            <button class="delete" onclick="hideNotification(this)"></button>
+            <span th:text="${warningMessage}"></span>
+        </div>
+
+        <div th:if="${demoEnvironment}" class="notification is-warning mb-0" style="border-radius: 0;">
+            <p>
+                <strong th:text="#{banner.demo.title}"></strong>
+                <span th:text="#{banner.demo.integrations}"></span>
+                <span th:if="${demoExpiresAt != null}"
+                      th:text="#{banner.demo.expiry(${demoExpiresAt}, ${demoDaysLeft})}"></span>
+            </p>
+        </div>
+
+        <main id="clContent" class="cl-content" tabindex="-1">
+            <section class="section">
+                <div class="container content is-fluid" layout:fragment="content">
                 </div>
-            </div>
-            <form th:action="@{/logout}" method="get">
-                <button type="submit" class="button is-danger is-small" style="margin-top: 8px" th:text="#{general.logout}"> </button>
-            </form>
-        </div>
+            </section>
+        </main>
     </div>
-</nav>
 </div>
-
-<div th:if="${successMessage}" class="notification is-success is-small has-text-centered">
-    <button class="delete" onclick="hideNotification(this)"></button>
-    <span th:text="${successMessage}"></span>
-</div>
-
-<div th:if="${errorMessage}" class="notification is-danger is-small has-text-centered">
-    <button class="delete" onclick="hideNotification(this)"></button>
-    <span th:text="${errorMessage}"></span>
-</div>
-
-<div th:if="${warningMessage}" class="notification is-warning is-small has-text-centered">
-    <button class="delete" onclick="hideNotification(this)"></button>
-    <span th:text="${warningMessage}"></span>
-</div>
-
-<div th:if="${demoEnvironment}" class="notification is-warning mb-0" style="border-radius: 0;">
-    <p>
-        <strong th:text="#{banner.demo.title}"></strong>
-        <span th:text="#{banner.demo.integrations}"></span>
-        <span th:if="${demoExpiresAt != null}"
-              th:text="#{banner.demo.expiry(${demoExpiresAt}, ${demoDaysLeft})}"></span>
-    </p>
-</div>
-
-<section class="section">
-    <div class="container content is-fluid" layout:fragment="content">
-    </div>
-</section>
 
 <!-- Confirm delete modal -->
 <div id="deleteModal" class="modal">
@@ -256,17 +103,6 @@
 <script>
     let formToSubmit;
     let onConfirmCallback;
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const burger = document.querySelector('.navbar-burger');
-        const menu = burger && document.getElementById(burger.dataset.target);
-        if (burger && menu) {
-            burger.addEventListener('click', function () {
-                burger.classList.toggle('is-active');
-                menu.classList.toggle('is-active');
-            });
-        }
-    });
 
     function hideNotification(button) {
         const notification = button.parentNode;
@@ -361,6 +197,8 @@
         }, 2000);
     }
 </script>
+
+<script th:src="@{/js/navigation.js}" defer></script>
 
 </body>
 </html>

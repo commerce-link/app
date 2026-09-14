@@ -71,8 +71,7 @@ public class OfferItemReloader {
 
     private List<OfferItem> sort(List<OfferItem> offerItems) {
         return offerItems.stream()
-                .sorted(Comparator.comparingInt(OfferItem::getPosition)
-                        .thenComparing(Comparator.comparingDouble(OfferItem::getUnitPrice).reversed()))
+                .sorted(Comparator.comparingInt(OfferItem::getSequenceNumber))
                 .collect(Collectors.toList());
     }
 

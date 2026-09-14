@@ -173,7 +173,7 @@
         </div>
     </div>
 
-    <div class="columns">
+    <div class="columns is-multiline">
         <div class="column">
             <div class="box">
                 <form th:action="@{/dashboard/orders/{orderId}/updateOrderInfo(orderId=${order.orderId})}"
@@ -316,6 +316,7 @@
         <!-- New Order Events Section -->
         <div class="column">
             <div class="box">
+                <div class="table-container">
                 <table class="table is-fullwidth">
                     <thead>
                     <tr>
@@ -332,6 +333,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>
@@ -903,7 +905,7 @@
         <input type="hidden" id="toggleConsolidationItemId" name="itemId"/>
     </form>
 
-    <div class="columns">
+    <div class="columns is-multiline">
         <div class="column">
             <h2 class="subtitle" th:text="#{order.billing.details}"></h2>
             <div class="box">
@@ -1007,7 +1009,7 @@
         </div>
     </div>
 
-    <div class="columns">
+    <div class="columns is-multiline">
         <div class="column">
             <h2 class="subtitle" th:text="#{order.shipments}"></h2>
             <div class="box">
@@ -1298,7 +1300,7 @@
         </div>
     </div>
 
-    <div class="columns">
+    <div class="columns is-multiline">
         <div class="column">
             <h2 class="subtitle" th:text="#{order.review}"></h2>
             <div class="box">

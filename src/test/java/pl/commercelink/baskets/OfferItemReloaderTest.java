@@ -103,8 +103,8 @@ class OfferItemReloaderTest {
     }
 
     @Test
-    @DisplayName("reload sorts products before services following the position bands")
-    void reloadSortsProductsBeforeServices() {
+    @DisplayName("reload keeps services where the operator placed them in the list instead of pushing them to the end")
+    void reloadKeepsServicesInListOrder() {
         // given
         BasketItem service = BasketItem.shipping("Dostawa", 20.0);
         BasketItem product = new BasketItem("pim-1", "Laptop", "MFN-L",
@@ -115,9 +115,8 @@ class OfferItemReloaderTest {
         List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "SHIPPING");
-        assertThat(offerItems.get(0).getBasketItem().getPosition())
-                .isLessThan(offerItems.get(1).getBasketItem().getPosition());
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("SHIPPING", "MFN-L");
+        assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
     }
 
     @Test
@@ -139,30 +138,11 @@ class OfferItemReloaderTest {
         List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-C", "MFN-S");
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-S", "MFN-C");
         for (OfferItem offerItem : offerItems) {
             assertThat(basket.getBasketItems().get(offerItem.getSequenceNumber()))
                     .isSameAs(offerItem.getBasketItem());
         }
-    }
-
-    @Test
-    @DisplayName("reload breaks equal-position ties by unit price descending")
-    void reloadBreaksEqualPositionTiesByUnitPriceDescending() {
-        // given
-        BasketItem cheaper = new BasketItem("pim-1", "Cheaper", "MFN-CHEAP",
-                "Laptops", 100.0, 0, 1, null, 3, false);
-        BasketItem pricier = new BasketItem("pim-2", "Pricier", "MFN-PRICEY",
-                "Laptops", 500.0, 0, 1, null, 3, false);
-        Basket basket = basketWith(cheaper, pricier);
-        basket.getBasketItems().forEach(item -> item.setPosition(7));
-
-        // when
-        List<OfferItem> offerItems = offerItemReloader.reload(basket);
-
-        // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn())
-                .containsExactly("MFN-PRICEY", "MFN-CHEAP");
     }
 
     private Basket basketWith(BasketItem... items) {

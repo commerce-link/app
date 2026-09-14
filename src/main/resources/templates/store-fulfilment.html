@@ -42,6 +42,22 @@
                     </div>
 
                     <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.fulfilmentConfiguration.clientOrderPageEnabled}">
+                            <strong th:text="#{store.enable.client.order.page}"></strong>
+                        </label>
+                        <p th:text="#{store.enable.client.order.page.description}"></p>
+                    </div>
+
+                    <div class="field">
+                        <label class="checkbox">
+                            <input type="checkbox" th:field="*{store.fulfilmentConfiguration.clientShippingAddressChangeEnabled}">
+                            <strong th:text="#{store.enable.client.shipping.address.change}"></strong>
+                        </label>
+                        <p th:text="#{store.enable.client.shipping.address.change.description}"></p>
+                    </div>
+
+                    <div class="field">
                         <label class="label" th:text="#{store.fulfilment.default.type}"></label>
                         <div class="control">
                             <div class="select">

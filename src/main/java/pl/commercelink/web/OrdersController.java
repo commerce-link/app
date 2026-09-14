@@ -421,7 +421,8 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::resolveTaxonomyName)));
 
         model.addAttribute("order", order);
-        model.addAttribute("clientOrderUrl", order.hasStatus(OrderStatus.Completed) ? null : order.createClientOrderUrl(appDomain));
+        model.addAttribute("clientOrderUrl", store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed)
+                ? order.createClientOrderUrl(appDomain) : null);
         model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store, supplierRegistry));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
