@@ -70,4 +70,15 @@ public final class StoreSettingsCatalog {
     public static String homeHref(UserRole role, String storeId) {
         return role == SUPER_ADMIN ? HOME_PATH + "/" + storeId : HOME_PATH;
     }
+
+    /** Sections and tiles visible to the given role, each tile linked to its own settings page under homeHref. */
+    public static List<SettingsSectionView> sectionsFor(UserRole role, String homeHref) {
+        return SECTIONS.stream()
+                .map(section -> new SettingsSectionView(section.messageKey(), section.tiles().stream()
+                        .filter(tile -> tile.visibleFor(role))
+                        .map(tile -> new SettingsTileView(tile, homeHref + tile.relativePath()))
+                        .toList()))
+                .filter(section -> !section.tiles().isEmpty())
+                .toList();
+    }
 }

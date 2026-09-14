@@ -54,6 +54,68 @@ class SettingsHeaderFragmentTest {
     }
 
     @Test
+    void leavesOutTheNavigationAndJumpMenuWhenThereIsNoSettingsHomeToReturnTo() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS,
+                page(UserRole.SUPER_ADMIN, "/dashboard/store/rma-centers"));
+
+        // then
+        assertThat(html).doesNotContain("cl-settings-nav").doesNotContain("cl-settings-jump");
+    }
+
+    @Test
+    void rendersTheNavigationGroupedBySectionWithAllTileHrefsForAStoreAdmin() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS, page(UserRole.ADMIN, "/dashboard/store/warehouse"));
+
+        // then
+        assertThat(html).contains("<nav class=\"cl-settings-nav\"").contains("aria-label=\"Ustawienia sklepu\"");
+        String navBlock = html.substring(0, html.indexOf("<header"));
+        assertThat(occurrences(navBlock, "cl-settings-nav-title")).isEqualTo(6);
+        assertThat(html).contains("href=\"/dashboard/store/rma-centers\"").contains(">Centra RMA<");
+        assertThat(html).contains("href=\"/dashboard/store/invoicing\"");
+    }
+
+    @Test
+    void rendersTheNavigationPrefixedWithTheStoreForASuperAdminAndWithoutRmaCenters() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS,
+                page(UserRole.SUPER_ADMIN, "/dashboard/store/store-1/invoicing"));
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/store-1/warehouse\"");
+        assertThat(html).doesNotContain("rma-centers");
+    }
+
+    @Test
+    void marksExactlyTheCurrentTileAsActiveOnceInTheNavigationAndOnceInTheJumpMenu() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS, page(UserRole.ADMIN, "/dashboard/store/warehouse"));
+
+        // then
+        assertThat(occurrences(html, "aria-current=\"page\"")).isEqualTo(2);
+        assertThat(occurrences(html, "cl-settings-nav-item is-active")).isEqualTo(2);
+        int navEnd = html.indexOf("<details");
+        assertThat(html.substring(0, navEnd)).contains("aria-current=\"page\"");
+        assertThat(html.substring(navEnd)).contains("aria-current=\"page\"");
+    }
+
+    @Test
+    void showsTheJumpMenuWithATranslatedSummaryBelowTheHeader() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS, page(UserRole.ADMIN, "/dashboard/store/warehouse"));
+
+        // then
+        assertThat(html).contains("<details class=\"cl-settings-jump\">");
+        assertThat(html).contains("class=\"cl-settings-jump-toggle\"").contains("Przejdź do innego ustawienia");
+        assertThat(html.indexOf("</header>")).isLessThan(html.indexOf("<details"));
+    }
+
+    private static int occurrences(String haystack, String needle) {
+        return haystack.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
+    }
+
+    @Test
     void rendersNothingOutsideASettingsPage() {
         // when
         String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS, page(UserRole.ADMIN, "/dashboard/orders"));

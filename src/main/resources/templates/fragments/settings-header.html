@@ -2,22 +2,54 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<header th:fragment="header(intro, actions)" th:if="${settingsPage != null}" class="cl-page-header">
-    <a th:if="${settingsPage.homeHref() != null}" class="cl-back" th:href="@{${settingsPage.homeHref()}}">
-        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
-        <span th:text="#{nav.settings}"></span>
-    </a>
-    <div class="cl-page-header-row">
-        <h1 class="cl-page-title" th:text="#{${settingsPage.tile().titleKey()}}"></h1>
-        <th:block th:if="${intro}">
-            <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-        </th:block>
-        <div th:if="${actions != null}" class="cl-page-actions">
-            <th:block th:replace="${actions}"></th:block>
-        </div>
+<th:block th:fragment="groups(sections, activeKey)">
+    <div class="cl-settings-nav-group" th:each="section : ${sections}">
+        <div class="cl-settings-nav-title" th:text="#{${section.messageKey()}}"></div>
+        <ul>
+            <li th:each="item : ${section.tiles()}">
+                <a class="cl-settings-nav-item" th:href="@{${item.href()}}"
+                   th:classappend="${item.tile().key() == activeKey} ? 'is-active' : ''"
+                   th:attr="aria-current=${item.tile().key() == activeKey} ? 'page' : null"
+                   th:text="#{${item.tile().titleKey()}}"></a>
+            </li>
+        </ul>
     </div>
-    <div class="cl-page-lead" th:text="#{${settingsPage.tile().descriptionKey()}}"></div>
-</header>
+</th:block>
+
+<th:block th:fragment="header(intro, actions)" th:if="${settingsPage != null}">
+
+    <nav class="cl-settings-nav" th:if="${!settingsPage.navigation().isEmpty()}" th:attr="aria-label=#{store.title}">
+        <th:block th:replace="~{:: groups(${settingsPage.navigation()}, ${settingsPage.tile().key()})}"></th:block>
+    </nav>
+
+    <header class="cl-page-header">
+        <a th:if="${settingsPage.homeHref() != null}" class="cl-back" th:href="@{${settingsPage.homeHref()}}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+            <span th:text="#{nav.settings}"></span>
+        </a>
+        <div class="cl-page-header-row">
+            <h1 class="cl-page-title" th:text="#{${settingsPage.tile().titleKey()}}"></h1>
+            <th:block th:if="${intro}">
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+            </th:block>
+            <div th:if="${actions != null}" class="cl-page-actions">
+                <th:block th:replace="${actions}"></th:block>
+            </div>
+        </div>
+        <div class="cl-page-lead" th:text="#{${settingsPage.tile().descriptionKey()}}"></div>
+    </header>
+
+    <details class="cl-settings-jump" th:if="${!settingsPage.navigation().isEmpty()}">
+        <summary class="cl-settings-jump-toggle">
+            <span th:text="#{store.settings.nav.jump}"></span>
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+        </summary>
+        <div class="cl-settings-jump-panel">
+            <th:block th:replace="~{:: groups(${settingsPage.navigation()}, ${settingsPage.tile().key()})}"></th:block>
+        </div>
+    </details>
+
+</th:block>
 
 </body>
 </html>

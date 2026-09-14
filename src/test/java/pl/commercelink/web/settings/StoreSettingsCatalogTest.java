@@ -74,6 +74,39 @@ class StoreSettingsCatalogTest {
     }
 
     @Test
+    void sectionsForFiltersTilesByRoleAndBuildsHrefsUnderHomeHref() {
+        // when
+        List<SettingsSectionView> adminSections = StoreSettingsCatalog.sectionsFor(UserRole.ADMIN, "/dashboard/store");
+        List<SettingsSectionView> superAdminSections =
+                StoreSettingsCatalog.sectionsFor(UserRole.SUPER_ADMIN, "/dashboard/store/store-1");
+
+        // then
+        List<SettingsTileView> adminTiles = adminSections.stream().flatMap(section -> section.tiles().stream()).toList();
+        assertThat(adminSections).hasSize(6);
+        assertThat(adminTiles).hasSize(14);
+        assertThat(adminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
+                .extracting(SettingsTileView::href).containsExactly("/dashboard/store/warehouse");
+
+        List<SettingsTileView> superAdminTiles =
+                superAdminSections.stream().flatMap(section -> section.tiles().stream()).toList();
+        assertThat(superAdminTiles).hasSize(13);
+        assertThat(superAdminTiles).noneMatch(tile -> tile.tile().key().equals("rmaCenters"));
+        assertThat(superAdminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
+                .extracting(SettingsTileView::href).containsExactly("/dashboard/store/store-1/warehouse");
+    }
+
+    @Test
+    void translatesTheSettingsNavigationJumpMenuInBothLanguages() {
+        for (String language : List.of("pl", "en")) {
+            // given
+            ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
+
+            // when / then
+            assertThat(messages.containsKey("store.settings.nav.jump")).as(language).isTrue();
+        }
+    }
+
+    @Test
     void translatesEverySectionAndTileInBothLanguages() {
         for (String language : List.of("pl", "en")) {
             // given
