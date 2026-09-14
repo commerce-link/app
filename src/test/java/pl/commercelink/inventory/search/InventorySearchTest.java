@@ -302,4 +302,93 @@ class InventorySearchTest {
         assertThat(found.prices().medianGross())
                 .isCloseTo((Price.fromNet(110.0).grossValue() + Price.fromNet(120.0).grossValue()) / 2, within(0.001));
     }
+
+    @Test
+    void tiedCheapestOffersAreAllMarkedCheapest() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("Elko", 100.0, 5), offer("AB", 100.0, 5), offer("Kosatec", 110.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko", "AB", "Kosatec");
+        assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, true, false);
+        assertThat(found.supplierOffers()).extracting(OfferRow::percentAboveCheapest).containsExactly(null, null, 10.0);
+    }
+
+    @Test
+    void productKnownOnlyToPimByGtinIsReportedAsKnown() {
+        // given
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(entry.brand()).thenReturn("Logitech");
+        when(entry.gtins()).thenReturn(List.of(EAN));
+        when(entry.mpns()).thenReturn(List.of(MFN));
+        when(pimCatalog.findByGtin(EAN)).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult result = search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(result).isInstanceOf(InventorySearchResult.KnownWithoutOffers.class);
+        InventorySearchResult.KnownWithoutOffers known = (InventorySearchResult.KnownWithoutOffers) result;
+        assertThat(known.matchedBy()).isEqualTo(MatchedBy.EAN);
+        assertThat(known.product().name()).isEqualTo("Logitech MX Keys S");
+    }
+
+    @Test
+    void productKnownOnlyToPimByIdIsReportedAsKnown() {
+        // given
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(entry.gtins()).thenReturn(List.of(EAN));
+        when(entry.mpns()).thenReturn(List.of(MFN));
+        when(pimCatalog.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult result = search.search(STORE_ID, "PIM-7");
+
+        // then
+        assertThat(result).isInstanceOf(InventorySearchResult.KnownWithoutOffers.class);
+        assertThat(((InventorySearchResult.KnownWithoutOffers) result).matchedBy()).isEqualTo(MatchedBy.PIM_ID);
+    }
+
+    @Test
+    void storeSearchMarksTheWarehouseAsChecked() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.warehouseChecked()).isTrue();
+    }
+
+    @Test
+    void globalSearchNeverMarksTheWarehouseAsChecked() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.searchGlobal(EAN);
+
+        // then
+        assertThat(found.warehouseChecked()).isFalse();
+    }
+
+    @Test
+    void storeWithExternalWarehouseMarksTheWarehouseAsNotChecked() {
+        // given
+        when(store.hasIntegration(IntegrationType.WMS_PROVIDER)).thenReturn(true);
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.warehouseChecked()).isFalse();
+    }
 }
