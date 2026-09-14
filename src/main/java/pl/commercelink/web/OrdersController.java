@@ -69,6 +69,8 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.util.*;
@@ -101,6 +103,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     @Autowired
     private BasketsRepository basketsRepository;
@@ -473,6 +478,10 @@ public class OrdersController extends BaseController {
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
 
+        SupplierLabelMap labels = supplierLabels.forStore(store);
+        model.addAttribute("supplierLabels", labels);
+        model.addAttribute("assignableSuppliers", labels.options());
+
         return "orderDetails";
     }
 
@@ -685,6 +694,12 @@ public class OrdersController extends BaseController {
         }
 
         Store store = storesRepository.findById(getStoreId());
+        if (!store.getEnabledProviders().contains(supplier)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.unknown", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
         if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, supplier)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));

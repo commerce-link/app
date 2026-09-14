@@ -9,6 +9,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.financials.*;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.io.IOException;
@@ -42,6 +44,9 @@ public class FinancialReportsController {
     @Autowired
     private FinancialReportGenerator financialReportGenerator;
 
+    @Autowired
+    private SupplierLabels supplierLabels;
+
     @GetMapping("/dashboard/reports")
     public String reports(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -55,7 +60,8 @@ public class FinancialReportsController {
         FinancialReports reports = financialReportGenerator.generate(getStoreId(), dateFrom, dateTo);
 
         Map<String, Integer> salesVolumeByProvider = reports.ownSources().getSalesVolumeByProvider();
-        List<String> providerNames = new ArrayList<>(salesVolumeByProvider.keySet());
+        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+        List<String> providerNames = salesVolumeByProvider.keySet().stream().map(labels::of).toList();
         List<Integer> providerSales = new ArrayList<>(salesVolumeByProvider.values());
 
         model.addAttribute("reportOwn", reports.ownSources());

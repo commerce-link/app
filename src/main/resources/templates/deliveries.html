@@ -33,7 +33,16 @@
 
                     <div class="field">
                         <label class="label" th:text="#{deliveries.provider}"></label>
-                        <div class="control">
+                        <div class="control" th:if="${!providerOptions.isEmpty()}">
+                            <div class="select is-fullwidth">
+                                <select name="provider">
+                                    <option value="" th:text="#{deliveries.provider.all}"></option>
+                                    <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
+                                            th:text="${option.label()}" th:selected="${option.identity() == searchParams.provider}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control" th:if="${providerOptions.isEmpty()}">
                             <input class="input" type="text" name="provider" th:value="${searchParams.provider}">
                         </div>
                     </div>

@@ -187,6 +187,7 @@ public class DeliveriesController {
 
         List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
         model.addAttribute("supplierLabels", isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId()));
+        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : supplierLabels.forStoreId(getStoreId()).options());
 
         return "deliveries";
     }

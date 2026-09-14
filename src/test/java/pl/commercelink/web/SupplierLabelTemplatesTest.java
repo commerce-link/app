@@ -40,4 +40,16 @@ class SupplierLabelTemplatesTest {
         assertThat(html).contains("th:data-provider=\"${entry.source.provider}\"");
         assertThat(html).contains("supplierLabels.of(entry.source.provider)");
     }
+
+    @Test
+    void orderRmaAndDeliveryFiltersUseSelectsOfConnections() throws Exception {
+        // when / then
+        assertThat(template("orderDetails.html")).contains("id=\"quickAssignSupplier\" name=\"supplier\"")
+                .contains("th:each=\"option : ${assignableSuppliers}\"")
+                .doesNotContain("type=\"text\" id=\"quickAssignSupplier\"");
+        assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
+                .contains("th:each=\"option : ${providerOptions}\"");
+        assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
+        assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
+    }
 }
