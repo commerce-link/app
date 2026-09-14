@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -13,8 +14,8 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierSelectionForm;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +24,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class StoreSupplierConnectionService {
 
-    private final SupplierRegistry supplierRegistry;
     private final SupplierProviderFactory supplierProviderFactory;
     private final ProviderConfigurationManager configurationManager;
     private final SupplierConnectionValidator validator;
@@ -48,72 +48,130 @@ public class StoreSupplierConnectionService {
         return configs;
     }
 
-    public List<SupplierSelectionForm> selectionsFor(Store store) {
-        List<StoreSupplierConnection> existing = store.getFulfilmentConfiguration().getSupplierConnections();
-        List<SupplierSelectionForm> selections = new ArrayList<>();
-        for (String name : supplierRegistry.getExternalSupplierNames()) {
-            StoreSupplierConnection connection = existing.stream()
-                    .filter(c -> c.getSupplierName().equals(name))
-                    .findFirst()
-                    .orElse(null);
-            SupplierSelectionForm selection = new SupplierSelectionForm(
-                    name,
-                    connection != null,
-                    connection != null ? connection.getMode() : ConnectionMode.GLOBAL,
-                    connection == null || connection.isIncludeInPricing(),
-                    connection == null || connection.isIncludeInFulfilment());
-            selection.setExternalSupplierId(connection != null ? connection.getExternalSupplierId() : null);
-            selections.add(selection);
+    // The template needs to tell "no stored configuration" apart from "stored configuration whose
+    // password is masked to blank" -- getConfigurationForUI() makes both look identical, so this
+    // publishes the same notion connectOrUpdate()/storedConfigFor() already use to decide
+    // preservedPassword, without exposing the configuration values themselves.
+    public Set<String> suppliersWithStoredConfiguration(Store store) {
+        Set<String> stored = new LinkedHashSet<>();
+        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
+            String name = descriptor.supplierInfo().name();
+            if (hasStoredConfiguration(store, name)) {
+                stored.add(name);
+            }
         }
-        return selections;
+        return stored;
     }
 
-    public ConnectionUpdateResult apply(Store existingStore, FulfilmentConfiguration submitted,
-                                        List<SupplierSelectionForm> selections,
-                                        Map<String, Map<String, String>> submittedConfig, boolean isSuperAdmin) {
-        prepareSubmittedConfiguration(existingStore, submitted, selections, isSuperAdmin);
+    public ConnectionUpdateResult connectOrUpdate(Store existingStore, SupplierSelectionForm selection,
+                                                  Map<String, String> submittedConfig) {
+        boolean canUseGlobal = existingStore.canUseGlobalSuppliers();
+        ConnectionMode mode = canUseGlobal
+                ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
+                : ConnectionMode.OWN;
+        StoreSupplierConnection edited = new StoreSupplierConnection(
+                selection.getSupplierName(), mode,
+                selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+        if (mode == ConnectionMode.OWN) {
+            edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
+        }
 
-        List<ErrorMessage> errors = validate(existingStore, submitted, submittedConfig);
+        List<StoreSupplierConnection> connections = connectionsWithout(existingStore, selection.getSupplierName());
+        connections.add(edited);
+
+        Map<String, Map<String, String>> config = Map.of(selection.getSupplierName(), submittedConfig);
+        // Only the edited connection is validated: a broken entry belonging to another supplier
+        // must not block this one.
+        List<ErrorMessage> errors = validator.validate(
+                canUseGlobal, List.of(edited), configurationFields(), config, storedConfigFor(existingStore, edited));
         if (!errors.isEmpty()) {
             return ConnectionUpdateResult.errors(errors);
         }
+        return persist(existingStore, connections, config);
+    }
 
-        StoreSupplierConnectionPersister.PersistOutcome outcome =
-                persister.persist(existingStore, submitted, submittedConfig);
+    public ConnectionUpdateResult disconnect(Store existingStore, String supplierName) {
+        return persist(existingStore, connectionsWithout(existingStore, supplierName), Map.of());
+    }
+
+    public ConnectionUpdateResult applyStoreSettings(Store existingStore, FulfilmentConfiguration submitted,
+                                                     boolean isSuperAdmin) {
+        FulfilmentConfiguration existing = existingConfiguration(existingStore);
+        submitted.setEnabledProductGroups(existing.getEnabledProductGroups());
+        if (submitted.getEnabledCategories() == null) {
+            submitted.setEnabledCategories(existing.getEnabledCategories());
+        }
+        submitted.setCanUseGlobalSuppliers(
+                resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin));
+        submitted.setInventoryCacheTtlMinutes(
+                resolveInventoryCacheTtlMinutes(existingStore, submitted.getInventoryCacheTtlMinutes(), isSuperAdmin));
+        // Connections have their own per-supplier endpoints; this path must leave them alone.
+        submitted.setSupplierConnections(new ArrayList<>(existing.getSupplierConnections()));
+
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, Map.of());
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed());
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
-    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed) {
+    private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
+                                           Map<String, Map<String, String>> config) {
+        FulfilmentConfiguration submitted = existingConfiguration(existingStore).withConnections(connections);
+        StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, config);
+        if (!outcome.success()) {
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
+        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
+    }
+
+    // Case-insensitive on purpose: identities here always come from the supplier registry, which
+    // is also what StoreSupplierConnectionPersister compares by exact (case-sensitive) match when
+    // it works out what was added and removed. The two must keep agreeing on case, or an edit
+    // whose casing differs from what is stored would look like an add plus a remove and delete
+    // the supplier's secret.
+    private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String supplierName) {
+        List<StoreSupplierConnection> connections = new ArrayList<>();
+        for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {
+            if (!connection.getSupplierName().equalsIgnoreCase(supplierName)) {
+                connections.add(connection);
+            }
+        }
+        return connections;
+    }
+
+    // A store without any fulfilment configuration yet (e.g. connecting its first supplier)
+    // legitimately has a null getFulfilmentConfiguration().
+    private FulfilmentConfiguration existingConfiguration(Store existingStore) {
+        FulfilmentConfiguration config = existingStore.getFulfilmentConfiguration();
+        return config != null ? config : new FulfilmentConfiguration();
+    }
+
+    private Set<String> storedConfigFor(Store existingStore, StoreSupplierConnection connection) {
+        if (connection.getMode() != ConnectionMode.OWN
+                || !hasStoredConfiguration(existingStore, connection.getSupplierName())) {
+            return Set.of();
+        }
+        return Set.of(connection.getSupplierName());
+    }
+
+    private boolean hasStoredConfiguration(Store existingStore, String supplierName) {
+        return !configurationManager.loadConfiguration(existingStore, supplierName).isEmpty();
+    }
+
+    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed,
+                                         Set<String> rescheduled) {
         static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
-            return new ConnectionUpdateResult(errors, Set.of(), Set.of());
+            return new ConnectionUpdateResult(errors, Set.of(), Set.of(), Set.of());
         }
 
-        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed) {
-            return new ConnectionUpdateResult(List.of(), added, removed);
+        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed, Set<String> rescheduled) {
+            return new ConnectionUpdateResult(List.of(), added, removed, rescheduled);
         }
 
         public boolean hasErrors() {
             return !errors.isEmpty();
         }
-    }
-
-    private void prepareSubmittedConfiguration(Store existingStore, FulfilmentConfiguration submitted,
-                                               List<SupplierSelectionForm> selections, boolean isSuperAdmin) {
-        FulfilmentConfiguration existing = existingStore.getFulfilmentConfiguration();
-        submitted.setEnabledProductGroups(existing != null ? existing.getEnabledProductGroups() : null);
-        if (submitted.getEnabledCategories() == null) {
-            submitted.setEnabledCategories(existing != null ? existing.getEnabledCategories() : null);
-        }
-        boolean canUseGlobal = resolveCanUseGlobalSuppliers(existingStore, submitted.isCanUseGlobalSuppliers(), isSuperAdmin);
-        submitted.setCanUseGlobalSuppliers(canUseGlobal);
-        List<StoreSupplierConnection> connections = buildConnections(selections, canUseGlobal);
-        connections.addAll(existingManualConnections(existingStore));
-        submitted.setSupplierConnections(connections);
-        submitted.setInventoryCacheTtlMinutes(
-                resolveInventoryCacheTtlMinutes(existingStore, submitted.getInventoryCacheTtlMinutes(), isSuperAdmin));
     }
 
     boolean resolveCanUseGlobalSuppliers(Store existingStore, boolean submittedCanUseGlobal, boolean isSuperAdmin) {
@@ -122,45 +180,5 @@ public class StoreSupplierConnectionService {
 
     Integer resolveInventoryCacheTtlMinutes(Store existingStore, Integer submittedTtl, boolean isSuperAdmin) {
         return isSuperAdmin ? submittedTtl : existingStore.getInventoryCacheTtlMinutes().orElse(null);
-    }
-
-    List<StoreSupplierConnection> buildConnections(List<SupplierSelectionForm> selections, boolean canUseGlobal) {
-        List<StoreSupplierConnection> connections = new ArrayList<>();
-        for (SupplierSelectionForm selection : selections) {
-            if (selection.isEnabled()) {
-                ConnectionMode mode = canUseGlobal
-                        ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
-                        : ConnectionMode.OWN;
-                StoreSupplierConnection connection = new StoreSupplierConnection(
-                        selection.getSupplierName(), mode,
-                        selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
-                connection.setExternalSupplierId(StringUtils.trimToNull(selection.getExternalSupplierId()));
-                connections.add(connection);
-            }
-        }
-        return connections;
-    }
-
-    private List<StoreSupplierConnection> existingManualConnections(Store existingStore) {
-        FulfilmentConfiguration config = existingStore.getFulfilmentConfiguration();
-        if (config == null) {
-            return List.of();
-        }
-        return config.getSupplierConnections().stream()
-                .filter(connection -> connection.getMode() == ConnectionMode.MANUAL)
-                .toList();
-    }
-
-    List<ErrorMessage> validate(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
-        Set<String> suppliersWithStoredConfig = new HashSet<>();
-        for (StoreSupplierConnection connection : submitted.getSupplierConnections()) {
-            if (connection.getMode() == ConnectionMode.OWN
-                    && !configurationManager.loadConfiguration(existingStore, connection.getSupplierName()).isEmpty()) {
-                suppliersWithStoredConfig.add(connection.getSupplierName());
-            }
-        }
-        return validator.validate(
-                submitted.isCanUseGlobalSuppliers(), submitted.getSupplierConnections(),
-                configurationFields(), submittedConfig, suppliersWithStoredConfig);
     }
 }

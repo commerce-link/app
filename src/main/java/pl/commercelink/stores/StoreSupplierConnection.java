@@ -25,6 +25,8 @@ public class StoreSupplierConnection {
 
     @DynamoDBAttribute(attributeName = "externalSupplierId")
     private String externalSupplierId;
+    @DynamoDBAttribute(attributeName = "feedSchedule")
+    private String feedSchedule;
 
     public StoreSupplierConnection() {
     }
@@ -87,5 +89,13 @@ public class StoreSupplierConnection {
 
     public void setExternalSupplierId(String externalSupplierId) {
         this.externalSupplierId = externalSupplierId;
+    }
+
+    public String getFeedSchedule() {
+        return feedSchedule;
+    }
+
+    public void setFeedSchedule(String feedSchedule) {
+        this.feedSchedule = feedSchedule;
     }
 }

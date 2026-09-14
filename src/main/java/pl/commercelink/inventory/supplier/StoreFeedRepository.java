@@ -6,9 +6,15 @@ import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 @Repository
 public class StoreFeedRepository {
+
+    private static final String FEED_MARKER = "-feed.";
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -34,11 +40,29 @@ public class StoreFeedRepository {
         fileStorage.deleteAll(bucketName, feedPrefix(storeId, supplierName));
     }
 
+    public Map<String, LocalDateTime> feedLastModifiedByIdentity(String storeId) {
+        String prefix = storeId + "/supplier-feeds/";
+        Map<String, LocalDateTime> byIdentity = new HashMap<>();
+        for (Map.Entry<String, LocalDateTime> entry : fileStorage.getAllObjectLastModified(bucketName, prefix).entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            String fileName = key.substring(prefix.length());
+            int marker = fileName.lastIndexOf(FEED_MARKER);
+            if (marker <= 0) {
+                continue;
+            }
+            byIdentity.put(fileName.substring(0, marker), entry.getValue());
+        }
+        return byIdentity;
+    }
+
     private String key(String storeId, String supplierName, String fileExtension) {
         return feedPrefix(storeId, supplierName) + fileExtension;
     }
 
     private String feedPrefix(String storeId, String supplierName) {
-        return storeId + "/supplier-feeds/" + supplierName.toLowerCase() + "-feed.";
+        return storeId + "/supplier-feeds/" + supplierName.toLowerCase(Locale.ROOT) + "-feed.";
     }
 }

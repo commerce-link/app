@@ -18,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -42,10 +41,6 @@ public class ManualSupplierService {
         public static Result error(String messageCode) {
             return new Result(false, messageCode);
         }
-    }
-
-    public record ManualSupplierView(String identity, String label, boolean enabled, boolean includeInPricing,
-                                     boolean includeInFulfilment, boolean hasFeed, String externalSupplierId) {
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
@@ -121,27 +116,6 @@ public class ManualSupplierService {
         }
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
-    }
-
-    public List<ManualSupplierView> list(Store store) {
-        List<ManualSupplierView> views = new ArrayList<>();
-        if (store == null) {
-            return views;
-        }
-        for (StoreSupplierConnection connection : connections(store)) {
-            if (connection.getMode() == ConnectionMode.MANUAL) {
-                String identity = connection.getSupplierName();
-                views.add(new ManualSupplierView(
-                        identity,
-                        ManualSupplierInfos.label(identity),
-                        connection.isEnabled(),
-                        connection.isIncludeInPricing(),
-                        connection.isIncludeInFulfilment(),
-                        storeFeedRepository.canRead(store.getStoreId(), identity, "csv"),
-                        connection.getExternalSupplierId()));
-            }
-        }
-        return views;
     }
 
     private boolean collidesWithStatic(String label) {

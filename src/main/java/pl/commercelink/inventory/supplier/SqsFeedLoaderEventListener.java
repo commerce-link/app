@@ -54,6 +54,12 @@ public class SqsFeedLoaderEventListener {
         public FeedLoaderEventPayload() {
         }
 
+        public FeedLoaderEventPayload(String supplierName, String storeId, int attempt) {
+            this.supplierName = supplierName;
+            this.storeId = storeId;
+            this.attempt = attempt;
+        }
+
         public String getSupplierName() {
             return supplierName;
         }
