@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
@@ -29,19 +30,22 @@ public class StoreIntegrationsController {
     private final PaymentProviderFactory paymentProviderFactory;
     private final MarketplaceProviderFactory marketplaceProviderFactory;
     private final MessageSource messageSource;
+    private final StoreNotificationService notificationService;
 
     public StoreIntegrationsController(StoresRepository storesRepository,
                                        ShippingProviderFactory shippingProviderFactory,
                                        InvoicingProviderFactory invoicingProviderFactory,
                                        PaymentProviderFactory paymentProviderFactory,
                                        MarketplaceProviderFactory marketplaceProviderFactory,
-                                       MessageSource messageSource) {
+                                       MessageSource messageSource,
+                                       StoreNotificationService notificationService) {
         this.storesRepository = storesRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.paymentProviderFactory = paymentProviderFactory;
         this.marketplaceProviderFactory = marketplaceProviderFactory;
         this.messageSource = messageSource;
+        this.notificationService = notificationService;
     }
 
     @PostMapping("/dashboard/store/integrations/credentials")
@@ -63,6 +67,7 @@ public class StoreIntegrationsController {
         ProviderFactory<?, ?> factory = resolveFactory(providerType);
         factory.saveConfiguration(store, providerName, config);
 
+        boolean connectionRestored = false;
         switch (providerType) {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
@@ -76,11 +81,15 @@ public class StoreIntegrationsController {
                     store.getMarketplaces().add(created);
                 } else if (!requiresDeviceAuth) {
                     store.markConnectionAsRestored(providerName);
+                    connectionRestored = true;
                 }
             }
         }
 
         storesRepository.save(store);
+        if (connectionRestored) {
+            resolveExpiredConnection(store.getStoreId(), providerName);
+        }
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.credentials.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
@@ -112,6 +121,9 @@ public class StoreIntegrationsController {
         }
 
         storesRepository.save(store);
+        if ("marketplace".equals(providerType)) {
+            resolveExpiredConnection(store.getStoreId(), providerName);
+        }
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.disconnect.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
@@ -134,6 +146,11 @@ public class StoreIntegrationsController {
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.default.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
+    }
+
+    private void resolveExpiredConnection(String storeId, String marketplace) {
+        notificationService.resolve(storeId, StoreNotificationType.UNAUTHENTICATED,
+                StoreNotification.marketplaceConnectionObject(marketplace));
     }
 
     private ProviderFactory<?, ?> resolveFactory(String providerType) {

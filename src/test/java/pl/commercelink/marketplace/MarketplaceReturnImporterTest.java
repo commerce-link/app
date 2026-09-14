@@ -31,10 +31,11 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
+import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
-import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,7 +59,7 @@ class MarketplaceReturnImporterTest {
     @Mock private RMAItemsRepository rmaItemsRepository;
     @Mock private OrdersRepository ordersRepository;
     @Mock private OrderItemsRepository orderItemsRepository;
-    @Mock private StoresRepository storesRepository;
+    @Mock private StoreNotificationService notificationService;
     @Mock private OrderItemFamily orderItemFamily;
     @Mock private OpenRmaCoverage openRmaCoverage;
     @Mock private Order order;
@@ -117,6 +118,12 @@ class MarketplaceReturnImporterTest {
 
     private static OrderItem orderItem(String itemId, String sku, int qty) {
         return orderItem(itemId, sku, sku, qty);
+    }
+
+    private StoreNotification publishedNotification() {
+        ArgumentCaptor<StoreNotification> published = ArgumentCaptor.forClass(StoreNotification.class);
+        verify(notificationService).publish(eq(STORE_ID), published.capture());
+        return published.getValue();
     }
 
     private static OrderItem legacyOrderItem(String itemId, String sku, String supplierMfn, int qty) {
@@ -259,9 +266,9 @@ class MarketplaceReturnImporterTest {
         verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
         assertEquals(3, itemsCaptor.getValue().get(0).getQty());
         // the buyer asked for 5, we can only refund 3 - the operator must learn about the shortfall
-        assertEquals(1, store.getNotifications().size());
-        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
-        assertTrue(store.getNotifications().get(0).getMessage().contains("only partially matched"));
+        StoreNotification notification = publishedNotification();
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, notification.getType());
+        assertTrue(notification.getMessage().contains("only partially matched"));
     }
 
     @Test
@@ -275,12 +282,12 @@ class MarketplaceReturnImporterTest {
         // then
         verify(rmaRepository, never()).save(any());
         verify(rmaItemsRepository, never()).batchSave(anyList());
-        assertEquals(1, store.getNotifications().size());
-        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, store.getNotifications().get(0).getType());
-        assertEquals("r-1", store.getNotifications().get(0).getObject());
+        StoreNotification notification = publishedNotification();
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, notification.getType());
+        assertEquals(StoreNotificationSeverity.WARNING, notification.getSeverity());
+        assertEquals("r-1", notification.getObject());
         // No RMA was created, so the wording must send the operator to the marketplace panel directly
-        assertTrue(store.getNotifications().get(0).getMessage().contains("could not be matched"));
-        verify(storesRepository).save(store);
+        assertTrue(notification.getMessage().contains("could not be matched"));
     }
 
     @Test
@@ -296,10 +303,8 @@ class MarketplaceReturnImporterTest {
 
         // then: the RMA is still created, but the shortfall must not be silent
         verify(rmaRepository).save(any(RMA.class));
-        StoreNotification notification = store.getNotifications().stream()
-                .filter(n -> n.getType() == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED)
-                .findFirst()
-                .orElseThrow();
+        StoreNotification notification = publishedNotification();
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, notification.getType());
         // M1: an RMA WAS created for the matched items - the wording must not read as a total miss, which
         // would invite a manual marketplace refund on top of the app's own partial one (a double refund)
         assertTrue(notification.getMessage().contains("RMA was created"));
@@ -369,18 +374,19 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
-    void notifiesStoreOnceWhenTheSameUnmatchedReturnIsPolledAgain() {
+    void publishesARepeatedUnmatchedReturnUnderTheSameIdentity() {
         // given
         when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
         MarketplaceReturn unmatched = marketplaceReturn("r-1", MarketplaceReturnStatus.DECLARED, item("OTHER", 1));
+        ArgumentCaptor<StoreNotification> published = ArgumentCaptor.forClass(StoreNotification.class);
 
         // when
         importer.importReturn(store, MARKETPLACE, unmatched);
         importer.importReturn(store, MARKETPLACE, unmatched);
 
-        // then
-        assertEquals(1, store.getNotifications().size());
-        verify(storesRepository, times(1)).save(store);
+        // then: the service deduplicates by type and return id, so both polls must describe the same notification
+        verify(notificationService, times(2)).publish(eq(STORE_ID), published.capture());
+        assertEquals(published.getAllValues().get(0), published.getAllValues().get(1));
     }
 
     @Test
@@ -431,7 +437,7 @@ class MarketplaceReturnImporterTest {
         assertEquals(MarketplaceReturnStatus.DELIVERED, existing.getExternalReturnStatus());
         verify(rmaRepository).save(existing);
         verify(rmaItemsRepository, never()).batchSave(anyList());
-        assertTrue(store.getNotifications().isEmpty());
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -487,12 +493,11 @@ class MarketplaceReturnImporterTest {
         importer.importReturn(store, MARKETPLACE, refunded);
 
         // then
-        assertEquals(1, store.getNotifications().size());
-        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_REFUNDED, store.getNotifications().get(0).getType());
-        assertEquals(existing.getRmaId(), store.getNotifications().get(0).getObject());
+        StoreNotification notification = publishedNotification();
+        assertEquals(StoreNotificationType.MARKETPLACE_RETURN_REFUNDED, notification.getType());
+        assertEquals(existing.getRmaId(), notification.getObject());
         assertTrue(existing.hasEvent(new Event(EventType.action, RMA.EVENT_REFUNDED_BY_MARKETPLACE, null)));
         assertEquals(RMAStatus.New, existing.getStatus());
-        verify(storesRepository, times(1)).save(store);
     }
 
     @Test
@@ -508,8 +513,24 @@ class MarketplaceReturnImporterTest {
         importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1)));
 
         // then
-        assertTrue(store.getNotifications().isEmpty());
-        verify(storesRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
         assertEquals(MarketplaceReturnStatus.REFUNDED, existing.getExternalReturnStatus());
+    }
+
+    @Test
+    void publishesTheMarketplaceRefundBeforeSavingTheRma() {
+        // given
+        RMA existing = new RMA(STORE_ID);
+        existing.setExternalReturnId("r-1");
+        existing.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
+        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(existing);
+
+        // when
+        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.REFUNDED, item("SKU-1", 1)));
+
+        // then: a failed publish must leave the status unsaved, so the next poll tries again
+        InOrder inOrder = inOrder(notificationService, rmaRepository);
+        inOrder.verify(notificationService).publish(eq(STORE_ID), any(StoreNotification.class));
+        inOrder.verify(rmaRepository).save(existing);
     }
 }

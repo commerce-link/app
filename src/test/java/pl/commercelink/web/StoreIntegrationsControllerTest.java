@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,11 +12,13 @@ import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.IntegrationCredentialsForm;
 
@@ -50,6 +53,9 @@ class StoreIntegrationsControllerTest {
     private MessageSource messageSource;
 
     @Mock
+    private StoreNotificationService notificationService;
+
+    @Mock
     private Store store;
 
     private MockedStatic<CustomSecurityContext> securityStub;
@@ -64,7 +70,8 @@ class StoreIntegrationsControllerTest {
         lenient().when(store.getStoreId()).thenReturn("store-1");
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         controller = new StoreIntegrationsController(storesRepository, shippingProviderFactory,
-                invoicingProviderFactory, paymentProviderFactory, marketplaceProviderFactory, messageSource);
+                invoicingProviderFactory, paymentProviderFactory, marketplaceProviderFactory, messageSource,
+                notificationService);
     }
 
     @AfterEach
@@ -124,6 +131,7 @@ class StoreIntegrationsControllerTest {
         // then
         verify(store, never()).markConnectionAsRestored("Allegro");
         verify(storesRepository).save(store);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -137,5 +145,18 @@ class StoreIntegrationsControllerTest {
 
         // then
         verify(store).markConnectionAsRestored("Morele");
+        verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "morele_marketplace");
+    }
+
+    @Test
+    void disconnectingAMarketplaceClearsItsExpiredConnectionNotificationAfterSavingTheStore() {
+        // when
+        controller.disconnectIntegration(marketplaceForm("Allegro"), Locale.getDefault(), new RedirectAttributesModelMap());
+
+        // then
+        verify(store).removeMarketplaceIntegration("Allegro");
+        InOrder inOrder = inOrder(storesRepository, notificationService);
+        inOrder.verify(storesRepository).save(store);
+        inOrder.verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
     }
 }

@@ -22,11 +22,11 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
-import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -47,7 +47,7 @@ public class MarketplaceReturnImporter {
     private final RMAItemsRepository rmaItemsRepository;
     private final OrdersRepository ordersRepository;
     private final OrderItemsRepository orderItemsRepository;
-    private final StoresRepository storesRepository;
+    private final StoreNotificationService notificationService;
     private final OrderItemFamily orderItemFamily;
     private final OpenRmaCoverage openRmaCoverage;
 
@@ -80,13 +80,13 @@ public class MarketplaceReturnImporter {
             rma.setExternalReturnStatus(ret.status());
             if (ret.status() == MarketplaceReturnStatus.REFUNDED && !refundAlreadyRecorded(rma)) {
                 rma.addActionEvent(RMA.EVENT_REFUNDED_BY_MARKETPLACE);
-                store.addNotification(new StoreNotification(
+                // publish before saving the RMA: if publishing fails, the unchanged status makes the next poll retry it
+                notificationService.publish(store.getStoreId(), new StoreNotification(
                         StoreNotificationSeverity.WARNING,
                         StoreNotificationType.MARKETPLACE_RETURN_REFUNDED,
                         rma.getRmaId(),
                         marketplace + " refunded the buyer for return " + referenceOf(rma)
                                 + " without a decision in the application"));
-                storesRepository.save(store);
             }
         }
         rmaRepository.save(rma);
@@ -164,16 +164,11 @@ public class MarketplaceReturnImporter {
                         + "rest could not be matched and needs a manual refund in the marketplace panel"
                 : marketplace + " return " + referenceOf(ret)
                         + " could not be matched to an order in the application — handle it in the marketplace panel";
-        StoreNotification notification = new StoreNotification(
+        notificationService.publish(store.getStoreId(), new StoreNotification(
                 StoreNotificationSeverity.WARNING,
                 StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED,
                 ret.externalReturnId(),
-                message);
-        if (store.getNotifications().contains(notification)) {
-            return;
-        }
-        store.addNotification(notification);
-        storesRepository.save(store);
+                message));
     }
 
     private static String referenceOf(MarketplaceReturn ret) {

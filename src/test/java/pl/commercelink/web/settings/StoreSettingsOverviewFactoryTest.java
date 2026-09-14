@@ -156,7 +156,6 @@ class StoreSettingsOverviewFactoryTest {
         Store store = emptyStore();
         store.setMarketplaces(null);
         store.setPayments(null);
-        store.setNotifications(null);
 
         // when
         StoreSettingsOverview overview = factory.build(store, UserRole.ADMIN);
