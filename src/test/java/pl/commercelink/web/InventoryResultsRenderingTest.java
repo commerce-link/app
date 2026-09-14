@@ -122,6 +122,6 @@ class InventoryResultsRenderingTest {
         String html = engine.process("<div th:replace=\"~{fragments/inventory-results :: emptyState}\"></div>", context(null, true));
 
         // then
-        assertThat(html).contains("Check the price and availability of a product").doesNotContain("??");
+        assertThat(html).contains("Check the price and availability of a product").contains("Enter an EAN").doesNotContain("??");
     }
 }

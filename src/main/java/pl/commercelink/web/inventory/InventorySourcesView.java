@@ -24,4 +24,8 @@ public record InventorySourcesView(List<SourceRow> attention, List<SourceRow> wo
     public boolean hasSuppliers() {
         return activeSupplierCount > 0;
     }
+
+    public int sourceCount() {
+        return activeSupplierCount + 1;
+    }
 }

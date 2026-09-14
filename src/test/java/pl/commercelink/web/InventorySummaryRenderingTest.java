@@ -54,10 +54,15 @@ class InventorySummaryRenderingTest {
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("data-inventory-fragment=\"summary\"");
         assertThat(html).contains("Products at suppliers").contains("38 755").contains("62% with stock above zero");
-        assertThat(html).contains("All sources have a feed file");
         assertThat(html).contains("data-inventory-slot=\"warehouse\"");
         assertThat(html).contains("href=\"/dashboard/store/fulfilment\"");
         assertThat(html).contains("Products: 12,430").contains("feed 3 h ago");
+        assertThat(html).containsPattern("data-inventory-source-count[^>]*>\\s*<span aria-hidden=\"true\">3</span>")
+                .contains("Sources: 3");
+        assertThat(html).contains("data-inventory-warehouse-products");
+        assertThat(html).contains("Expand").contains("Collapse");
+        assertThat(html).doesNotContain("All sources have a feed file").doesNotContain("Active suppliers:")
+                .doesNotContain(">Working<").doesNotContain("Open the warehouse").doesNotContain("cl-inv-sources-footer");
     }
 
     @Test
@@ -105,8 +110,23 @@ class InventorySummaryRenderingTest {
 
         // then
         assertThat(countedHtml).contains("data-inventory-fragment=\"warehouse\"").contains("184").contains("612 pcs in stock").contains("+2 in transit");
-        assertThat(externalHtml).contains("External warehouse").contains("href=\"/dashboard/warehouse\"");
+        assertThat(countedHtml).containsPattern("data-warehouse-products-label[^>]*>Products: 184<");
+        assertThat(externalHtml).contains("External warehouse").contains("href=\"/dashboard/warehouse\"")
+                .doesNotContain("data-warehouse-products-label");
         assertThat(countedHtml + externalHtml).doesNotContain("??");
+    }
+
+    @Test
+    void externalWarehouseRowHasNoProductCountPlaceholder() {
+        // given
+        InventorySourcesView sources = new InventorySourcesView(List.of(), List.of(working("AB")), 1, 1, true);
+
+        // when
+        String html = engine.process(SUMMARY, context(sources, true));
+
+        // then
+        assertThat(html).contains("External warehouse").doesNotContain("data-inventory-warehouse-products");
+        assertThat(html).contains("Sources: 2");
     }
 
     @Test

@@ -57,10 +57,8 @@
                         <i class="fas fa-times" aria-hidden="true"></i>
                     </button>
                 </div>
-                <button type="submit" class="cl-inv-button is-primary" data-inventory-submit>
-                    <span data-when-idle th:text="#{inventory.search.submit}"></span>
-                    <span data-when-busy hidden th:text="#{inventory.search.loading}"></span>
-                </button>
+                <button type="submit" class="cl-inv-button is-primary" data-inventory-submit
+                        th:text="#{inventory.search.submit}"></button>
                 <p id="inventory-q-error" class="cl-inv-field-error" role="alert" data-inventory-field-error hidden>
                     <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span th:text="#{inventory.search.tooShort}"></span>
@@ -82,13 +80,19 @@
                 <div th:replace="~{fragments/inventory-results :: emptyState}"></div>
             </template>
 
-            <div id="inventory-results">
-                <th:block th:if="${#strings.isEmpty(query)}">
-                    <div th:replace="~{fragments/inventory-results :: emptyState}"></div>
-                </th:block>
-                <th:block th:unless="${#strings.isEmpty(query)}">
-                    <div th:replace="~{fragments/inventory-results :: results}"></div>
-                </th:block>
+            <div class="cl-inv-results-region">
+                <div id="inventory-results">
+                    <th:block th:if="${#strings.isEmpty(query)}">
+                        <div th:replace="~{fragments/inventory-results :: emptyState}"></div>
+                    </th:block>
+                    <th:block th:unless="${#strings.isEmpty(query)}">
+                        <div th:replace="~{fragments/inventory-results :: results}"></div>
+                    </th:block>
+                </div>
+                <div class="cl-inv-spinner-overlay" data-inventory-spinner role="status" hidden>
+                    <span class="cl-spinner" aria-hidden="true"></span>
+                    <span class="cl-inv-visually-hidden" th:text="#{inventory.search.loading}"></span>
+                </div>
             </div>
         </section>
     </div>

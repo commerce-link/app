@@ -224,6 +224,13 @@
     margin-top: 6px;
 }
 
+.cl-inv-skeleton-inline {
+    display: inline-block;
+    width: 90px;
+    height: 12px;
+    vertical-align: middle;
+}
+
 @keyframes cl-inv-shimmer {
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
@@ -255,6 +262,21 @@
 
 .cl-inv-issues strong {
     font-weight: 600;
+}
+
+.cl-inv-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--cl-info-soft);
+    color: var(--cl-info);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
 }
 
 .cl-inv-more {
@@ -364,11 +386,6 @@
     font-size: 13px;
     color: var(--cl-ink-2);
     font-variant-numeric: tabular-nums;
-}
-
-.cl-inv-sources-footer {
-    padding: 10px 14px;
-    border-top: 1px solid var(--cl-line);
 }
 
 .cl-inv-load-error {
@@ -526,9 +543,51 @@
     border-top: 1px solid var(--cl-line);
 }
 
-#inventory-results.is-loading > * {
-    opacity: .45;
-    transition: opacity .15s ease;
+/* Spinner: the app has no loading indicator yet; this ring mirrors the shape Bulma draws for button.is-loading,
+   in the app's tokens, so it can move to commercelink.css as the shared standard. */
+.cl-spinner {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--cl-line);
+    border-top-color: var(--cl-accent);
+    border-radius: 50%;
+    animation: cl-spin .7s linear infinite;
+}
+
+@keyframes cl-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes cl-spin-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .35; }
+}
+
+.cl-inv-results-region {
+    position: relative;
+}
+
+.cl-inv-spinner-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 48px;
+}
+
+.cl-inv-spinner-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--cl-surface);
+    opacity: .72;
+}
+
+.cl-inv-spinner-overlay .cl-spinner {
+    position: relative;
 }
 
 .cl-inv-page .cl-inv-empty {
@@ -906,8 +965,11 @@
         animation: none;
     }
 
-    .cl-inv-toggle svg,
-    #inventory-results.is-loading > * {
+    .cl-inv-toggle svg {
         transition: none;
+    }
+
+    .cl-spinner {
+        animation: cl-spin-pulse 1.2s ease-in-out infinite;
     }
 }

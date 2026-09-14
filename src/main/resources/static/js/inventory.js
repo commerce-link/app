@@ -8,7 +8,7 @@
 
     const STORAGE_KEY = 'cl.inventory.sources.expanded';
     const MIN_QUERY_LENGTH = 3;
-    const SKELETON_DELAY_MS = 150;
+    const SPINNER_DELAY_MS = 150;
 
     const summarySlot = page.querySelector('[data-inventory-summary]');
     const form = page.querySelector('[data-inventory-search]');
@@ -21,6 +21,7 @@
     const live = page.querySelector('[data-inventory-live]');
     const emptyTemplate = page.querySelector('[data-inventory-empty-template]');
     const results = page.querySelector('#inventory-results');
+    const spinner = page.querySelector('[data-inventory-spinner]');
 
     let currentSearch = null;
     let failedQuery = null;
@@ -102,14 +103,26 @@
         });
     }
 
+    function showWarehouseProducts(summary, text) {
+        const target = summary.querySelector('[data-inventory-warehouse-products]');
+        if (target && text !== null) {
+            target.textContent = text;
+        }
+    }
+
     function placeWarehouse(summary, request) {
         const slot = summary.querySelector('[data-inventory-slot="warehouse"]');
         if (!slot) {
             return;
         }
         request
-            .then(fragment => slot.replaceWith(fragment))
+            .then(fragment => {
+                slot.replaceWith(fragment);
+                const label = fragment.querySelector('[data-warehouse-products-label]');
+                showWarehouseProducts(summary, label ? label.textContent : null);
+            })
             .catch(() => {
+                showWarehouseProducts(summary, '—');
                 slot.removeAttribute('aria-busy');
                 slot.querySelectorAll('.cl-inv-skeleton, .cl-inv-load-error').forEach(node => node.remove());
                 slot.appendChild(loadError(() => {
@@ -164,9 +177,10 @@
     }
 
     function setBusy(busy) {
-        submitButton.querySelector('[data-when-idle]').hidden = busy;
-        submitButton.querySelector('[data-when-busy]').hidden = !busy;
         results.setAttribute('aria-busy', String(busy));
+        if (!busy) {
+            spinner.hidden = true;
+        }
     }
 
     function announce(root) {
@@ -188,7 +202,10 @@
         currentSearch = controller;
         searchError.hidden = true;
         setBusy(true);
-        const skeletonTimer = window.setTimeout(() => results.classList.add('is-loading'), SKELETON_DELAY_MS);
+        // a spinner flashing for a fast response is noisier than a short wait without one
+        const spinnerTimer = window.setTimeout(() => {
+            spinner.hidden = false;
+        }, SPINNER_DELAY_MS);
         fetchFragment(page.dataset.searchUrl + '?q=' + encodeURIComponent(query), 'results', controller.signal)
             .then(fragment => {
                 results.replaceChildren(fragment);
@@ -210,12 +227,11 @@
                 searchError.hidden = false;
             })
             .finally(() => {
-                window.clearTimeout(skeletonTimer);
+                window.clearTimeout(spinnerTimer);
                 if (currentSearch !== controller) {
                     return;
                 }
                 currentSearch = null;
-                results.classList.remove('is-loading');
                 setBusy(false);
             });
     }

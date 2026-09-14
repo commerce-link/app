@@ -31,9 +31,11 @@
     <section class="cl-inv-sources" aria-labelledby="inventory-sources-title">
         <div class="cl-inv-sources-bar">
             <h2 class="cl-inv-eyebrow" id="inventory-sources-title" th:text="#{inventory.sources.title}"></h2>
-            <span class="cl-inv-muted" th:text="#{inventory.sources.count(${sources.activeSupplierCount()})}"></span>
-            <span th:if="${!sources.hasSuppliers()}" class="cl-status is-neutral" th:text="#{inventory.sources.none}"></span>
-            <span th:if="${sources.hasSuppliers() and !sources.hasIssues()}" class="cl-status is-ok" th:text="#{inventory.sources.ok}"></span>
+            <span class="cl-inv-count" data-inventory-source-count
+                  th:title="#{inventory.sources.count(${sources.sourceCount()})}">
+                <span aria-hidden="true" th:text="${sources.sourceCount()}"></span>
+                <span class="cl-inv-visually-hidden" th:text="#{inventory.sources.count(${sources.sourceCount()})}"></span>
+            </span>
             <th:block th:if="${sources.hasIssues()}">
                 <span class="cl-status is-warn" th:text="#{inventory.sources.attention(${sources.attention().size()})}"></span>
                 <span class="cl-inv-issues">
@@ -67,25 +69,20 @@
                     </th:block>
                 </ul>
             </th:block>
-            <h3 class="cl-inv-group-title" th:text="#{inventory.sources.group.working}"></h3>
             <ul class="cl-inv-source-rows">
                 <li class="cl-inv-source-row">
                     <span class="cl-inv-source-name"
                           th:text="${sources.externalWarehouse()} ? #{inventory.sources.warehouse.external} : #{inventory.sources.warehouse}"></span>
-                    <span class="cl-inv-source-meta">
-                        <a class="cl-inv-link" th:href="${warehouseUrl}" th:text="#{inventory.sources.warehouse.open}"></a>
+                    <span class="cl-inv-source-meta" th:unless="${sources.externalWarehouse()}">
+                        <span data-inventory-warehouse-products>
+                            <span class="cl-inv-skeleton cl-inv-skeleton-inline" aria-hidden="true"></span>
+                        </span>
                     </span>
                 </li>
                 <th:block th:each="row : ${sources.working()}">
                     <li th:replace="~{fragments/inventory-summary :: sourceRow(${row})}"></li>
                 </th:block>
             </ul>
-            <div th:if="${canManageSuppliers}" class="cl-inv-sources-footer">
-                <a class="cl-inv-button" th:href="${manageSuppliersUrl}">
-                    <i class="fas fa-cog" aria-hidden="true"></i>
-                    <span th:text="#{inventory.sources.manage}"></span>
-                </a>
-            </div>
         </div>
     </section>
 </div>
@@ -110,6 +107,8 @@
     </th:block>
     <th:block th:unless="${externalWarehouse}">
         <span class="cl-inv-number" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
+        <span data-warehouse-products-label hidden
+              th:text="#{inventory.sources.products(${warehouseSummary.products()})}"></span>
         <span class="cl-inv-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
                 th:if="${warehouseSummary.inDeliveryQty() > 0}"
                 th:text="#{inventory.tile.warehouse.inDelivery(${warehouseSummary.inDeliveryQty()})}"></span></span>

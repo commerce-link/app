@@ -30,6 +30,13 @@ class InventoryPageTemplateTest {
     }
 
     @Test
+    void checkButtonKeepsOneLabelWhileTheResultsShowASpinner() throws Exception {
+        // when / then
+        assertThat(page()).doesNotContain("data-when-busy").doesNotContain("data-when-idle")
+                .contains("data-inventory-spinner").contains("class=\"cl-spinner\"");
+    }
+
+    @Test
     void loadsThePageStylesAndScript() throws Exception {
         // when / then
         assertThat(page()).contains("@{/css/inventory.css}").contains("@{/js/inventory.js}");

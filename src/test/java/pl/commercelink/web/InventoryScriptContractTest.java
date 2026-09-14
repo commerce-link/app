@@ -29,7 +29,7 @@ class InventoryScriptContractTest {
                 "data-inventory-clear", "data-inventory-submit", "data-inventory-field-error", "data-inventory-search-error",
                 "data-inventory-search-retry", "data-inventory-live", "data-inventory-empty-template",
                 "data-inventory-slot", "data-inventory-sources-toggle", "data-when-collapsed", "data-when-expanded",
-                "data-when-idle", "data-when-busy", "data-inventory-results-heading", "data-inventory-offers",
+                "data-inventory-spinner", "data-inventory-warehouse-products", "data-warehouse-products-label", "data-inventory-results-heading", "data-inventory-offers",
                 "data-inventory-sortable", "data-sort-key", "data-announce", "data-inventory-fragment")) {
             assertThat(script).as("script references " + hook).contains(hook);
             assertThat(templates).as("templates render " + hook).contains(hook);
@@ -54,6 +54,16 @@ class InventoryScriptContractTest {
 
         // when / then
         assertThat(css).contains(".cl-status.is-info").contains("var(--cl-info)").contains("--cl-ok-tint");
+    }
+
+    @Test
+    void styleSheetDefinesTheSpinnerWithAReducedMotionFallback() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+
+        // when / then
+        assertThat(css).contains(".cl-spinner {").contains("@keyframes cl-spin").contains("@keyframes cl-spin-pulse")
+                .contains(".cl-inv-count {");
     }
 
     @Test

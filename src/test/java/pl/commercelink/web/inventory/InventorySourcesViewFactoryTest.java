@@ -123,4 +123,16 @@ class InventorySourcesViewFactoryTest {
         // when / then
         assertThat(factory.build(null, InventoryStatistics.EMPTY, NOW)).isEqualTo(InventorySourcesView.EMPTY);
     }
+
+    @Test
+    void sourceCountIncludesTheWarehouseRow() {
+        // given
+        InventorySourcesView view = new InventorySourcesView(List.of(), List.of(), 2, 3, false);
+
+        // when
+        int count = view.sourceCount();
+
+        // then
+        assertThat(count).isEqualTo(3);
+    }
 }
