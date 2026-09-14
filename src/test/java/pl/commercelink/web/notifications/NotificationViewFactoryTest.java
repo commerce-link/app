@@ -56,6 +56,19 @@ class NotificationViewFactoryTest {
     }
 
     @Test
+    void encodesTheRmaIdInTheReturnActionLink() {
+        // given
+        StoreNotificationRecord refunded = record(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.MARKETPLACE_RETURN_REFUNDED, "rma 7/a", "Allegro refunded the buyer");
+
+        // when
+        NotificationView admin = factory.toView(refunded, UserRole.ADMIN);
+
+        // then
+        assertThat(admin.actionHref()).isEqualTo("/dashboard/rma/rma%207%2Fa");
+    }
+
+    @Test
     void linksARefundedReturnToItsRmaForTheStoreAdminOnly() {
         // given
         StoreNotificationRecord refunded = record(StoreNotificationSeverity.WARNING,

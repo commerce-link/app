@@ -128,8 +128,10 @@ public class NotificationsController {
     }
 
     static String safeRedirect(String redirect, String basePath) {
+        // RedirectView expands {…} as a URI template variable, which throws when the value is not a known one
         boolean withinDashboard = redirect != null && redirect.startsWith("/dashboard")
-                && !redirect.contains("//") && !redirect.contains("\\");
+                && !redirect.contains("//") && !redirect.contains("\\")
+                && !redirect.contains("{") && !redirect.contains("}");
         return withinDashboard ? redirect : basePath;
     }
 

@@ -283,15 +283,17 @@ class NotificationsControllerTest {
 
     @Test
     void acceptsOnlyARedirectWithinTheDashboard() {
-        for (String redirect : Arrays.asList(null, "", "https://evil.example/dashboard", "//evil.example/dashboard",
-                "/dashboard//evil.example", "/dashboard\\evil", "/login")) {
-            // when / then
+        // given
+        List<String> unsafeRedirects = Arrays.asList(null, "", "https://evil.example/dashboard",
+                "//evil.example/dashboard", "/dashboard//evil.example", "/dashboard\\evil", "/login",
+                "/dashboard/orders?status={status}", "/dashboard/orders}");
+
+        // when / then
+        for (String redirect : unsafeRedirects) {
             assertThat(NotificationsController.safeRedirect(redirect, "/dashboard/notifications"))
                     .as(String.valueOf(redirect))
                     .isEqualTo("/dashboard/notifications");
         }
-
-        // when / then
         assertThat(NotificationsController.safeRedirect("/dashboard/store/marketplaces?lang=pl", "/dashboard/notifications"))
                 .isEqualTo("/dashboard/store/marketplaces?lang=pl");
     }

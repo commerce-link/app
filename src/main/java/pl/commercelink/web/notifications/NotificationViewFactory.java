@@ -32,7 +32,7 @@ public class NotificationViewFactory {
         } else if (type == StoreNotificationType.MARKETPLACE_RETURN_REFUNDED && role == UserRole.ADMIN
                 && StringUtils.isNotBlank(record.getObject())) {
             // the RMA screen resolves the store from the logged-in admin, so only the store admin gets the link
-            actionHref = "/dashboard/rma/" + record.getObject();
+            actionHref = "/dashboard/rma/" + UriUtils.encodePathSegment(record.getObject(), StandardCharsets.UTF_8);
             actionKey = "store.notification.action.viewReturn";
         }
         return new NotificationView(record.getNotificationId(), titleKey, record.getMessage(), record.getCreatedAt(),
