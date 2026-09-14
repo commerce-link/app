@@ -5,12 +5,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.supplier.ConnectionSupplierDescriptor;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.inventory.supplier.manual.ManualConnectionDescriptor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -85,9 +85,11 @@ public class StoreInventoryProvider {
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {
+        String identity = connection.getSupplierName();
         if (connection.getMode() == ConnectionMode.MANUAL) {
-            return new ManualSupplierDescriptor(ManualSupplierInfos.label(connection.getSupplierName()));
+            return new ManualConnectionDescriptor(identity);
         }
-        return supplierProviderFactory.getDescriptor(connection.getSupplierName());
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+        return descriptor == null ? null : new ConnectionSupplierDescriptor(identity, descriptor);
     }
 }

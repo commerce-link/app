@@ -110,4 +110,36 @@ class StoreFeedItemLoaderTest {
         // then
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void restampsCsvRowsWithTheDescriptorIdentity() {
+        // given -- adapter parsers hardcode the type name; the connection identity must win
+        SupplierProviderDescriptor descriptor = csvDescriptor("Kosatec-k7f3a9c2");
+        InventoryItem parsedByType = new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, "Kosatec");
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Kosatec-k7f3a9c2"), anyInt()))
+                .thenReturn(new java.util.ArrayList<>(List.of(parsedByType)));
+
+        // when
+        List<InventoryItem> items = loader.load("store-1", descriptor, Map.of("PLN", 1.0));
+
+        // then
+        assertEquals(1, items.size());
+        assertEquals("Kosatec-k7f3a9c2", items.get(0).supplier());
+        assertEquals("Kosatec-k7f3a9c2_4711111111111_MFN", items.get(0).uuid());
+    }
+
+    @Test
+    void leavesRowsAlreadyStampedWithTheIdentityUntouched() {
+        // given
+        SupplierProviderDescriptor descriptor = csvDescriptor("Kosatec");
+        InventoryItem parsed = new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, "Kosatec");
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Kosatec"), anyInt()))
+                .thenReturn(new java.util.ArrayList<>(List.of(parsed)));
+
+        // when
+        List<InventoryItem> items = loader.load("store-1", descriptor, Map.of("PLN", 1.0));
+
+        // then
+        assertEquals("Kosatec", items.get(0).supplier());
+    }
 }
