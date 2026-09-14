@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SupplierConnectionValidatorTest {
 
-    private final SupplierConnectionValidator validator = new SupplierConnectionValidator();
+    private final SupplierConnectionValidator validator = new SupplierConnectionValidator(5);
 
     private static ProviderField urlField() {
         return new ProviderField("url", "Feed URL", ProviderField.FieldType.URL, true, "https://...");
@@ -102,5 +102,59 @@ class SupplierConnectionValidatorTest {
 
         // then
         assertEquals(1, errors.size());
+    }
+
+    private static StoreSupplierConnection ownWithSchedule(String schedule) {
+        StoreSupplierConnection connection = new StoreSupplierConnection("Action", ConnectionMode.OWN);
+        connection.setFeedSchedule(schedule);
+        return connection;
+    }
+
+    @Test
+    void ownModeAcceptsValidFeedSchedule() {
+        // when
+        List<ErrorMessage> errors = validator.validate(true,
+                List.of(ownWithSchedule("0/30 9-17 * * ? *")), Map.of(), Map.of(), Set.of());
+
+        // then
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void ownModeRejectsMalformedFeedSchedule() {
+        // when
+        List<ErrorMessage> errors = validator.validate(true,
+                List.of(ownWithSchedule("every 5 minutes")), Map.of(), Map.of(), Set.of());
+
+        // then
+        assertEquals(1, errors.size());
+        assertEquals("store.supplier.connection.error.invalid.schedule", errors.get(0).code());
+        assertEquals("Action", errors.get(0).args()[0]);
+        assertEquals("every 5 minutes", errors.get(0).args()[1]);
+    }
+
+    @Test
+    void ownModeRejectsFeedScheduleBelowTheFloor() {
+        // when
+        List<ErrorMessage> errors = validator.validate(true,
+                List.of(ownWithSchedule("0/2 * * * ? *")), Map.of(), Map.of(), Set.of());
+
+        // then
+        assertEquals(1, errors.size());
+        assertEquals("store.supplier.connection.error.schedule.too.frequent", errors.get(0).code());
+        assertEquals(5, errors.get(0).args()[1]);
+    }
+
+    @Test
+    void globalModeIgnoresFeedSchedule() {
+        // given
+        StoreSupplierConnection global = new StoreSupplierConnection("Action", ConnectionMode.GLOBAL);
+        global.setFeedSchedule("nonsense");
+
+        // when
+        List<ErrorMessage> errors = validator.validate(true, List.of(global), Map.of(), Map.of(), Set.of());
+
+        // then
+        assertTrue(errors.isEmpty());
     }
 }
